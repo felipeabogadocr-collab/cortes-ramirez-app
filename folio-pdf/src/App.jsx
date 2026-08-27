@@ -43,7 +43,11 @@ export default function App() {
 
   return (
     <div style={{ minHeight: "100dvh", display: "flex", flexDirection: "column" }}>
-      <Header theme={theme} onToggleTheme={() => setTheme((t) => (t === "dark" ? "light" : "dark"))} />
+      <Header
+        theme={theme}
+        onToggleTheme={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
+        onGoHome={() => setActiveTool(null)}
+      />
 
       <main style={{ flex: 1, maxWidth: 1000, margin: "0 auto", width: "100%", padding: "24px 20px 60px" }}>
         <PrivacyNotice style={{ marginBottom: 20 }} />

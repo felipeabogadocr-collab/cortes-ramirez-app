@@ -1,6 +1,6 @@
 import Logo from "./Logo.jsx";
 
-export default function Header({ theme, onToggleTheme }) {
+export default function Header({ theme, onToggleTheme, onGoHome }) {
   return (
     <header
       style={{
@@ -23,13 +23,26 @@ export default function Header({ theme, onToggleTheme }) {
         }}
       >
         <div />
-        <div style={{ display: "flex", alignItems: "center", gap: 10, justifySelf: "center" }}>
+        <button
+          onClick={onGoHome}
+          title="Ir al menú principal"
+          aria-label="Ir al menú principal"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            justifySelf: "center",
+            background: "transparent",
+            border: "none",
+            padding: 0,
+          }}
+        >
           <Logo />
           <div style={{ textAlign: "center" }}>
             <div style={{ fontWeight: 800, fontSize: 18, letterSpacing: 0.2 }}>Folio</div>
             <div style={{ fontSize: 11, color: "var(--muted)", marginTop: -2 }}>Herramientas PDF gratis</div>
           </div>
-        </div>
+        </button>
         <div style={{ justifySelf: "end" }}>
           <button
             className="btn-icon"
