@@ -3271,18 +3271,29 @@ function construirMatrizMes(anio, mes) {
   return semanas;
 }
 
-async function generarIdeasCalendario(tema) {
+function contextoEstrategia(estrategia) {
+  if (!estrategia) return "";
+  const partes = [];
+  if (estrategia.audiencia?.trim()) partes.push(`Audiencia/nicho objetivo a atraer como seguidores y futuros clientes: ${estrategia.audiencia.trim()}.`);
+  if (estrategia.pilares?.trim()) partes.push(`Pilares de contenido definidos por el despacho: ${estrategia.pilares.trim()}.`);
+  if (estrategia.tono?.trim()) partes.push(`Tono de voz que debe usarse: ${estrategia.tono.trim()}.`);
+  return partes.join(" ");
+}
+
+async function generarIdeasCalendario(tema, estrategia) {
+  const contexto = contextoEstrategia(estrategia);
   const response = await fetch("/api/assistant", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       model: "claude-sonnet-4-6",
-      max_tokens: 500,
+      max_tokens: 600,
       system:
-        `Eres un asistente de marketing de contenido para un despacho de abogados en Colombia (Cortés Ramírez Abogados), que publica en Instagram, Facebook y TikTok. ` +
-        `Genera 5 ideas de contenido concretas y variadas (educativas, cercanas, casos de éxito sin romper confidencialidad, detrás de cámaras, tendencias, formatos de video corto, etc.)` +
-        (tema ? ` enfocadas en: ${tema}.` : ".") +
-        ` Responde SOLO con una lista numerada del 1 al 5, cada idea en una sola línea corta (máximo 20 palabras), sin texto adicional antes o después, sin usar markdown.`,
+        `Eres un community manager experto y estratega de contenido para Cortés Ramírez Abogados, un despacho de abogados en Colombia que publica en Instagram, Facebook y TikTok. ` +
+        `Genera 5 ideas de contenido concretas, poderosas y variadas (educativas, cercanas, casos de éxito sin romper confidencialidad, detrás de cámaras, tendencias, formatos de video corto, etc.), pensadas para atraer seguidores del nicho correcto y convertirlos en clientes potenciales.` +
+        (tema ? ` Enfocadas en: ${tema}.` : ".") +
+        (contexto ? ` ${contexto}` : "") +
+        ` Responde SOLO con una lista numerada del 1 al 5, cada idea en una sola línea corta (máximo 25 palabras) incluyendo el formato (reel, carrusel, historia, etc.), sin texto adicional antes o después, sin usar markdown.`,
       messages: [{ role: "user", content: "Dame ideas de contenido." }],
     }),
   });
@@ -3366,10 +3377,263 @@ function useIdeasContenido() {
   return { ideas, agregarVarias, eliminar };
 }
 
+const ESTRATEGIA_INICIAL = { audiencia: "", pilares: "", tono: "" };
+
+function useEstrategiaContenido() {
+  const [estrategia, setEstrategiaState] = useState(ESTRATEGIA_INICIAL);
+  const [cargado, setCargado] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      const raw = await storageGet("estrategia-contenido", true);
+      if (raw) {
+        try {
+          setEstrategiaState(JSON.parse(raw));
+        } catch (e) {
+          setEstrategiaState(ESTRATEGIA_INICIAL);
+        }
+      }
+      setCargado(true);
+    })();
+  }, []);
+
+  const guardar = async (nueva) => {
+    setEstrategiaState(nueva);
+    await storageSet("estrategia-contenido", JSON.stringify(nueva), true);
+  };
+
+  return { estrategia, cargado, guardar };
+}
+
+function EstrategiaContenidoCard({ estrategia, cargado, onGuardar }) {
+  const [form, setForm] = useState(ESTRATEGIA_INICIAL);
+  const [editando, setEditando] = useState(false);
+
+  useEffect(() => {
+    if (cargado) setForm(estrategia);
+  }, [cargado, estrategia]);
+
+  const guardarCambios = async () => {
+    await onGuardar(form);
+    setEditando(false);
+  };
+
+  if (!cargado) return null;
+
+  const tieneEstrategia = estrategia.audiencia || estrategia.pilares || estrategia.tono;
+
+  return (
+    <Card style={{ marginBottom: 20 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, flexWrap: "wrap", gap: 8 }}>
+        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, fontWeight: 700, color: COLORS.ink, margin: 0 }}>🎯 Estrategia y nicho</p>
+        <button className="drx-btn-ghost" style={{ ...buttonGhost, fontSize: 11.5, padding: "5px 10px" }} onClick={() => setEditando((e) => !e)}>
+          {editando ? "Cancelar" : tieneEstrategia ? "Editar" : "Definir"}
+        </button>
+      </div>
+      <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.muted, marginBottom: 12 }}>
+        Define a quién le quieres hablar y de qué temas. El Community Manager IA y el banco de ideas usan esto para darte ideas y estrategia enfocadas en
+        convertir a ese nicho en seguidores y clientes.
+      </p>
+      {editando ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <Field label="Audiencia / nicho objetivo">
+            <textarea
+              className="drx-input"
+              style={{ ...inputStyle, minHeight: 60, resize: "vertical" }}
+              value={form.audiencia}
+              onChange={(e) => setForm((f) => ({ ...f, audiencia: e.target.value }))}
+              placeholder="Ej: personas de 25-45 años en Colombia con dudas de arriendo, herencias, despidos"
+            />
+          </Field>
+          <Field label="Pilares de contenido">
+            <textarea
+              className="drx-input"
+              style={{ ...inputStyle, minHeight: 60, resize: "vertical" }}
+              value={form.pilares}
+              onChange={(e) => setForm((f) => ({ ...f, pilares: e.target.value }))}
+              placeholder="Ej: tips legales rápidos, mitos vs realidad, casos de éxito, detrás de cámaras del despacho"
+            />
+          </Field>
+          <Field label="Tono de voz">
+            <input
+              className="drx-input"
+              style={inputStyle}
+              value={form.tono}
+              onChange={(e) => setForm((f) => ({ ...f, tono: e.target.value }))}
+              placeholder="Ej: cercano, claro, con humor moderado, nada acartonado"
+            />
+          </Field>
+          <button className="drx-btn-primary" style={buttonPrimary} onClick={guardarCambios}>
+            Guardar estrategia
+          </button>
+        </div>
+      ) : tieneEstrategia ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          {estrategia.audiencia && (
+            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.inkSoft, margin: 0 }}>
+              <strong>Audiencia:</strong> {estrategia.audiencia}
+            </p>
+          )}
+          {estrategia.pilares && (
+            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.inkSoft, margin: 0 }}>
+              <strong>Pilares:</strong> {estrategia.pilares}
+            </p>
+          )}
+          {estrategia.tono && (
+            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.inkSoft, margin: 0 }}>
+              <strong>Tono:</strong> {estrategia.tono}
+            </p>
+          )}
+        </div>
+      ) : (
+        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.muted }}>Aún no la has definido.</p>
+      )}
+    </Card>
+  );
+}
+
+function CommunityManagerIA({ estrategia, onGuardarIdeas }) {
+  const [mensajes, setMensajes] = useState([]);
+  const [texto, setTexto] = useState("");
+  const [cargando, setCargando] = useState(false);
+  const [historialCargado, setHistorialCargado] = useState(false);
+  const contenedorRef = useRef(null);
+
+  useEffect(() => {
+    (async () => {
+      const raw = await storageGet("chat-community-manager", true);
+      if (raw) {
+        try {
+          setMensajes(JSON.parse(raw));
+        } catch (e) {
+          setMensajes([]);
+        }
+      }
+      setHistorialCargado(true);
+    })();
+  }, []);
+
+  useEffect(() => {
+    if (!historialCargado) return;
+    storageSet("chat-community-manager", JSON.stringify(mensajes), true);
+  }, [mensajes, historialCargado]);
+
+  useEffect(() => {
+    if (contenedorRef.current) contenedorRef.current.scrollTop = contenedorRef.current.scrollHeight;
+  }, [mensajes, cargando]);
+
+  const enviar = async () => {
+    if (!texto.trim() || cargando) return;
+    const nuevos = [...mensajes, { rol: "usuario", texto: texto.trim() }];
+    setMensajes(nuevos);
+    setTexto("");
+    setCargando(true);
+    try {
+      const contexto = contextoEstrategia(estrategia);
+      const systemPrompt =
+        `Eres un community manager experto y estratega de contenido para Cortés Ramírez Abogados, un despacho de abogados en Colombia con cuentas en Instagram, Facebook y TikTok (@felipeabogadocr y @cortesramirezabogados_). ` +
+        `Ayudas a la persona encargada de contenido (que no es abogada) a crear un plan de contenido poderoso: ideas concretas de video o post con gancho (hook), guion corto, caption sugerido y hashtags relevantes; estrategia de crecimiento para convertir seguidores en un nicho fiel de clientes potenciales; y consejos de formato y tendencias específicos de Instagram, Facebook y TikTok. Sé específico y práctico, nunca genérico. ` +
+        (contexto ? `${contexto} ` : "") +
+        `Responde siempre en español, en un tono cercano y motivador, con listas y pasos claros cuando aplique.`;
+      const mensajesAPI = nuevos.map((m) => ({ role: m.rol === "usuario" ? "user" : "assistant", content: m.texto }));
+      const response = await fetch("/api/assistant", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ model: "claude-sonnet-4-6", max_tokens: 900, system: systemPrompt, messages: mensajesAPI }),
+      });
+      const data = await response.json();
+      const respuesta =
+        (data.content || [])
+          .filter((b) => b.type === "text")
+          .map((b) => b.text)
+          .join("\n") || "No pude generar una respuesta, intenta de nuevo.";
+      setMensajes((prev) => [...prev, { rol: "asistente", texto: respuesta }]);
+    } catch (e) {
+      setMensajes((prev) => [...prev, { rol: "asistente", texto: "Tuve un problema para responder. Intenta de nuevo en un momento." }]);
+    }
+    setCargando(false);
+  };
+
+  const guardarComoIdeas = (textoRespuesta) => {
+    const lineas = textoRespuesta
+      .split("\n")
+      .map((l) => l.replace(/^\s*[\d.\-•)]+\s*/, "").trim())
+      .filter((l) => l.length > 3);
+    if (lineas.length > 0) onGuardarIdeas(lineas);
+  };
+
+  const borrarHistorial = async () => {
+    setMensajes([]);
+    await storageSet("chat-community-manager", JSON.stringify([]), true);
+  };
+
+  return (
+    <Card style={{ marginBottom: 20, padding: 24 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, fontWeight: 700, color: COLORS.ink, margin: 0 }}>🤝 Community Manager IA</p>
+        {mensajes.length > 0 && (
+          <button
+            onClick={borrarHistorial}
+            style={{ background: "none", border: "none", cursor: "pointer", color: COLORS.muted, fontSize: 11.5, fontFamily: "Inter, sans-serif", textDecoration: "underline" }}
+          >
+            Borrar conversación
+          </button>
+        )}
+      </div>
+      <div ref={contenedorRef} style={{ minHeight: 200, maxHeight: 420, overflowY: "auto", display: "flex", flexDirection: "column", gap: 10, marginBottom: 12, paddingRight: 4 }}>
+        {mensajes.length === 0 && (
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.muted }}>
+            Pídele ideas de video, guiones, captions, hashtags o estrategia para crecer seguidores que se conviertan en clientes. Ejemplo: "dame 5 ideas de
+            reels sobre herencias" o "ayúdame a planear el contenido de esta semana".
+          </p>
+        )}
+        {mensajes.map((m, i) => (
+          <div key={i} style={{ alignSelf: m.rol === "usuario" ? "flex-end" : "flex-start", maxWidth: "88%" }}>
+            <div
+              style={{
+                background: m.rol === "usuario" ? COLORS.navy : COLORS.accentSoft,
+                color: m.rol === "usuario" ? "#FFFFFF" : COLORS.navy,
+                borderRadius: 10,
+                padding: "9px 13px",
+                fontSize: 13,
+                fontFamily: "Inter, sans-serif",
+                whiteSpace: "pre-wrap",
+                lineHeight: 1.5,
+              }}
+            >
+              {m.texto}
+            </div>
+            {m.rol === "asistente" && (
+              <button className="drx-btn-ghost" style={{ ...buttonGhost, fontSize: 11, padding: "4px 9px", marginTop: 4 }} onClick={() => guardarComoIdeas(m.texto)}>
+                + Guardar como ideas
+              </button>
+            )}
+          </div>
+        ))}
+        {cargando && <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted }}>Pensando...</p>}
+      </div>
+      <div style={{ display: "flex", gap: 8 }}>
+        <input
+          className="drx-input"
+          style={{ ...inputStyle, flex: 1 }}
+          value={texto}
+          onChange={(e) => setTexto(e.target.value)}
+          placeholder="Ej: dame ideas de reels sobre herencias para esta semana"
+          onKeyDown={(e) => e.key === "Enter" && enviar()}
+        />
+        <button className="drx-btn-primary" style={buttonPrimary} onClick={enviar} disabled={cargando || !texto.trim()}>
+          Enviar
+        </button>
+      </div>
+    </Card>
+  );
+}
+
 function ContenidoTab() {
   const { items, crear, actualizar, eliminar } = useContenido();
   const { usuarios } = useUsuariosDespacho();
   const { ideas, agregarVarias, eliminar: eliminarIdea } = useIdeasContenido();
+  const { estrategia, cargado: estrategiaCargada, guardar: guardarEstrategia } = useEstrategiaContenido();
 
   const [mesActual, setMesActual] = useState(() => {
     const d = new Date();
@@ -3431,7 +3695,7 @@ function ContenidoTab() {
   const pedirIdeas = async () => {
     setGenerandoIdeas(true);
     try {
-      const nuevas = await generarIdeasCalendario(temaIdeas.trim());
+      const nuevas = await generarIdeasCalendario(temaIdeas.trim(), estrategia);
       if (nuevas.length > 0) await agregarVarias(nuevas);
     } catch (e) {
       // se puede reintentar con el mismo botón
@@ -3468,8 +3732,12 @@ function ContenidoTab() {
         automáticamente — es la agenda para no perder el hilo. Lo pendiente para hoy o vencido aparece en la campana de notificaciones.
       </div>
 
+      <EstrategiaContenidoCard estrategia={estrategia} cargado={estrategiaCargada} onGuardar={guardarEstrategia} />
+
+      <CommunityManagerIA estrategia={estrategia} onGuardarIdeas={agregarVarias} />
+
       <Card style={{ marginBottom: 20 }}>
-        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, fontWeight: 700, color: COLORS.ink, marginBottom: 4 }}>💡 Banco de ideas</p>
+        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, fontWeight: 700, color: COLORS.ink, marginBottom: 4 }}>💡 Banco de ideas rápidas</p>
         <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.muted, marginBottom: 12 }}>
           Pide ideas a la IA (con o sin tema) y guárdalas aquí. Cuando quieras usar una, la conviertes en una entrada del calendario con un clic.
         </p>
