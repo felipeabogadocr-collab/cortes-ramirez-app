@@ -107,7 +107,7 @@ export default function SignTool() {
     setError("");
     try {
       const out = await signPdf(bytes, firma, pageIndex, box);
-      downloadBytes(out, "firmado-litia.pdf");
+      downloadBytes(out, "firmado-lexdoc.pdf");
     } catch {
       setError("No se pudo firmar el PDF.");
     } finally {

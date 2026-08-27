@@ -2,7 +2,7 @@ const WHATSAPP_NUMBER = "573192875428";
 
 export default function WhatsAppFloat() {
   const href = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(
-    "Hola, tengo una consulta sobre IA Litia."
+    "Hola, tengo una consulta sobre LexDoc."
   )}`;
   return (
     <a

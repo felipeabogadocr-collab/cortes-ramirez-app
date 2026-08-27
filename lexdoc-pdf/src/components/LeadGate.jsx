@@ -2,7 +2,7 @@ import { useState } from "react";
 import Logo from "./Logo.jsx";
 
 const WHATSAPP_NUMBER = "573192875428";
-const STORAGE_KEY = "litia_lead_ok";
+const STORAGE_KEY = "lexdoc_lead_ok";
 
 export function hasAcceptedLead() {
   try {
@@ -44,7 +44,7 @@ export default function LeadGate({ onDone }) {
       // si el navegador bloquea localStorage, igual dejamos continuar
     }
     const texto = encodeURIComponent(
-      `Hola, soy ${nombre.trim()} (${telefonoCompleto}). Quiero recibir por WhatsApp actualizaciones, noticias de IA Litia y acceder a descuentos.`
+      `Hola, soy ${nombre.trim()} (${telefonoCompleto}). Quiero recibir por WhatsApp actualizaciones, noticias de LITIA.ai y acceder a descuentos.`
     );
     window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=${texto}`, "_blank", "noopener,noreferrer");
     onDone();
@@ -64,7 +64,7 @@ export default function LeadGate({ onDone }) {
       <div className="card" style={{ maxWidth: 420, width: "100%", padding: "28px 26px" }}>
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, marginBottom: 18 }}>
           <Logo size={44} />
-          <h1 style={{ fontSize: 20, margin: 0, textAlign: "center" }}>Bienvenido a IA Litia</h1>
+          <h1 style={{ fontSize: 20, margin: 0, textAlign: "center" }}>Bienvenido a LexDoc</h1>
           <p style={{ fontSize: 13, color: "var(--muted)", textAlign: "center", margin: 0 }}>
             Sin registro ni contraseñas. Solo necesitamos tu nombre y celular para darte acceso.
           </p>
@@ -104,7 +104,7 @@ export default function LeadGate({ onDone }) {
           Acepto recibir novedades y descuentos por WhatsApp — Continuar
         </button>
         <p style={{ fontSize: 10.5, color: "var(--muted)", textAlign: "center", marginTop: 10 }}>
-          Al continuar aceptas recibir por WhatsApp actualizaciones y noticias de IA Litia, y acceder a
+          Al continuar aceptas recibir por WhatsApp actualizaciones y noticias de LITIA.ai, y acceder a
           descuentos. Tus documentos nunca se almacenan.
         </p>
       </div>

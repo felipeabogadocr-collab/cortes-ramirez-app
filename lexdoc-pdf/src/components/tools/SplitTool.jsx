@@ -54,7 +54,7 @@ export default function SplitTool() {
         const zip = new JSZip();
         partes.forEach((p, i) => zip.file(`parte-${i + 1}.pdf`, p));
         const zipBytes = await zip.generateAsync({ type: "uint8array" });
-        downloadBytes(zipBytes, "pdf-dividido-litia.zip", "application/zip");
+        downloadBytes(zipBytes, "pdf-dividido-lexdoc.zip", "application/zip");
       }
     } catch (e) {
       setError(e.message || "No se pudo dividir el PDF.");

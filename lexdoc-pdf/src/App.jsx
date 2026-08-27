@@ -21,13 +21,13 @@ const TOOLS = [
 ];
 
 export default function App() {
-  const [theme, setTheme] = useState(() => localStorage.getItem("litia_theme") || "light");
+  const [theme, setTheme] = useState(() => localStorage.getItem("lexdoc_theme") || "light");
   const [accepted, setAccepted] = useState(hasAcceptedLead());
   const [activeTool, setActiveTool] = useState(null);
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
-    localStorage.setItem("litia_theme", theme);
+    localStorage.setItem("lexdoc_theme", theme);
   }, [theme]);
 
   if (!accepted) {

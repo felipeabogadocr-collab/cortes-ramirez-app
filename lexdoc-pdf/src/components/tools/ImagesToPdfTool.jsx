@@ -36,7 +36,7 @@ export default function ImagesToPdfTool() {
     setError("");
     try {
       const bytes = await imagesToPdf(files);
-      downloadBytes(bytes, "imagenes-litia.pdf");
+      downloadBytes(bytes, "imagenes-lexdoc.pdf");
     } catch {
       setError("No se pudo generar el PDF. Verifica que las imágenes sean JPG o PNG.");
     } finally {

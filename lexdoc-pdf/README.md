@@ -1,8 +1,8 @@
-# IA Litia — Herramientas PDF gratis
+# LexDoc — Herramientas PDF gratis
 
-App gratuita, sin login ni registro, para unir, organizar (reordenar/rotar/eliminar/extraer
-páginas), dividir, firmar (firma electrónica simple) y convertir imágenes a PDF. Pensada para
-estudiantes y abogados.
+Diseñado por **LITIA.ai**. App gratuita, sin login ni registro, para unir, organizar
+(reordenar/rotar/eliminar/extraer páginas), dividir, firmar (firma electrónica simple) y
+convertir imágenes a PDF. Pensada para estudiantes y abogados.
 
 ## Por qué es gratis y rápida
 
@@ -15,7 +15,7 @@ estudiantes y abogados.
 
 En vez de una cuenta/contraseña, se pide una sola vez nombre + celular con indicativo. Al
 continuar se abre WhatsApp con un mensaje prellenado hacia el número del despacho, aceptando
-recibir actualizaciones/descuentos de IA Litia. No se guarda nada en un servidor propio; el
+recibir actualizaciones/descuentos de LITIA.ai. No se guarda nada en un servidor propio; el
 lead llega directo al WhatsApp configurado en `src/components/WhatsAppFloat.jsx` y
 `src/components/LeadGate.jsx` (`WHATSAPP_NUMBER`).
 
@@ -33,7 +33,7 @@ npm run build
 ```
 
 En Vercel: **Add New Project** → selecciona este repo → en **Root Directory** elige
-`litia-pdf` → build command `npm run build`, output `dist`. No requiere variables de entorno.
+`lexdoc-pdf` → build command `npm run build`, output `dist`. No requiere variables de entorno.
 
 ## Firma electrónica
 

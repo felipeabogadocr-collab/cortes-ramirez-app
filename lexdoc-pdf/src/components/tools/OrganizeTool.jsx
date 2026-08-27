@@ -60,7 +60,7 @@ export default function OrganizeTool() {
     setError("");
     try {
       const out = await organizePdf(bytes, pages);
-      downloadBytes(out, "organizado-litia.pdf");
+      downloadBytes(out, "organizado-lexdoc.pdf");
     } catch {
       setError("No se pudo guardar el PDF organizado.");
     } finally {
