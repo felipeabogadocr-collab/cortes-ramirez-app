@@ -8,10 +8,11 @@ const SESSION_KEY = "folio_panel_ok";
 
 function PasswordGate({ onUnlock }) {
   const [clave, setClave] = useState("");
+  const [mostrar, setMostrar] = useState(false);
   const [error, setError] = useState("");
 
   function entrar() {
-    if (clave === PANEL_PASSWORD) {
+    if (clave.trim().toLowerCase() === PANEL_PASSWORD.toLowerCase()) {
       try {
         sessionStorage.setItem(SESSION_KEY, "1");
       } catch {
@@ -42,22 +43,45 @@ function PasswordGate({ onUnlock }) {
             Solo para el equipo de CR Abogados.
           </p>
         </div>
-        <input
-          type="password"
-          value={clave}
-          onChange={(e) => setClave(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && entrar()}
-          placeholder="Contraseña"
-          style={{
-            width: "100%",
-            padding: "10px 12px",
-            borderRadius: 10,
-            border: "1px solid var(--border)",
-            background: "var(--bg)",
-            color: "var(--text)",
-            fontSize: 14,
-          }}
-        />
+        <div style={{ position: "relative" }}>
+          <input
+            type={mostrar ? "text" : "password"}
+            value={clave}
+            onChange={(e) => setClave(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && entrar()}
+            placeholder="Contraseña"
+            autoCapitalize="off"
+            autoCorrect="off"
+            autoComplete="off"
+            spellCheck={false}
+            style={{
+              width: "100%",
+              padding: "10px 44px 10px 12px",
+              borderRadius: 10,
+              border: "1px solid var(--border)",
+              background: "var(--bg)",
+              color: "var(--text)",
+              fontSize: 14,
+            }}
+          />
+          <button
+            type="button"
+            onClick={() => setMostrar((m) => !m)}
+            aria-label={mostrar ? "Ocultar contraseña" : "Mostrar contraseña"}
+            style={{
+              position: "absolute",
+              right: 8,
+              top: "50%",
+              transform: "translateY(-50%)",
+              background: "transparent",
+              border: "none",
+              fontSize: 16,
+              padding: 4,
+            }}
+          >
+            {mostrar ? "🙈" : "👁️"}
+          </button>
+        </div>
         {error && <p style={{ color: "var(--danger)", fontSize: 12, marginTop: 8 }}>{error}</p>}
         <button className="btn-primary" style={{ width: "100%", marginTop: 14 }} onClick={entrar}>
           Entrar
