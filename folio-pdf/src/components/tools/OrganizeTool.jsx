@@ -45,7 +45,7 @@ export default function OrganizeTool() {
   async function extraer(i) {
     try {
       const out = await extractPage(bytes, pages[i].index);
-      downloadBytes(out, `pagina-${pages[i].index + 1}.pdf`);
+      downloadBytes(out, `pagina-${pages[i].index + 1}.pdf`, "application/pdf", "Organizar páginas");
     } catch {
       setError("No se pudo extraer esa página.");
     }
@@ -60,7 +60,7 @@ export default function OrganizeTool() {
     setError("");
     try {
       const out = await organizePdf(bytes, pages);
-      downloadBytes(out, "organizado-folio.pdf");
+      downloadBytes(out, "organizado-folio.pdf", "application/pdf", "Organizar páginas");
     } catch {
       setError("No se pudo guardar el PDF organizado.");
     } finally {

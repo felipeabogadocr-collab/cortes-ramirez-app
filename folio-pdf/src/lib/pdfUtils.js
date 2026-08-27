@@ -1,6 +1,7 @@
 import { PDFDocument, degrees } from "pdf-lib";
 import * as pdfjsLib from "pdfjs-dist";
 import workerSrc from "pdfjs-dist/build/pdf.worker.min.mjs?url";
+import { registrarEvento } from "./analytics.js";
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc;
 
@@ -8,7 +9,7 @@ export async function fileToBytes(file) {
   return new Uint8Array(await file.arrayBuffer());
 }
 
-export function downloadBytes(bytes, filename, mime = "application/pdf") {
+export function downloadBytes(bytes, filename, mime = "application/pdf", herramienta = null) {
   const blob = new Blob([bytes], { type: mime });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -19,6 +20,7 @@ export function downloadBytes(bytes, filename, mime = "application/pdf") {
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 5000);
   window.dispatchEvent(new CustomEvent("folio:download", { detail: { filename } }));
+  if (herramienta) registrarEvento(herramienta);
 }
 
 // Devuelve una miniatura (data URL) de cada página de un PDF.

@@ -321,7 +321,7 @@ export default function SignTool() {
       }
       const compuesta = await composeStamp({ signatureDataUrl: grafica, nombre: nombre.trim() });
       const out = await signPdf(bytes, compuesta, pageIndex, box);
-      downloadBytes(out, "firmado-folio.pdf");
+      downloadBytes(out, "firmado-folio.pdf", "application/pdf", "Firmar PDF");
     } catch {
       setError("No se pudo firmar el PDF.");
     } finally {

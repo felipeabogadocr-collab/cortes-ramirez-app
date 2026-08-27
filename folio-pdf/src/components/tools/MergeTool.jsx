@@ -36,7 +36,7 @@ export default function MergeTool() {
     setError("");
     try {
       const bytes = await mergePdfs(files);
-      downloadBytes(bytes, "unido-folio.pdf");
+      downloadBytes(bytes, "unido-folio.pdf", "application/pdf", "Unir PDF");
     } catch (e) {
       setError("No se pudo unir el PDF. Verifica que los archivos no estén dañados o protegidos con contraseña.");
     } finally {

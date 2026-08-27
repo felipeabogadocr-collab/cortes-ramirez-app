@@ -60,7 +60,10 @@ export default function CompressTool() {
           <p style={{ margin: "0 0 6px" }}>
             Original: <strong>{kb(result.original)}</strong> → Comprimido: <strong>{kb(result.nuevo)}</strong>
           </p>
-          <button className="btn-primary" onClick={() => downloadBytes(result.bytes, "comprimido-folio.pdf")}>
+          <button
+            className="btn-primary"
+            onClick={() => downloadBytes(result.bytes, "comprimido-folio.pdf", "application/pdf", "Comprimir PDF")}
+          >
             Descargar PDF comprimido
           </button>
         </div>

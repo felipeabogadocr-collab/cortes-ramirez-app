@@ -1,5 +1,6 @@
 import { useState } from "react";
 import Logo from "./Logo.jsx";
+import { registrarLead } from "../lib/analytics.js";
 
 const WHATSAPP_NUMBER = "573192875428";
 const STORAGE_KEY = "folio_lead_ok";
@@ -57,6 +58,7 @@ export default function LeadGate({ onDone }) {
     } catch {
       // si el navegador bloquea localStorage, igual dejamos continuar
     }
+    registrarLead(nombre.trim(), telefonoCompleto);
     const texto = encodeURIComponent(
       `Hola, soy ${nombre.trim()} (${telefonoCompleto}). Quiero recibir por WhatsApp actualizaciones, noticias de LITIA.ai y acceder a descuentos.`
     );

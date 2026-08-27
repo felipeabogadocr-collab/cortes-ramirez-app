@@ -36,7 +36,7 @@ export default function ImagesToPdfTool() {
     setError("");
     try {
       const bytes = await imagesToPdf(files);
-      downloadBytes(bytes, "imagenes-folio.pdf");
+      downloadBytes(bytes, "imagenes-folio.pdf", "application/pdf", "Imágenes a PDF");
     } catch {
       setError("No se pudo generar el PDF. Verifica que las imágenes sean JPG o PNG.");
     } finally {

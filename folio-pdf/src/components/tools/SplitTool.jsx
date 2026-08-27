@@ -49,12 +49,12 @@ export default function SplitTool() {
       const ranges = parseRangos(rangos, total);
       const partes = await splitPdf(bytes, ranges);
       if (partes.length === 1) {
-        downloadBytes(partes[0], `parte-1.pdf`);
+        downloadBytes(partes[0], `parte-1.pdf`, "application/pdf", "Dividir PDF");
       } else {
         const zip = new JSZip();
         partes.forEach((p, i) => zip.file(`parte-${i + 1}.pdf`, p));
         const zipBytes = await zip.generateAsync({ type: "uint8array" });
-        downloadBytes(zipBytes, "pdf-dividido-folio.zip", "application/zip");
+        downloadBytes(zipBytes, "pdf-dividido-folio.zip", "application/zip", "Dividir PDF");
       }
     } catch (e) {
       setError(e.message || "No se pudo dividir el PDF.");
