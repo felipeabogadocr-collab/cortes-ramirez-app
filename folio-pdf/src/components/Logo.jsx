@@ -5,7 +5,7 @@ export default function Logo({ size = 34 }) {
       <path d="M20 16h16l8 8v24a2 2 0 0 1-2 2H20a2 2 0 0 1-2-2V18a2 2 0 0 1 2-2z" fill="#ffffff" />
       <path d="M36 16v8h8" fill="none" stroke="var(--brand)" strokeWidth="2" />
       <text x="32" y="40" fontFamily="Arial, sans-serif" fontSize="12" fontWeight="700" textAnchor="middle" fill="var(--brand)">
-        Lx
+        Fo
       </text>
     </svg>
   );

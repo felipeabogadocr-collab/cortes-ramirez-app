@@ -1,4 +1,4 @@
-# LexDoc — Herramientas PDF gratis
+# Folio — Herramientas PDF gratis
 
 Diseñado por **LITIA.ai**. App gratuita, sin login ni registro, para unir, organizar
 (reordenar/rotar/eliminar/extraer páginas), dividir, firmar (firma electrónica simple) y
@@ -33,7 +33,7 @@ npm run build
 ```
 
 En Vercel: **Add New Project** → selecciona este repo → en **Root Directory** elige
-`lexdoc-pdf` → build command `npm run build`, output `dist`. No requiere variables de entorno.
+`folio-pdf` → build command `npm run build`, output `dist`. No requiere variables de entorno.
 
 ## Firma electrónica
 

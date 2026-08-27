@@ -26,7 +26,7 @@ export default function Header({ theme, onToggleTheme }) {
         <div style={{ display: "flex", alignItems: "center", gap: 10, justifySelf: "center" }}>
           <Logo />
           <div style={{ textAlign: "center" }}>
-            <div style={{ fontWeight: 800, fontSize: 18, letterSpacing: 0.2 }}>LexDoc</div>
+            <div style={{ fontWeight: 800, fontSize: 18, letterSpacing: 0.2 }}>Folio</div>
             <div style={{ fontSize: 11, color: "var(--muted)", marginTop: -2 }}>Herramientas PDF gratis</div>
           </div>
         </div>

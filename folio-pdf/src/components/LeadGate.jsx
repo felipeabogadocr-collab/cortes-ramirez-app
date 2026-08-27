@@ -2,7 +2,7 @@ import { useState } from "react";
 import Logo from "./Logo.jsx";
 
 const WHATSAPP_NUMBER = "573192875428";
-const STORAGE_KEY = "lexdoc_lead_ok";
+const STORAGE_KEY = "folio_lead_ok";
 
 export function hasAcceptedLead() {
   try {
@@ -64,7 +64,7 @@ export default function LeadGate({ onDone }) {
       <div className="card" style={{ maxWidth: 420, width: "100%", padding: "28px 26px" }}>
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, marginBottom: 18 }}>
           <Logo size={44} />
-          <h1 style={{ fontSize: 20, margin: 0, textAlign: "center" }}>Bienvenido a LexDoc</h1>
+          <h1 style={{ fontSize: 20, margin: 0, textAlign: "center" }}>Bienvenido a Folio</h1>
           <p style={{ fontSize: 13, color: "var(--muted)", textAlign: "center", margin: 0 }}>
             Sin registro ni contraseñas. Solo necesitamos tu nombre y celular para darte acceso.
           </p>
