@@ -31,7 +31,12 @@ export default function App() {
   }, [theme]);
 
   if (!accepted) {
-    return <LeadGate onDone={() => setAccepted(true)} />;
+    return (
+      <>
+        <LeadGate onDone={() => setAccepted(true)} />
+        <WhatsAppFloat />
+      </>
+    );
   }
 
   const Active = TOOLS.find((t) => t.id === activeTool);
