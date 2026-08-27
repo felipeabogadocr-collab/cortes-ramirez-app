@@ -57,8 +57,8 @@ export default function ImagesToPdfTool() {
         style={{ display: "none" }}
         onChange={(e) => addFiles(e.target.files)}
       />
-      <button className="btn-ghost" onClick={() => inputRef.current.click()}>
-        + Agregar imágenes
+      <button className="btn-upload" onClick={() => inputRef.current.click()}>
+        📤 Agregar imágenes
       </button>
 
       <div style={{ marginTop: 14, display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(110px, 1fr))", gap: 10 }}>

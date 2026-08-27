@@ -18,6 +18,7 @@ export function downloadBytes(bytes, filename, mime = "application/pdf") {
   a.click();
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 5000);
+  window.dispatchEvent(new CustomEvent("folio:download", { detail: { filename } }));
 }
 
 // Devuelve una miniatura (data URL) de cada página de un PDF.

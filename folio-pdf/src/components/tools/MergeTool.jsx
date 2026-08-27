@@ -57,8 +57,8 @@ export default function MergeTool() {
         style={{ display: "none" }}
         onChange={(e) => addFiles(e.target.files)}
       />
-      <button className="btn-ghost" onClick={() => inputRef.current.click()}>
-        + Agregar PDF
+      <button className="btn-upload" onClick={() => inputRef.current.click()}>
+        📤 Agregar PDF
       </button>
 
       <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 8 }}>

@@ -45,8 +45,8 @@ export default function CompressTool() {
           setError("");
         }}
       />
-      <button className="btn-ghost" onClick={() => inputRef.current.click()}>
-        {file ? file.name : "+ Subir PDF"}
+      <button className="btn-upload" onClick={() => inputRef.current.click()}>
+        {file ? `📄 ${file.name}` : "📤 Subir PDF"}
       </button>
 
       {error && <p style={{ color: "var(--danger)", fontSize: 13, marginTop: 10 }}>{error}</p>}

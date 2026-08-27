@@ -3,6 +3,7 @@ import Header from "./components/Header.jsx";
 import Footer from "./components/Footer.jsx";
 import PrivacyNotice from "./components/PrivacyNotice.jsx";
 import WhatsAppFloat from "./components/WhatsAppFloat.jsx";
+import Toast from "./components/Toast.jsx";
 import LeadGate, { hasAcceptedLead } from "./components/LeadGate.jsx";
 import MergeTool from "./components/tools/MergeTool.jsx";
 import OrganizeTool from "./components/tools/OrganizeTool.jsx";
@@ -49,34 +50,37 @@ export default function App() {
         onGoHome={() => setActiveTool(null)}
       />
 
-      <main style={{ flex: 1, maxWidth: 1000, margin: "0 auto", width: "100%", padding: "24px 20px 60px" }}>
+      <main style={{ flex: 1, maxWidth: 1100, margin: "0 auto", width: "100%", padding: "24px 20px 60px" }}>
         <PrivacyNotice style={{ marginBottom: 20 }} />
 
         {!Active && (
           <>
-            <h1 style={{ fontSize: 22, margin: "0 0 4px" }}>Herramientas PDF gratis</h1>
+            <h1 className="uppercase" style={{ fontSize: 22, margin: "0 0 4px", letterSpacing: 1 }}>
+              Herramientas PDF gratis
+            </h1>
             <p style={{ color: "var(--muted)", fontSize: 14, margin: "0 0 20px" }}>
               Para estudiantes y abogados. Rápidas, sencillas y sin costo.
             </p>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 14 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(170px, 1fr))", gap: 14 }}>
               {TOOLS.map((t) => (
                 <button
                   key={t.id}
-                  className="card"
+                  className="card tool-card"
                   onClick={() => setActiveTool(t.id)}
                   style={{
-                    padding: "22px 14px",
+                    padding: "24px 14px",
                     display: "flex",
                     flexDirection: "column",
                     alignItems: "center",
-                    gap: 8,
-                    border: "1px solid var(--border)",
+                    gap: 10,
                     background: "var(--panel)",
                     color: "var(--text)",
                   }}
                 >
-                  <span style={{ fontSize: 28 }}>{t.icon}</span>
-                  <span style={{ fontWeight: 700, fontSize: 14 }}>{t.label}</span>
+                  <span style={{ fontSize: 30 }}>{t.icon}</span>
+                  <span className="uppercase" style={{ fontWeight: 700, fontSize: 13.5, letterSpacing: 0.4 }}>
+                    {t.label}
+                  </span>
                 </button>
               ))}
             </div>
@@ -88,7 +92,7 @@ export default function App() {
             <button className="btn-ghost" style={{ marginBottom: 16 }} onClick={() => setActiveTool(null)}>
               ← Volver a herramientas
             </button>
-            <h2 style={{ fontSize: 19, margin: "0 0 14px" }}>
+            <h2 className="uppercase" style={{ fontSize: 19, margin: "0 0 14px", letterSpacing: 0.8 }}>
               {Active.icon} {Active.label}
             </h2>
             <Active.Component />
@@ -98,6 +102,7 @@ export default function App() {
 
       <Footer />
       <WhatsAppFloat />
+      <Toast />
     </div>
   );
 }
