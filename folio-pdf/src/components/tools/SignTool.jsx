@@ -3,6 +3,7 @@ import { fileToBytes, renderThumbnails, signPdf, downloadBytes } from "../../lib
 
 const STAMP_W = 640;
 const STAMP_H = 240;
+const MIN_LARGO_NOMBRE = 5;
 
 function loadImage(src) {
   return new Promise((resolve, reject) => {
@@ -50,26 +51,29 @@ async function composeStamp({ signatureDataUrl, nombre }) {
 }
 
 const ESTILOS_FIRMA = [
-  { id: "dancing", label: "Cursiva elegante", family: "Dancing Script", size: 72 },
-  { id: "caveat", label: "Manuscrita", family: "Caveat", size: 78 },
+  { id: "arial", label: "Arial", family: "Arial, Helvetica, sans-serif", size: 56, cursiva: false },
+  { id: "cursiva", label: "Cursiva", family: '"Dancing Script", cursive', size: 74, cursiva: true },
 ];
 
-async function renderTextoCursivo(texto, estilo) {
+async function renderTextoCursivo(texto, estilo, negrilla) {
   const canvas = document.createElement("canvas");
   canvas.width = STAMP_W;
   canvas.height = 180;
   const ctx = canvas.getContext("2d");
-  const fuente = `700 ${estilo.size}px "${estilo.family}"`;
-  try {
-    await document.fonts.load(fuente);
-    await document.fonts.ready;
-  } catch {
-    // si la fuente no carga a tiempo, se dibuja con la de respaldo
+  const peso = negrilla ? 700 : 400;
+  const fuente = `${peso} ${estilo.size}px ${estilo.family}`;
+  if (estilo.cursiva) {
+    try {
+      await document.fonts.load(fuente);
+      await document.fonts.ready;
+    } catch {
+      // si la fuente no carga a tiempo, se dibuja con la de respaldo
+    }
   }
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.fillStyle = "#111827";
-  ctx.font = `${fuente}, cursive`;
+  ctx.font = fuente;
   ctx.fillText(texto, STAMP_W / 2, canvas.height / 2);
   return canvas.toDataURL("image/png");
 }
@@ -224,6 +228,7 @@ export default function SignTool() {
   const [pageIndex, setPageIndex] = useState(0);
   const [metodo, setMetodo] = useState("dibujar");
   const [estiloFirmaId, setEstiloFirmaId] = useState(ESTILOS_FIRMA[0].id);
+  const [negrilla, setNegrilla] = useState(false);
   const [nombre, setNombre] = useState("");
   const [firmaDibujada, setFirmaDibujada] = useState(null);
   const [firmaImagen, setFirmaImagen] = useState(null);
@@ -235,12 +240,14 @@ export default function SignTool() {
   const imagenInputRef = useRef(null);
   const containerRef = useRef(null);
 
-  const firmaGrafica = metodo === "dibujar" ? firmaDibujada : metodo === "imagen" ? firmaImagen : nombre.trim() ? "texto" : null;
+  const nombreValido = nombre.trim().length >= MIN_LARGO_NOMBRE;
+
+  const firmaGrafica = metodo === "dibujar" ? firmaDibujada : metodo === "imagen" ? firmaImagen : nombreValido ? "texto" : null;
 
   useEffect(() => {
     let cancelado = false;
     async function generarPreview() {
-      if (!nombre.trim()) {
+      if (!nombreValido) {
         setStampUrl(null);
         return;
       }
@@ -250,7 +257,7 @@ export default function SignTool() {
         else if (metodo === "imagen" && firmaImagen) grafica = firmaImagen;
         else if (metodo === "texto") {
           const estilo = ESTILOS_FIRMA.find((e) => e.id === estiloFirmaId);
-          grafica = await renderTextoCursivo(nombre.trim(), estilo);
+          grafica = await renderTextoCursivo(nombre.trim(), estilo, negrilla);
         }
         if (!grafica) {
           setStampUrl(null);
@@ -266,7 +273,7 @@ export default function SignTool() {
     return () => {
       cancelado = true;
     };
-  }, [metodo, nombre, firmaDibujada, firmaImagen, estiloFirmaId]);
+  }, [metodo, nombre, firmaDibujada, firmaImagen, estiloFirmaId, negrilla]);
 
   async function cargar(file) {
     if (!file) return;
@@ -293,8 +300,8 @@ export default function SignTool() {
   }
 
   async function aplicar() {
-    if (!nombre.trim()) {
-      setError("Escribe el nombre y apellido de quien firma.");
+    if (!nombreValido) {
+      setError(`Escribe el nombre y apellido de quien firma (mínimo ${MIN_LARGO_NOMBRE} letras). Es obligatorio.`);
       return;
     }
     if (!firmaGrafica) {
@@ -310,7 +317,7 @@ export default function SignTool() {
       if (metodo === "imagen") grafica = firmaImagen;
       if (metodo === "texto") {
         const estilo = ESTILOS_FIRMA.find((e) => e.id === estiloFirmaId);
-        grafica = await renderTextoCursivo(nombre.trim(), estilo);
+        grafica = await renderTextoCursivo(nombre.trim(), estilo, negrilla);
       }
       const compuesta = await composeStamp({ signatureDataUrl: grafica, nombre: nombre.trim() });
       const out = await signPdf(bytes, compuesta, pageIndex, box);
@@ -381,24 +388,44 @@ export default function SignTool() {
       </div>
 
       <div>
-        <label style={{ fontSize: 12, fontWeight: 600, display: "block", marginBottom: 4 }}>
-          Nombre y apellido de quien firma
+        <label
+          style={{
+            fontSize: 16,
+            fontWeight: 800,
+            display: "block",
+            marginBottom: 6,
+            color: "var(--brand-2)",
+          }}
+        >
+          Nombre y apellido de quien firma <span style={{ color: "var(--danger)" }}>* Obligatorio</span>
         </label>
         <input
           value={nombre}
           onChange={(e) => setNombre(e.target.value)}
           placeholder="Ej: María Pérez"
+          required
+          minLength={MIN_LARGO_NOMBRE}
           style={{
             width: "100%",
             padding: "10px 12px",
             borderRadius: 10,
-            border: "1px solid var(--border)",
+            border: `2px solid ${nombre && !nombreValido ? "var(--danger)" : "var(--brand-2)"}`,
             background: "var(--bg)",
             color: "var(--text)",
-            fontSize: 14,
-            marginBottom: 14,
+            fontSize: 15,
+            fontWeight: 600,
           }}
         />
+        <p
+          style={{
+            fontSize: 11.5,
+            color: nombre && !nombreValido ? "var(--danger)" : "var(--muted)",
+            margin: "6px 0 14px",
+          }}
+        >
+          Mínimo {MIN_LARGO_NOMBRE} letras. Sin este dato no se puede firmar — queda registrado en el
+          sello del documento.
+        </p>
 
         <div className="sign-tabs">
           <button className={`sign-tab ${metodo === "dibujar" ? "active" : ""}`} onClick={() => setMetodo("dibujar")}>
@@ -441,22 +468,48 @@ export default function SignTool() {
 
         {metodo === "texto" && (
           <div>
-            <p style={{ fontSize: 12, color: "var(--muted)", marginBottom: 8 }}>
-              Tu nombre se convierte automáticamente en una firma, junto con el sello de fecha y
-              hora. Elige el estilo de letra:
+            <p style={{ fontSize: 14, color: "var(--text)", marginBottom: 10, lineHeight: 1.5 }}>
+              ✨ Tu nombre se convierte <strong>automáticamente en una firma</strong>, junto con el
+              sello de fecha y hora.
             </p>
-            <div className="sign-tabs" style={{ marginBottom: 4 }}>
+            <label style={{ fontSize: 12.5, fontWeight: 700, display: "block", marginBottom: 6 }}>
+              Elige el estilo de letra
+            </label>
+            <div className="sign-tabs" style={{ marginBottom: 10 }}>
               {ESTILOS_FIRMA.map((estilo) => (
                 <button
                   key={estilo.id}
                   className={`sign-tab ${estiloFirmaId === estilo.id ? "active" : ""}`}
-                  style={{ fontFamily: `"${estilo.family}", cursive`, fontSize: 15 }}
+                  style={{
+                    fontFamily: estilo.family,
+                    fontWeight: negrilla ? 700 : 400,
+                    fontSize: 17,
+                    padding: "10px 20px",
+                  }}
                   onClick={() => setEstiloFirmaId(estilo.id)}
                 >
                   {estilo.label}
                 </button>
               ))}
             </div>
+            <label
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                fontSize: 13,
+                fontWeight: 600,
+                cursor: "pointer",
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={negrilla}
+                onChange={(e) => setNegrilla(e.target.checked)}
+                style={{ width: 16, height: 16 }}
+              />
+              Negrilla
+            </label>
           </div>
         )}
 
