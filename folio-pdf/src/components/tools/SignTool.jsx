@@ -36,33 +36,32 @@ async function composeStamp({ signatureDataUrl, nombre }) {
   const h = img.height * scale;
   ctx.drawImage(img, (STAMP_W - w) / 2, 10 + (maxH - h) / 2, w, h);
 
-  const lineY = STAMP_H * 0.66;
-  ctx.strokeStyle = "#94a3b8";
-  ctx.lineWidth = 1.5;
-  ctx.beginPath();
-  ctx.moveTo(STAMP_W * 0.12, lineY);
-  ctx.lineTo(STAMP_W * 0.88, lineY);
-  ctx.stroke();
-
+  const textY = STAMP_H * 0.66;
   const { fecha, hora } = formatFechaHora();
   ctx.textAlign = "center";
   ctx.fillStyle = "#1f2937";
   ctx.font = "700 22px Manrope, sans-serif";
-  ctx.fillText(`Firmado por ${nombre}`, STAMP_W / 2, lineY + 34);
+  ctx.fillText(`Firmado por ${nombre}`, STAMP_W / 2, textY + 12);
   ctx.fillStyle = "#4b5563";
   ctx.font = "500 17px Manrope, sans-serif";
-  ctx.fillText(`el ${fecha} a las ${hora}`, STAMP_W / 2, lineY + 58);
+  ctx.fillText(`el ${fecha} a las ${hora}`, STAMP_W / 2, textY + 36);
 
   return canvas.toDataURL("image/png");
 }
 
-async function renderTextoCursivo(texto) {
+const ESTILOS_FIRMA = [
+  { id: "dancing", label: "Cursiva elegante", family: "Dancing Script", size: 72 },
+  { id: "caveat", label: "Manuscrita", family: "Caveat", size: 78 },
+];
+
+async function renderTextoCursivo(texto, estilo) {
   const canvas = document.createElement("canvas");
   canvas.width = STAMP_W;
   canvas.height = 180;
   const ctx = canvas.getContext("2d");
+  const fuente = `700 ${estilo.size}px "${estilo.family}"`;
   try {
-    await document.fonts.load('700 72px "Dancing Script"');
+    await document.fonts.load(fuente);
     await document.fonts.ready;
   } catch {
     // si la fuente no carga a tiempo, se dibuja con la de respaldo
@@ -70,7 +69,7 @@ async function renderTextoCursivo(texto) {
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.fillStyle = "#111827";
-  ctx.font = '700 72px "Dancing Script", cursive';
+  ctx.font = `${fuente}, cursive`;
   ctx.fillText(texto, STAMP_W / 2, canvas.height / 2);
   return canvas.toDataURL("image/png");
 }
@@ -224,6 +223,7 @@ export default function SignTool() {
   const [thumbs, setThumbs] = useState([]);
   const [pageIndex, setPageIndex] = useState(0);
   const [metodo, setMetodo] = useState("dibujar");
+  const [estiloFirmaId, setEstiloFirmaId] = useState(ESTILOS_FIRMA[0].id);
   const [nombre, setNombre] = useState("");
   const [firmaDibujada, setFirmaDibujada] = useState(null);
   const [firmaImagen, setFirmaImagen] = useState(null);
@@ -248,7 +248,10 @@ export default function SignTool() {
         let grafica = null;
         if (metodo === "dibujar" && firmaDibujada) grafica = firmaDibujada;
         else if (metodo === "imagen" && firmaImagen) grafica = firmaImagen;
-        else if (metodo === "texto") grafica = await renderTextoCursivo(nombre.trim());
+        else if (metodo === "texto") {
+          const estilo = ESTILOS_FIRMA.find((e) => e.id === estiloFirmaId);
+          grafica = await renderTextoCursivo(nombre.trim(), estilo);
+        }
         if (!grafica) {
           setStampUrl(null);
           return;
@@ -263,7 +266,7 @@ export default function SignTool() {
     return () => {
       cancelado = true;
     };
-  }, [metodo, nombre, firmaDibujada, firmaImagen]);
+  }, [metodo, nombre, firmaDibujada, firmaImagen, estiloFirmaId]);
 
   async function cargar(file) {
     if (!file) return;
@@ -305,7 +308,10 @@ export default function SignTool() {
     try {
       let grafica = firmaDibujada;
       if (metodo === "imagen") grafica = firmaImagen;
-      if (metodo === "texto") grafica = await renderTextoCursivo(nombre.trim());
+      if (metodo === "texto") {
+        const estilo = ESTILOS_FIRMA.find((e) => e.id === estiloFirmaId);
+        grafica = await renderTextoCursivo(nombre.trim(), estilo);
+      }
       const compuesta = await composeStamp({ signatureDataUrl: grafica, nombre: nombre.trim() });
       const out = await signPdf(bytes, compuesta, pageIndex, box);
       downloadBytes(out, "firmado-folio.pdf");
@@ -434,10 +440,24 @@ export default function SignTool() {
         )}
 
         {metodo === "texto" && (
-          <p style={{ fontSize: 12, color: "var(--muted)" }}>
-            Tu nombre se convierte automáticamente en una firma con estilo cursivo, junto con el sello
-            de fecha y hora.
-          </p>
+          <div>
+            <p style={{ fontSize: 12, color: "var(--muted)", marginBottom: 8 }}>
+              Tu nombre se convierte automáticamente en una firma, junto con el sello de fecha y
+              hora. Elige el estilo de letra:
+            </p>
+            <div className="sign-tabs" style={{ marginBottom: 4 }}>
+              {ESTILOS_FIRMA.map((estilo) => (
+                <button
+                  key={estilo.id}
+                  className={`sign-tab ${estiloFirmaId === estilo.id ? "active" : ""}`}
+                  style={{ fontFamily: `"${estilo.family}", cursive`, fontSize: 15 }}
+                  onClick={() => setEstiloFirmaId(estilo.id)}
+                >
+                  {estilo.label}
+                </button>
+              ))}
+            </div>
+          </div>
         )}
 
         {stampUrl && (
