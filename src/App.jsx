@@ -733,12 +733,19 @@ async function calcularResumenOperacion() {
     else docsListos++;
   }
 
-  const metricasRedesRaw = await storageGet("metricas-redes", false);
-  const metricasRedes = metricasRedesRaw ? JSON.parse(metricasRedesRaw) : [];
-  const ultimaMetrica = (cuenta) => {
-    const filtradas = metricasRedes.filter((m) => m.cuenta === cuenta).sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
-    return filtradas[0]?.seguidores ?? null;
-  };
+  const idsContenidoRaw = await storageGet("indice-contenido", true);
+  const idsContenido = idsContenidoRaw ? JSON.parse(idsContenidoRaw) : [];
+  const hoyISO = fechaHoyISO();
+  let contenidoPendienteHoy = 0;
+  let contenidoVencido = 0;
+  for (const id of idsContenido) {
+    const raw = await storageGet(`contenido:${id}`, true);
+    if (!raw) continue;
+    const it = JSON.parse(raw);
+    if (it.estado === "Publicado" || !it.fecha) continue;
+    if (it.fecha === hoyISO) contenidoPendienteHoy++;
+    else if (it.fecha < hoyISO) contenidoVencido++;
+  }
 
   const usuariosRaw = await storageGet("usuarios-despacho", true);
   const usuariosDespacho = usuariosRaw ? JSON.parse(usuariosRaw) : [];
@@ -767,8 +774,8 @@ async function calcularResumenOperacion() {
     numeroPagos,
     promedioPago: numeroPagos > 0 ? recaudadoTotal / numeroPagos : 0,
     pendienteTotal,
-    seguidoresFelipe: ultimaMetrica("felipe"),
-    seguidoresFirma: ultimaMetrica("firma"),
+    contenidoPendienteHoy,
+    contenidoVencido,
     totalUsuarios,
     totalAdministradores,
     totalAbogados,
@@ -796,8 +803,8 @@ function useResumenGeneral() {
     recaudadoTotal: 0,
     numeroPagos: 0,
     pendienteTotal: 0,
-    seguidoresFelipe: null,
-    seguidoresFirma: null,
+    contenidoPendienteHoy: 0,
+    contenidoVencido: 0,
     promedioPago: 0,
     totalUsuarios: 0,
     totalAdministradores: 0,
@@ -1035,19 +1042,6 @@ const TOOLS_ASISTENTE = [
     },
   },
   {
-    name: "registrar_metrica_redes",
-    description: "Registra el número de seguidores de una de las cuentas de Instagram del despacho.",
-    input_schema: {
-      type: "object",
-      properties: {
-        cuenta: { type: "string", description: "felipe (cuenta personal) o firma (Cortés Ramírez Abogados)" },
-        seguidores: { type: "number" },
-        publicaciones: { type: "number" },
-      },
-      required: ["cuenta", "seguidores"],
-    },
-  },
-  {
     name: "generar_informe_pdf",
     description: "Genera un informe en PDF descargable con el diagnóstico y las métricas actuales del despacho (clientes, dinero recaudado, pendientes, documentos, vigilancia).",
     input_schema: {
@@ -1166,20 +1160,6 @@ async function ejecutarHerramienta(nombreHerramienta, input) {
     });
     await storageSet(`cliente:${id}`, JSON.stringify(actualizado), false);
     return { mensaje: `Datos de ${cliente.nombre} actualizados.` };
-  }
-
-  if (nombreHerramienta === "registrar_metrica_redes") {
-    const raw = await storageGet("metricas-redes", false);
-    const metricas = raw ? JSON.parse(raw) : [];
-    const nuevaEntrada = {
-      id: uid(),
-      cuenta: input.cuenta === "firma" ? "firma" : "felipe",
-      fecha: new Date().toISOString(),
-      seguidores: Number(input.seguidores),
-      publicaciones: input.publicaciones ? Number(input.publicaciones) : null,
-    };
-    await storageSet("metricas-redes", JSON.stringify([...metricas, nuevaEntrada]), false);
-    return { mensaje: `Registré ${input.seguidores} seguidores para la cuenta de ${input.cuenta === "firma" ? "Cortés Ramírez Abogados" : "Felipe"}.` };
   }
 
   if (nombreHerramienta === "generar_informe_pdf") {
@@ -1656,9 +1636,9 @@ function ResumenTab({ nombre, usuarioId, onIr }) {
           <MiniEstadistica etiqueta="Finalizados" valor={r.vigilanciaFinalizado} />
         </SeccionEstadisticas>
 
-        <SeccionEstadisticas titulo="Redes sociales" color="#EC4899" onClick={() => onIr("redes")}>
-          <MiniEstadistica etiqueta="Felipe" valor={r.seguidoresFelipe !== null ? r.seguidoresFelipe.toLocaleString("es-CO") : "—"} color="#EC4899" />
-          <MiniEstadistica etiqueta="Cortés Ramírez" valor={r.seguidoresFirma !== null ? r.seguidoresFirma.toLocaleString("es-CO") : "—"} color="#EC4899" />
+        <SeccionEstadisticas titulo="Contenido" color="#8B5CF6" onClick={() => onIr("contenido")}>
+          <MiniEstadistica etiqueta="Pendiente hoy" valor={r.contenidoPendienteHoy} color={r.contenidoPendienteHoy > 0 ? "#F5A524" : undefined} />
+          <MiniEstadistica etiqueta="Vencido" valor={r.contenidoVencido} color={r.contenidoVencido > 0 ? "#F43F5E" : undefined} />
         </SeccionEstadisticas>
 
         <SeccionEstadisticas titulo="Equipo" color="#6B7480">
@@ -3069,173 +3049,6 @@ function ContabilidadTab() {
   );
 }
 
-const CUENTAS_REDES = [
-  { id: "felipe", nombre: "Felipe (personal)", usuario: "felipeabogadocr" },
-  { id: "firma", nombre: "Cortés Ramírez Abogados", usuario: "cortesramirezabogados_" },
-];
-
-async function generarIdeasContenido(cuenta) {
-  const response = await fetch("/api/assistant", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model: "claude-sonnet-4-6",
-      max_tokens: 500,
-      system:
-        `Eres un asistente de marketing para redes sociales de un abogado colombiano. Genera 5 ideas de contenido para Instagram para la cuenta @${cuenta.usuario} (${cuenta.nombre} — un abogado/despacho de abogados en Colombia). ` +
-        `Las ideas deben ser prácticas, variadas (educativas, cercanas, casos de éxito sin romper confidencialidad, detrás de cámaras, etc.), y pensadas para generar confianza y clientes potenciales. Responde solo con una lista numerada del 1 al 5, cada idea en una línea corta, sin texto adicional antes o después.`,
-      messages: [{ role: "user", content: "Dame ideas de contenido para hoy." }],
-    }),
-  });
-  const data = await response.json();
-  return (data.content || []).map((b) => b.text || "").join("");
-}
-
-function RedesSocialesTab() {
-  const [metricas, setMetricas] = useState([]);
-  const [cuentaForm, setCuentaForm] = useState("felipe");
-  const [seguidores, setSeguidores] = useState("");
-  const [publicaciones, setPublicaciones] = useState("");
-  const [ideas, setIdeas] = useState({});
-  const [generandoIdeas, setGenerandoIdeas] = useState(null);
-
-  const cargar = useCallback(async () => {
-    const raw = await storageGet("metricas-redes", false);
-    setMetricas(raw ? JSON.parse(raw) : []);
-  }, []);
-
-  useEffect(() => {
-    cargar();
-  }, [cargar]);
-
-  const registrarMetrica = async () => {
-    if (!seguidores) return;
-    const nuevaEntrada = { id: uid(), cuenta: cuentaForm, fecha: new Date().toISOString(), seguidores: Number(seguidores), publicaciones: publicaciones ? Number(publicaciones) : null };
-    const actualizadas = [...metricas, nuevaEntrada];
-    await storageSet("metricas-redes", JSON.stringify(actualizadas), false);
-    setMetricas(actualizadas);
-    setSeguidores("");
-    setPublicaciones("");
-  };
-
-  const pedirIdeas = async (cuenta) => {
-    setGenerandoIdeas(cuenta.id);
-    try {
-      const resultado = await generarIdeasContenido(cuenta);
-      setIdeas((prev) => ({ ...prev, [cuenta.id]: resultado }));
-    } catch (e) {
-      setIdeas((prev) => ({ ...prev, [cuenta.id]: "No pudimos generar ideas en este momento. Intenta de nuevo." }));
-    }
-    setGenerandoIdeas(null);
-  };
-
-  return (
-    <div>
-      <EncabezadoSeccion titulo="Redes sociales" color="#EC4899" />
-      <div
-        style={{
-          background: COLORS.accentSoft,
-          border: "1px solid #C7D6EA",
-          borderRadius: 10,
-          padding: "14px 16px",
-          marginBottom: 20,
-          fontFamily: "Inter, sans-serif",
-          fontSize: 12.5,
-          color: COLORS.navy,
-          lineHeight: 1.6,
-        }}
-      >
-        <strong>📸 Sobre esta sección:</strong> traer las métricas reales de Instagram automáticamente (seguidores, alcance, interacciones) requiere conectar la API oficial de Meta, que necesita una cuenta de Instagram profesional vinculada a una página de Facebook y aprobación de Meta — eso se activa al publicar la versión final. Por ahora, registra aquí tus números manualmente para llevar el histórico, y pide ideas de contenido con IA.
-      </div>
-
-      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-        {CUENTAS_REDES.map((cuenta) => {
-          const historial = metricas.filter((m) => m.cuenta === cuenta.id).sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
-          const ultima = historial[0];
-          const anterior = historial[1];
-          const delta = ultima && anterior ? ultima.seguidores - anterior.seguidores : null;
-
-          return (
-            <Card key={cuenta.id}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
-                <div>
-                  <p style={{ fontFamily: "Inter, sans-serif", fontSize: 17, fontWeight: 700, margin: 0, color: COLORS.ink }}>{cuenta.nombre}</p>
-                  <a
-                    href={`https://instagram.com/${cuenta.usuario}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.accentBright, textDecoration: "none" }}
-                  >
-                    @{cuenta.usuario} ↗
-                  </a>
-                </div>
-                {ultima && (
-                  <div style={{ textAlign: "right" }}>
-                    <p style={{ fontFamily: "Inter, sans-serif", fontSize: 24, fontWeight: 700, color: COLORS.headingText, margin: 0 }}>{ultima.seguidores.toLocaleString("es-CO")}</p>
-                    <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11, color: delta > 0 ? "#2F5D3A" : delta < 0 ? "#B42318" : COLORS.muted, margin: 0 }}>
-                      seguidores {delta !== null ? `(${delta > 0 ? "+" : ""}${delta} desde el último registro)` : ""}
-                    </p>
-                  </div>
-                )}
-              </div>
-
-              <button
-                className="drx-btn-ghost"
-                style={{ ...buttonGhost, fontSize: 12.5, padding: "7px 14px" }}
-                onClick={() => pedirIdeas(cuenta)}
-                disabled={generandoIdeas === cuenta.id}
-              >
-                {generandoIdeas === cuenta.id ? "Generando ideas..." : "Pedir ideas de contenido a la IA"}
-              </button>
-
-              {ideas[cuenta.id] && (
-                <div style={{ marginTop: 12, background: COLORS.surfaceSoft, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: 12, whiteSpace: "pre-wrap", fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.inkSoft, lineHeight: 1.6 }}>
-                  {ideas[cuenta.id]}
-                </div>
-              )}
-
-              {historial.length > 0 && (
-                <div style={{ marginTop: 14, borderTop: `1px solid ${COLORS.border}`, paddingTop: 10 }}>
-                  <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, fontWeight: 600, color: COLORS.muted, marginBottom: 6 }}>Historial</p>
-                  {historial.slice(0, 5).map((m) => (
-                    <p key={m.id} style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.inkSoft, margin: "2px 0" }}>
-                      {new Date(m.fecha).toLocaleDateString("es-CO", { dateStyle: "medium" })} — {m.seguidores.toLocaleString("es-CO")} seguidores
-                      {m.publicaciones ? ` · ${m.publicaciones} publicaciones` : ""}
-                    </p>
-                  ))}
-                </div>
-              )}
-            </Card>
-          );
-        })}
-
-        <Card>
-          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, fontWeight: 600, color: COLORS.headingText, marginBottom: 12 }}>Registrar métricas de hoy</p>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
-            <Field label="Cuenta">
-              <select className="drx-input" style={inputStyle} value={cuentaForm} onChange={(e) => setCuentaForm(e.target.value)}>
-                {CUENTAS_REDES.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.nombre}
-                  </option>
-                ))}
-              </select>
-            </Field>
-            <Field label="Seguidores">
-              <input className="drx-input" style={inputStyle} type="number" value={seguidores} onChange={(e) => setSeguidores(e.target.value)} placeholder="Ej: 3200" />
-            </Field>
-            <Field label="Publicaciones (opcional)">
-              <input className="drx-input" style={inputStyle} type="number" value={publicaciones} onChange={(e) => setPublicaciones(e.target.value)} placeholder="Ej: 45" />
-            </Field>
-          </div>
-          <button className="drx-btn-primary" style={{ ...buttonPrimary, marginTop: 14 }} onClick={registrarMetrica} disabled={!seguidores}>
-            Guardar registro
-          </button>
-        </Card>
-      </div>
-    </div>
-  );
-}
 
 const PLATAFORMAS_CONTENIDO = ["Instagram", "Facebook", "TikTok"];
 const ESTADOS_CONTENIDO = ["Idea", "En preparación", "Listo para subir", "Publicado"];
@@ -4671,7 +4484,6 @@ const SECCIONES_PERMISOS = [
   { id: "clientes", nombre: "Clientes" },
   { id: "vigilancia", nombre: "Vigilancia judicial" },
   { id: "contabilidad", nombre: "Contabilidad" },
-  { id: "redes", nombre: "Redes sociales" },
   { id: "contenido", nombre: "Calendario de contenido" },
   { id: "documentos", nombre: "Firmar documentos" },
 ];
@@ -4679,7 +4491,7 @@ const SECCIONES_PERMISOS = [
 function permisosPorDefecto(rol) {
   const todos = Object.fromEntries(SECCIONES_PERMISOS.map((s) => [s.id, true]));
   if (rol === "Administrador" || rol === "Abogado") return todos;
-  return { resumen: true, clientes: true, casos: true, vigilancia: false, contabilidad: false, redes: false, contenido: false, documentos: true };
+  return { resumen: true, clientes: true, casos: true, vigilancia: false, contabilidad: false, contenido: false, documentos: true };
 }
 
 const NOTIF_CATEGORIAS = [
@@ -5213,11 +5025,6 @@ export default function App() {
               Contabilidad
             </SidebarButton>
           )}
-          {puedeVer("redes") && (
-            <SidebarButton active={tab === "redes"} onClick={() => setTab("redes")} color="#EC4899">
-              Redes sociales
-            </SidebarButton>
-          )}
           {puedeVer("contenido") && (
             <SidebarButton active={tab === "contenido"} onClick={() => setTab("contenido")} color="#8B5CF6">
               Calendario de contenido
@@ -5313,7 +5120,6 @@ export default function App() {
             {tab === "clientes" && puedeVer("clientes") && <ClientesTab />}
             {tab === "vigilancia" && puedeVer("vigilancia") && <VigilanciaTab />}
             {tab === "contabilidad" && puedeVer("contabilidad") && <ContabilidadTab />}
-            {tab === "redes" && puedeVer("redes") && <RedesSocialesTab />}
             {tab === "contenido" && puedeVer("contenido") && <ContenidoTab />}
             {tab === "documentos" && puedeVer("documentos") && <DocumentosTab />}
             {tab === "usuarios" && usuarioActual.rol === "Administrador" && <UsuariosPermisosTab usuarioActualId={usuarioActual.id} />}
