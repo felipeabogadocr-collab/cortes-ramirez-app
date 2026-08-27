@@ -1407,7 +1407,7 @@ function AsistenteIA({ nombre, usuarioId, onAccionCompletada }) {
       let respuestaFinal = "";
       let archivoGenerado = null;
       for (let intento = 0; intento < 3; intento++) {
-        const response = await fetch("/api/anthropic", {
+        const response = await fetch("/api/assistant", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ model: "claude-sonnet-4-6", max_tokens: 700, system: systemPrompt, tools: TOOLS_ASISTENTE, messages: mensajesAPI }),
@@ -2129,7 +2129,7 @@ const FRECUENCIAS_PAGO = ["Semanal", "Quincenal", "Mensual", "Pago único", "Otr
 
 async function organizarPagoConIA(descripcion) {
   const hoy = new Date().toISOString().slice(0, 10);
-  const response = await fetch("/api/anthropic", {
+  const response = await fetch("/api/assistant", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -3075,7 +3075,7 @@ const CUENTAS_REDES = [
 ];
 
 async function generarIdeasContenido(cuenta) {
-  const response = await fetch("/api/anthropic", {
+  const response = await fetch("/api/assistant", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({

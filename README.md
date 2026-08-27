@@ -3,7 +3,7 @@
 App interna del despacho para gestión de clientes, documentos (con firma), contabilidad,
 vigilancia judicial, métricas de redes sociales y un asistente de IA. Construida con
 Vite + React, Supabase (base de datos) y una función serverless de Vercel (proxy seguro
-hacia la API de Anthropic). Instalable como PWA en celular/tablet.
+hacia la API gratuita de Google Gemini). Instalable como PWA en celular/tablet.
 
 ## 1. Crear el proyecto en Supabase (plan gratuito)
 
@@ -15,10 +15,13 @@ hacia la API de Anthropic). Instalable como PWA en celular/tablet.
    - `Project URL` → `VITE_SUPABASE_URL`
    - `anon public key` → `VITE_SUPABASE_ANON_KEY`
 
-## 2. Obtener la clave de la API de Anthropic
+## 2. Obtener la clave de la API de Gemini (gratis)
 
-1. Entra a [console.anthropic.com](https://console.anthropic.com) → **API Keys** → crea una clave.
-2. Guárdala como `ANTHROPIC_API_KEY` (solo se usa en el servidor, nunca en el navegador).
+1. Entra a [aistudio.google.com/apikey](https://aistudio.google.com/apikey) e inicia sesión
+   con una cuenta de Google.
+2. **Create API key**. No pide tarjeta de crédito; tiene un nivel gratuito con límite de
+   peticiones por minuto/día (suficiente para el uso de un despacho).
+3. Guárdala como `GEMINI_API_KEY` (solo se usa en el servidor, nunca en el navegador).
 
 ## 3. Desarrollo local
 
@@ -40,9 +43,9 @@ Vercel y haber hecho `vercel link` al proyecto) o despliega directo a Vercel.
 3. En **Environment Variables** agrega las 3 claves de arriba:
    - `VITE_SUPABASE_URL`
    - `VITE_SUPABASE_ANON_KEY`
-   - `ANTHROPIC_API_KEY`
-4. Despliega. Vercel publica automáticamente la función `api/anthropic.js` como
-   endpoint serverless en `/api/anthropic`.
+   - `GEMINI_API_KEY`
+4. Despliega. Vercel publica automáticamente la función `api/assistant.js` como
+   endpoint serverless en `/api/assistant`.
 
 ## 5. Instalar como app (PWA)
 
@@ -55,9 +58,12 @@ Abre la URL publicada desde el navegador del celular/tablet y usa
 - `src/lib/storage.js` reemplaza el `window.storage` del prototipo original por
   llamadas a Supabase, manteniendo la misma interfaz (`storageGet`/`storageSet`) para
   no tener que reescribir la lógica de negocio del resto de la app.
-- `api/anthropic.js` es la única función serverless: recibe las mismas peticiones que
-  antes iban directo a `api.anthropic.com` y las reenvía con la clave guardada en el
-  servidor (variable de entorno `ANTHROPIC_API_KEY`).
+- `api/assistant.js` es la única función serverless: recibe las mismas peticiones "estilo
+  Anthropic" que el frontend ya armaba (system/tools/messages con bloques de texto,
+  imagen, PDF y uso de herramientas) y las traduce al formato de la API de Gemini
+  (function calling incluido), usando la clave guardada en el servidor
+  (`GEMINI_API_KEY`). La respuesta se traduce de vuelta a la misma forma que esperaba
+  el frontend, así que el resto de la app no tuvo que cambiar.
 - Las políticas de Row Level Security en `supabase/schema.sql` permiten acceso completo
   con la llave `anon` (uso interno del despacho). Si más adelante se necesita login por
   usuario, se puede activar Supabase Auth y restringir las políticas.
