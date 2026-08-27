@@ -3237,6 +3237,493 @@ function RedesSocialesTab() {
   );
 }
 
+const PLATAFORMAS_CONTENIDO = ["Instagram", "Facebook", "TikTok"];
+const ESTADOS_CONTENIDO = ["Idea", "En preparación", "Listo para subir", "Publicado"];
+const COLOR_ESTADO_CONTENIDO = {
+  Idea: "#8B5CF6",
+  "En preparación": "#F5A524",
+  "Listo para subir": "#2F80ED",
+  Publicado: "#10B981",
+};
+const FORM_CONTENIDO_INICIAL = { titulo: "", plataformas: ["Instagram"], fecha: "", hora: "", estado: "Idea", asignadoA: "", notas: "" };
+
+function fechaHoyISO() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function fechaISO(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+function construirMatrizMes(anio, mes) {
+  const primerDia = new Date(anio, mes, 1);
+  const inicioSemana = primerDia.getDay();
+  const diasEnMes = new Date(anio, mes + 1, 0).getDate();
+  const celdas = [];
+  for (let i = 0; i < inicioSemana; i++) celdas.push(null);
+  for (let d = 1; d <= diasEnMes; d++) celdas.push(new Date(anio, mes, d));
+  while (celdas.length % 7 !== 0) celdas.push(null);
+  const semanas = [];
+  for (let i = 0; i < celdas.length; i += 7) semanas.push(celdas.slice(i, i + 7));
+  return semanas;
+}
+
+async function generarIdeasCalendario(tema) {
+  const response = await fetch("/api/assistant", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: "claude-sonnet-4-6",
+      max_tokens: 500,
+      system:
+        `Eres un asistente de marketing de contenido para un despacho de abogados en Colombia (Cortés Ramírez Abogados), que publica en Instagram, Facebook y TikTok. ` +
+        `Genera 5 ideas de contenido concretas y variadas (educativas, cercanas, casos de éxito sin romper confidencialidad, detrás de cámaras, tendencias, formatos de video corto, etc.)` +
+        (tema ? ` enfocadas en: ${tema}.` : ".") +
+        ` Responde SOLO con una lista numerada del 1 al 5, cada idea en una sola línea corta (máximo 20 palabras), sin texto adicional antes o después, sin usar markdown.`,
+      messages: [{ role: "user", content: "Dame ideas de contenido." }],
+    }),
+  });
+  const data = await response.json();
+  const texto = (data.content || []).map((b) => b.text || "").join("");
+  return texto
+    .split("\n")
+    .map((l) => l.replace(/^\s*\d+[.)]\s*/, "").trim())
+    .filter(Boolean);
+}
+
+function useContenido() {
+  const { ids, addId, removeId } = useIndex("indice-contenido", true);
+  const [items, setItems] = useState({});
+
+  const cargar = useCallback(async () => {
+    const entries = {};
+    for (const id of ids) {
+      const raw = await storageGet(`contenido:${id}`, true);
+      if (raw) entries[id] = JSON.parse(raw);
+    }
+    setItems(entries);
+  }, [ids]);
+
+  useEffect(() => {
+    cargar();
+  }, [cargar]);
+
+  const crear = async (datos) => {
+    const id = uid();
+    const nuevo = { ...datos, id, creadoEn: new Date().toISOString() };
+    await storageSet(`contenido:${id}`, JSON.stringify(nuevo), true);
+    await addId(id);
+    setItems((prev) => ({ ...prev, [id]: nuevo }));
+    return nuevo;
+  };
+
+  const actualizar = async (id, cambios) => {
+    const actualizado = { ...items[id], ...cambios };
+    await storageSet(`contenido:${id}`, JSON.stringify(actualizado), true);
+    setItems((prev) => ({ ...prev, [id]: actualizado }));
+  };
+
+  const eliminar = async (id) => {
+    await removeId(id);
+    setItems((prev) => {
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
+  };
+
+  return { items, crear, actualizar, eliminar };
+}
+
+function useIdeasContenido() {
+  const [ideas, setIdeas] = useState([]);
+
+  const cargar = useCallback(async () => {
+    const raw = await storageGet("ideas-contenido", true);
+    setIdeas(raw ? JSON.parse(raw) : []);
+  }, []);
+
+  useEffect(() => {
+    cargar();
+  }, [cargar]);
+
+  const agregarVarias = async (textos) => {
+    const nuevas = textos.map((t) => ({ id: uid(), texto: t, creadaEn: new Date().toISOString() }));
+    const actualizadas = [...nuevas, ...ideas];
+    await storageSet("ideas-contenido", JSON.stringify(actualizadas), true);
+    setIdeas(actualizadas);
+  };
+
+  const eliminar = async (id) => {
+    const actualizadas = ideas.filter((i) => i.id !== id);
+    await storageSet("ideas-contenido", JSON.stringify(actualizadas), true);
+    setIdeas(actualizadas);
+  };
+
+  return { ideas, agregarVarias, eliminar };
+}
+
+function ContenidoTab() {
+  const { items, crear, actualizar, eliminar } = useContenido();
+  const { usuarios } = useUsuariosDespacho();
+  const { ideas, agregarVarias, eliminar: eliminarIdea } = useIdeasContenido();
+
+  const [mesActual, setMesActual] = useState(() => {
+    const d = new Date();
+    return new Date(d.getFullYear(), d.getMonth(), 1);
+  });
+  const [diaSeleccionado, setDiaSeleccionado] = useState(fechaHoyISO());
+  const [mostrarForm, setMostrarForm] = useState(false);
+  const [form, setForm] = useState(FORM_CONTENIDO_INICIAL);
+  const [editandoId, setEditandoId] = useState(null);
+  const [temaIdeas, setTemaIdeas] = useState("");
+  const [generandoIdeas, setGenerandoIdeas] = useState(false);
+
+  const lista = Object.values(items);
+  const porFecha = {};
+  lista.forEach((it) => {
+    porFecha[it.fecha] = porFecha[it.fecha] || [];
+    porFecha[it.fecha].push(it);
+  });
+
+  const semanas = construirMatrizMes(mesActual.getFullYear(), mesActual.getMonth());
+  const hoyISO = fechaHoyISO();
+
+  const abrirNuevo = (fechaPrefill) => {
+    setEditandoId(null);
+    setForm({ ...FORM_CONTENIDO_INICIAL, fecha: fechaPrefill || diaSeleccionado });
+    setMostrarForm(true);
+  };
+
+  const abrirEdicion = (item) => {
+    setEditandoId(item.id);
+    setForm({
+      titulo: item.titulo,
+      plataformas: item.plataformas || [],
+      fecha: item.fecha,
+      hora: item.hora || "",
+      estado: item.estado,
+      asignadoA: item.asignadoA || "",
+      notas: item.notas || "",
+    });
+    setMostrarForm(true);
+  };
+
+  const guardar = async () => {
+    if (!form.titulo.trim() || !form.fecha) return;
+    if (editandoId) {
+      await actualizar(editandoId, form);
+    } else {
+      await crear(form);
+    }
+    setMostrarForm(false);
+    setForm(FORM_CONTENIDO_INICIAL);
+    setEditandoId(null);
+  };
+
+  const alternarPlataforma = (p) => {
+    setForm((f) => ({ ...f, plataformas: f.plataformas.includes(p) ? f.plataformas.filter((x) => x !== p) : [...f.plataformas, p] }));
+  };
+
+  const pedirIdeas = async () => {
+    setGenerandoIdeas(true);
+    try {
+      const nuevas = await generarIdeasCalendario(temaIdeas.trim());
+      if (nuevas.length > 0) await agregarVarias(nuevas);
+    } catch (e) {
+      // se puede reintentar con el mismo botón
+    }
+    setGenerandoIdeas(false);
+  };
+
+  const usarIdea = (idea) => {
+    setEditandoId(null);
+    setForm({ ...FORM_CONTENIDO_INICIAL, titulo: idea.texto, fecha: diaSeleccionado });
+    setMostrarForm(true);
+  };
+
+  const itemsDelDia = (porFecha[diaSeleccionado] || []).sort((a, b) => (a.hora || "").localeCompare(b.hora || ""));
+
+  return (
+    <div>
+      <EncabezadoSeccion titulo="Calendario de contenido" color="#8B5CF6" />
+
+      <div
+        style={{
+          background: COLORS.accentSoft,
+          border: "1px solid #C7D6EA",
+          borderRadius: 10,
+          padding: "12px 16px",
+          marginBottom: 18,
+          fontFamily: "Inter, sans-serif",
+          fontSize: 12.5,
+          color: COLORS.navy,
+          lineHeight: 1.6,
+        }}
+      >
+        <strong>🗓️ Planeador de contenido:</strong> organiza qué se sube, en qué red (Instagram, Facebook, TikTok) y cuándo. No publica nada
+        automáticamente — es la agenda para no perder el hilo. Lo pendiente para hoy o vencido aparece en la campana de notificaciones.
+      </div>
+
+      <Card style={{ marginBottom: 20 }}>
+        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, fontWeight: 700, color: COLORS.ink, marginBottom: 4 }}>💡 Banco de ideas</p>
+        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.muted, marginBottom: 12 }}>
+          Pide ideas a la IA (con o sin tema) y guárdalas aquí. Cuando quieras usar una, la conviertes en una entrada del calendario con un clic.
+        </p>
+        <div style={{ display: "flex", gap: 10, marginBottom: 14, flexWrap: "wrap" }}>
+          <input
+            className="drx-input"
+            style={{ ...inputStyle, flex: 1, minWidth: 220 }}
+            placeholder="Tema u ocasión (opcional): herencias, tips laborales, fin de año..."
+            value={temaIdeas}
+            onChange={(e) => setTemaIdeas(e.target.value)}
+          />
+          <button className="drx-btn-primary" style={buttonPrimary} onClick={pedirIdeas} disabled={generandoIdeas}>
+            {generandoIdeas ? "Generando..." : "✨ Generar 5 ideas"}
+          </button>
+        </div>
+        {ideas.length > 0 ? (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {ideas.map((idea) => (
+              <div
+                key={idea.id}
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  gap: 10,
+                  background: COLORS.surfaceSoft,
+                  border: `1px solid ${COLORS.border}`,
+                  borderRadius: 8,
+                  padding: "9px 12px",
+                  flexWrap: "wrap",
+                }}
+              >
+                <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.inkSoft, margin: 0, flex: 1, minWidth: 160 }}>{idea.texto}</p>
+                <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                  <button className="drx-btn-ghost" style={{ ...buttonGhost, fontSize: 11.5, padding: "5px 10px" }} onClick={() => usarIdea(idea)}>
+                    + Al calendario
+                  </button>
+                  <button className="drx-btn-ghost" style={{ ...buttonGhost, fontSize: 11.5, padding: "5px 10px" }} onClick={() => eliminarIdea(idea.id)}>
+                    Descartar
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.muted }}>Aún no has generado ideas. Prueba con el botón de arriba.</p>
+        )}
+      </Card>
+
+      <Card style={{ marginBottom: 20 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+          <button className="drx-btn-ghost" style={buttonGhost} onClick={() => setMesActual((m) => new Date(m.getFullYear(), m.getMonth() - 1, 1))}>
+            ←
+          </button>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, fontWeight: 700, color: COLORS.ink, margin: 0, textTransform: "capitalize" }}>
+            {mesActual.toLocaleDateString("es-CO", { month: "long", year: "numeric" })}
+          </p>
+          <button className="drx-btn-ghost" style={buttonGhost} onClick={() => setMesActual((m) => new Date(m.getFullYear(), m.getMonth() + 1, 1))}>
+            →
+          </button>
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4, marginBottom: 4 }}>
+          {["D", "L", "M", "M", "J", "V", "S"].map((d, i) => (
+            <p key={i} style={{ fontFamily: "Inter, sans-serif", fontSize: 11, fontWeight: 700, color: COLORS.muted, textAlign: "center", margin: 0 }}>
+              {d}
+            </p>
+          ))}
+        </div>
+
+        {semanas.map((semana, si) => (
+          <div key={si} style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4, marginBottom: 4 }}>
+            {semana.map((dia, di) => {
+              if (!dia) return <div key={di} />;
+              const iso = fechaISO(dia);
+              const itemsDia = porFecha[iso] || [];
+              const esHoy = iso === hoyISO;
+              const esSeleccionado = iso === diaSeleccionado;
+              return (
+                <button
+                  key={di}
+                  onClick={() => setDiaSeleccionado(iso)}
+                  style={{
+                    aspectRatio: "1",
+                    borderRadius: 8,
+                    border: esSeleccionado ? `2px solid ${COLORS.navy}` : esHoy ? `1px solid ${COLORS.accentBright}` : `1px solid ${COLORS.border}`,
+                    background: esSeleccionado ? COLORS.accentSoft : "transparent",
+                    cursor: "pointer",
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    padding: 2,
+                    fontFamily: "Inter, sans-serif",
+                  }}
+                >
+                  <span style={{ fontSize: 12, fontWeight: esHoy ? 800 : 500, color: COLORS.ink }}>{dia.getDate()}</span>
+                  {itemsDia.length > 0 && (
+                    <div style={{ display: "flex", gap: 2, marginTop: 2, flexWrap: "wrap", justifyContent: "center" }}>
+                      {itemsDia.slice(0, 3).map((it) => (
+                        <span key={it.id} style={{ width: 5, height: 5, borderRadius: "50%", background: COLOR_ESTADO_CONTENIDO[it.estado] || COLORS.muted }} />
+                      ))}
+                    </div>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        ))}
+      </Card>
+
+      <Card style={{ marginBottom: 20 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, flexWrap: "wrap", gap: 10 }}>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, fontWeight: 700, color: COLORS.ink, margin: 0, textTransform: "capitalize" }}>
+            {new Date(`${diaSeleccionado}T00:00:00`).toLocaleDateString("es-CO", { weekday: "long", day: "numeric", month: "long" })}
+          </p>
+          <button className="drx-btn-primary" style={buttonPrimary} onClick={() => abrirNuevo(diaSeleccionado)}>
+            + Agregar
+          </button>
+        </div>
+
+        {itemsDelDia.length > 0 ? (
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {itemsDelDia.map((it) => (
+              <div key={it.id} style={{ border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: 12 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10, flexWrap: "wrap" }}>
+                  <div>
+                    <p style={{ fontFamily: "Inter, sans-serif", fontSize: 14, fontWeight: 700, color: COLORS.ink, margin: 0 }}>
+                      {it.hora ? `${it.hora} · ` : ""}
+                      {it.titulo}
+                    </p>
+                    <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, color: COLORS.muted, margin: "3px 0 0" }}>
+                      {(it.plataformas || []).join(" · ")}
+                      {it.asignadoA ? ` · Asignado a ${it.asignadoA}` : ""}
+                    </p>
+                    {it.notas && <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.inkSoft, margin: "6px 0 0" }}>{it.notas}</p>}
+                  </div>
+                  <span
+                    style={{
+                      fontFamily: "Inter, sans-serif",
+                      fontSize: 11,
+                      fontWeight: 700,
+                      color: "#FFFFFF",
+                      background: COLOR_ESTADO_CONTENIDO[it.estado] || COLORS.muted,
+                      borderRadius: 20,
+                      padding: "3px 10px",
+                      flexShrink: 0,
+                    }}
+                  >
+                    {it.estado}
+                  </span>
+                </div>
+                <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
+                  {it.estado !== "Publicado" && (
+                    <button className="drx-btn-ghost" style={{ ...buttonGhost, fontSize: 11.5, padding: "5px 10px" }} onClick={() => actualizar(it.id, { estado: "Publicado" })}>
+                      ✓ Marcar publicado
+                    </button>
+                  )}
+                  <button className="drx-btn-ghost" style={{ ...buttonGhost, fontSize: 11.5, padding: "5px 10px" }} onClick={() => abrirEdicion(it)}>
+                    Editar
+                  </button>
+                  <button className="drx-btn-ghost" style={{ ...buttonGhost, fontSize: 11.5, padding: "5px 10px" }} onClick={() => eliminar(it.id)}>
+                    Eliminar
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.muted }}>Nada programado este día.</p>
+        )}
+      </Card>
+
+      {mostrarForm && (
+        <Card>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, fontWeight: 700, color: COLORS.ink, marginBottom: 12 }}>
+            {editandoId ? "Editar entrada" : "Nueva entrada"}
+          </p>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <Field label="Título / qué se sube">
+              <input
+                className="drx-input"
+                style={inputStyle}
+                value={form.titulo}
+                onChange={(e) => setForm((f) => ({ ...f, titulo: e.target.value }))}
+                placeholder="Ej: Reel - 3 errores en contratos de arriendo"
+              />
+            </Field>
+            <Field label="Asignado a">
+              <select className="drx-input" style={inputStyle} value={form.asignadoA} onChange={(e) => setForm((f) => ({ ...f, asignadoA: e.target.value }))}>
+                <option value="">Sin asignar</option>
+                {usuarios.map((u) => (
+                  <option key={u.id} value={u.nombre}>
+                    {u.nombre}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Fecha">
+              <input type="date" className="drx-input" style={inputStyle} value={form.fecha} onChange={(e) => setForm((f) => ({ ...f, fecha: e.target.value }))} />
+            </Field>
+            <Field label="Hora (opcional)">
+              <input type="time" className="drx-input" style={inputStyle} value={form.hora} onChange={(e) => setForm((f) => ({ ...f, hora: e.target.value }))} />
+            </Field>
+            <Field label="Estado">
+              <select className="drx-input" style={inputStyle} value={form.estado} onChange={(e) => setForm((f) => ({ ...f, estado: e.target.value }))}>
+                {ESTADOS_CONTENIDO.map((e) => (
+                  <option key={e}>{e}</option>
+                ))}
+              </select>
+            </Field>
+          </div>
+          <div style={{ marginTop: 12 }}>
+            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, fontWeight: 600, color: COLORS.inkSoft, marginBottom: 6 }}>Plataformas</p>
+            <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
+              {PLATAFORMAS_CONTENIDO.map((p) => (
+                <label key={p} style={{ display: "flex", alignItems: "center", gap: 6, fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.inkSoft, cursor: "pointer" }}>
+                  <input type="checkbox" checked={form.plataformas.includes(p)} onChange={() => alternarPlataforma(p)} />
+                  {p}
+                </label>
+              ))}
+            </div>
+          </div>
+          <div style={{ marginTop: 12 }}>
+            <Field label="Guion / notas (opcional)">
+              <textarea
+                className="drx-input"
+                style={{ ...inputStyle, minHeight: 80, resize: "vertical" }}
+                value={form.notas}
+                onChange={(e) => setForm((f) => ({ ...f, notas: e.target.value }))}
+              />
+            </Field>
+          </div>
+          <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
+            <button className="drx-btn-primary" style={buttonPrimary} onClick={guardar} disabled={!form.titulo.trim() || !form.fecha}>
+              {editandoId ? "Guardar cambios" : "Agregar al calendario"}
+            </button>
+            <button
+              className="drx-btn-ghost"
+              style={buttonGhost}
+              onClick={() => {
+                setMostrarForm(false);
+                setEditandoId(null);
+              }}
+            >
+              Cancelar
+            </button>
+          </div>
+        </Card>
+      )}
+    </div>
+  );
+}
+
 const FORM_DOC_INICIAL = { titulo: "", cliente: "", whatsappIndicativo: "57", whatsappNumero: "", contenido: "", nombreArchivo: "", tipoDocumento: "texto", archivoPdfBase64: "" };
 
 function DocumentosTab() {
@@ -3668,10 +4155,13 @@ function DocumentosTab() {
   );
 }
 
-function useNotificacionesPanel() {
+function useNotificacionesPanel(prefs) {
   const [firmasNuevas, setFirmasNuevas] = useState([]);
   const [clientesInactivos, setClientesInactivos] = useState([]);
   const [pagosPendientes, setPagosPendientes] = useState([]);
+  const [contenidoPendiente, setContenidoPendiente] = useState([]);
+  const [contenidoVencido, setContenidoVencido] = useState([]);
+  const notifPrefs = prefs || notificacionesPorDefecto();
 
   const cargar = useCallback(async () => {
     const revision = (await storageGet("ultima-revision-firmas", false)) || "1970-01-01T00:00:00.000Z";
@@ -3712,6 +4202,22 @@ function useNotificacionesPanel() {
     }
     setClientesInactivos(inactivos);
     setPagosPendientes(pendientesPago.sort((a, b) => a.dias - b.dias));
+
+    const idsContenidoRaw = await storageGet("indice-contenido", true);
+    const idsContenido = idsContenidoRaw ? JSON.parse(idsContenidoRaw) : [];
+    const hoyISO = fechaHoyISO();
+    const pendientesHoy = [];
+    const vencidos = [];
+    for (const id of idsContenido) {
+      const raw = await storageGet(`contenido:${id}`, true);
+      if (!raw) continue;
+      const it = JSON.parse(raw);
+      if (it.estado === "Publicado" || !it.fecha) continue;
+      if (it.fecha === hoyISO) pendientesHoy.push(it);
+      else if (it.fecha < hoyISO) vencidos.push(it);
+    }
+    setContenidoPendiente(pendientesHoy);
+    setContenidoVencido(vencidos);
   }, []);
 
   useEffect(() => {
@@ -3723,12 +4229,36 @@ function useNotificacionesPanel() {
     setFirmasNuevas([]);
   };
 
-  const count = firmasNuevas.length + clientesInactivos.length + pagosPendientes.length;
+  const count =
+    (notifPrefs.firmas !== false ? firmasNuevas.length : 0) +
+    (notifPrefs.clientes !== false ? clientesInactivos.length : 0) +
+    (notifPrefs.pagos !== false ? pagosPendientes.length : 0) +
+    (notifPrefs.contenido !== false ? contenidoPendiente.length + contenidoVencido.length : 0);
 
-  return { count, firmasNuevas, clientesInactivos, pagosPendientes, marcarFirmasVistas, reload: cargar };
+  return {
+    count,
+    firmasNuevas: notifPrefs.firmas !== false ? firmasNuevas : [],
+    clientesInactivos: notifPrefs.clientes !== false ? clientesInactivos : [],
+    pagosPendientes: notifPrefs.pagos !== false ? pagosPendientes : [],
+    contenidoPendiente: notifPrefs.contenido !== false ? contenidoPendiente : [],
+    contenidoVencido: notifPrefs.contenido !== false ? contenidoVencido : [],
+    marcarFirmasVistas,
+    reload: cargar,
+  };
 }
 
-function ModalNotificaciones({ firmasNuevas, clientesInactivos, pagosPendientes, onCerrar, onMarcarVistas, onIrADocumentos, onIrAClientes }) {
+function ModalNotificaciones({
+  firmasNuevas,
+  clientesInactivos,
+  pagosPendientes,
+  contenidoPendiente,
+  contenidoVencido,
+  onCerrar,
+  onMarcarVistas,
+  onIrADocumentos,
+  onIrAClientes,
+  onIrAContenido,
+}) {
   return (
     <div
       onClick={onCerrar}
@@ -3831,7 +4361,36 @@ function ModalNotificaciones({ firmasNuevas, clientesInactivos, pagosPendientes,
               ))}
             </div>
           ) : (
-            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.muted }}>No hay pagos por vencer en los próximos días.</p>
+            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.muted, marginBottom: 18 }}>No hay pagos por vencer en los próximos días.</p>
+          )}
+
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, fontWeight: 700, color: "#7C3AED", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 10 }}>
+            🗓️ Contenido pendiente
+          </p>
+          {contenidoVencido.length > 0 || contenidoPendiente.length > 0 ? (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {contenidoVencido.map((it) => (
+                <div key={it.id} style={{ background: "#FEECEC", borderRadius: 8, padding: "10px 12px" }}>
+                  <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, fontWeight: 600, color: "#B42318", margin: 0 }}>{it.titulo}</p>
+                  <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11, color: "#B42318", margin: "2px 0 0" }}>
+                    Vencido — estaba programado para {new Date(`${it.fecha}T00:00:00`).toLocaleDateString("es-CO", { dateStyle: "medium" })}
+                  </p>
+                </div>
+              ))}
+              {contenidoPendiente.map((it) => (
+                <div key={it.id} style={{ background: COLORS.accentSoft, borderRadius: 8, padding: "10px 12px" }}>
+                  <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, fontWeight: 600, color: COLORS.navy, margin: 0 }}>{it.titulo}</p>
+                  <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11, color: COLORS.navy, margin: "2px 0 0" }}>
+                    Programado para hoy{it.hora ? ` a las ${it.hora}` : ""}
+                  </p>
+                </div>
+              ))}
+              <button className="drx-btn-ghost" style={{ ...buttonGhost, fontSize: 12, padding: "6px 12px", alignSelf: "flex-start" }} onClick={onIrAContenido}>
+                Ver calendario de contenido
+              </button>
+            </div>
+          ) : (
+            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.muted }}>No hay contenido pendiente ni vencido.</p>
           )}
         </div>
       </div>
@@ -3845,13 +4404,25 @@ const SECCIONES_PERMISOS = [
   { id: "vigilancia", nombre: "Vigilancia judicial" },
   { id: "contabilidad", nombre: "Contabilidad" },
   { id: "redes", nombre: "Redes sociales" },
+  { id: "contenido", nombre: "Calendario de contenido" },
   { id: "documentos", nombre: "Firmar documentos" },
 ];
 
 function permisosPorDefecto(rol) {
   const todos = Object.fromEntries(SECCIONES_PERMISOS.map((s) => [s.id, true]));
   if (rol === "Administrador" || rol === "Abogado") return todos;
-  return { resumen: true, clientes: true, casos: true, vigilancia: false, contabilidad: false, redes: false, documentos: true };
+  return { resumen: true, clientes: true, casos: true, vigilancia: false, contabilidad: false, redes: false, contenido: false, documentos: true };
+}
+
+const NOTIF_CATEGORIAS = [
+  { id: "firmas", nombre: "Firmas nuevas" },
+  { id: "clientes", nombre: "Clientes sin actividad" },
+  { id: "pagos", nombre: "Pagos pendientes" },
+  { id: "contenido", nombre: "Contenido pendiente o vencido" },
+];
+
+function notificacionesPorDefecto() {
+  return Object.fromEntries(NOTIF_CATEGORIAS.map((n) => [n.id, true]));
 }
 
 function useUsuariosDespacho() {
@@ -3866,7 +4437,7 @@ function useUsuariosDespacho() {
     cargar();
   }, [cargar]);
   const agregar = async (nombre, usuario, contrasena, rol, permisos) => {
-    const nuevo = { id: uid(), nombre, usuario, contrasena, rol, permisos: permisos || permisosPorDefecto(rol) };
+    const nuevo = { id: uid(), nombre, usuario, contrasena, rol, permisos: permisos || permisosPorDefecto(rol), notificaciones: notificacionesPorDefecto() };
     const actualizados = [...usuarios, nuevo];
     setUsuarios(actualizados);
     await storageSet("usuarios-despacho", JSON.stringify(actualizados), true);
@@ -4122,6 +4693,11 @@ function UsuariosPermisosTab({ usuarioActualId }) {
     actualizar(u.id, { permisos });
   };
 
+  const cambiarNotificacion = (u, categoriaId, valor) => {
+    const notificaciones = { ...(u.notificaciones || notificacionesPorDefecto()), [categoriaId]: valor };
+    actualizar(u.id, { notificaciones });
+  };
+
   return (
     <div>
       <EncabezadoSeccion titulo="Usuarios y permisos" color="#6B7480" />
@@ -4203,6 +4779,23 @@ function UsuariosPermisosTab({ usuarioActualId }) {
                   Los administradores siempre ven todas las secciones.
                 </p>
               )}
+
+              <div style={{ borderTop: `1px solid ${COLORS.border}`, marginTop: 12, paddingTop: 10 }}>
+                <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, fontWeight: 600, color: COLORS.muted, marginBottom: 8 }}>
+                  🔔 Qué notificaciones recibe (campana)
+                </p>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
+                  {NOTIF_CATEGORIAS.map((n) => {
+                    const notifs = u.notificaciones || notificacionesPorDefecto();
+                    return (
+                      <label key={n.id} style={{ display: "flex", alignItems: "center", gap: 6, fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.inkSoft, cursor: "pointer" }}>
+                        <input type="checkbox" checked={notifs[n.id] !== false} onChange={(e) => cambiarNotificacion(u, n.id, e.target.checked)} />
+                        {n.nombre}
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
             </Card>
           );
         })}
@@ -4223,7 +4816,15 @@ export default function App() {
   const [cambiandoUsuario, setCambiandoUsuario] = useState(false);
   const [tab, setTab] = useState("resumen");
   const [mostrarNotificaciones, setMostrarNotificaciones] = useState(false);
-  const { count: notificaciones, firmasNuevas, clientesInactivos, pagosPendientes, marcarFirmasVistas } = useNotificacionesPanel();
+  const {
+    count: notificaciones,
+    firmasNuevas,
+    clientesInactivos,
+    pagosPendientes,
+    contenidoPendiente,
+    contenidoVencido,
+    marcarFirmasVistas,
+  } = useNotificacionesPanel(usuarioActual?.notificaciones);
   const { oscuro, alternar } = useTema();
 
   useEffect(() => {
@@ -4276,6 +4877,10 @@ export default function App() {
   };
   const irAClientes = () => {
     setTab("clientes");
+    setMostrarNotificaciones(false);
+  };
+  const irAContenido = () => {
+    setTab("contenido");
     setMostrarNotificaciones(false);
   };
 
@@ -4343,6 +4948,11 @@ export default function App() {
           {puedeVer("redes") && (
             <SidebarButton active={tab === "redes"} onClick={() => setTab("redes")} color="#EC4899">
               Redes sociales
+            </SidebarButton>
+          )}
+          {puedeVer("contenido") && (
+            <SidebarButton active={tab === "contenido"} onClick={() => setTab("contenido")} color="#8B5CF6">
+              Calendario de contenido
             </SidebarButton>
           )}
           {puedeVer("documentos") && (
@@ -4436,6 +5046,7 @@ export default function App() {
             {tab === "vigilancia" && puedeVer("vigilancia") && <VigilanciaTab />}
             {tab === "contabilidad" && puedeVer("contabilidad") && <ContabilidadTab />}
             {tab === "redes" && puedeVer("redes") && <RedesSocialesTab />}
+            {tab === "contenido" && puedeVer("contenido") && <ContenidoTab />}
             {tab === "documentos" && puedeVer("documentos") && <DocumentosTab />}
             {tab === "usuarios" && usuarioActual.rol === "Administrador" && <UsuariosPermisosTab usuarioActualId={usuarioActual.id} />}
           </div>
@@ -4459,10 +5070,13 @@ export default function App() {
           firmasNuevas={firmasNuevas}
           clientesInactivos={clientesInactivos}
           pagosPendientes={pagosPendientes}
+          contenidoPendiente={contenidoPendiente}
+          contenidoVencido={contenidoVencido}
           onCerrar={() => setMostrarNotificaciones(false)}
           onMarcarVistas={marcarFirmasVistas}
           onIrADocumentos={irADocumentos}
           onIrAClientes={irAClientes}
+          onIrAContenido={irAContenido}
         />
       )}
     </div>
