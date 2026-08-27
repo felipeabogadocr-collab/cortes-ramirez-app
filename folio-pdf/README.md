@@ -4,7 +4,8 @@ Diseñado por **LITIA.ai**. App gratuita, sin login ni registro, para unir, orga
 (reordenar/rotar/eliminar/extraer páginas), dividir, firmar (firma electrónica simple) y
 convertir imágenes a PDF. Pensada para estudiantes y abogados.
 
-Desplegado en Vercel con **Root Directory** = `folio-pdf` desde esta misma rama.
+Desplegado en Vercel con **Root Directory** = `folio-pdf` desde esta misma rama (URL de
+producción: `folio-pdf-omega.vercel.app`).
 
 ## Por qué es gratis y rápida
 
