@@ -1,10 +1,10 @@
 // Crea un usuario real en Supabase Auth (contraseña hasheada por Supabase,
-// nunca guardada por nosotros) y su fila en la tabla "perfiles".
+// nunca guardada por nosotros) y su fila en la tabla "perfiles", como
+// integrante del MISMO despacho de quien lo crea.
 //
-// Caso especial: si todavía no existe NINGÚN perfil en el sistema, cualquiera
-// puede crear el primer usuario (queda como Administrador) — es el flujo de
-// "arranque" cuando se instala la app por primera vez. Si ya existe al menos
-// un usuario, solo un Administrador autenticado puede crear más.
+// Solo un Administrador autenticado puede llamar esto — para crear un
+// despacho nuevo (el primer usuario, que queda como su Administrador) se usa
+// api/despachos/crear.js en su lugar.
 
 import { supabaseAdmin } from "../_lib/supabaseAdmin.js";
 import { permisosPorDefecto, notificacionesPorDefecto } from "../_lib/defaults.js";
@@ -28,26 +28,19 @@ export default async function handler(req, res) {
   const admin = supabaseAdmin();
 
   try {
-    const { count, error: countError } = await admin.from("perfiles").select("id", { count: "exact", head: true });
-    if (countError) throw countError;
+    const authHeader = req.headers.authorization || "";
+    const token = authHeader.replace(/^Bearer\s+/i, "");
+    if (!token) return res.status(401).json({ error: "No autenticado" });
 
-    let rolFinal = ROLES_VALIDOS.has(rol) ? rol : "Asistente";
+    const { data: userData, error: userError } = await admin.auth.getUser(token);
+    if (userError || !userData?.user) return res.status(401).json({ error: "Sesión inválida" });
 
-    if (count && count > 0) {
-      const authHeader = req.headers.authorization || "";
-      const token = authHeader.replace(/^Bearer\s+/i, "");
-      if (!token) return res.status(401).json({ error: "No autenticado" });
-
-      const { data: userData, error: userError } = await admin.auth.getUser(token);
-      if (userError || !userData?.user) return res.status(401).json({ error: "Sesión inválida" });
-
-      const { data: perfilLlamador } = await admin.from("perfiles").select("rol").eq("id", userData.user.id).maybeSingle();
-      if (perfilLlamador?.rol !== "Administrador") {
-        return res.status(403).json({ error: "Solo un administrador puede crear usuarios" });
-      }
-    } else {
-      rolFinal = "Administrador"; // el primer usuario del sistema siempre es admin
+    const { data: perfilLlamador } = await admin.from("perfiles").select("rol, despacho_id").eq("id", userData.user.id).maybeSingle();
+    if (perfilLlamador?.rol !== "Administrador") {
+      return res.status(403).json({ error: "Solo un administrador puede crear usuarios" });
     }
+
+    const rolFinal = ROLES_VALIDOS.has(rol) ? rol : "Asistente";
 
     const { data: nuevoUsuario, error: createError } = await admin.auth.admin.createUser({
       email: email.trim(),
@@ -63,6 +56,7 @@ export default async function handler(req, res) {
         nombre: nombre.trim(),
         email: email.trim(),
         rol: rolFinal,
+        despacho_id: perfilLlamador.despacho_id,
         permisos: permisosPorDefecto(rolFinal),
         notificaciones: notificacionesPorDefecto(),
       })

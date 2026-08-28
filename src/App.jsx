@@ -11,6 +11,7 @@ async function registrarAuditoria(usuarioActual, accion, entidad, entidadId, det
     await supabase.from("auditoria").insert({
       usuario_id: usuarioActual?.id || null,
       usuario_nombre: usuarioActual?.nombre || null,
+      despacho_id: usuarioActual?.despacho_id || null,
       accion,
       entidad: entidad || null,
       entidad_id: entidadId || null,
@@ -191,7 +192,7 @@ function ensureFonts() {
   document.head.appendChild(link);
 }
 
-import { storageGet, storageSet } from "./lib/storage";
+import { storageGet, storageSet, setDespachoActual } from "./lib/storage";
 
 function useIndex(key, shared) {
   const [ids, setIds] = useState([]);
@@ -4812,7 +4813,8 @@ function CampoContrasena({ valor, onChange, onEnter, autoFocus }) {
 
 function LoginGate({ onIngresar, onCancelar }) {
   const { oscuro, alternar } = useTema();
-  const [pantalla, setPantalla] = useState("cargando"); // cargando | bootstrap | login
+  const [pantalla, setPantalla] = useState("login"); // login | registro
+  const [nombreDespacho, setNombreDespacho] = useState("");
   const [nombre, setNombre] = useState("");
   const [email, setEmail] = useState("");
   const [contrasena, setContrasena] = useState("");
@@ -4823,32 +4825,28 @@ function LoginGate({ onIngresar, onCancelar }) {
     ensureFonts();
   }, []);
 
-  useEffect(() => {
-    (async () => {
-      const { data, error: rpcError } = await supabase.rpc("hay_administrador");
-      // Si la función falla (ej. sin conexión), asumimos que ya existe un
-      // administrador y mostramos el login normal en vez de dejar crear uno.
-      setPantalla(!rpcError && data === false ? "bootstrap" : "login");
-    })();
-  }, []);
+  const cambiarPantalla = (nueva) => {
+    setPantalla(nueva);
+    setError("");
+  };
 
-  const crearAdministrador = async () => {
-    if (!nombre.trim() || !email.trim() || !contrasena.trim()) return;
+  const crearDespacho = async () => {
+    if (!nombreDespacho.trim() || !nombre.trim() || !email.trim() || !contrasena.trim()) return;
     setEnviando(true);
     setError("");
     try {
-      const response = await fetch("/api/usuarios/crear", {
+      const response = await fetch("/api/despachos/crear", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ nombre: nombre.trim(), email: email.trim(), contrasena, rol: "Administrador" }),
+        body: JSON.stringify({ nombreDespacho: nombreDespacho.trim(), nombre: nombre.trim(), email: email.trim(), contrasena }),
       });
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "No se pudo crear el administrador.");
+      if (!response.ok) throw new Error(data.error || "No se pudo crear el despacho.");
       const { error: loginError } = await supabase.auth.signInWithPassword({ email: email.trim(), password: contrasena });
       if (loginError) throw loginError;
       onIngresar();
     } catch (e) {
-      setError(e.message || "No se pudo crear el administrador. Intenta de nuevo.");
+      setError(e.message || "No se pudo crear el despacho. Intenta de nuevo.");
     }
     setEnviando(false);
   };
@@ -4888,19 +4886,28 @@ function LoginGate({ onIngresar, onCancelar }) {
         )}
         <InsigniaPlataforma grande />
         <h1 style={{ fontFamily: "Inter, sans-serif", fontSize: 22, fontWeight: 800, textTransform: "uppercase", letterSpacing: 0.5, color: COLORS.headingText, margin: "0 0 4px" }}>
-          Cortés Ramírez Abogados
+          {pantalla === "registro" ? "Registra tu despacho" : "Cortés Ramírez Abogados"}
         </h1>
 
-        {pantalla === "cargando" && <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.muted, marginTop: 20 }}>Cargando…</p>}
-
-        {pantalla === "bootstrap" && (
+        {pantalla === "registro" && (
           <div style={{ textAlign: "left" }}>
             <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted, margin: "8px 0 16px" }}>
-              Aún no hay ningún administrador. Crea la primera cuenta — quedará como Administrador y podrá crear a los demás usuarios y darles permisos.
+              Crea la cuenta de tu despacho — quedas como su Administrador y desde ahí creas a los demás usuarios y les das permisos. Tus datos quedan
+              completamente separados de los de cualquier otro despacho.
             </p>
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              <Field label="Nombre del despacho">
+                <input
+                  className="drx-input"
+                  style={inputStyle}
+                  value={nombreDespacho}
+                  onChange={(e) => setNombreDespacho(e.target.value)}
+                  placeholder="Ej: Cortés Ramírez Abogados"
+                  autoFocus
+                />
+              </Field>
               <Field label="Tu nombre">
-                <input className="drx-input" style={inputStyle} value={nombre} onChange={(e) => setNombre(e.target.value)} autoFocus />
+                <input className="drx-input" style={inputStyle} value={nombre} onChange={(e) => setNombre(e.target.value)} />
               </Field>
               <Field label="Correo">
                 <input
@@ -4920,11 +4927,20 @@ function LoginGate({ onIngresar, onCancelar }) {
             <button
               className="drx-btn-primary"
               style={{ ...buttonPrimary, width: "100%", marginTop: 16 }}
-              onClick={crearAdministrador}
-              disabled={enviando || !nombre.trim() || !email.trim() || !contrasena.trim()}
+              onClick={crearDespacho}
+              disabled={enviando || !nombreDespacho.trim() || !nombre.trim() || !email.trim() || !contrasena.trim()}
             >
-              {enviando ? "Creando…" : "Crear administrador e ingresar"}
+              {enviando ? "Creando…" : "Crear mi despacho e ingresar"}
             </button>
+            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11, color: COLORS.muted, marginTop: 14, textAlign: "center" }}>
+              ¿Ya tienes cuenta?{" "}
+              <button
+                onClick={() => cambiarPantalla("login")}
+                style={{ background: "none", border: "none", color: COLORS.accentBright, cursor: "pointer", textDecoration: "underline", fontFamily: "Inter, sans-serif", fontSize: 11 }}
+              >
+                Inicia sesión
+              </button>
+            </p>
           </div>
         )}
 
@@ -4958,6 +4974,14 @@ function LoginGate({ onIngresar, onCancelar }) {
             </button>
             <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11, color: COLORS.muted, marginTop: 14, textAlign: "center" }}>
               ¿No tienes acceso? Pídele a tu administrador que te cree un usuario desde "Usuarios y permisos".
+              <br />
+              ¿Primera vez aquí?{" "}
+              <button
+                onClick={() => cambiarPantalla("registro")}
+                style={{ background: "none", border: "none", color: COLORS.accentBright, cursor: "pointer", textDecoration: "underline", fontFamily: "Inter, sans-serif", fontSize: 11 }}
+              >
+                Crea tu despacho
+              </button>
             </p>
           </div>
         )}
@@ -5207,10 +5231,12 @@ export default function App() {
       data: { user },
     } = await supabase.auth.getUser();
     if (!user) {
+      setDespachoActual(null);
       setUsuarioActual(null);
       return;
     }
     const { data: perfil } = await supabase.from("perfiles").select("*").eq("id", user.id).maybeSingle();
+    setDespachoActual(perfil?.despacho_id || null);
     setUsuarioActual(perfil ? { ...perfil, email: user.email } : null);
   }, []);
 

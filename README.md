@@ -54,11 +54,13 @@ despliega directo a Vercel.
 
 ## 5. Primer ingreso
 
-La primera vez que se abre la app, como no hay ningún usuario todavía, se muestra la
-pantalla para crear el Administrador (nombre, correo, contraseña). Desde ahí, el
-Administrador crea a los demás usuarios en "Usuarios y permisos" y decide qué secciones
-ve cada uno. El login es real: las contraseñas las gestiona Supabase Auth, nunca se
-guardan en texto plano.
+La app es multi-despacho (multi-tenant): una misma base de datos puede tener varios
+despachos distintos, cada uno viendo solo sus propios datos. Para entrar por primera vez,
+en la pantalla de login hay un link **"Crea tu despacho"** — pide el nombre del despacho,
+tu nombre, correo y contraseña, y te deja como Administrador de ese despacho. Desde ahí
+creas a los demás usuarios en "Usuarios y permisos" (quedan en el mismo despacho) y
+decides qué secciones ve cada uno. El login es real: las contraseñas las gestiona
+Supabase Auth, nunca se guardan en texto plano.
 
 ## 6. Instalar como app (PWA)
 
@@ -68,18 +70,28 @@ Abre la URL publicada desde el navegador del celular/tablet y usa
 
 ## Notas de arquitectura
 
+- **Multi-despacho (multi-tenant):** la tabla `despachos` es el "tenant". Cada tabla de
+  datos (`clientes`, `casos`, `chats`, `app_settings`, `perfiles`, `auditoria`) tiene una
+  columna `despacho_id`, y las políticas de Row Level Security usan las funciones
+  `mi_despacho_id()` y `soy_administrador()` para que un despacho nunca pueda leer ni
+  escribir los datos de otro. `src/lib/storage.js` filtra automáticamente por el
+  despacho del usuario que inició sesión (`setDespachoActual`, llamado desde `App.jsx`
+  al cargar el perfil).
 - **Autenticación real (Supabase Auth):** el login usa correo + contraseña verificados
   por Supabase (hash seguro, JWT de sesión). La tabla `perfiles` guarda nombre, rol,
-  permisos y preferencias de notificación de cada usuario, ligada al usuario real de
-  `auth.users`. Crear un usuario nuevo pasa por `api/usuarios/crear.js`, la única
-  función que puede usar la llave `service_role` para dar de alta cuentas.
-- **Row Level Security:** `clientes`, `casos`, `chats`, `app_settings`, `perfiles` y
-  `auditoria` exigen una sesión autenticada — ya no se puede leer el despacho completo
-  solo con la llave pública `anon`, como en la primera versión.
-  **Pendiente conocido:** la tabla `documentos` se dejó con acceso anónimo a propósito,
-  porque el link de firma (`#firmar` + código) lo abren los clientes sin iniciar sesión.
-  Es un pendiente para una fase futura: mover la firma a enlaces de un solo uso en vez
-  de una tabla legible completa.
+  permisos, despacho y preferencias de notificación de cada usuario, ligada al usuario
+  real de `auth.users`. Crear el primer usuario de un despacho nuevo pasa por
+  `api/despachos/crear.js` (siempre disponible, sin necesitar sesión — es el registro de
+  un cliente nuevo del producto); crear usuarios adicionales dentro de un despacho ya
+  existente pasa por `api/usuarios/crear.js`, y solo lo puede hacer un Administrador
+  autenticado de ese mismo despacho. Ambas son las únicas piezas que usan la llave
+  `service_role`.
+- **Row Level Security:** exige sesión autenticada y despacho correcto — ya no se puede
+  leer ni un despacho completo ni los de otros con la llave pública `anon`.
+  **Pendiente conocido:** la tabla `documentos` se dejó con acceso anónimo a propósito
+  (no filtrado por despacho), porque el link de firma (`#firmar` + código) lo abren los
+  clientes sin iniciar sesión. Es un pendiente para una fase futura: mover la firma a
+  enlaces de un solo uso en vez de una tabla legible completa.
 - **Auditoría:** la tabla `auditoria` registra quién hizo qué y cuándo (por ahora:
   crear/eliminar cliente, registrar pago, crear usuario, cambiar permisos). Solo un
   Administrador puede leerla, desde "Usuarios y permisos" → "Auditoría".
