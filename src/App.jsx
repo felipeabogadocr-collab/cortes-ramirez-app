@@ -2137,7 +2137,7 @@ function TabButton({ active, onClick, children }) {
   );
 }
 
-function SidebarButton({ active, onClick, children, color }) {
+function SidebarButton({ active, onClick, children, color, icono }) {
   const c = color || "#2F80ED";
   return (
     <button
@@ -2163,7 +2163,21 @@ function SidebarButton({ active, onClick, children, color }) {
         boxShadow: active ? `0 0 0 1px ${c}40, 0 4px 14px ${c}26` : "none",
       }}
     >
-      <span style={{ width: 8, height: 8, borderRadius: "50%", background: c, flexShrink: 0 }} />
+      <span
+        style={{
+          width: 22,
+          height: 22,
+          borderRadius: 7,
+          background: `${c}30`,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontSize: 12.5,
+          flexShrink: 0,
+        }}
+      >
+        {icono}
+      </span>
       {children}
     </button>
   );
@@ -2728,7 +2742,7 @@ function ClientesTab({ usuarioActual }) {
           const inactivo = dias !== null && dias >= DIAS_ALERTA_INACTIVIDAD;
 
           return (
-            <Card key={id}>
+            <Card key={id} style={{ borderLeft: "4px solid #14B8A6" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                 <div style={{ flex: 1 }}>
                   <p style={{ fontFamily: "Inter, sans-serif", fontSize: 17, fontWeight: 700, margin: 0, color: COLORS.ink }}>{c.nombre}</p>
@@ -3414,7 +3428,7 @@ function VigilanciaTab() {
           const resultado = resultados[id];
           const errorConsulta = errores[id];
           return (
-            <Card key={id}>
+            <Card key={id} style={{ borderLeft: "4px solid #F5A524" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
                 <div>
                   <p style={{ fontFamily: "Inter, sans-serif", fontSize: 16, fontWeight: 700, margin: 0, color: COLORS.ink }}>{c.nombre}</p>
@@ -3904,7 +3918,7 @@ function ContabilidadTab({ usuarioActual }) {
           const saldo = valorTotal > 0 ? valorTotal - totalPagado : null;
 
           return (
-            <Card key={id}>
+            <Card key={id} style={{ borderLeft: "4px solid #F43F5E" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                 <div>
                   <p style={{ fontFamily: "Inter, sans-serif", fontSize: 17, fontWeight: 700, margin: 0, color: COLORS.ink }}>{c.nombre}</p>
@@ -5039,7 +5053,7 @@ function DocumentosTab() {
           }
 
           return (
-            <Card key={id}>
+            <Card key={id} style={{ borderLeft: "4px solid #10B981" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
                 <div>
                   <p style={{ fontFamily: "Inter, sans-serif", fontSize: 17, fontWeight: 700, margin: 0, color: COLORS.ink }}>{d.titulo}</p>
@@ -5963,6 +5977,36 @@ function UsuariosPermisosTab({ usuarioActual, onDespachoRenombrado }) {
     actualizar(u.id, { notificaciones });
   };
 
+  const [respaldando, setRespaldando] = useState(false);
+
+  const descargarRespaldo = async () => {
+    setRespaldando(true);
+    try {
+      const despachoId = usuarioActual.despacho_id;
+      const tablas = ["clientes", "documentos", "casos", "chats", "app_settings"];
+      const respaldo = { despacho: getNombreDespacho(), generadoEn: new Date().toISOString() };
+      for (const tabla of tablas) {
+        const { data, error } = await supabase.from(tabla).select("*").eq("despacho_id", despachoId);
+        if (error) throw error;
+        respaldo[tabla] = data || [];
+      }
+      const contenido = JSON.stringify(respaldo, null, 2);
+      const blob = new Blob([contenido], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `respaldo-${getNombreDespacho().toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      registrarAuditoria(usuarioActual, "descargar_respaldo", "despacho", despachoId, {});
+    } catch (e) {
+      window.alert("No se pudo generar el respaldo. Intenta de nuevo en un momento.");
+    }
+    setRespaldando(false);
+  };
+
   return (
     <div>
       <EncabezadoSeccion titulo="Usuarios y permisos" color="#6B7480" />
@@ -6016,6 +6060,18 @@ function UsuariosPermisosTab({ usuarioActual, onDespachoRenombrado }) {
             </button>
           </div>
         )}
+      </Card>
+
+      <Card style={{ marginBottom: 20, borderLeft: "4px solid #10B981" }}>
+        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, fontWeight: 600, color: COLORS.headingText, marginBottom: 4 }}>🛡️ Respaldo de tus datos</p>
+        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, marginBottom: 12 }}>
+          Descarga ahora mismo un archivo con TODA la información de tu despacho (clientes, documentos, casos y contenido) tal
+          como está en este momento. Guárdalo en tu computador o en la nube (Google Drive, etc.). Recomendado: descárgalo
+          cada semana o antes de cualquier cambio grande.
+        </p>
+        <button className="drx-btn-primary" style={{ ...buttonPrimary, background: "#10B981" }} onClick={descargarRespaldo} disabled={respaldando}>
+          {respaldando ? "Generando respaldo…" : "⬇️ Descargar respaldo completo"}
+        </button>
       </Card>
 
       <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 16 }}>
@@ -6243,6 +6299,7 @@ function PanelAuditoria() {
     crear_usuario: "creó al usuario",
     cambiar_permiso: "cambió un permiso de",
     inicio_sesion: "inició sesión",
+    descargar_respaldo: "descargó un respaldo completo",
   };
 
   return (
@@ -6536,42 +6593,42 @@ export default function App() {
 
         <div style={{ display: "flex", flexDirection: "column", gap: 8, flex: 1 }}>
           {puedeVer("resumen") && (
-            <SidebarButton active={tab === "resumen"} onClick={() => setTab("resumen")} color="#2F80ED">
+            <SidebarButton active={tab === "resumen"} onClick={() => setTab("resumen")} color="#2F80ED" icono="🏠">
               Resumen
             </SidebarButton>
           )}
           {puedeVer("clientes") && (
-            <SidebarButton active={tab === "clientes"} onClick={() => setTab("clientes")} color="#14B8A6">
+            <SidebarButton active={tab === "clientes"} onClick={() => setTab("clientes")} color="#14B8A6" icono="👥">
               Clientes
             </SidebarButton>
           )}
           {puedeVer("vigilancia") && (
-            <SidebarButton active={tab === "vigilancia"} onClick={() => setTab("vigilancia")} color="#F5A524">
+            <SidebarButton active={tab === "vigilancia"} onClick={() => setTab("vigilancia")} color="#F5A524" icono="⚖️">
               Vigilancia judicial
             </SidebarButton>
           )}
           {puedeVer("contabilidad") && (
-            <SidebarButton active={tab === "contabilidad"} onClick={() => setTab("contabilidad")} color="#F43F5E">
+            <SidebarButton active={tab === "contabilidad"} onClick={() => setTab("contabilidad")} color="#F43F5E" icono="💳">
               Contabilidad
             </SidebarButton>
           )}
           {puedeVer("contenido") && (
-            <SidebarButton active={tab === "contenido"} onClick={() => setTab("contenido")} color="#8B5CF6">
+            <SidebarButton active={tab === "contenido"} onClick={() => setTab("contenido")} color="#8B5CF6" icono="🗓️">
               Calendario de contenido
             </SidebarButton>
           )}
           {puedeVer("documentos") && (
-            <SidebarButton active={tab === "documentos"} onClick={irADocumentos} color="#10B981">
+            <SidebarButton active={tab === "documentos"} onClick={irADocumentos} color="#10B981" icono="✍️">
               Firmar documentos
             </SidebarButton>
           )}
           {puedeVer("reportes") && (
-            <SidebarButton active={tab === "reportes"} onClick={() => setTab("reportes")} color="#0EA5E9">
+            <SidebarButton active={tab === "reportes"} onClick={() => setTab("reportes")} color="#0EA5E9" icono="📊">
               Reportes
             </SidebarButton>
           )}
           {usuarioActual.rol === "Administrador" && (
-            <SidebarButton active={tab === "usuarios"} onClick={() => setTab("usuarios")} color="#6B7480">
+            <SidebarButton active={tab === "usuarios"} onClick={() => setTab("usuarios")} color="#6B7480" icono="⚙️">
               Usuarios y permisos
             </SidebarButton>
           )}
