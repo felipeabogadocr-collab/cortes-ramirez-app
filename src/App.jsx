@@ -3318,6 +3318,7 @@ function VigilanciaTab() {
   };
 
   const conRadicado = ids.filter((id) => clientes[id]?.radicado?.trim());
+  const sinRadicado = ids.filter((id) => !clientes[id]?.radicado?.trim());
 
   // Consulta todos los procesos con radicado y marca automáticamente "Con
   // novedad" (y agrega la actuación a la línea de tiempo) solo en los que
@@ -3373,6 +3374,27 @@ function VigilanciaTab() {
         (el mismo buscador público de la Rama Judicial, por número de radicado — no existe una API oficial del Estado
         para esto, así que si algún día cambian su página puede dejar de funcionar y hay que ajustarlo).
       </div>
+
+      {sinRadicado.length > 0 && (
+        <div
+          style={{
+            background: "#FEF3E2",
+            border: "1px solid #FCE3B8",
+            borderRadius: 10,
+            padding: "14px 16px",
+            marginBottom: 18,
+            fontFamily: "Inter, sans-serif",
+            fontSize: 12.5,
+            color: "#92400E",
+            lineHeight: 1.6,
+          }}
+        >
+          <strong>⚠️ {sinRadicado.length} cliente{sinRadicado.length !== 1 ? "s" : ""} sin número de radicado:</strong>{" "}
+          {sinRadicado.map((id) => clientes[id]?.nombre).filter(Boolean).join(", ")}. La revisión automática diaria y la
+          consulta a la Rama Judicial solo funcionan si el cliente tiene el radicado registrado — agrégalo desde{" "}
+          <strong>Clientes → Editar</strong> para que estos también queden vigilados.
+        </div>
+      )}
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
         <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted, margin: 0 }}>
@@ -5159,6 +5181,7 @@ function useNotificacionesPanel(prefs) {
   const [contenidoPendiente, setContenidoPendiente] = useState([]);
   const [contenidoVencido, setContenidoVencido] = useState([]);
   const [novedadesJudiciales, setNovedadesJudiciales] = useState([]);
+  const [clientesSinRadicado, setClientesSinRadicado] = useState([]);
   const notifPrefs = prefs || notificacionesPorDefecto();
 
   const cargar = useCallback(async () => {
@@ -5184,6 +5207,7 @@ function useNotificacionesPanel(prefs) {
     const inactivos = [];
     const pendientesPago = [];
     const novedades = [];
+    const sinRadicado = [];
     for (const id of idsClientes) {
       const raw = await storageGet(`cliente:${id}`, false);
       if (!raw) continue;
@@ -5201,10 +5225,14 @@ function useNotificacionesPanel(prefs) {
       if (c.estadoVigilancia === "Con novedad") {
         novedades.push({ nombre: c.nombre, radicado: c.radicado });
       }
+      if (!c.radicado?.trim()) {
+        sinRadicado.push({ nombre: c.nombre });
+      }
     }
     setClientesInactivos(inactivos);
     setPagosPendientes(pendientesPago.sort((a, b) => a.dias - b.dias));
     setNovedadesJudiciales(novedades);
+    setClientesSinRadicado(sinRadicado);
 
     const idsContenidoRaw = await storageGet("indice-contenido", true);
     const idsContenido = idsContenidoRaw ? JSON.parse(idsContenidoRaw) : [];
@@ -5237,7 +5265,8 @@ function useNotificacionesPanel(prefs) {
     (notifPrefs.clientes !== false ? clientesInactivos.length : 0) +
     (notifPrefs.pagos !== false ? pagosPendientes.length : 0) +
     (notifPrefs.contenido !== false ? contenidoPendiente.length + contenidoVencido.length : 0) +
-    (notifPrefs.vigilancia !== false ? novedadesJudiciales.length : 0);
+    (notifPrefs.vigilancia !== false ? novedadesJudiciales.length : 0) +
+    (notifPrefs.radicados !== false ? clientesSinRadicado.length : 0);
 
   return {
     count,
@@ -5247,6 +5276,7 @@ function useNotificacionesPanel(prefs) {
     contenidoPendiente: notifPrefs.contenido !== false ? contenidoPendiente : [],
     contenidoVencido: notifPrefs.contenido !== false ? contenidoVencido : [],
     novedadesJudiciales: notifPrefs.vigilancia !== false ? novedadesJudiciales : [],
+    clientesSinRadicado: notifPrefs.radicados !== false ? clientesSinRadicado : [],
     marcarFirmasVistas,
     reload: cargar,
   };
@@ -5259,6 +5289,7 @@ function ModalNotificaciones({
   contenidoPendiente,
   contenidoVencido,
   novedadesJudiciales,
+  clientesSinRadicado,
   onCerrar,
   onMarcarVistas,
   onIrADocumentos,
@@ -5418,7 +5449,28 @@ function ModalNotificaciones({
               </button>
             </div>
           ) : (
-            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.muted }}>Sin novedades judiciales por revisar.</p>
+            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.muted, marginBottom: 18 }}>Sin novedades judiciales por revisar.</p>
+          )}
+
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, fontWeight: 700, color: "#B45309", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 10 }}>
+            📋 Clientes sin radicado
+          </p>
+          {clientesSinRadicado.length > 0 ? (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {clientesSinRadicado.map((c, i) => (
+                <div key={i} style={{ background: "#FEF3E2", borderRadius: 8, padding: "10px 12px" }}>
+                  <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, fontWeight: 600, color: "#92400E", margin: 0 }}>{c.nombre}</p>
+                  <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11, color: "#B45309", margin: "2px 0 0" }}>
+                    Sin radicado: no se vigila su proceso automáticamente
+                  </p>
+                </div>
+              ))}
+              <button className="drx-btn-ghost" style={{ ...buttonGhost, fontSize: 12, padding: "6px 12px", alignSelf: "flex-start" }} onClick={onIrAClientes}>
+                Ver clientes
+              </button>
+            </div>
+          ) : (
+            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.muted }}>Todos los clientes tienen radicado registrado.</p>
           )}
         </div>
       </div>
@@ -5448,6 +5500,7 @@ const NOTIF_CATEGORIAS = [
   { id: "pagos", nombre: "Pagos pendientes" },
   { id: "contenido", nombre: "Contenido pendiente o vencido" },
   { id: "vigilancia", nombre: "Novedades judiciales" },
+  { id: "radicados", nombre: "Clientes sin radicado" },
 ];
 
 function notificacionesPorDefecto() {
@@ -6323,6 +6376,7 @@ export default function App() {
     contenidoPendiente,
     contenidoVencido,
     novedadesJudiciales,
+    clientesSinRadicado,
     marcarFirmasVistas,
   } = useNotificacionesPanel(usuarioActual?.notificaciones);
   const { oscuro, alternar } = useTema();
@@ -6645,6 +6699,7 @@ export default function App() {
           contenidoPendiente={contenidoPendiente}
           contenidoVencido={contenidoVencido}
           novedadesJudiciales={novedadesJudiciales}
+          clientesSinRadicado={clientesSinRadicado}
           onCerrar={() => setMostrarNotificaciones(false)}
           onMarcarVistas={marcarFirmasVistas}
           onIrADocumentos={irADocumentos}
