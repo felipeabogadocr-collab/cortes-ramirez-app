@@ -474,7 +474,7 @@ const GlobalStyle = () => (
     .drx-btn-ghost { transition: background .15s ease, border-color .15s ease; }
     .drx-tema-claro .drx-btn-ghost:hover { background: #EEF2F7; border-color: #B9C2CF; }
     .drx-tema-oscuro .drx-btn-ghost:hover { background: #232C39; border-color: #3A4657; }
-    .drx-card { transition: box-shadow .15s ease, border-color .15s ease; }
+    .drx-card { transition: box-shadow .15s ease, border-color .15s ease, transform .15s ease; }
     .drx-tema-claro .drx-card:hover { box-shadow: 0 2px 10px rgba(10,35,66,0.06); }
     .drx-tema-oscuro .drx-card:hover { box-shadow: 0 4px 18px rgba(0,0,0,0.4); }
     .drx-tab { transition: background .15s ease, color .15s ease; }
@@ -496,6 +496,10 @@ const GlobalStyle = () => (
       z-index: 0;
     }
     @keyframes drx-pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(30,95,180,0.35); } 50% { box-shadow: 0 0 0 6px rgba(30,95,180,0); } }
+    @keyframes drx-fade-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+    .drx-fade-in { animation: drx-fade-in 0.22s ease; }
+    @keyframes drx-spin { to { transform: rotate(360deg); } }
+    .drx-card:hover { transform: translateY(-1px); }
   `}</style>
 );
 
@@ -571,6 +575,42 @@ function Card({ children, style }) {
       }}
     >
       {children}
+    </div>
+  );
+}
+
+function Spinner({ texto = "Cargando…" }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "16px 0" }}>
+      <span
+        style={{
+          width: 16,
+          height: 16,
+          borderRadius: "50%",
+          border: `2.5px solid ${COLORS.border}`,
+          borderTopColor: COLORS.accentBright,
+          display: "inline-block",
+          animation: "drx-spin 0.7s linear infinite",
+        }}
+      />
+      <span style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted }}>{texto}</span>
+    </div>
+  );
+}
+
+function EstadoVacio({ icono, texto }) {
+  return (
+    <div
+      style={{
+        textAlign: "center",
+        padding: "36px 20px",
+        border: `1.5px dashed ${COLORS.border}`,
+        borderRadius: 12,
+        background: COLORS.surfaceSoft,
+      }}
+    >
+      <div style={{ fontSize: 30, marginBottom: 10, opacity: 0.7 }}>{icono}</div>
+      <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted, margin: 0 }}>{texto}</p>
     </div>
   );
 }
@@ -2284,6 +2324,40 @@ function IconoTab({ tipo }) {
   );
 }
 
+const COLORES_AVATAR = ["#2F80ED", "#14B8A6", "#8B5CF6", "#F5A524", "#F43F5E", "#10B981", "#0EA5E9"];
+
+function AvatarIniciales({ nombre, size = 34 }) {
+  const texto = (nombre || "?").trim();
+  const iniciales = texto
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((p) => p[0]?.toUpperCase() || "")
+    .join("");
+  let hash = 0;
+  for (let i = 0; i < texto.length; i++) hash = texto.charCodeAt(i) + ((hash << 5) - hash);
+  const color = COLORES_AVATAR[Math.abs(hash) % COLORES_AVATAR.length];
+  return (
+    <div
+      style={{
+        width: size,
+        height: size,
+        borderRadius: "50%",
+        background: color,
+        color: "#FFFFFF",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        fontFamily: "Inter, sans-serif",
+        fontWeight: 700,
+        fontSize: size * 0.4,
+        flexShrink: 0,
+      }}
+    >
+      {iniciales || "?"}
+    </div>
+  );
+}
+
 function SidebarButton({ active, onClick, children, color, icono }) {
   const c = color || "#2F80ED";
   return (
@@ -2967,11 +3041,9 @@ function ClientesTab({ usuarioActual }) {
             </Card>
           );
         })}
-        {ids.length === 0 && !showForm && (
-          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted }}>Aún no has registrado clientes.</p>
-        )}
+        {ids.length === 0 && !showForm && <EstadoVacio icono="👥" texto="Aún no has registrado clientes." />}
         {ids.length > 0 && idsFiltrados.length === 0 && (
-          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted }}>Ningún cliente coincide con "{filtro}".</p>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted, textAlign: "center" }}>Ningún cliente coincide con "{filtro}".</p>
         )}
       </div>
     </div>
@@ -3871,7 +3943,7 @@ function ReportesTab() {
     return (
       <div>
         <EncabezadoSeccion titulo="Reportes" color="#0EA5E9" />
-        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted }}>Cargando…</p>
+        <Spinner />
       </div>
     );
   }
@@ -5342,11 +5414,9 @@ function DocumentosTab() {
             </Card>
           );
         })}
-        {ids.length === 0 && !showForm && (
-          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted }}>Aún no has creado documentos para firma.</p>
-        )}
+        {ids.length === 0 && !showForm && <EstadoVacio icono="✍️" texto="Aún no has creado documentos para firma." />}
         {ids.length > 0 && idsFiltrados.length === 0 && (
-          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted }}>Ningún documento coincide con "{filtro}".</p>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted, textAlign: "center" }}>Ningún documento coincide con "{filtro}".</p>
         )}
       </div>
     </div>
@@ -6812,7 +6882,7 @@ function PlataformaTab() {
       </div>
 
       {error && <p style={{ color: "#B42318", fontSize: 13, marginBottom: 14, fontFamily: "Inter, sans-serif" }}>{error}</p>}
-      {cargando && <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted }}>Cargando…</p>}
+      {cargando && <Spinner />}
 
       {!cargando && (
         <>
@@ -7628,10 +7698,13 @@ export default function App() {
         </div>
 
         <div style={{ borderTop: "1px solid #3A5A82", paddingTop: 14, marginTop: 14 }}>
-          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: "#D7E2F1", margin: 0 }}>
-            👤 <strong style={{ color: "#FFFFFF" }}>{usuarioActual.nombre}</strong>
-          </p>
-          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, color: "#9FB6D6", margin: "2px 0 10px" }}>{usuarioActual.rol}</p>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+            <AvatarIniciales nombre={usuarioActual.nombre} />
+            <div>
+              <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: "#FFFFFF", fontWeight: 700, margin: 0 }}>{usuarioActual.nombre}</p>
+              <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11, color: "#9FB6D6", margin: 0 }}>{usuarioActual.rol}</p>
+            </div>
+          </div>
           <div style={{ display: "flex", gap: 12 }}>
             <button
               onClick={() => setCambiandoUsuario(true)}
@@ -7697,6 +7770,7 @@ export default function App() {
                     fontWeight: 700,
                     padding: "1px 5px",
                     fontFamily: "Inter, sans-serif",
+                    animation: "drx-pulse 1.8s ease-in-out infinite",
                   }}
                 >
                   {notificaciones}
@@ -7711,7 +7785,7 @@ export default function App() {
         </div>
 
         <div style={{ padding: "28px 28px 40px", flex: 1 }}>
-          <div style={{ maxWidth: 760, margin: "0 auto" }}>
+          <div key={tab} className="drx-fade-in" style={{ maxWidth: 760, margin: "0 auto" }}>
             {tab === "resumen" && puedeVer("resumen") && <ResumenTab nombre={usuarioActual.nombre} usuarioId={usuarioActual.id} onIr={setTab} />}
             {tab === "clientes" && puedeVer("clientes") && <ClientesTab usuarioActual={usuarioActual} />}
             {tab === "vigilancia" && puedeVer("vigilancia") && <VigilanciaTab />}
