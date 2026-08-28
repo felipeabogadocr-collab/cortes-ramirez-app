@@ -6,7 +6,7 @@
 // desde "Usuarios y permisos" (api/usuarios/crear.js).
 
 import { supabaseAdmin } from "../_lib/supabaseAdmin.js";
-import { permisosPorDefecto, notificacionesPorDefecto } from "../_lib/defaults.js";
+import { permisosPorDefecto, notificacionesPorDefecto, validarContrasena } from "../_lib/defaults.js";
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
@@ -18,8 +18,9 @@ export default async function handler(req, res) {
   if (!nombreDespacho?.trim() || !nombre?.trim() || !email?.trim() || !contrasena?.trim()) {
     return res.status(400).json({ error: "Faltan datos" });
   }
-  if (contrasena.length < 8) {
-    return res.status(400).json({ error: "La contraseña debe tener al menos 8 caracteres" });
+  const errorContrasena = validarContrasena(contrasena);
+  if (errorContrasena) {
+    return res.status(400).json({ error: errorContrasena });
   }
 
   const admin = supabaseAdmin();

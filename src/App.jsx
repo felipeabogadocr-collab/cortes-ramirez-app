@@ -631,6 +631,29 @@ function useTema() {
   return { oscuro, alternar };
 }
 
+const MINUTOS_INACTIVIDAD = 30;
+
+// Cierra la sesión sola tras MINUTOS_INACTIVIDAD sin que el usuario toque
+// nada (clic, tecla, scroll, pantalla táctil) — útil en equipos compartidos
+// del despacho.
+function useCierreSesionPorInactividad(activo, onExpirar) {
+  useEffect(() => {
+    if (!activo) return;
+    let temporizador;
+    const reiniciar = () => {
+      clearTimeout(temporizador);
+      temporizador = setTimeout(onExpirar, MINUTOS_INACTIVIDAD * 60 * 1000);
+    };
+    const eventos = ["mousemove", "mousedown", "keydown", "touchstart", "scroll"];
+    eventos.forEach((ev) => window.addEventListener(ev, reiniciar));
+    reiniciar();
+    return () => {
+      clearTimeout(temporizador);
+      eventos.forEach((ev) => window.removeEventListener(ev, reiniciar));
+    };
+  }, [activo, onExpirar]);
+}
+
 function IconoSol({ size = 17 }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -4865,6 +4888,21 @@ function LoginGate({ onIngresar, onCancelar }) {
     onIngresar();
   };
 
+  const enviarRecuperacion = async () => {
+    if (!email.trim()) return;
+    setEnviando(true);
+    setError("");
+    const { error: recError } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+      redirectTo: typeof window !== "undefined" ? window.location.origin : undefined,
+    });
+    setEnviando(false);
+    if (recError) {
+      setError("No pudimos enviar el correo. Verifica la dirección e intenta de nuevo.");
+      return;
+    }
+    setPantalla("recuperacion-enviada");
+  };
+
   return (
     <div
       className={`${oscuro ? "drx-tema-oscuro" : "drx-tema-claro"} drx-glow`}
@@ -4886,7 +4924,11 @@ function LoginGate({ onIngresar, onCancelar }) {
         )}
         <InsigniaPlataforma grande />
         <h1 style={{ fontFamily: "Inter, sans-serif", fontSize: 22, fontWeight: 800, textTransform: "uppercase", letterSpacing: 0.5, color: COLORS.headingText, margin: "0 0 4px" }}>
-          {pantalla === "registro" ? "Registra tu despacho" : "Cortés Ramírez Abogados"}
+          {pantalla === "registro"
+            ? "Registra tu despacho"
+            : pantalla === "recuperar" || pantalla === "recuperacion-enviada"
+              ? "Recuperar contraseña"
+              : "Cortés Ramírez Abogados"}
         </h1>
 
         {pantalla === "registro" && (
@@ -4921,6 +4963,9 @@ function LoginGate({ onIngresar, onCancelar }) {
               </Field>
               <Field label="Contraseña">
                 <CampoContrasena valor={contrasena} onChange={setContrasena} />
+                <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11, color: COLORS.muted, margin: "4px 0 0" }}>
+                  Mínimo 10 caracteres, combinando letras y números.
+                </p>
               </Field>
             </div>
             {error && <p style={{ color: "#B42318", fontSize: 12.5, marginTop: 10, fontFamily: "Inter, sans-serif" }}>{error}</p>}
@@ -4973,6 +5018,13 @@ function LoginGate({ onIngresar, onCancelar }) {
               {enviando ? "Ingresando…" : "Ingresar"}
             </button>
             <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11, color: COLORS.muted, marginTop: 14, textAlign: "center" }}>
+              <button
+                onClick={() => cambiarPantalla("recuperar")}
+                style={{ background: "none", border: "none", color: COLORS.accentBright, cursor: "pointer", textDecoration: "underline", fontFamily: "Inter, sans-serif", fontSize: 11 }}
+              >
+                ¿Olvidaste tu contraseña?
+              </button>
+              <br />
               ¿No tienes acceso? Pídele a tu administrador que te cree un usuario desde "Usuarios y permisos".
               <br />
               ¿Primera vez aquí?{" "}
@@ -4983,6 +5035,58 @@ function LoginGate({ onIngresar, onCancelar }) {
                 Crea tu despacho
               </button>
             </p>
+          </div>
+        )}
+
+        {pantalla === "recuperar" && (
+          <div style={{ textAlign: "left" }}>
+            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted, margin: "8px 0 16px" }}>
+              Escribe tu correo y te enviamos un enlace para poner una contraseña nueva.
+            </p>
+            <Field label="Correo">
+              <input
+                type="email"
+                className="drx-input"
+                style={inputStyle}
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && enviarRecuperacion()}
+                autoFocus
+              />
+            </Field>
+            {error && <p style={{ color: "#B42318", fontSize: 12.5, marginTop: 10, fontFamily: "Inter, sans-serif" }}>{error}</p>}
+            <button
+              className="drx-btn-primary"
+              style={{ ...buttonPrimary, width: "100%", marginTop: 16 }}
+              onClick={enviarRecuperacion}
+              disabled={enviando || !email.trim()}
+            >
+              {enviando ? "Enviando…" : "Enviar enlace de recuperación"}
+            </button>
+            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11, color: COLORS.muted, marginTop: 14, textAlign: "center" }}>
+              <button
+                onClick={() => cambiarPantalla("login")}
+                style={{ background: "none", border: "none", color: COLORS.accentBright, cursor: "pointer", textDecoration: "underline", fontFamily: "Inter, sans-serif", fontSize: 11 }}
+              >
+                Volver a iniciar sesión
+              </button>
+            </p>
+          </div>
+        )}
+
+        {pantalla === "recuperacion-enviada" && (
+          <div style={{ textAlign: "left" }}>
+            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted, margin: "8px 0 16px" }}>
+              Listo — si ese correo tiene una cuenta, te llegó un enlace para poner una contraseña nueva. Ábrelo desde el mismo dispositivo y sigue las
+              instrucciones.
+            </p>
+            <button
+              className="drx-btn-ghost"
+              style={{ ...buttonGhost, width: "100%" }}
+              onClick={() => cambiarPantalla("login")}
+            >
+              Volver a iniciar sesión
+            </button>
           </div>
         )}
 
@@ -5070,6 +5174,7 @@ function UsuariosPermisosTab({ usuarioActual }) {
             </Field>
             <Field label="Contraseña">
               <input type="password" className="drx-input" style={inputStyle} value={contrasena} onChange={(e) => setContrasena(e.target.value)} />
+              <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11, color: COLORS.muted, margin: "4px 0 0" }}>Mínimo 10 caracteres, combinando letras y números.</p>
             </Field>
             <Field label="Rol">
               <select className="drx-input" style={inputStyle} value={rol} onChange={(e) => setRol(e.target.value)}>
@@ -5169,6 +5274,7 @@ function PanelAuditoria() {
     registrar_pago: "registró un pago de",
     crear_usuario: "creó al usuario",
     cambiar_permiso: "cambió un permiso de",
+    inicio_sesion: "inició sesión",
   };
 
   return (
@@ -5203,6 +5309,83 @@ function PanelAuditoria() {
   );
 }
 
+function EstablecerContrasenaNueva({ onListo }) {
+  const { oscuro, alternar } = useTema();
+  const [contrasena, setContrasena] = useState("");
+  const [confirmacion, setConfirmacion] = useState("");
+  const [error, setError] = useState("");
+  const [enviando, setEnviando] = useState(false);
+  const [listo, setListo] = useState(false);
+
+  const guardar = async () => {
+    if (!contrasena.trim() || contrasena !== confirmacion) return;
+    setEnviando(true);
+    setError("");
+    const { error: updateError } = await supabase.auth.updateUser({ password: contrasena });
+    setEnviando(false);
+    if (updateError) {
+      setError(updateError.message?.toLowerCase().includes("password") ? "La contraseña debe tener al menos 10 caracteres, combinando letras y números." : "No pudimos guardar la contraseña. Intenta de nuevo.");
+      return;
+    }
+    setListo(true);
+  };
+
+  return (
+    <div
+      className={`${oscuro ? "drx-tema-oscuro" : "drx-tema-claro"} drx-glow`}
+      style={{ minHeight: "100%", background: COLORS.bg, display: "flex", alignItems: "center", justifyContent: "center", padding: 24, position: "relative" }}
+    >
+      <GlobalStyle />
+      <div style={{ position: "absolute", top: 20, right: 20 }}>
+        <BotonTema oscuro={oscuro} onClick={alternar} />
+      </div>
+      <Card style={{ maxWidth: 420, width: "100%", textAlign: "center" }}>
+        <InsigniaPlataforma grande />
+        <h1 style={{ fontFamily: "Inter, sans-serif", fontSize: 22, fontWeight: 800, textTransform: "uppercase", letterSpacing: 0.5, color: COLORS.headingText, margin: "0 0 4px" }}>
+          Nueva contraseña
+        </h1>
+        {listo ? (
+          <div style={{ textAlign: "left", marginTop: 16 }}>
+            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted, marginBottom: 16 }}>
+              Tu contraseña quedó actualizada. Inicia sesión con la nueva.
+            </p>
+            <button className="drx-btn-primary" style={{ ...buttonPrimary, width: "100%" }} onClick={onListo}>
+              Ir a iniciar sesión
+            </button>
+          </div>
+        ) : (
+          <div style={{ textAlign: "left", marginTop: 8 }}>
+            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted, marginBottom: 16 }}>Escribe tu contraseña nueva.</p>
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              <Field label="Contraseña nueva">
+                <CampoContrasena valor={contrasena} onChange={setContrasena} autoFocus />
+              </Field>
+              <Field label="Confirmar contraseña">
+                <CampoContrasena valor={confirmacion} onChange={setConfirmacion} onEnter={guardar} />
+              </Field>
+            </div>
+            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11, color: COLORS.muted, margin: "4px 0 0" }}>
+              Mínimo 10 caracteres, combinando letras y números.
+            </p>
+            {confirmacion && contrasena !== confirmacion && (
+              <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: "#B42318", marginTop: 8 }}>Las contraseñas no coinciden.</p>
+            )}
+            {error && <p style={{ color: "#B42318", fontSize: 12.5, marginTop: 10, fontFamily: "Inter, sans-serif" }}>{error}</p>}
+            <button
+              className="drx-btn-primary"
+              style={{ ...buttonPrimary, width: "100%", marginTop: 16 }}
+              onClick={guardar}
+              disabled={enviando || !contrasena.trim() || contrasena !== confirmacion}
+            >
+              {enviando ? "Guardando…" : "Guardar contraseña"}
+            </button>
+          </div>
+        )}
+      </Card>
+    </div>
+  );
+}
+
 export default function App() {
   useEffect(() => {
     ensureFonts();
@@ -5226,7 +5409,9 @@ export default function App() {
   } = useNotificacionesPanel(usuarioActual?.notificaciones);
   const { oscuro, alternar } = useTema();
 
-  const cargarPerfilActual = useCallback(async () => {
+  const [modoRecuperacion, setModoRecuperacion] = useState(false);
+
+  const cargarPerfilActual = useCallback(async (registrarLogin) => {
     const {
       data: { user },
     } = await supabase.auth.getUser();
@@ -5237,16 +5422,24 @@ export default function App() {
     }
     const { data: perfil } = await supabase.from("perfiles").select("*").eq("id", user.id).maybeSingle();
     setDespachoActual(perfil?.despacho_id || null);
-    setUsuarioActual(perfil ? { ...perfil, email: user.email } : null);
+    const usuario = perfil ? { ...perfil, email: user.email } : null;
+    setUsuarioActual(usuario);
+    if (registrarLogin && usuario) {
+      registrarAuditoria(usuario, "inicio_sesion", "sesion", null, {});
+    }
   }, []);
 
   useEffect(() => {
     (async () => {
-      await cargarPerfilActual();
+      await cargarPerfilActual(false);
       setSesionCargada(true);
     })();
-    const { data: suscripcion } = supabase.auth.onAuthStateChange(() => {
-      cargarPerfilActual();
+    const { data: suscripcion } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "PASSWORD_RECOVERY") {
+        setModoRecuperacion(true);
+        return;
+      }
+      cargarPerfilActual(event === "SIGNED_IN");
     });
     return () => suscripcion.subscription.unsubscribe();
   }, [cargarPerfilActual]);
@@ -5255,10 +5448,12 @@ export default function App() {
     setCambiandoUsuario(false);
   };
 
-  const cerrarSesion = async () => {
+  const cerrarSesion = useCallback(async () => {
     await supabase.auth.signOut();
     setCambiandoUsuario(false);
-  };
+  }, []);
+
+  useCierreSesionPorInactividad(!!usuarioActual && !modoPublico, cerrarSesion);
 
   if (modoPublico) {
     return (
@@ -5279,6 +5474,17 @@ export default function App() {
 
   if (!sesionCargada) {
     return <div style={{ background: COLORS.bg, minHeight: "100%" }} />;
+  }
+
+  if (modoRecuperacion) {
+    return (
+      <EstablecerContrasenaNueva
+        onListo={async () => {
+          await supabase.auth.signOut();
+          setModoRecuperacion(false);
+        }}
+      />
+    );
   }
 
   if (!usuarioActual || cambiandoUsuario) {
