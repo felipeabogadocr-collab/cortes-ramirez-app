@@ -138,7 +138,7 @@ async function sha256Hex(texto) {
   }
 }
 
-function generarReciboImagen(cliente, pago) {
+function generarReciboImagen(clienteId, cliente, pago) {
   return new Promise((resolve) => {
     const width = 720;
     const height = 920;
@@ -205,7 +205,22 @@ function generarReciboImagen(cliente, pago) {
       ctx.fillText(`Recibo N.º ${pago.id}`, 44, height - 86);
       ctx.fillText(`Comprobante generado electrónicamente · ${getNombreDespacho()}`, 44, height - 62);
 
-      resolve(canvas.toDataURL("image/png"));
+      // Se sube al bucket "recibos" (privado, aislado por despacho) en vez
+      // de guardar la imagen completa dentro de la fila del cliente — así
+      // cientos de recibos no inflan el límite de espacio de la base de
+      // datos. Si por lo que sea la subida falla (sin internet, bucket no
+      // creado todavía), se cae de vuelta al base64 de siempre para no
+      // perder el recibo.
+      canvas.toBlob(async (blob) => {
+        try {
+          if (!blob) throw new Error("No se pudo generar la imagen");
+          const ruta = await subirReciboImagen(clienteId, pago.id, blob);
+          resolve(ruta);
+        } catch (e) {
+          console.warn("No se pudo subir el recibo a Storage, se guarda como antes:", e);
+          resolve(canvas.toDataURL("image/png"));
+        }
+      }, "image/png");
     };
 
     const logoImg = new Image();
@@ -260,6 +275,8 @@ import {
   restaurarDePapelera,
   eliminarDefinitivo,
   firmarDocumentoPublico,
+  subirReciboImagen,
+  obtenerUrlReciboImagen,
 } from "./lib/storage";
 
 function useIndex(key, shared) {
@@ -1287,7 +1304,7 @@ async function ejecutarHerramienta(nombreHerramienta, input) {
     if (!encontrado) return { mensaje: `No encontré ningún cliente llamado "${input.nombre_cliente}". Verifica el nombre exacto.` };
     const { id, cliente } = encontrado;
     const pago = { id: uid(), fecha: new Date().toISOString(), medioPago: input.medio_pago, valor: Number(input.valor), concepto: input.concepto || "" };
-    pago.reciboImagen = await generarReciboImagen(cliente, pago);
+    pago.reciboImagen = await generarReciboImagen(id, cliente, pago);
     const actualizado = { ...cliente, pagos: [...(cliente.pagos || []), pago] };
     await storageSet(`cliente:${id}`, JSON.stringify(actualizado), false);
     return { mensaje: `Pago de ${formatoCOP(input.valor)} registrado para ${cliente.nombre}, con su recibo generado.` };
@@ -4182,9 +4199,35 @@ function FormularioPago({ cliente, onRegistrar }) {
   );
 }
 
+// El recibo puede venir de dos formas: un base64 completo (recibos viejos,
+// de antes de mover esto a Storage) o una ruta dentro del bucket privado
+// "recibos" (recibos nuevos) — en ese segundo caso hay que pedirle la
+// imagen a Supabase antes de poder mostrarla, por eso el estado de carga.
+function useUrlRecibo(reciboImagen) {
+  const [url, setUrl] = useState(reciboImagen?.startsWith("data:") ? reciboImagen : null);
+  useEffect(() => {
+    if (!reciboImagen || reciboImagen.startsWith("data:")) return;
+    let cancelado = false;
+    let urlCreada = null;
+    obtenerUrlReciboImagen(reciboImagen)
+      .then((u) => {
+        if (cancelado) return;
+        urlCreada = u;
+        setUrl(u);
+      })
+      .catch(() => {});
+    return () => {
+      cancelado = true;
+      if (urlCreada) URL.revokeObjectURL(urlCreada);
+    };
+  }, [reciboImagen]);
+  return url;
+}
+
 function ReciboCard({ cliente, pago }) {
   const [copiado, setCopiado] = useState(false);
   const numero = numeroWhatsappCliente(cliente.telefono);
+  const urlRecibo = useUrlRecibo(pago.reciboImagen);
 
   const enviarPorWhatsapp = () => {
     const mensaje = `Hola ${cliente.nombre || ""} 👋\n\n*${getNombreDespacho()}* te confirma la recepción de tu pago:\n\n💳 Medio: ${pago.medioPago}\n💰 Valor: ${formatoCOP(pago.valor)}\n📅 Fecha: ${new Date(pago.fecha).toLocaleDateString("es-CO", { dateStyle: "long" })}${pago.concepto ? `\n📝 Concepto: ${pago.concepto}` : ""}\n\nTe adjuntamos el recibo. ¡Gracias por tu confianza!`;
@@ -4193,7 +4236,13 @@ function ReciboCard({ cliente, pago }) {
 
   return (
     <div style={{ display: "flex", gap: 14, flexWrap: "wrap", alignItems: "flex-start", background: COLORS.surfaceSoft, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: 12, marginTop: 10 }}>
-      {pago.reciboImagen && <img src={pago.reciboImagen} alt="Recibo de pago" style={{ width: 140, borderRadius: 6, border: `1px solid ${COLORS.border}` }} />}
+      {urlRecibo ? (
+        <img src={urlRecibo} alt="Recibo de pago" style={{ width: 140, borderRadius: 6, border: `1px solid ${COLORS.border}` }} />
+      ) : pago.reciboImagen ? (
+        <div style={{ width: 140, height: 178, borderRadius: 6, border: `1px solid ${COLORS.border}`, background: COLORS.panel, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <Spinner texto="" />
+        </div>
+      ) : null}
       <div style={{ flex: 1, minWidth: 180 }}>
         <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, fontWeight: 600, color: COLORS.ink, margin: 0 }}>
           {formatoCOP(pago.valor)} · {pago.medioPago}
@@ -4203,9 +4252,9 @@ function ReciboCard({ cliente, pago }) {
           {pago.concepto ? ` · ${pago.concepto}` : ""}
         </p>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          {pago.reciboImagen && (
+          {urlRecibo && (
             <a
-              href={pago.reciboImagen}
+              href={urlRecibo}
               download={`recibo_${(cliente.nombre || "cliente").replace(/[^a-z0-9]+/gi, "_")}_${pago.id}.png`}
               style={{ ...buttonGhost, padding: "5px 12px", fontSize: 12, textDecoration: "none" }}
               onClick={() => {
@@ -4421,7 +4470,7 @@ function ContabilidadTab({ usuarioActual }) {
       valor: datosPago.valor,
       concepto: datosPago.concepto,
     };
-    const reciboImagen = await generarReciboImagen(cliente, pago);
+    const reciboImagen = await generarReciboImagen(id, cliente, pago);
     pago.reciboImagen = reciboImagen;
 
     let proximoPago = cliente.proximoPago || null;

@@ -372,3 +372,32 @@ create policy "administradores renombran su despacho" on despachos
   for update
   using (soy_administrador() and id = mi_despacho_id())
   with check (id = mi_despacho_id());
+
+-- Almacenamiento de recibos de pago -----------------------------------------
+-- Antes cada recibo (una imagen generada en canvas) se guardaba completo en
+-- base64 dentro de la fila del cliente — con el tiempo eso llena el límite
+-- de espacio gratis de la base de datos mucho más rápido que cualquier otra
+-- cosa en la app. Ahora se sube como archivo a este bucket, organizado en
+-- carpetas por despacho_id, y la fila del cliente solo guarda la ruta.
+-- Bucket privado (no público): solo se puede leer autenticado y a través de
+-- las políticas de abajo, nunca por URL directa.
+
+insert into storage.buckets (id, name, public)
+values ('recibos', 'recibos', false)
+on conflict (id) do nothing;
+
+drop policy if exists "cada despacho sube sus propios recibos" on storage.objects;
+create policy "cada despacho sube sus propios recibos" on storage.objects
+  for insert
+  with check (bucket_id = 'recibos' and (storage.foldername(name))[1] = mi_despacho_id()::text);
+
+drop policy if exists "cada despacho lee sus propios recibos" on storage.objects;
+create policy "cada despacho lee sus propios recibos" on storage.objects
+  for select
+  using (bucket_id = 'recibos' and (storage.foldername(name))[1] = mi_despacho_id()::text);
+
+drop policy if exists "cada despacho actualiza sus propios recibos" on storage.objects;
+create policy "cada despacho actualiza sus propios recibos" on storage.objects
+  for update
+  using (bucket_id = 'recibos' and (storage.foldername(name))[1] = mi_despacho_id()::text)
+  with check (bucket_id = 'recibos' and (storage.foldername(name))[1] = mi_despacho_id()::text);

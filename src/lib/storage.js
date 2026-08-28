@@ -17,6 +17,31 @@ export function setDespachoActual(id, nombre) {
   despachoActualId = id || null;
   despachoActualNombre = nombre || "";
 }
+export function getDespachoActualId() {
+  return despachoActualId;
+}
+
+// Recibos de pago (imágenes generadas en canvas) --------------------------
+// Antes se guardaban como texto base64 completo dentro de la fila del
+// cliente en la base de datos — con cientos de pagos eso infla rápido el
+// límite de espacio gratis de Supabase. Ahora se suben al bucket privado
+// "recibos" (protegido por RLS: cada despacho solo puede leer su propia
+// carpeta) y en el cliente solo se guarda la ruta del archivo, no la imagen.
+
+export async function subirReciboImagen(clienteId, pagoId, blob) {
+  if (!despachoActualId) throw new Error("Sin despacho activo");
+  const ruta = `${despachoActualId}/${clienteId}/${pagoId}.png`;
+  const { error } = await supabase.storage.from("recibos").upload(ruta, blob, { contentType: "image/png", upsert: true });
+  if (error) throw error;
+  return ruta;
+}
+
+export async function obtenerUrlReciboImagen(ruta) {
+  if (!ruta) return null;
+  const { data, error } = await supabase.storage.from("recibos").download(ruta);
+  if (error) throw error;
+  return URL.createObjectURL(data);
+}
 
 // Para textos (PDFs, WhatsApp, recibos, etc.) que antes decían siempre
 // "Cortés Ramírez Abogados" a mano: ahora usan el nombre del despacho de la
