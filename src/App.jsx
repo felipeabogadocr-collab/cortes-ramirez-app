@@ -6413,14 +6413,14 @@ const PLANES_PRECIO = [
 ];
 
 const FUNCIONES_LANDING = [
-  { titulo: "Resumen", color: "#2F80ED", icono: "📊", texto: "Un panel que te dice qué necesita tu atención hoy — pagos pendientes, novedades judiciales, documentos por firmar — no solo números sueltos." },
-  { titulo: "Clientes", color: "#14B8A6", icono: "👥", texto: "Ficha completa por cliente: contacto, proceso, radicado, plan de pago y valor acordado. Búsqueda instantánea y filtros, incluso con cientos de clientes." },
-  { titulo: "Vigilancia judicial", color: "#F5A524", icono: "⚖️", texto: "Consulta en vivo a la Rama Judicial por radicado. Una IA te explica cada actuación en palabras simples y sugiere el siguiente paso. Revisión automática todos los días, sin que tengas que entrar." },
-  { titulo: "Contabilidad", color: "#F43F5E", icono: "💳", texto: "Registra pagos, genera recibos automáticos y controla quién debe y cuánto — con recordatorios listos para enviar por WhatsApp con un clic." },
-  { titulo: "Calendario de contenido", color: "#8B5CF6", icono: "📅", texto: "Un Community Manager con IA que te propone ideas de contenido para Instagram, Facebook y TikTok, pensadas para atraer clientes del despacho." },
-  { titulo: "Firmar documentos", color: "#10B981", icono: "✍️", texto: "Comparte un código con tu cliente y firma electrónicamente desde el celular, sin instalar nada. Los enlaces sin firmar vencen solos a los 30 días." },
-  { titulo: "Portal del cliente", color: "#2F80ED", icono: "🔗", texto: "Tus clientes consultan el estado de su proceso y su estado de cuenta cuando quieran, sin tener que llamarte ni escribirte." },
-  { titulo: "Reportes", color: "#0EA5E9", icono: "📈", texto: "Ingresos por mes, procesos por estado y carga de trabajo por abogado — para decidir con datos reales, no con intuición." },
+  { titulo: "Resumen", color: "#2F80ED", icono: "📊", texto: "Lo que necesita tu atención hoy, en un solo panel." },
+  { titulo: "Clientes", color: "#14B8A6", icono: "👥", texto: "Ficha completa por cliente, con búsqueda instantánea." },
+  { titulo: "Vigilancia judicial", color: "#F5A524", icono: "⚖️", texto: "La Rama Judicial, consultada y explicada por IA." },
+  { titulo: "Contabilidad", color: "#F43F5E", icono: "💳", texto: "Pagos, recibos y cobros listos para WhatsApp." },
+  { titulo: "Calendario de contenido", color: "#8B5CF6", icono: "📅", texto: "Ideas de redes sociales generadas con IA." },
+  { titulo: "Firmar documentos", color: "#10B981", icono: "✍️", texto: "Firma electrónica desde el celular, sin instalar nada." },
+  { titulo: "Portal del cliente", color: "#2F80ED", icono: "🔗", texto: "Tus clientes consultan su caso sin llamarte." },
+  { titulo: "Reportes", color: "#0EA5E9", icono: "📈", texto: "Ingresos y carga de trabajo, con datos reales." },
 ];
 
 const FAQ_LANDING = [
@@ -6459,12 +6459,14 @@ const FAQ_LANDING = [
 ];
 
 const SEGURIDAD_LANDING = [
-  "Autenticación real: contraseñas nunca guardadas en texto plano, con verificación por correo.",
-  "Cada despacho ve únicamente sus propios datos — aislamiento total entre clientes de la plataforma.",
-  "Registro de auditoría: queda constancia de quién hizo qué y cuándo dentro de tu despacho.",
-  "Límite de intentos automatizado contra ataques de fuerza bruta y uso indebido.",
-  "Respaldo completo descargable en cualquier momento, sin costo adicional.",
-  "Toda la conexión viaja cifrada (HTTPS) con cabeceras de seguridad activas.",
+  { titulo: "Autenticación real", texto: "Contraseñas nunca en texto plano, con verificación por correo." },
+  { titulo: "Aislamiento total", texto: "Cada despacho ve únicamente sus propios datos." },
+  { titulo: "Registro de auditoría", texto: "Constancia de quién hizo qué y cuándo." },
+  { titulo: "Freno a ataques", texto: "Límite automático de intentos, con espera creciente." },
+  { titulo: "Respaldo descargable", texto: "Toda tu información, exportable cuando quieras." },
+  { titulo: "Conexión cifrada", texto: "HTTPS con cabeceras de seguridad activas." },
+  { titulo: "Sesión con vencimiento", texto: "Cierre automático si dejas el computador sin usar." },
+  { titulo: "Firma verificable", texto: "Hash de integridad e IP en cada firma electrónica." },
 ];
 
 function PoliticaPrivacidad() {
@@ -7074,9 +7076,9 @@ function LandingPage({ onRegistrar, onIniciarSesion }) {
           <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted, textAlign: "center", marginBottom: 30 }}>
             Se registra información sensible de tus clientes — la protegemos en serio.
           </p>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))", gap: 14 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14 }}>
             {SEGURIDAD_LANDING.map((s, i) => (
-              <AlEntrar key={i} retraso={(i % 3) * 70}>
+              <AlEntrar key={s.titulo} retraso={(i % 4) * 70}>
                 <Card>
                   <div
                     style={{
@@ -7092,9 +7094,10 @@ function LandingPage({ onRegistrar, onIniciarSesion }) {
                       marginBottom: 10,
                     }}
                   >
-                    {["🔒", "🏢", "📝", "🚫", "💾", "🔐"][i % 6]}
+                    {["🔒", "🏢", "📝", "🚫", "💾", "🔐", "⏱️", "🖋️"][i % 8]}
                   </div>
-                  <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.inkSoft, lineHeight: 1.6, margin: 0 }}>{s}</p>
+                  <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, fontWeight: 700, color: COLORS.headingText, margin: "0 0 4px" }}>{s.titulo}</p>
+                  <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.inkSoft, lineHeight: 1.5, margin: 0 }}>{s.texto}</p>
                 </Card>
               </AlEntrar>
             ))}
