@@ -5635,7 +5635,7 @@ function CampoContrasena({ valor, onChange, onEnter, autoFocus }) {
 
 const PLANES_PRECIO = [
   {
-    nombre: "Individual",
+    nombre: "Abogado",
     precio: "$79.000",
     periodo: "/mes por abogado",
     descripcion: "Para el abogado independiente que quiere dejar el Excel y el WhatsApp desordenado.",
@@ -5647,16 +5647,8 @@ const PLANES_PRECIO = [
     precio: "$199.000",
     periodo: "/mes",
     descripcion: "Para despachos con varios abogados que necesitan trabajar coordinados.",
-    caracteristicas: ["Hasta 5 usuarios", "Clientes ilimitados", "Todas las funciones de Individual", "Reportes y carga de trabajo por abogado", "Roles y permisos por usuario"],
+    caracteristicas: ["Usuarios ilimitados", "Clientes ilimitados", "Todas las funciones de Abogado", "Reportes y carga de trabajo por abogado", "Roles y permisos por usuario", "Soporte prioritario"],
     destacado: true,
-  },
-  {
-    nombre: "Firma",
-    precio: "$399.000",
-    periodo: "/mes",
-    descripcion: "Para firmas grandes que necesitan escalar sin límites ni fricciones.",
-    caracteristicas: ["Usuarios ilimitados", "Todas las funciones de Despacho", "Soporte prioritario", "Onboarding acompañado"],
-    destacado: false,
   },
 ];
 
