@@ -4453,7 +4453,25 @@ function ReportesTab() {
 
   return (
     <div>
-      <EncabezadoSeccion titulo="Reportes" color="#0EA5E9" />
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
+        <EncabezadoSeccion titulo="Reportes" color="#0EA5E9" />
+        <button
+          className="drx-btn-ghost"
+          style={buttonGhost}
+          onClick={() =>
+            exportarCSV(
+              "reporte-ingresos.csv",
+              [
+                { titulo: "Mes", valor: (m) => m.etiqueta },
+                { titulo: "Ingreso", valor: (m) => ingresosPorMes[m.clave] },
+              ],
+              mesesEtiquetas
+            )
+          }
+        >
+          Exportar CSV
+        </button>
+      </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, marginBottom: 20 }}>
         <Card>
@@ -4591,6 +4609,12 @@ function ContabilidadTab({ usuarioActual }) {
     return saldo && saldo > 0 ? sum + saldo : sum;
   }, 0);
 
+  // Clientes con un valor acordado pero sin ni un solo pago registrado —
+  // fácil que se pierdan de vista entre los que sí van pagando poco a poco.
+  const clientesSinPagos = ids
+    .map((id) => clientes[id])
+    .filter((c) => c && Number(c.valorTotal) > 0 && (c.pagos || []).length === 0);
+
   const textoFiltro = filtro.trim().toLowerCase();
   let idsFiltrados = textoFiltro ? ids.filter((id) => clientes[id]?.nombre?.toLowerCase().includes(textoFiltro)) : ids;
   if (soloPendientes) idsFiltrados = idsFiltrados.filter((id) => (saldoDe(clientes[id]) || 0) > 0);
@@ -4605,6 +4629,16 @@ function ContabilidadTab({ usuarioActual }) {
           </p>
           <p style={{ fontFamily: "Inter, sans-serif", fontSize: 26, fontWeight: 800, color: "#B42318", margin: "4px 0 0" }}>{formatoCOP(carteraTotal)}</p>
         </Card>
+      )}
+      {clientesSinPagos.length > 0 && (
+        <div style={{ marginBottom: 20 }}>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, fontWeight: 700, color: "#8B5CF6", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 10 }}>
+            👀 Sin ningún pago registrado todavía
+          </p>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.inkSoft, margin: "0 0 8px" }}>
+            {clientesSinPagos.map((c) => c.nombre).join(", ")}
+          </p>
+        </div>
       )}
       {proximosPagos.length > 0 && (
         <div style={{ marginBottom: 20 }}>
