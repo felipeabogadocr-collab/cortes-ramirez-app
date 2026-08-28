@@ -6996,26 +6996,46 @@ function LandingPage({ onRegistrar, onIniciarSesion }) {
           </AlEntrar>
         </div>
 
-        <Kicker texto="Datos sensibles, en serio" />
-        <h2 id="seguridad" style={{ fontFamily: "Inter, sans-serif", fontSize: 22, fontWeight: 800, color: COLORS.headingText, textAlign: "center", marginBottom: 8, marginTop: 0, scrollMarginTop: 90 }}>
-          Seguridad
-        </h2>
-        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted, textAlign: "center", marginBottom: 24 }}>
-          Se registra información sensible de tus clientes — la protegemos en serio.
-        </p>
-        <AlEntrar>
-          <Card style={{ marginBottom: 60 }}>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "10px 24px" }}>
-              {SEGURIDAD_LANDING.map((s, i) => (
-                <div key={i} style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
-                  <span style={{ color: "#10B981", fontWeight: 800, fontSize: 14, lineHeight: 1.5 }}>✓</span>
-                  <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.inkSoft, lineHeight: 1.6, margin: 0 }}>{s}</p>
-                </div>
-              ))}
-            </div>
-          </Card>
-        </AlEntrar>
+      </div>
 
+      <div style={{ background: COLORS.surfaceSoft, borderTop: `1px solid ${COLORS.border}`, borderBottom: `1px solid ${COLORS.border}`, padding: "56px 20px" }}>
+        <div style={{ maxWidth: 1040, margin: "0 auto" }}>
+          <Kicker texto="Datos sensibles, en serio" />
+          <h2 id="seguridad" style={{ fontFamily: "Inter, sans-serif", fontSize: 22, fontWeight: 800, color: COLORS.headingText, textAlign: "center", marginBottom: 8, marginTop: 0, scrollMarginTop: 90 }}>
+            Seguridad
+          </h2>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted, textAlign: "center", marginBottom: 30 }}>
+            Se registra información sensible de tus clientes — la protegemos en serio.
+          </p>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))", gap: 14 }}>
+            {SEGURIDAD_LANDING.map((s, i) => (
+              <AlEntrar key={i} retraso={(i % 3) * 70}>
+                <Card>
+                  <div
+                    style={{
+                      width: 36,
+                      height: 36,
+                      borderRadius: 9,
+                      background: COLORS.accentSoft,
+                      color: COLORS.navy,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: 16,
+                      marginBottom: 10,
+                    }}
+                  >
+                    {["🔒", "🏢", "📝", "🚫", "💾", "🔐"][i % 6]}
+                  </div>
+                  <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.inkSoft, lineHeight: 1.6, margin: 0 }}>{s}</p>
+                </Card>
+              </AlEntrar>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div style={{ maxWidth: 1040, margin: "0 auto", padding: "56px 20px 0" }}>
         <Kicker texto="Sin sorpresas" />
         <h2 id="planes" style={{ fontFamily: "Inter, sans-serif", fontSize: 22, fontWeight: 800, color: COLORS.headingText, textAlign: "center", marginBottom: 8, marginTop: 0, scrollMarginTop: 90 }}>
           Planes
@@ -7103,32 +7123,43 @@ function LandingPage({ onRegistrar, onIniciarSesion }) {
           </button>
         </div>
 
-        <Kicker texto="Antes de escribirnos" />
-        <h2 id="faq" style={{ fontFamily: "Inter, sans-serif", fontSize: 22, fontWeight: 800, color: COLORS.headingText, textAlign: "center", marginBottom: 24, marginTop: 0, scrollMarginTop: 90 }}>
-          Preguntas frecuentes
-        </h2>
-        <div className="drx-faq" style={{ display: "flex", flexDirection: "column", gap: 10, maxWidth: 680, margin: "0 auto" }}>
-          {FAQ_LANDING.map((f, i) => (
-            <details key={i} style={{ background: COLORS.panel, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: "14px 20px" }}>
-              <summary
-                style={{
-                  fontFamily: "Inter, sans-serif",
-                  fontSize: 13,
-                  fontWeight: 800,
-                  letterSpacing: 0.4,
-                  textTransform: "uppercase",
-                  color: COLORS.ink,
-                  textAlign: "center",
-                  cursor: "pointer",
-                }}
-              >
-                {f.p}
-              </summary>
-              <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.inkSoft, lineHeight: 1.7, margin: "12px 0 0", textAlign: "justify" }}>
-                {f.r}
-              </p>
-            </details>
-          ))}
+      </div>
+
+      <div style={{ background: COLORS.surfaceSoft, borderTop: `1px solid ${COLORS.border}`, padding: "56px 20px 60px" }}>
+        <div style={{ maxWidth: 900, margin: "0 auto" }}>
+          <Kicker texto="Antes de escribirnos" />
+          <h2 id="faq" style={{ fontFamily: "Inter, sans-serif", fontSize: 22, fontWeight: 800, color: COLORS.headingText, textAlign: "center", marginBottom: 30, marginTop: 0, scrollMarginTop: 90 }}>
+            Preguntas frecuentes
+          </h2>
+          <div className="drx-faq" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))", gap: 12 }}>
+            {FAQ_LANDING.map((f, i) => (
+              <AlEntrar key={i} retraso={(i % 4) * 60}>
+                <details style={{ background: COLORS.panel, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: "14px 20px", height: "100%" }}>
+                  <summary
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 10,
+                      fontFamily: "Inter, sans-serif",
+                      fontSize: 13,
+                      fontWeight: 800,
+                      letterSpacing: 0.3,
+                      color: COLORS.ink,
+                      cursor: "pointer",
+                    }}
+                  >
+                    <span style={{ width: 22, height: 22, borderRadius: 6, background: COLORS.accentSoft, color: COLORS.navy, display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 800, flexShrink: 0 }}>
+                      ?
+                    </span>
+                    {f.p}
+                  </summary>
+                  <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.inkSoft, lineHeight: 1.7, margin: "12px 0 0" }}>
+                    {f.r}
+                  </p>
+                </details>
+              </AlEntrar>
+            ))}
+          </div>
         </div>
       </div>
 
