@@ -527,6 +527,14 @@ const buttonGhost = {
   fontFamily: "Inter, sans-serif",
 };
 
+const navLinkStyle = {
+  fontFamily: "Inter, sans-serif",
+  fontSize: 13,
+  fontWeight: 600,
+  color: COLORS.inkSoft,
+  textDecoration: "none",
+};
+
 function Card({ children, style }) {
   return (
     <div
@@ -665,26 +673,33 @@ function useTema() {
 }
 
 const MINUTOS_INACTIVIDAD = 30;
+const SEGUNDOS_AVISO_PREVIO = 60;
 
 // Cierra la sesión sola tras MINUTOS_INACTIVIDAD sin que el usuario toque
 // nada (clic, tecla, scroll, pantalla táctil) — útil en equipos compartidos
-// del despacho.
-function useCierreSesionPorInactividad(activo, onExpirar) {
+// del despacho. Un minuto antes de cerrarla, avisa (onAviso(true)) para que
+// la app pueda mostrar un mensaje — cualquier actividad lo cancela solo.
+function useCierreSesionPorInactividad(activo, onExpirar, onAviso) {
   useEffect(() => {
     if (!activo) return;
-    let temporizador;
+    let temporizadorAviso;
+    let temporizadorCierre;
     const reiniciar = () => {
-      clearTimeout(temporizador);
-      temporizador = setTimeout(onExpirar, MINUTOS_INACTIVIDAD * 60 * 1000);
+      clearTimeout(temporizadorAviso);
+      clearTimeout(temporizadorCierre);
+      onAviso?.(false);
+      temporizadorAviso = setTimeout(() => onAviso?.(true), MINUTOS_INACTIVIDAD * 60 * 1000 - SEGUNDOS_AVISO_PREVIO * 1000);
+      temporizadorCierre = setTimeout(onExpirar, MINUTOS_INACTIVIDAD * 60 * 1000);
     };
     const eventos = ["mousemove", "mousedown", "keydown", "touchstart", "scroll"];
     eventos.forEach((ev) => window.addEventListener(ev, reiniciar));
     reiniciar();
     return () => {
-      clearTimeout(temporizador);
+      clearTimeout(temporizadorAviso);
+      clearTimeout(temporizadorCierre);
       eventos.forEach((ev) => window.removeEventListener(ev, reiniciar));
     };
-  }, [activo, onExpirar]);
+  }, [activo, onExpirar, onAviso]);
 }
 
 function IconoSol({ size = 17 }) {
@@ -5708,6 +5723,29 @@ const FUNCIONES_LANDING = [
   { titulo: "Reportes", color: "#0EA5E9", texto: "Ingresos por mes, procesos por estado y carga de trabajo por abogado — para decidir con datos reales, no con intuición." },
 ];
 
+const FAQ_LANDING = [
+  {
+    p: "¿Qué pasa con mis datos si algún día dejo de pagar o quiero irme?",
+    r: "Puedes descargar en cualquier momento un respaldo completo de toda tu información (clientes, documentos, casos) en un archivo que te llevas tú. No queda nada retenido.",
+  },
+  {
+    p: "¿Es válida legalmente la firma electrónica de los documentos?",
+    r: "Sí, es una firma electrónica bajo la Ley 527 de 1999, con consentimiento explícito del firmante y un hash de integridad que demuestra que el documento no fue alterado después de firmado.",
+  },
+  {
+    p: "¿Quién puede ver la información de mis clientes?",
+    r: "Solo los usuarios que tú autorices dentro de tu propio despacho. Cada despacho está completamente aislado del resto — nadie de otro despacho puede ver tus datos, ni siquiera nosotros por defecto.",
+  },
+  {
+    p: "¿Necesito instalar algo?",
+    r: "No. Funciona desde el navegador, en el celular o el computador, y se puede \"agregar a inicio\" para que se sienta como una app nativa, sin pasar por tiendas de aplicaciones.",
+  },
+  {
+    p: "¿Puedo cambiar de plan o cancelar cuando quiera?",
+    r: "Sí, no hay contratos de permanencia forzosa.",
+  },
+];
+
 const SEGURIDAD_LANDING = [
   "Autenticación real: contraseñas nunca guardadas en texto plano, con verificación por correo.",
   "Cada despacho ve únicamente sus propios datos — aislamiento total entre clientes de la plataforma.",
@@ -5797,17 +5835,34 @@ function LandingPage({ onRegistrar, onIniciarSesion }) {
   return (
     <div className={oscuro ? "drx-tema-oscuro" : "drx-tema-claro"} style={{ background: COLORS.bg, minHeight: "100%" }}>
       <GlobalStyle />
+      <style>{`html { scroll-behavior: smooth; }`}</style>
 
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "18px 24px", maxWidth: 1040, margin: "0 auto" }}>
-        <InsigniaPlataforma />
-        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-          <button
-            onClick={onIniciarSesion}
-            style={{ background: "none", border: "none", color: COLORS.muted, fontFamily: "Inter, sans-serif", fontSize: 13, fontWeight: 600, cursor: "pointer", textDecoration: "underline" }}
-          >
-            Ya tengo cuenta — Iniciar sesión
-          </button>
-          <BotonTema oscuro={oscuro} onClick={alternar} />
+      <div
+        style={{
+          position: "sticky",
+          top: 0,
+          zIndex: 30,
+          background: COLORS.panel,
+          borderBottom: `1px solid ${COLORS.border}`,
+        }}
+      >
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 24px", maxWidth: 1040, margin: "0 auto", flexWrap: "wrap", gap: 12 }}>
+          <InsigniaPlataforma />
+          <div style={{ display: "flex", alignItems: "center", gap: 20, flexWrap: "wrap" }}>
+            <a href="#funciones" style={navLinkStyle}>Funciones</a>
+            <a href="#seguridad" style={navLinkStyle}>Seguridad</a>
+            <a href="#planes" style={navLinkStyle}>Planes</a>
+            <a href="#faq" style={navLinkStyle}>Preguntas frecuentes</a>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+            <button
+              onClick={onIniciarSesion}
+              style={{ background: "none", border: "none", color: COLORS.muted, fontFamily: "Inter, sans-serif", fontSize: 13, fontWeight: 600, cursor: "pointer", textDecoration: "underline" }}
+            >
+              Ya tengo cuenta — Iniciar sesión
+            </button>
+            <BotonTema oscuro={oscuro} onClick={alternar} />
+          </div>
         </div>
       </div>
 
@@ -5839,7 +5894,7 @@ function LandingPage({ onRegistrar, onIniciarSesion }) {
       </div>
 
       <div style={{ maxWidth: 1040, margin: "0 auto", padding: "0 20px 60px" }}>
-        <h2 style={{ fontFamily: "Inter, sans-serif", fontSize: 22, fontWeight: 800, color: COLORS.headingText, textAlign: "center", marginBottom: 8 }}>
+        <h2 id="funciones" style={{ fontFamily: "Inter, sans-serif", fontSize: 22, fontWeight: 800, color: COLORS.headingText, textAlign: "center", marginBottom: 8, scrollMarginTop: 90 }}>
           Qué encuentras adentro
         </h2>
         <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted, textAlign: "center", marginBottom: 30 }}>
@@ -5854,7 +5909,7 @@ function LandingPage({ onRegistrar, onIniciarSesion }) {
           ))}
         </div>
 
-        <h2 style={{ fontFamily: "Inter, sans-serif", fontSize: 22, fontWeight: 800, color: COLORS.headingText, textAlign: "center", marginBottom: 8 }}>
+        <h2 id="seguridad" style={{ fontFamily: "Inter, sans-serif", fontSize: 22, fontWeight: 800, color: COLORS.headingText, textAlign: "center", marginBottom: 8, scrollMarginTop: 90 }}>
           Seguridad
         </h2>
         <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted, textAlign: "center", marginBottom: 24 }}>
@@ -5871,7 +5926,7 @@ function LandingPage({ onRegistrar, onIniciarSesion }) {
           </div>
         </Card>
 
-        <h2 style={{ fontFamily: "Inter, sans-serif", fontSize: 22, fontWeight: 800, color: COLORS.headingText, textAlign: "center", marginBottom: 8 }}>
+        <h2 id="planes" style={{ fontFamily: "Inter, sans-serif", fontSize: 22, fontWeight: 800, color: COLORS.headingText, textAlign: "center", marginBottom: 8, scrollMarginTop: 90 }}>
           Planes
         </h2>
         <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted, textAlign: "center", marginBottom: 6 }}>
@@ -5933,10 +5988,22 @@ function LandingPage({ onRegistrar, onIniciarSesion }) {
           ))}
         </div>
 
-        <div style={{ textAlign: "center" }}>
+        <div style={{ textAlign: "center", marginBottom: 60 }}>
           <button className="drx-btn-primary" style={{ ...buttonPrimary, padding: "14px 28px", fontSize: 14 }} onClick={onRegistrar}>
             Registrar mi despacho
           </button>
+        </div>
+
+        <h2 id="faq" style={{ fontFamily: "Inter, sans-serif", fontSize: 22, fontWeight: 800, color: COLORS.headingText, textAlign: "center", marginBottom: 24, scrollMarginTop: 90 }}>
+          Preguntas frecuentes
+        </h2>
+        <div style={{ display: "flex", flexDirection: "column", gap: 10, maxWidth: 680, margin: "0 auto" }}>
+          {FAQ_LANDING.map((f, i) => (
+            <details key={i} style={{ background: COLORS.panel, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: "12px 16px" }}>
+              <summary style={{ fontFamily: "Inter, sans-serif", fontSize: 13.5, fontWeight: 700, color: COLORS.ink, cursor: "pointer" }}>{f.p}</summary>
+              <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.inkSoft, lineHeight: 1.6, margin: "10px 0 0" }}>{f.r}</p>
+            </details>
+          ))}
         </div>
       </div>
 
@@ -6816,7 +6883,8 @@ export default function App() {
     setCambiandoUsuario(false);
   }, []);
 
-  useCierreSesionPorInactividad(!!usuarioActual && !modoPublico && !modoPortal, cerrarSesion);
+  const [avisoInactividad, setAvisoInactividad] = useState(false);
+  useCierreSesionPorInactividad(!!usuarioActual && !modoPublico && !modoPortal, cerrarSesion, setAvisoInactividad);
 
   if (modoPublico) {
     return (
@@ -7123,6 +7191,34 @@ export default function App() {
           onIrAContenido={irAContenido}
           onIrAVigilancia={irAVigilancia}
         />
+      )}
+
+      {avisoInactividad && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(10,18,32,0.55)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 20,
+            zIndex: 2000,
+          }}
+        >
+          <Card style={{ maxWidth: 380, textAlign: "center" }}>
+            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 16, fontWeight: 700, color: COLORS.ink, marginBottom: 8 }}>
+              ¿Sigues ahí?
+            </p>
+            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted, marginBottom: 18, lineHeight: 1.5 }}>
+              Por seguridad, tu sesión está a punto de cerrarse por inactividad — útil si usas un computador compartido
+              en el despacho. Mueve el mouse o haz clic para seguir conectado.
+            </p>
+            <button className="drx-btn-primary" style={{ ...buttonPrimary, width: "100%" }} onClick={() => setAvisoInactividad(false)}>
+              Seguir conectado
+            </button>
+          </Card>
+        </div>
       )}
     </div>
   );
