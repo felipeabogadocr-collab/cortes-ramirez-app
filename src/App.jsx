@@ -3,6 +3,14 @@ import { supabase } from "./lib/supabaseClient";
 
 const uid = () => Math.random().toString(36).slice(2, 10).toUpperCase();
 
+// Misma regla que api/_lib/defaults.js (validarContrasena) — se valida acá
+// también para no gastar una llamada de red si la contraseña ya se ve mal.
+function validarContrasenaCliente(contrasena) {
+  if (!contrasena || contrasena.length < 10) return "La contraseña debe tener al menos 10 caracteres";
+  if (!/[a-zA-Z]/.test(contrasena) || !/[0-9]/.test(contrasena)) return "La contraseña debe combinar letras y números";
+  return null;
+}
+
 // Registro de auditoría: quién hizo qué y cuándo, visible solo para
 // Administradores. Si falla (sin conexión, sin sesión, etc.) no bloquea la
 // acción que se estaba auditando — solo se pierde ese registro.
@@ -4855,19 +4863,38 @@ function LoginGate({ onIngresar, onCancelar }) {
 
   const crearDespacho = async () => {
     if (!nombreDespacho.trim() || !nombre.trim() || !email.trim() || !contrasena.trim()) return;
+    const errorContrasena = validarContrasenaCliente(contrasena);
+    if (errorContrasena) {
+      setError(errorContrasena);
+      return;
+    }
     setEnviando(true);
     setError("");
     try {
+      // Se crea el usuario de Auth desde el navegador (no con service_role)
+      // para que Supabase mande el correo real de confirmación. Sin ese
+      // correo confirmado, signUp no deja sesión activa todavía.
+      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+        email: email.trim(),
+        password: contrasena,
+        options: { emailRedirectTo: typeof window !== "undefined" ? window.location.origin : undefined },
+      });
+      if (signUpError) throw signUpError;
+      if (!signUpData.user) throw new Error("No se pudo crear la cuenta.");
+
       const response = await fetch("/api/despachos/crear", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ nombreDespacho: nombreDespacho.trim(), nombre: nombre.trim(), email: email.trim(), contrasena }),
+        body: JSON.stringify({ nombreDespacho: nombreDespacho.trim(), nombre: nombre.trim(), email: email.trim(), userId: signUpData.user.id }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "No se pudo crear el despacho.");
-      const { error: loginError } = await supabase.auth.signInWithPassword({ email: email.trim(), password: contrasena });
-      if (loginError) throw loginError;
-      onIngresar();
+
+      if (signUpData.session) {
+        onIngresar();
+      } else {
+        setPantalla("registro-enviado");
+      }
     } catch (e) {
       setError(e.message || "No se pudo crear el despacho. Intenta de nuevo.");
     }
@@ -4926,9 +4953,11 @@ function LoginGate({ onIngresar, onCancelar }) {
         <h1 style={{ fontFamily: "Inter, sans-serif", fontSize: 22, fontWeight: 800, textTransform: "uppercase", letterSpacing: 0.5, color: COLORS.headingText, margin: "0 0 4px" }}>
           {pantalla === "registro"
             ? "Registra tu despacho"
-            : pantalla === "recuperar" || pantalla === "recuperacion-enviada"
-              ? "Recuperar contraseña"
-              : "Cortés Ramírez Abogados"}
+            : pantalla === "registro-enviado"
+              ? "Confirma tu correo"
+              : pantalla === "recuperar" || pantalla === "recuperacion-enviada"
+                ? "Recuperar contraseña"
+                : "Cortés Ramírez Abogados"}
         </h1>
 
         {pantalla === "registro" && (
@@ -4975,7 +5004,7 @@ function LoginGate({ onIngresar, onCancelar }) {
               onClick={crearDespacho}
               disabled={enviando || !nombreDespacho.trim() || !nombre.trim() || !email.trim() || !contrasena.trim()}
             >
-              {enviando ? "Creando…" : "Crear mi despacho e ingresar"}
+              {enviando ? "Creando…" : "Crear mi despacho"}
             </button>
             <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11, color: COLORS.muted, marginTop: 14, textAlign: "center" }}>
               ¿Ya tienes cuenta?{" "}
@@ -4986,6 +5015,18 @@ function LoginGate({ onIngresar, onCancelar }) {
                 Inicia sesión
               </button>
             </p>
+          </div>
+        )}
+
+        {pantalla === "registro-enviado" && (
+          <div style={{ textAlign: "left" }}>
+            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted, margin: "8px 0 16px" }}>
+              Te enviamos un correo a <strong>{email}</strong> para confirmar tu cuenta. Ábrelo y confirma; después vuelve aquí e inicia sesión con tu
+              correo y contraseña.
+            </p>
+            <button className="drx-btn-ghost" style={{ ...buttonGhost, width: "100%" }} onClick={() => cambiarPantalla("login")}>
+              Ya confirmé, iniciar sesión
+            </button>
           </div>
         )}
 

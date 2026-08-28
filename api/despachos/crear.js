@@ -1,12 +1,17 @@
 // Registro de un despacho nuevo (self-service, sin necesitar un
-// administrador previo): crea el despacho, el usuario real en Supabase Auth
-// (contraseña hasheada por Supabase) y su perfil como Administrador de ese
-// despacho. Es el único punto de entrada para "nacer" un despacho nuevo en
-// el sistema — los demás usuarios de ese despacho los crea su Administrador
-// desde "Usuarios y permisos" (api/usuarios/crear.js).
+// administrador previo). El usuario de Supabase Auth se crea del lado del
+// navegador con supabase.auth.signUp() ANTES de llamar aquí — así Supabase
+// envía el correo real de confirmación (esta función con service_role no
+// puede disparar ese correo). Esta función solo crea el despacho y el
+// perfil, verificando que el userId corresponda a un usuario real recién
+// creado.
+//
+// Los demás usuarios de un despacho ya existente los crea su Administrador
+// desde "Usuarios y permisos" (api/usuarios/crear.js), sin este paso de
+// verificación de correo.
 
 import { supabaseAdmin } from "../_lib/supabaseAdmin.js";
-import { permisosPorDefecto, notificacionesPorDefecto, validarContrasena } from "../_lib/defaults.js";
+import { permisosPorDefecto, notificacionesPorDefecto } from "../_lib/defaults.js";
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
@@ -14,18 +19,24 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: "Método no permitido" });
   }
 
-  const { nombreDespacho, nombre, email, contrasena } = req.body || {};
-  if (!nombreDespacho?.trim() || !nombre?.trim() || !email?.trim() || !contrasena?.trim()) {
+  const { nombreDespacho, nombre, email, userId } = req.body || {};
+  if (!nombreDespacho?.trim() || !nombre?.trim() || !email?.trim() || !userId) {
     return res.status(400).json({ error: "Faltan datos" });
-  }
-  const errorContrasena = validarContrasena(contrasena);
-  if (errorContrasena) {
-    return res.status(400).json({ error: errorContrasena });
   }
 
   const admin = supabaseAdmin();
 
   try {
+    const { data: userData, error: userError } = await admin.auth.admin.getUserById(userId);
+    if (userError || !userData?.user || userData.user.email !== email.trim()) {
+      return res.status(400).json({ error: "Usuario inválido" });
+    }
+
+    const { data: perfilExistente } = await admin.from("perfiles").select("id").eq("id", userId).maybeSingle();
+    if (perfilExistente) {
+      return res.status(400).json({ error: "Ya existe un despacho para esta cuenta." });
+    }
+
     const { data: despacho, error: despachoError } = await admin
       .from("despachos")
       .insert({ nombre: nombreDespacho.trim() })
@@ -33,21 +44,10 @@ export default async function handler(req, res) {
       .single();
     if (despachoError) throw despachoError;
 
-    const { data: nuevoUsuario, error: createError } = await admin.auth.admin.createUser({
-      email: email.trim(),
-      password: contrasena,
-      email_confirm: true,
-    });
-    if (createError) {
-      // Si falla la creación del usuario, no dejamos el despacho huérfano.
-      await admin.from("despachos").delete().eq("id", despacho.id);
-      throw createError;
-    }
-
     const { data: perfil, error: perfilError } = await admin
       .from("perfiles")
       .insert({
-        id: nuevoUsuario.user.id,
+        id: userId,
         nombre: nombre.trim(),
         email: email.trim(),
         rol: "Administrador",
@@ -57,7 +57,11 @@ export default async function handler(req, res) {
       })
       .select()
       .single();
-    if (perfilError) throw perfilError;
+    if (perfilError) {
+      // Si falla el perfil, no dejamos el despacho huérfano.
+      await admin.from("despachos").delete().eq("id", despacho.id);
+      throw perfilError;
+    }
 
     return res.status(200).json({ perfil, despacho });
   } catch (err) {
