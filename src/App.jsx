@@ -2780,6 +2780,7 @@ function ClientesTab({ usuarioActual }) {
                     className="drx-btn-ghost"
                     style={buttonGhost}
                     onClick={() => {
+                      if (!window.confirm(`¿Eliminar a ${c.nombre}? Puedes recuperarlo después desde la Papelera.`)) return;
                       removeId(id);
                       registrarAuditoria(usuarioActual, "eliminar_cliente", "cliente", id, { nombre: c.nombre });
                     }}
@@ -5100,7 +5101,14 @@ function DocumentosTab() {
                   <button className="drx-btn-ghost" style={{ ...buttonGhost, padding: "4px 10px", fontSize: 12 }} onClick={() => empezarEdicionDoc(id)}>
                     Editar
                   </button>
-                  <button className="drx-btn-ghost" style={{ ...buttonGhost, padding: "4px 10px", fontSize: 12 }} onClick={() => removeId(id)}>
+                  <button
+                    className="drx-btn-ghost"
+                    style={{ ...buttonGhost, padding: "4px 10px", fontSize: 12 }}
+                    onClick={() => {
+                      if (!window.confirm(`¿Eliminar "${d.titulo}"? Puedes recuperarlo después desde la Papelera.`)) return;
+                      removeId(id);
+                    }}
+                  >
                     Eliminar
                   </button>
                 </div>
