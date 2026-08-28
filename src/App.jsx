@@ -5633,9 +5633,216 @@ function CampoContrasena({ valor, onChange, onEnter, autoFocus }) {
   );
 }
 
-function LoginGate({ onIngresar, onCancelar }) {
+const PLANES_PRECIO = [
+  {
+    nombre: "Individual",
+    precio: "$79.000",
+    periodo: "/mes por abogado",
+    descripcion: "Para el abogado independiente que quiere dejar el Excel y el WhatsApp desordenado.",
+    caracteristicas: ["1 usuario", "Hasta 30 clientes activos", "Firma electrónica de documentos", "Vigilancia judicial automática", "Portal del cliente"],
+    destacado: false,
+  },
+  {
+    nombre: "Despacho",
+    precio: "$199.000",
+    periodo: "/mes",
+    descripcion: "Para despachos con varios abogados que necesitan trabajar coordinados.",
+    caracteristicas: ["Hasta 5 usuarios", "Clientes ilimitados", "Todas las funciones de Individual", "Reportes y carga de trabajo por abogado", "Roles y permisos por usuario"],
+    destacado: true,
+  },
+  {
+    nombre: "Firma",
+    precio: "$399.000",
+    periodo: "/mes",
+    descripcion: "Para firmas grandes que necesitan escalar sin límites ni fricciones.",
+    caracteristicas: ["Usuarios ilimitados", "Todas las funciones de Despacho", "Soporte prioritario", "Onboarding acompañado"],
+    destacado: false,
+  },
+];
+
+const FUNCIONES_LANDING = [
+  { titulo: "Resumen", color: "#2F80ED", texto: "Un panel que te dice qué necesita tu atención hoy — pagos pendientes, novedades judiciales, documentos por firmar — no solo números sueltos." },
+  { titulo: "Clientes", color: "#14B8A6", texto: "Ficha completa por cliente: contacto, proceso, radicado, plan de pago y valor acordado. Búsqueda instantánea y filtros, incluso con cientos de clientes." },
+  { titulo: "Vigilancia judicial", color: "#F5A524", texto: "Consulta en vivo a la Rama Judicial por radicado. Una IA te explica cada actuación en palabras simples y sugiere el siguiente paso. Revisión automática todos los días, sin que tengas que entrar." },
+  { titulo: "Contabilidad", color: "#F43F5E", texto: "Registra pagos, genera recibos automáticos y controla quién debe y cuánto — con recordatorios listos para enviar por WhatsApp con un clic." },
+  { titulo: "Calendario de contenido", color: "#8B5CF6", texto: "Un Community Manager con IA que te propone ideas de contenido para Instagram, Facebook y TikTok, pensadas para atraer clientes del despacho." },
+  { titulo: "Firmar documentos", color: "#10B981", texto: "Comparte un código con tu cliente y firma electrónicamente desde el celular, sin instalar nada. Los enlaces sin firmar vencen solos a los 30 días." },
+  { titulo: "Portal del cliente", color: "#2F80ED", texto: "Tus clientes consultan el estado de su proceso y su estado de cuenta cuando quieran, sin tener que llamarte ni escribirte." },
+  { titulo: "Reportes", color: "#0EA5E9", texto: "Ingresos por mes, procesos por estado y carga de trabajo por abogado — para decidir con datos reales, no con intuición." },
+];
+
+const SEGURIDAD_LANDING = [
+  "Autenticación real: contraseñas nunca guardadas en texto plano, con verificación por correo.",
+  "Cada despacho ve únicamente sus propios datos — aislamiento total entre clientes de la plataforma.",
+  "Registro de auditoría: queda constancia de quién hizo qué y cuándo dentro de tu despacho.",
+  "Límite de intentos automatizado contra ataques de fuerza bruta y uso indebido.",
+  "Respaldo completo descargable en cualquier momento, sin costo adicional.",
+  "Toda la conexión viaja cifrada (HTTPS) con cabeceras de seguridad activas.",
+];
+
+function LandingPage({ onRegistrar, onIniciarSesion }) {
   const { oscuro, alternar } = useTema();
-  const [pantalla, setPantalla] = useState("login"); // login | registro
+  return (
+    <div className={oscuro ? "drx-tema-oscuro" : "drx-tema-claro"} style={{ background: COLORS.bg, minHeight: "100%" }}>
+      <GlobalStyle />
+
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "18px 24px", maxWidth: 1040, margin: "0 auto" }}>
+        <InsigniaPlataforma />
+        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+          <button
+            onClick={onIniciarSesion}
+            style={{ background: "none", border: "none", color: COLORS.muted, fontFamily: "Inter, sans-serif", fontSize: 13, fontWeight: 600, cursor: "pointer", textDecoration: "underline" }}
+          >
+            Ya tengo cuenta — Iniciar sesión
+          </button>
+          <BotonTema oscuro={oscuro} onClick={alternar} />
+        </div>
+      </div>
+
+      <div className="drx-glow" style={{ textAlign: "center", padding: "40px 20px 50px" }}>
+        <Pill>⚖️ Software de gestión legal para despachos en Colombia</Pill>
+        <h1
+          style={{
+            fontFamily: "Inter, sans-serif",
+            fontSize: 38,
+            fontWeight: 800,
+            letterSpacing: 0.3,
+            color: COLORS.headingText,
+            margin: "22px auto 16px",
+            maxWidth: 640,
+            lineHeight: 1.2,
+          }}
+        >
+          Todo tu despacho, en un solo lugar
+        </h1>
+        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, color: COLORS.muted, maxWidth: 560, margin: "0 auto 30px", lineHeight: 1.6 }}>
+          Clientes, procesos judiciales, cobros, documentos con firma electrónica y contenido para redes sociales — con
+          inteligencia artificial que te ayuda en el día a día. Sin instalar nada, desde el celular o el computador.
+        </p>
+        <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
+          <button className="drx-btn-primary" style={{ ...buttonPrimary, padding: "14px 28px", fontSize: 14 }} onClick={onRegistrar}>
+            Registrar mi despacho
+          </button>
+        </div>
+      </div>
+
+      <div style={{ maxWidth: 1040, margin: "0 auto", padding: "0 20px 60px" }}>
+        <h2 style={{ fontFamily: "Inter, sans-serif", fontSize: 22, fontWeight: 800, color: COLORS.headingText, textAlign: "center", marginBottom: 8 }}>
+          Qué encuentras adentro
+        </h2>
+        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted, textAlign: "center", marginBottom: 30 }}>
+          Cada pestaña de la app resuelve una parte real de la operación de un despacho.
+        </p>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 16, marginBottom: 60 }}>
+          {FUNCIONES_LANDING.map((f) => (
+            <Card key={f.titulo} style={{ borderLeft: `4px solid ${f.color}` }}>
+              <p style={{ fontFamily: "Inter, sans-serif", fontSize: 14.5, fontWeight: 700, color: f.color, marginBottom: 8 }}>{f.titulo}</p>
+              <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.inkSoft, lineHeight: 1.6, margin: 0 }}>{f.texto}</p>
+            </Card>
+          ))}
+        </div>
+
+        <h2 style={{ fontFamily: "Inter, sans-serif", fontSize: 22, fontWeight: 800, color: COLORS.headingText, textAlign: "center", marginBottom: 8 }}>
+          Seguridad
+        </h2>
+        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted, textAlign: "center", marginBottom: 24 }}>
+          Se registra información sensible de tus clientes — la protegemos en serio.
+        </p>
+        <Card style={{ marginBottom: 60 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "10px 24px" }}>
+            {SEGURIDAD_LANDING.map((s, i) => (
+              <div key={i} style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+                <span style={{ color: "#10B981", fontWeight: 800, fontSize: 14, lineHeight: 1.5 }}>✓</span>
+                <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.inkSoft, lineHeight: 1.6, margin: 0 }}>{s}</p>
+              </div>
+            ))}
+          </div>
+        </Card>
+
+        <h2 style={{ fontFamily: "Inter, sans-serif", fontSize: 22, fontWeight: 800, color: COLORS.headingText, textAlign: "center", marginBottom: 8 }}>
+          Planes
+        </h2>
+        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted, textAlign: "center", marginBottom: 6 }}>
+          Precios de referencia — se ajustan antes del lanzamiento comercial.
+        </p>
+        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, textAlign: "center", marginBottom: 30 }}>Pesos colombianos, IVA no incluido.</p>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 16, marginBottom: 50 }}>
+          {PLANES_PRECIO.map((p) => (
+            <Card
+              key={p.nombre}
+              style={{
+                border: p.destacado ? `2px solid ${COLORS.accentBright}` : `1px solid ${COLORS.border}`,
+                boxShadow: p.destacado ? "0 10px 30px rgba(30,95,180,0.18)" : "none",
+                position: "relative",
+              }}
+            >
+              {p.destacado && (
+                <span
+                  style={{
+                    position: "absolute",
+                    top: -11,
+                    left: 20,
+                    background: COLORS.accentBright,
+                    color: "#FFFFFF",
+                    fontFamily: "Inter, sans-serif",
+                    fontSize: 10.5,
+                    fontWeight: 700,
+                    padding: "3px 10px",
+                    borderRadius: 20,
+                    textTransform: "uppercase",
+                    letterSpacing: 0.5,
+                  }}
+                >
+                  Más elegido
+                </span>
+              )}
+              <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, fontWeight: 700, color: COLORS.headingText, margin: "6px 0 4px" }}>{p.nombre}</p>
+              <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, marginBottom: 14, minHeight: 32, lineHeight: 1.5 }}>{p.descripcion}</p>
+              <p style={{ fontFamily: "Inter, sans-serif", margin: "0 0 16px" }}>
+                <span style={{ fontSize: 30, fontWeight: 800, color: COLORS.headingText }}>{p.precio}</span>
+                <span style={{ fontSize: 12.5, color: COLORS.muted }}> {p.periodo}</span>
+              </p>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 18 }}>
+                {p.caracteristicas.map((c, i) => (
+                  <div key={i} style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+                    <span style={{ color: "#10B981", fontWeight: 800, fontSize: 12.5 }}>✓</span>
+                    <span style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.inkSoft }}>{c}</span>
+                  </div>
+                ))}
+              </div>
+              <button
+                className={p.destacado ? "drx-btn-primary" : "drx-btn-ghost"}
+                style={{ ...(p.destacado ? buttonPrimary : buttonGhost), width: "100%" }}
+                onClick={onRegistrar}
+              >
+                Empezar
+              </button>
+            </Card>
+          ))}
+        </div>
+
+        <div style={{ textAlign: "center" }}>
+          <button className="drx-btn-primary" style={{ ...buttonPrimary, padding: "14px 28px", fontSize: 14 }} onClick={onRegistrar}>
+            Registrar mi despacho
+          </button>
+        </div>
+      </div>
+
+      <div style={{ borderTop: `1px solid ${COLORS.border}`, background: COLORS.panel, padding: "20px 24px" }}>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
+          <InsigniaPlataforma />
+          <p style={{ textAlign: "center", fontFamily: "Inter, sans-serif", fontSize: 11, color: COLORS.muted, margin: 0 }}>
+            CROS — desarrollado por <strong style={{ color: COLORS.headingText }}>Felipe Cortés Ramírez</strong>, CEO. Todos los derechos reservados.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function LoginGate({ onIngresar, onCancelar, pantallaInicial }) {
+  const { oscuro, alternar } = useTema();
+  const [pantalla, setPantalla] = useState(pantallaInicial || "login"); // login | registro
   const [nombreDespacho, setNombreDespacho] = useState("");
   const [nombre, setNombre] = useState("");
   const [email, setEmail] = useState("");
@@ -6448,6 +6655,8 @@ export default function App() {
   const { oscuro, alternar } = useTema();
 
   const [modoRecuperacion, setModoRecuperacion] = useState(false);
+  const [mostrarLanding, setMostrarLanding] = useState(!isFirmaView && !isPortalView);
+  const [pantallaLoginInicial, setPantallaLoginInicial] = useState("login");
 
   const cargarPerfilActual = useCallback(async (registrarLogin) => {
     const {
@@ -6542,8 +6751,29 @@ export default function App() {
     );
   }
 
+  if (!usuarioActual && mostrarLanding) {
+    return (
+      <LandingPage
+        onRegistrar={() => {
+          setPantallaLoginInicial("registro");
+          setMostrarLanding(false);
+        }}
+        onIniciarSesion={() => {
+          setPantallaLoginInicial("login");
+          setMostrarLanding(false);
+        }}
+      />
+    );
+  }
+
   if (!usuarioActual || cambiandoUsuario) {
-    return <LoginGate onIngresar={iniciarSesion} onCancelar={usuarioActual ? () => setCambiandoUsuario(false) : undefined} />;
+    return (
+      <LoginGate
+        onIngresar={iniciarSesion}
+        onCancelar={usuarioActual ? () => setCambiandoUsuario(false) : () => setMostrarLanding(true)}
+        pantallaInicial={pantallaLoginInicial}
+      />
+    );
   }
 
   const irADocumentos = () => {
