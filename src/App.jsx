@@ -521,6 +521,13 @@ const GlobalStyle = () => (
     .drx-card:hover { transform: translateY(-1px); }
     @keyframes drx-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
     @keyframes drx-mesh { 0%, 100% { transform: translate(0, 0) scale(1); } 50% { transform: translate(3%, -4%) scale(1.08); } }
+    .drx-cta-shine { position: relative; overflow: hidden; }
+    .drx-cta-shine::after {
+      content: ""; position: absolute; top: 0; left: -60%; width: 40%; height: 100%;
+      background: linear-gradient(115deg, transparent, rgba(255,255,255,0.45), transparent);
+      transform: skewX(-20deg); transition: left 0.55s ease;
+    }
+    .drx-cta-shine:hover::after { left: 130%; }
   `}</style>
 );
 
@@ -6347,6 +6354,45 @@ function CampoContrasena({ valor, onChange, onEnter, autoFocus }) {
   );
 }
 
+// Heurística simple de fuerza, solo para dar una señal visual inmediata
+// mientras se escribe — la regla real que se aplica y valida es
+// validarContrasenaCliente/validarContrasena (mínimo 10 caracteres, letras y
+// números), tanto acá como en el servidor.
+function calcularFuerzaContrasena(pw) {
+  if (!pw) return 0;
+  let puntos = 0;
+  if (pw.length >= 10) puntos++;
+  if (pw.length >= 14) puntos++;
+  if (/[a-z]/.test(pw) && /[A-Z]/.test(pw)) puntos++;
+  if (/[0-9]/.test(pw)) puntos++;
+  if (/[^A-Za-z0-9]/.test(pw)) puntos++;
+  return Math.min(4, puntos);
+}
+
+const NIVELES_FUERZA = [
+  { texto: "Muy débil", color: "#B42318" },
+  { texto: "Débil", color: "#F43F5E" },
+  { texto: "Aceptable", color: "#F5A524" },
+  { texto: "Buena", color: "#2F80ED" },
+  { texto: "Fuerte", color: "#10B981" },
+];
+
+function MedidorFuerzaContrasena({ valor }) {
+  if (!valor) return null;
+  const nivel = calcularFuerzaContrasena(valor);
+  const { texto, color } = NIVELES_FUERZA[nivel];
+  return (
+    <div style={{ marginTop: 6 }}>
+      <div style={{ display: "flex", gap: 4 }}>
+        {[0, 1, 2, 3].map((i) => (
+          <div key={i} style={{ height: 4, flex: 1, borderRadius: 2, background: i < nivel ? color : COLORS.border, transition: "background 0.2s ease" }} />
+        ))}
+      </div>
+      <p style={{ fontFamily: "Inter, sans-serif", fontSize: 10.5, fontWeight: 600, color, margin: "4px 0 0" }}>{texto}</p>
+    </div>
+  );
+}
+
 const PLANES_PRECIO = [
   {
     nombre: "Abogado",
@@ -6611,13 +6657,6 @@ function LandingPage({ onRegistrar, onIniciarSesion }) {
         .drx-faq details[open] summary::after { content: "−"; }
         @keyframes drx-subir { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: translateY(0); } }
         .drx-hero-item { opacity: 0; animation: drx-subir 0.7s ease forwards; }
-        .drx-cta-shine { position: relative; overflow: hidden; }
-        .drx-cta-shine::after {
-          content: ""; position: absolute; top: 0; left: -60%; width: 40%; height: 100%;
-          background: linear-gradient(115deg, transparent, rgba(255,255,255,0.45), transparent);
-          transform: skewX(-20deg); transition: left 0.55s ease;
-        }
-        .drx-cta-shine:hover::after { left: 130%; }
       `}</style>
 
       <div
@@ -7643,13 +7682,42 @@ function LoginGate({ onIngresar, onCancelar, pantallaInicial }) {
   return (
     <div
       className={`${oscuro ? "drx-tema-oscuro" : "drx-tema-claro"} drx-glow`}
-      style={{ minHeight: "100%", background: COLORS.bg, display: "flex", alignItems: "center", justifyContent: "center", padding: 24, position: "relative" }}
+      style={{ minHeight: "100%", background: COLORS.bg, display: "flex", alignItems: "center", justifyContent: "center", padding: 24, position: "relative", overflow: "hidden" }}
     >
       <GlobalStyle />
+      <div
+        aria-hidden="true"
+        style={{
+          position: "absolute",
+          top: "12%",
+          left: "12%",
+          width: 300,
+          height: 300,
+          borderRadius: "50%",
+          background: "radial-gradient(circle, rgba(30,95,180,0.16) 0%, rgba(30,95,180,0) 70%)",
+          animation: "drx-mesh 12s ease-in-out infinite",
+          pointerEvents: "none",
+        }}
+      />
+      <div
+        aria-hidden="true"
+        style={{
+          position: "absolute",
+          bottom: "8%",
+          right: "10%",
+          width: 260,
+          height: 260,
+          borderRadius: "50%",
+          background: "radial-gradient(circle, rgba(20,184,166,0.14) 0%, rgba(20,184,166,0) 70%)",
+          animation: "drx-mesh 15s ease-in-out infinite reverse",
+          pointerEvents: "none",
+        }}
+      />
       <div style={{ position: "absolute", top: 20, right: 20 }}>
         <BotonTema oscuro={oscuro} onClick={alternar} />
       </div>
-      <Card style={{ maxWidth: 420, width: "100%", textAlign: "center", position: "relative" }}>
+      <div className="drx-fade-in" style={{ maxWidth: 420, width: "100%", position: "relative" }}>
+      <Card style={{ width: "100%", textAlign: "center", position: "relative", borderTop: `3px solid ${COLORS.accentBright}`, boxShadow: "0 20px 50px rgba(10,35,66,0.14)" }}>
         {onCancelar && (
           <button
             onClick={onCancelar}
@@ -7660,6 +7728,9 @@ function LoginGate({ onIngresar, onCancelar, pantallaInicial }) {
           </button>
         )}
         <InsigniaPlataforma grande />
+        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 22, margin: "0 0 4px" }}>
+          {pantalla === "registro" ? "🏛️" : pantalla === "recuperar" || pantalla === "recuperacion-enviada" ? "✉️" : pantalla === "registro-enviado" ? "📬" : "🔑"}
+        </p>
         <h1 style={{ fontFamily: "Inter, sans-serif", fontSize: 22, fontWeight: 800, textTransform: "uppercase", letterSpacing: 0.5, color: COLORS.headingText, margin: "0 0 4px" }}>
           {pantalla === "registro"
             ? "Registra tu despacho"
@@ -7709,6 +7780,7 @@ function LoginGate({ onIngresar, onCancelar, pantallaInicial }) {
               </Field>
               <Field label="Contraseña">
                 <CampoContrasena valor={contrasena} onChange={setContrasena} />
+                <MedidorFuerzaContrasena valor={contrasena} />
                 <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11, color: COLORS.muted, margin: "4px 0 0" }}>
                   Mínimo 10 caracteres, combinando letras y números.
                 </p>
@@ -7716,7 +7788,7 @@ function LoginGate({ onIngresar, onCancelar, pantallaInicial }) {
             </div>
             {error && <p style={{ color: "#B42318", fontSize: 12.5, marginTop: 10, fontFamily: "Inter, sans-serif" }}>{error}</p>}
             <button
-              className="drx-btn-primary"
+              className="drx-btn-primary drx-cta-shine"
               style={{ ...buttonPrimary, width: "100%", marginTop: 16 }}
               onClick={crearDespacho}
               disabled={enviando || !nombreDespacho.trim() || !nombre.trim() || !email.trim() || !contrasena.trim()}
@@ -7773,7 +7845,7 @@ function LoginGate({ onIngresar, onCancelar, pantallaInicial }) {
               </p>
             )}
             <button
-              className="drx-btn-primary"
+              className="drx-btn-primary drx-cta-shine"
               style={{ ...buttonPrimary, width: "100%", marginTop: 16 }}
               onClick={iniciarSesion}
               disabled={enviando || !email.trim() || !contrasena.trim() || segundosBloqueoLogin > 0}
@@ -7858,6 +7930,7 @@ function LoginGate({ onIngresar, onCancelar, pantallaInicial }) {
           verifica el servidor.
         </p>
       </Card>
+      </div>
     </div>
   );
 }
