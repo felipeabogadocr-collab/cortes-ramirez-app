@@ -6559,6 +6559,7 @@ function LandingPage({ onRegistrar, onIniciarSesion }) {
   const [progresoScroll, setProgresoScroll] = useState(0);
   const [scrolleado, setScrolleado] = useState(false);
   const [mostrarSubir, setMostrarSubir] = useState(false);
+  const [mostrarCtaFlotante, setMostrarCtaFlotante] = useState(false);
 
   useEffect(() => {
     const alScroll = () => {
@@ -6566,6 +6567,7 @@ function LandingPage({ onRegistrar, onIniciarSesion }) {
       setProgresoScroll(alto > 0 ? Math.min(100, (window.scrollY / alto) * 100) : 0);
       setScrolleado(window.scrollY > 20);
       setMostrarSubir(window.scrollY > 600);
+      setMostrarCtaFlotante(window.scrollY > 700);
     };
     window.addEventListener("scroll", alScroll, { passive: true });
     alScroll();
@@ -6764,6 +6766,12 @@ function LandingPage({ onRegistrar, onIniciarSesion }) {
             pointerEvents: "none",
           }}
         />
+      </div>
+
+      <div aria-hidden="true" style={{ lineHeight: 0, marginTop: -36, position: "relative", zIndex: 0, pointerEvents: "none" }}>
+        <svg viewBox="0 0 1440 90" preserveAspectRatio="none" style={{ width: "100%", height: 70, display: "block" }}>
+          <path d="M0,45 C240,90 480,0 720,25 C960,50 1200,10 1440,40 L1440,90 L0,90 Z" fill={COLORS.navy} opacity="0.05" />
+        </svg>
       </div>
 
       <div style={{ maxWidth: 1040, margin: "0 auto", padding: "0 20px 60px" }}>
@@ -7117,8 +7125,44 @@ function LandingPage({ onRegistrar, onIniciarSesion }) {
           ))}
         </div>
 
+        <AlEntrar>
+          <div style={{ overflowX: "auto", marginBottom: 50 }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 460, fontFamily: "Inter, sans-serif" }}>
+              <thead>
+                <tr>
+                  <th style={{ textAlign: "left", padding: "10px 14px", fontSize: 12, color: COLORS.muted, fontWeight: 600, borderBottom: `1px solid ${COLORS.border}` }}>Incluye</th>
+                  <th style={{ textAlign: "center", padding: "10px 14px", fontSize: 12.5, color: COLORS.headingText, fontWeight: 800, borderBottom: `1px solid ${COLORS.border}` }}>Abogado</th>
+                  <th style={{ textAlign: "center", padding: "10px 14px", fontSize: 12.5, color: COLORS.accentBright, fontWeight: 800, borderBottom: `2px solid ${COLORS.accentBright}` }}>Despacho</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[
+                  { fila: "Usuarios", abogado: "1", despacho: "Ilimitados" },
+                  { fila: "Clientes activos", abogado: "Hasta 30", despacho: "Ilimitados" },
+                  { fila: "Firma electrónica", abogado: true, despacho: true },
+                  { fila: "Vigilancia judicial automática", abogado: true, despacho: true },
+                  { fila: "Portal del cliente", abogado: true, despacho: true },
+                  { fila: "Reportes y carga por abogado", abogado: false, despacho: true },
+                  { fila: "Roles y permisos por usuario", abogado: false, despacho: true },
+                  { fila: "Soporte prioritario", abogado: false, despacho: true },
+                ].map((r, i) => (
+                  <tr key={r.fila} style={{ background: i % 2 === 0 ? "transparent" : COLORS.surfaceSoft }}>
+                    <td style={{ padding: "10px 14px", fontSize: 12.5, color: COLORS.inkSoft }}>{r.fila}</td>
+                    <td style={{ padding: "10px 14px", textAlign: "center", fontSize: 12.5, color: COLORS.inkSoft }}>
+                      {typeof r.abogado === "boolean" ? <span style={{ color: r.abogado ? "#10B981" : COLORS.border, fontWeight: 800 }}>{r.abogado ? "✓" : "—"}</span> : r.abogado}
+                    </td>
+                    <td style={{ padding: "10px 14px", textAlign: "center", fontSize: 12.5, color: COLORS.inkSoft, background: `${COLORS.accentBright}0D` }}>
+                      {typeof r.despacho === "boolean" ? <span style={{ color: r.despacho ? "#10B981" : COLORS.border, fontWeight: 800 }}>{r.despacho ? "✓" : "—"}</span> : r.despacho}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </AlEntrar>
+
         <div style={{ textAlign: "center", marginBottom: 60 }}>
-          <button className="drx-btn-primary" style={{ ...buttonPrimary, padding: "14px 28px", fontSize: 14 }} onClick={onRegistrar}>
+          <button className="drx-btn-primary drx-cta-shine" style={{ ...buttonPrimary, padding: "14px 28px", fontSize: 14 }} onClick={onRegistrar}>
             Registrar mi despacho
           </button>
         </div>
@@ -7319,6 +7363,31 @@ function LandingPage({ onRegistrar, onIniciarSesion }) {
           <path d="M4 12l6-6 6 6" />
         </svg>
       </button>
+
+      <div
+        style={{
+          position: "fixed",
+          left: 0,
+          right: 0,
+          bottom: 0,
+          zIndex: 39,
+          background: COLORS.panel,
+          borderTop: `1px solid ${COLORS.border}`,
+          boxShadow: "0 -6px 20px rgba(10,35,66,0.12)",
+          padding: "12px 20px",
+          transform: mostrarCtaFlotante ? "translateY(0)" : "translateY(100%)",
+          transition: "transform 0.3s ease",
+        }}
+      >
+        <div style={{ maxWidth: 1040, margin: "0 auto", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, fontWeight: 700, color: COLORS.headingText, margin: 0 }}>
+            ¿Listo para dejar el papel atrás?
+          </p>
+          <button className="drx-btn-primary drx-cta-shine" style={{ ...buttonPrimary, padding: "9px 20px", fontSize: 13 }} onClick={onRegistrar}>
+            Registrar mi despacho
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
