@@ -25,6 +25,10 @@ export default async function handler(req, res) {
     `/Actuacion/Consulta/Proceso?idProceso=${idProceso}&idConexion=${idConexion}&pagina=1`,
     `/Procesos/Consulta/Actuaciones?idProceso=${idProceso}&idConexion=${idConexion}&pagina=1`,
     `/Procesos/${idProceso}?idConexion=${idConexion}`,
+    `/Actuaciones?idProceso=${idProceso}&idConexion=${idConexion}&pagina=1`,
+    `/Procesos/Consulta/Actuacion?idProceso=${idProceso}&idConexion=${idConexion}&pagina=1`,
+    `/Procesos/${idProceso}/Actuaciones/${idConexion}`,
+    `/Actuaciones/Proceso/${idProceso}?idConexion=${idConexion}&pagina=1`,
   ];
 
   const resultados = [];
@@ -33,7 +37,7 @@ export default async function handler(req, res) {
     try {
       const r = await fetch(url, { headers });
       const texto = await r.text();
-      resultados.push({ ruta, status: r.status, ok: r.ok, largo: texto.length, muestra: r.ok ? texto.slice(0, 300) : undefined });
+      resultados.push({ ruta, status: r.status, ok: r.ok, largo: texto.length, muestra: texto.slice(0, 300) });
     } catch (e) {
       resultados.push({ ruta, error: e.message });
     }
