@@ -17,7 +17,8 @@ export default function PanelChat({ password }) {
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState("");
 
-  async function enviar() {
+  async function enviar(e) {
+    if (e) e.preventDefault();
     const texto = pregunta.trim();
     if (!texto || cargando) return;
     setPregunta("");
@@ -65,12 +66,12 @@ export default function PanelChat({ password }) {
 
       {error && <p style={{ color: "var(--danger)", fontSize: 12.5, marginBottom: 8 }}>{error}</p>}
 
-      <div style={{ display: "flex", gap: 8 }}>
+      <form onSubmit={enviar} style={{ display: "flex", gap: 8 }}>
         <input
           value={pregunta}
           onChange={(e) => setPregunta(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && enviar()}
           placeholder="Escribe tu pregunta…"
+          enterKeyHint="send"
           style={{
             flex: 1,
             padding: "10px 12px",
@@ -81,10 +82,10 @@ export default function PanelChat({ password }) {
             fontSize: 14,
           }}
         />
-        <button className="btn-primary" onClick={enviar} disabled={cargando || !pregunta.trim()}>
+        <button type="submit" className="btn-primary" disabled={cargando || !pregunta.trim()}>
           {cargando ? "…" : "Enviar"}
         </button>
-      </div>
+      </form>
     </div>
   );
 }
