@@ -1,0 +1,48 @@
+# Nomos — robots.txt
+#
+# Los buscadores normales (Google, Bing) pueden indexar la página de
+# presentación, para que despachos nuevos encuentren la plataforma.
+# Los rastreadores que alimentan modelos de IA o hacen scraping masivo
+# quedan bloqueados a propósito: no autorizamos usar este sitio para
+# entrenar modelos, ni para copiar su contenido o funcionamiento.
+# Esto es un aviso de buenas prácticas, no una barrera técnica infranqueable
+# — la protección real está en la política de uso (ver /#terminos).
+
+User-agent: Googlebot
+Allow: /
+
+User-agent: Bingbot
+Allow: /
+
+User-agent: GPTBot
+Disallow: /
+
+User-agent: ChatGPT-User
+Disallow: /
+
+User-agent: CCBot
+Disallow: /
+
+User-agent: anthropic-ai
+Disallow: /
+
+User-agent: ClaudeBot
+Disallow: /
+
+User-agent: Claude-Web
+Disallow: /
+
+User-agent: Google-Extended
+Disallow: /
+
+User-agent: Bytespider
+Disallow: /
+
+User-agent: PerplexityBot
+Disallow: /
+
+User-agent: Applebot-Extended
+Disallow: /
+
+User-agent: *
+Allow: /
