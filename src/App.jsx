@@ -787,6 +787,21 @@ const SEGUNDOS_AVISO_PREVIO = 60;
 // nada (clic, tecla, scroll, pantalla táctil) — útil en equipos compartidos
 // del despacho. Un minuto antes de cerrarla, avisa (onAviso(true)) para que
 // la app pueda mostrar un mensaje — cualquier actividad lo cancela solo.
+// Avisa al navegador antes de cerrar la pestaña o recargar mientras hay un
+// formulario largo (cliente, documento) a medias — para no perder lo ya
+// escrito por un cierre accidental.
+function useAvisoAntesDeSalir(activo) {
+  useEffect(() => {
+    if (!activo) return;
+    const alSalir = (e) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", alSalir);
+    return () => window.removeEventListener("beforeunload", alSalir);
+  }, [activo]);
+}
+
 function useCierreSesionPorInactividad(activo, onExpirar, onAviso) {
   useEffect(() => {
     if (!activo) return;
@@ -3010,7 +3025,9 @@ function ClientesTab({ usuarioActual }) {
   const [filtro, setFiltro] = useState("");
   const [copiado, setCopiado] = useState("");
   const [orden, setOrden] = useState("recientes");
+  useAvisoAntesDeSalir(showForm && !!form.nombre.trim());
   const [soloSinRadicado, setSoloSinRadicado] = useState(false);
+  const [soloInactivos, setSoloInactivos] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -3084,6 +3101,12 @@ function ClientesTab({ usuarioActual }) {
       })
     : idsOrdenados;
   if (soloSinRadicado) idsFiltrados = idsFiltrados.filter((id) => !clientes[id]?.radicado?.trim());
+  if (soloInactivos) {
+    idsFiltrados = idsFiltrados.filter((id) => {
+      const dias = diasDesde(clientes[id]?.ultimaActuacion);
+      return dias !== null && dias >= DIAS_ALERTA_INACTIVIDAD;
+    });
+  }
 
   return (
     <div>
@@ -3131,6 +3154,10 @@ function ClientesTab({ usuarioActual }) {
         <label style={{ display: "flex", alignItems: "center", gap: 6, fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.inkSoft, cursor: "pointer" }}>
           <input type="checkbox" checked={soloSinRadicado} onChange={(e) => setSoloSinRadicado(e.target.checked)} />
           Solo sin radicado
+        </label>
+        <label style={{ display: "flex", alignItems: "center", gap: 6, fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.inkSoft, cursor: "pointer" }}>
+          <input type="checkbox" checked={soloInactivos} onChange={(e) => setSoloInactivos(e.target.checked)} />
+          Solo inactivos
         </label>
       </div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
@@ -5561,6 +5588,7 @@ function DocumentosTab() {
   const [docs, setDocs] = useState({});
   const [form, setForm] = useState(FORM_DOC_INICIAL);
   const [showForm, setShowForm] = useState(false);
+  useAvisoAntesDeSalir(showForm && !!(form.titulo.trim() || form.contenido.trim()));
   const [copiedId, setCopiedId] = useState(null);
   const [cargandoArchivo, setCargandoArchivo] = useState(false);
   const [errorArchivo, setErrorArchivo] = useState("");
@@ -6259,6 +6287,14 @@ function ModalNotificaciones({
   onIrAContenido,
   onIrAVigilancia,
 }) {
+  useEffect(() => {
+    const alPresionarTecla = (e) => {
+      if (e.key === "Escape") onCerrar();
+    };
+    window.addEventListener("keydown", alPresionarTecla);
+    return () => window.removeEventListener("keydown", alPresionarTecla);
+  }, [onCerrar]);
+
   return (
     <div
       onClick={onCerrar}
