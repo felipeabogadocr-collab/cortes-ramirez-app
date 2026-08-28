@@ -551,6 +551,13 @@ const navLinkStyle = {
   textDecoration: "none",
 };
 
+const footerLinkStyle = {
+  fontFamily: "Inter, sans-serif",
+  fontSize: 12.5,
+  color: "#D7E2F1",
+  textDecoration: "none",
+};
+
 function Card({ children, style }) {
   return (
     <div
@@ -5821,15 +5828,27 @@ const FUNCIONES_LANDING = [
 const FAQ_LANDING = [
   {
     p: "¿Qué pasa con mis datos si algún día dejo de pagar o quiero irme?",
-    r: "Puedes descargar en cualquier momento un respaldo completo de toda tu información (clientes, documentos, casos) en un archivo que te llevas tú. No queda nada retenido.",
+    r: "Puedes descargar en cualquier momento un respaldo completo de toda tu información (clientes, documentos, casos y contenido) en un archivo que te llevas tú, desde \"Usuarios y permisos\". No queda nada retenido.",
   },
   {
     p: "¿Es válida legalmente la firma electrónica de los documentos?",
-    r: "Sí, es una firma electrónica bajo la Ley 527 de 1999, con consentimiento explícito del firmante y un hash de integridad que demuestra que el documento no fue alterado después de firmado.",
+    r: "Sí, es una firma electrónica bajo la Ley 527 de 1999. Al firmar, quien firma acepta explícitamente el tratamiento de sus datos y la validez de la firma, y queda registrado un hash de integridad del documento, la IP real de quien firmó y un certificado de firma descargable — evidencia lista si algún día se cuestiona.",
+  },
+  {
+    p: "¿Cómo funciona el registro y el pago?",
+    r: "Te registras, confirmas tu correo y coordinamos el pago por WhatsApp — apenas se confirma, activamos tu acceso. No hay que meter una tarjeta ni configurar nada técnico.",
   },
   {
     p: "¿Quién puede ver la información de mis clientes?",
     r: "Solo los usuarios que tú autorices dentro de tu propio despacho. Cada despacho está completamente aislado del resto — nadie de otro despacho puede ver tus datos, ni siquiera nosotros por defecto.",
+  },
+  {
+    p: "¿La vigilancia judicial hay que revisarla a mano todos los días?",
+    r: "No. Todos los días se revisan solos los radicados de tus procesos contra la Rama Judicial, y si hay una actuación nueva te avisa la campanita de notificaciones — solo entras cuando de verdad hay algo que ver.",
+  },
+  {
+    p: "¿Mis clientes necesitan crear una cuenta para firmar o consultar su caso?",
+    r: "No. Firman con un código que tú les compartes, sin registrarse. Y con el Portal del cliente pueden consultar el estado de su proceso y su estado de cuenta cuando quieran, también sin cuenta ni contraseña.",
   },
   {
     p: "¿Necesito instalar algo?",
@@ -6008,7 +6027,19 @@ function LandingPage({ onRegistrar, onIniciarSesion }) {
   return (
     <div className={oscuro ? "drx-tema-oscuro" : "drx-tema-claro"} style={{ background: COLORS.bg, minHeight: "100%" }}>
       <GlobalStyle />
-      <style>{`html { scroll-behavior: smooth; }`}</style>
+      <style>{`
+        html { scroll-behavior: smooth; }
+        .drx-navlink { position: relative; padding-bottom: 3px; }
+        .drx-navlink::after {
+          content: ""; position: absolute; left: 0; right: 100%; bottom: 0; height: 2px;
+          background: ${COLORS.accentBright}; transition: right 0.2s ease;
+        }
+        .drx-navlink:hover::after { right: 0; }
+        .drx-faq summary { list-style: none; }
+        .drx-faq summary::-webkit-details-marker { display: none; }
+        .drx-faq summary::after { content: "+"; display: block; text-align: center; font-size: 16px; color: ${COLORS.accentBright}; margin-top: 4px; }
+        .drx-faq details[open] summary::after { content: "−"; }
+      `}</style>
 
       <div
         style={{
@@ -6017,22 +6048,27 @@ function LandingPage({ onRegistrar, onIniciarSesion }) {
           zIndex: 30,
           background: COLORS.panel,
           borderBottom: `1px solid ${COLORS.border}`,
+          borderTop: `3px solid ${COLORS.accentBright}`,
+          boxShadow: "0 2px 12px rgba(10,35,66,0.08)",
         }}
       >
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 24px", maxWidth: 1040, margin: "0 auto", flexWrap: "wrap", gap: 12 }}>
           <InsigniaPlataforma />
-          <div style={{ display: "flex", alignItems: "center", gap: 20, flexWrap: "wrap" }}>
-            <a href="#funciones" style={navLinkStyle}>Funciones</a>
-            <a href="#seguridad" style={navLinkStyle}>Seguridad</a>
-            <a href="#planes" style={navLinkStyle}>Planes</a>
-            <a href="#faq" style={navLinkStyle}>Preguntas frecuentes</a>
+          <div style={{ display: "flex", alignItems: "center", gap: 22, flexWrap: "wrap" }}>
+            <a href="#funciones" className="drx-navlink" style={navLinkStyle}>Funciones</a>
+            <a href="#seguridad" className="drx-navlink" style={navLinkStyle}>Seguridad</a>
+            <a href="#planes" className="drx-navlink" style={navLinkStyle}>Planes</a>
+            <a href="#faq" className="drx-navlink" style={navLinkStyle}>Preguntas frecuentes</a>
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
             <button
               onClick={onIniciarSesion}
               style={{ background: "none", border: "none", color: COLORS.muted, fontFamily: "Inter, sans-serif", fontSize: 13, fontWeight: 600, cursor: "pointer", textDecoration: "underline" }}
             >
-              Ya tengo cuenta — Iniciar sesión
+              Iniciar sesión
+            </button>
+            <button className="drx-btn-primary" style={{ ...buttonPrimary, padding: "9px 18px", fontSize: 13 }} onClick={onRegistrar}>
+              Registrar despacho
             </button>
             <BotonTema oscuro={oscuro} onClick={alternar} />
           </div>
@@ -6109,7 +6145,7 @@ function LandingPage({ onRegistrar, onIniciarSesion }) {
         <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted, textAlign: "center", marginBottom: 30 }}>
           Cada pestaña de la app resuelve una parte real de la operación de un despacho.
         </p>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 16, marginBottom: 60 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 16, marginBottom: 60 }}>
           {FUNCIONES_LANDING.map((f) => (
             <Card key={f.titulo} style={{ borderLeft: `4px solid ${f.color}` }}>
               <p style={{ fontFamily: "Inter, sans-serif", fontSize: 14.5, fontWeight: 700, color: f.color, marginBottom: 8 }}>{f.titulo}</p>
@@ -6206,30 +6242,97 @@ function LandingPage({ onRegistrar, onIniciarSesion }) {
         <h2 id="faq" style={{ fontFamily: "Inter, sans-serif", fontSize: 22, fontWeight: 800, color: COLORS.headingText, textAlign: "center", marginBottom: 24, scrollMarginTop: 90 }}>
           Preguntas frecuentes
         </h2>
-        <div style={{ display: "flex", flexDirection: "column", gap: 10, maxWidth: 680, margin: "0 auto" }}>
+        <div className="drx-faq" style={{ display: "flex", flexDirection: "column", gap: 10, maxWidth: 680, margin: "0 auto" }}>
           {FAQ_LANDING.map((f, i) => (
-            <details key={i} style={{ background: COLORS.panel, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: "12px 16px" }}>
-              <summary style={{ fontFamily: "Inter, sans-serif", fontSize: 13.5, fontWeight: 700, color: COLORS.ink, cursor: "pointer" }}>{f.p}</summary>
-              <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.inkSoft, lineHeight: 1.6, margin: "10px 0 0" }}>{f.r}</p>
+            <details key={i} style={{ background: COLORS.panel, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: "14px 20px" }}>
+              <summary
+                style={{
+                  fontFamily: "Inter, sans-serif",
+                  fontSize: 13,
+                  fontWeight: 800,
+                  letterSpacing: 0.4,
+                  textTransform: "uppercase",
+                  color: COLORS.ink,
+                  textAlign: "center",
+                  cursor: "pointer",
+                }}
+              >
+                {f.p}
+              </summary>
+              <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.inkSoft, lineHeight: 1.7, margin: "12px 0 0", textAlign: "justify" }}>
+                {f.r}
+              </p>
             </details>
           ))}
         </div>
       </div>
 
-      <div style={{ borderTop: `1px solid ${COLORS.border}`, background: COLORS.panel, padding: "20px 24px" }}>
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
-          <InsigniaPlataforma />
-          <p style={{ textAlign: "center", fontFamily: "Inter, sans-serif", fontSize: 11, color: COLORS.muted, margin: 0 }}>
-            Nomos — desarrollado por <strong style={{ color: COLORS.headingText }}>Felipe Cortés Ramírez</strong>, CEO. Todos los derechos reservados.
-          </p>
-          <div style={{ display: "flex", gap: 14 }}>
-            <a href="/#privacidad" target="_blank" rel="noreferrer" style={{ fontFamily: "Inter, sans-serif", fontSize: 11, color: COLORS.accentBright }}>
-              Política de tratamiento de datos
-            </a>
-            <a href="/#terminos" target="_blank" rel="noreferrer" style={{ fontFamily: "Inter, sans-serif", fontSize: 11, color: COLORS.accentBright }}>
-              Términos de uso
+      <div style={{ background: COLORS.navy, padding: "44px 24px 26px", marginTop: 20 }}>
+        <div
+          style={{
+            maxWidth: 1040,
+            margin: "0 auto",
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+            gap: 28,
+            marginBottom: 30,
+          }}
+        >
+          <div>
+            <div style={{ display: "inline-flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+              <div style={{ width: 34, height: 34, borderRadius: 9, background: "#FFFFFF", display: "flex", alignItems: "center", justifyContent: "center", color: COLORS.navy, flexShrink: 0 }}>
+                <IconoNomos size={18} />
+              </div>
+              <span style={{ fontFamily: "Inter, sans-serif", fontSize: 17, fontWeight: 800, letterSpacing: 1, color: "#FFFFFF" }}>Nomos</span>
+            </div>
+            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: "#9FB6D6", lineHeight: 1.6, margin: 0 }}>
+              Software de gestión legal para despachos de abogados en Colombia.
+            </p>
+          </div>
+
+          <div>
+            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, fontWeight: 700, color: "#FFFFFF", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 12 }}>
+              Producto
+            </p>
+            <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
+              <a href="#funciones" style={footerLinkStyle}>Funciones</a>
+              <a href="#seguridad" style={footerLinkStyle}>Seguridad</a>
+              <a href="#planes" style={footerLinkStyle}>Planes</a>
+              <a href="#faq" style={footerLinkStyle}>Preguntas frecuentes</a>
+            </div>
+          </div>
+
+          <div>
+            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, fontWeight: 700, color: "#FFFFFF", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 12 }}>
+              Legal
+            </p>
+            <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
+              <a href="/#privacidad" target="_blank" rel="noreferrer" style={footerLinkStyle}>Política de tratamiento de datos</a>
+              <a href="/#terminos" target="_blank" rel="noreferrer" style={footerLinkStyle}>Términos de uso</a>
+            </div>
+          </div>
+
+          <div>
+            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, fontWeight: 700, color: "#FFFFFF", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 12 }}>
+              Contacto
+            </p>
+            <a
+              href={`https://wa.me/${NUMERO_WHATSAPP_DESPACHO}?text=${encodeURIComponent("Hola, tengo una pregunta sobre Nomos.")}`}
+              target="_blank"
+              rel="noreferrer"
+              style={{ ...footerLinkStyle, display: "inline-flex", alignItems: "center", gap: 6 }}
+            >
+              💬 Escríbenos por WhatsApp
             </a>
           </div>
+        </div>
+
+        <div style={{ borderTop: "1px solid rgba(255,255,255,0.12)", paddingTop: 18, textAlign: "center" }}>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, color: "#9FB6D6", margin: 0, lineHeight: 1.6 }}>
+            Nomos — creado por <strong style={{ color: "#FFFFFF" }}>Felipe Cortés Ramírez</strong>, abogado y CEO de Cortés Ramírez Abogados.
+            <br />
+            Todos los derechos reservados.
+          </p>
         </div>
       </div>
 
@@ -7633,7 +7736,7 @@ export default function App() {
               {getNombreDespacho()}
             </p>
             <p style={{ textAlign: "center", fontFamily: "Inter, sans-serif", fontSize: 11, color: COLORS.muted, margin: 0 }}>
-              Nomos — desarrollado por <strong style={{ color: COLORS.headingText }}>Felipe Cortés Ramírez</strong>, CEO. Todos los derechos reservados.
+              Nomos — creado por <strong style={{ color: COLORS.headingText }}>Felipe Cortés Ramírez</strong>, abogado y CEO de Cortés Ramírez Abogados. Todos los derechos reservados.
             </p>
           </div>
         </div>
