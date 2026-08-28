@@ -2,6 +2,9 @@
   "crons": [
     { "path": "/api/cron/vigilancia-judicial", "schedule": "0 13 * * *" }
   ],
+  "rewrites": [
+    { "source": "/((?!api/).*)", "destination": "/index.html" }
+  ],
   "headers": [
     {
       "source": "/(.*)",

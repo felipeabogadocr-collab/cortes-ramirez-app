@@ -1896,6 +1896,7 @@ function VistaFirma() {
   const [preview, setPreview] = useState(null);
   const [error, setError] = useState("");
   const [confirmado, setConfirmado] = useState(false);
+  const [aceptaConsentimiento, setAceptaConsentimiento] = useState(false);
 
   const buscar = async () => {
     const code = codigo.trim().toUpperCase();
@@ -1929,6 +1930,10 @@ function VistaFirma() {
       setError("Escribe tu nombre completo y tu número de identificación antes de continuar.");
       return;
     }
+    if (!aceptaConsentimiento) {
+      setError("Debes aceptar la autorización de tratamiento de datos y la firma electrónica antes de continuar.");
+      return;
+    }
     setError("");
     setTextoFirma(nombre.trim());
     setPreview({ x: 55, y: 80, textoFirma: nombre.trim(), tipoId, numeroId: numeroId.trim() });
@@ -1936,6 +1941,21 @@ function VistaFirma() {
   };
 
   const confirmarFirma = async () => {
+    // Hash de integridad (SHA-256) del contenido del documento en el momento
+    // de la firma: sirve para demostrar después que el texto firmado no fue
+    // alterado (Ley 527 de 1999, art. 7 — requisito de integridad de la
+    // firma electrónica).
+    let hashDocumento = null;
+    try {
+      const contenidoParaHash = doc.tipoDocumento === "pdf" ? doc.archivoPdfBase64 || "" : doc.contenido || "";
+      const bytes = new TextEncoder().encode(contenidoParaHash);
+      const digest = await crypto.subtle.digest("SHA-256", bytes);
+      hashDocumento = Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, "0")).join("");
+    } catch (e) {
+      // Si el navegador no soporta Web Crypto (muy raro), se firma igual,
+      // simplemente sin el hash adicional.
+    }
+
     const nuevaFirma = {
       nombre: nombre.trim(),
       tipoId,
@@ -1945,6 +1965,9 @@ function VistaFirma() {
       y: preview.y,
       firmadoEn: new Date().toISOString(),
       rol: "cliente",
+      aceptaConsentimiento: true,
+      hashDocumento,
+      userAgent: typeof navigator !== "undefined" ? navigator.userAgent : null,
     };
     const firmantesActualizados = [...(doc.firmantes || []), nuevaFirma];
     const updated = { ...doc, firmantes: firmantesActualizados };
@@ -2084,8 +2107,24 @@ function VistaFirma() {
                   </Field>
                 </div>
               </div>
+              <label style={{ display: "flex", gap: 8, alignItems: "flex-start", marginBottom: 14, cursor: "pointer" }}>
+                <input
+                  type="checkbox"
+                  checked={aceptaConsentimiento}
+                  onChange={(e) => setAceptaConsentimiento(e.target.checked)}
+                  style={{ marginTop: 3, flexShrink: 0 }}
+                />
+                <span style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, color: COLORS.muted, lineHeight: 1.5 }}>
+                  Autorizo el tratamiento de mis datos personales conforme a la Ley 1581 de 2012, y entiendo que la firma
+                  que voy a colocar es una <strong>firma electrónica</strong> con la validez legal establecida en la Ley
+                  527 de 1999, que me identifica y expresa mi voluntad de aceptar el contenido de este documento.{" "}
+                  <a href="/#privacidad" target="_blank" rel="noreferrer" style={{ color: COLORS.accentBright }}>
+                    Ver política de tratamiento de datos.
+                  </a>
+                </span>
+              </label>
               {error && <p style={{ color: "#B42318", fontSize: 13, marginBottom: 10, fontFamily: "Inter, sans-serif" }}>{error}</p>}
-              <button className="drx-btn-primary" style={buttonPrimary} onClick={empezarColocacion}>
+              <button className="drx-btn-primary" style={buttonPrimary} onClick={empezarColocacion} disabled={!aceptaConsentimiento}>
                 Firmar documento
               </button>
             </div>
@@ -5678,6 +5717,81 @@ const SEGURIDAD_LANDING = [
   "Toda la conexión viaja cifrada (HTTPS) con cabeceras de seguridad activas.",
 ];
 
+function PoliticaPrivacidad() {
+  const { oscuro, alternar } = useTema();
+  return (
+    <div className={oscuro ? "drx-tema-oscuro" : "drx-tema-claro"} style={{ background: COLORS.bg, minHeight: "100%" }}>
+      <GlobalStyle />
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "18px 24px", maxWidth: 760, margin: "0 auto" }}>
+        <InsigniaPlataforma />
+        <BotonTema oscuro={oscuro} onClick={alternar} />
+      </div>
+      <div style={{ maxWidth: 760, margin: "0 auto", padding: "10px 24px 60px" }}>
+        <h1 style={{ fontFamily: "Inter, sans-serif", fontSize: 26, fontWeight: 800, color: COLORS.headingText, marginBottom: 8 }}>
+          Política de tratamiento de datos personales
+        </h1>
+        <div
+          style={{
+            background: "#FEF3E2",
+            border: "1px solid #FCE3B8",
+            borderRadius: 10,
+            padding: "12px 16px",
+            marginBottom: 24,
+            fontFamily: "Inter, sans-serif",
+            fontSize: 12.5,
+            color: "#92400E",
+            lineHeight: 1.6,
+          }}
+        >
+          <strong>Borrador de referencia.</strong> Este texto cubre los elementos que exige la Ley 1581 de 2012 (habeas
+          data), pero cada despacho debe revisarlo y ajustarlo con su propio abogado antes de publicarlo como su
+          política definitiva — especialmente el nombre del responsable, sus datos de contacto y el detalle de las
+          finalidades según lo que realmente hace con la información.
+        </div>
+
+        {[
+          {
+            t: "1. Responsable del tratamiento",
+            c: `${getNombreDespacho()}, en su calidad de despacho de abogados, es responsable del tratamiento de los datos personales que recolecta a través de esta plataforma para la gestión de sus clientes y procesos.`,
+          },
+          {
+            t: "2. Finalidad del tratamiento",
+            c: "Los datos personales (nombre, identificación, contacto, información del proceso judicial, información de pagos y documentos) se usan exclusivamente para: prestar el servicio de representación o asesoría legal contratado, hacer seguimiento a los procesos judiciales, gestionar cobros y pagos, comunicarse con el cliente, y cumplir obligaciones legales o contractuales derivadas de la relación.",
+          },
+          {
+            t: "3. Derechos del titular de los datos",
+            c: "Como titular de tus datos personales tienes derecho a: conocer, actualizar y rectificar tus datos; solicitar prueba de la autorización otorgada; ser informado sobre el uso que se les ha dado; presentar quejas ante la Superintendencia de Industria y Comercio (SIC) por infracciones a la ley; revocar la autorización y/o solicitar la supresión del dato cuando no exista un deber legal o contractual que lo impida; y acceder de forma gratuita a tus datos.",
+          },
+          {
+            t: "4. Cómo ejercer tus derechos",
+            c: "Puedes ejercer estos derechos escribiendo directamente al despacho, por los medios de contacto que te compartió tu abogado (correo o WhatsApp). El despacho debe responder dentro de los términos que establece la ley.",
+          },
+          {
+            t: "5. Seguridad de la información",
+            c: "La información se almacena con controles técnicos de seguridad: autenticación de usuarios, cifrado de la conexión (HTTPS), registro de auditoría de accesos y cambios, y acceso restringido únicamente al personal autorizado del despacho.",
+          },
+          {
+            t: "6. Vigencia",
+            c: "Esta política aplica mientras exista una relación contractual o legal entre el titular y el despacho, y durante el tiempo adicional necesario para atender obligaciones legales, contables o de defensa judicial.",
+          },
+        ].map((s) => (
+          <div key={s.t} style={{ marginBottom: 18 }}>
+            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 14.5, fontWeight: 700, color: COLORS.headingText, marginBottom: 6 }}>{s.t}</p>
+            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.inkSoft, lineHeight: 1.7, margin: 0 }}>{s.c}</p>
+          </div>
+        ))}
+
+        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, color: COLORS.muted, marginTop: 30 }}>
+          Última actualización: {new Date().toLocaleDateString("es-CO", { dateStyle: "long" })}.
+        </p>
+        <a href="/" style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.accentBright }}>
+          ← Volver al inicio
+        </a>
+      </div>
+    </div>
+  );
+}
+
 function LandingPage({ onRegistrar, onIniciarSesion }) {
   const { oscuro, alternar } = useTema();
   return (
@@ -5832,6 +5946,9 @@ function LandingPage({ onRegistrar, onIniciarSesion }) {
           <p style={{ textAlign: "center", fontFamily: "Inter, sans-serif", fontSize: 11, color: COLORS.muted, margin: 0 }}>
             Nomos — desarrollado por <strong style={{ color: COLORS.headingText }}>Felipe Cortés Ramírez</strong>, CEO. Todos los derechos reservados.
           </p>
+          <a href="/#privacidad" target="_blank" rel="noreferrer" style={{ fontFamily: "Inter, sans-serif", fontSize: 11, color: COLORS.accentBright }}>
+            Política de tratamiento de datos
+          </a>
         </div>
       </div>
     </div>
@@ -6632,6 +6749,7 @@ export default function App() {
 
   const isFirmaView = typeof window !== "undefined" && window.location.hash.replace("#", "") === "firmar";
   const isPortalView = typeof window !== "undefined" && window.location.hash.replace("#", "") === "portal";
+  const isPrivacidadView = typeof window !== "undefined" && window.location.hash.replace("#", "") === "privacidad";
   const [modoPublico, setModoPublico] = useState(isFirmaView);
   const [modoPortal, setModoPortal] = useState(isPortalView);
   const [usuarioActual, setUsuarioActual] = useState(null);
@@ -6732,6 +6850,10 @@ export default function App() {
         </p>
       </div>
     );
+  }
+
+  if (isPrivacidadView) {
+    return <PoliticaPrivacidad />;
   }
 
   if (!sesionCargada) {
