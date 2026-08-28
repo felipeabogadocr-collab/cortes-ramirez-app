@@ -2174,6 +2174,7 @@ function BuscadorGlobal({ onIr }) {
   const [resultados, setResultados] = useState([]);
   const [abierto, setAbierto] = useState(false);
   const [buscando, setBuscando] = useState(false);
+  const inputRef = useRef(null);
 
   useEffect(() => {
     const texto = q.trim();
@@ -2190,6 +2191,18 @@ function BuscadorGlobal({ onIr }) {
     return () => clearTimeout(timer);
   }, [q]);
 
+  useEffect(() => {
+    const alPresionarTecla = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        inputRef.current?.focus();
+        inputRef.current?.select();
+      }
+    };
+    window.addEventListener("keydown", alPresionarTecla);
+    return () => window.removeEventListener("keydown", alPresionarTecla);
+  }, []);
+
   const ir = (tabDestino) => {
     onIr(tabDestino);
     setAbierto(false);
@@ -2200,9 +2213,10 @@ function BuscadorGlobal({ onIr }) {
   return (
     <div style={{ position: "relative", flex: 1, maxWidth: 320 }}>
       <input
+        ref={inputRef}
         className="drx-input"
         style={{ ...inputStyle, width: "100%" }}
-        placeholder="🔍 Buscar cliente o documento..."
+        placeholder="🔍 Buscar cliente o documento... (Ctrl+K)"
         value={q}
         onChange={(e) => {
           setQ(e.target.value);
