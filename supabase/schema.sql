@@ -223,22 +223,26 @@ drop policy if exists "acceso publico para firma" on documentos;
 create policy "acceso publico para firma" on documentos for all using (true) with check (true);
 
 drop policy if exists "usuarios autenticados leen perfiles" on perfiles;
+drop policy if exists "mismo despacho leen perfiles" on perfiles;
 create policy "mismo despacho leen perfiles" on perfiles
   for select
   using (despacho_id = mi_despacho_id());
 
 drop policy if exists "administradores actualizan perfiles" on perfiles;
+drop policy if exists "administradores actualizan perfiles del mismo despacho" on perfiles;
 create policy "administradores actualizan perfiles del mismo despacho" on perfiles
   for update
   using (soy_administrador() and despacho_id = mi_despacho_id())
   with check (despacho_id = mi_despacho_id());
 
 drop policy if exists "usuarios autenticados insertan auditoria" on auditoria;
+drop policy if exists "mismo despacho insertan auditoria" on auditoria;
 create policy "mismo despacho insertan auditoria" on auditoria
   for insert
   with check (despacho_id = mi_despacho_id());
 
 drop policy if exists "administradores leen auditoria" on auditoria;
+drop policy if exists "administradores leen auditoria del mismo despacho" on auditoria;
 create policy "administradores leen auditoria del mismo despacho" on auditoria
   for select
   using (soy_administrador() and despacho_id = mi_despacho_id());
