@@ -1755,6 +1755,30 @@ function ResumenTab({ nombre, usuarioId, onIr }) {
 
       <AsistenteIA nombre={nombre} usuarioId={usuarioId} onAccionCompletada={r.reload} />
 
+      {tareasPendientes > 0 && (
+        <div className="drx-fade-in" style={{ marginBottom: 20 }}>
+          <Card style={{ borderLeft: "4px solid #F5A524" }}>
+            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, fontWeight: 700, color: COLORS.headingText, marginBottom: 10 }}>
+              📋 Pendientes de hoy ({tareasPendientes})
+            </p>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {r.procesosConNovedad > 0 && (
+                <BotonPendiente texto={`${r.procesosConNovedad} proceso${r.procesosConNovedad !== 1 ? "s" : ""} con novedad judicial`} onClick={() => onIr("vigilancia")} />
+              )}
+              {r.docsFaltaAbogado > 0 && (
+                <BotonPendiente texto={`${r.docsFaltaAbogado} documento${r.docsFaltaAbogado !== 1 ? "s" : ""} esperando tu firma`} onClick={() => onIr("documentos")} />
+              )}
+              {r.pagosPendientes > 0 && (
+                <BotonPendiente texto={`${r.pagosPendientes} pago${r.pagosPendientes !== 1 ? "s" : ""} por vencer`} onClick={() => onIr("contabilidad")} />
+              )}
+              {r.clientesInactivos > 0 && (
+                <BotonPendiente texto={`${r.clientesInactivos} cliente${r.clientesInactivos !== 1 ? "s" : ""} inactivo${r.clientesInactivos !== 1 ? "s" : ""}`} onClick={() => onIr("clientes")} />
+              )}
+            </div>
+          </Card>
+        </div>
+      )}
+
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))", gap: 14, marginBottom: 20 }}>
         <SeccionEstadisticas titulo="Financiero" color="#10B981" onClick={() => onIr("contabilidad")}>
           <MiniEstadistica etiqueta="Hoy" valor={formatoCOP(r.recaudadoHoy)} color="#10B981" />
@@ -1793,10 +1817,35 @@ function ResumenTab({ nombre, usuarioId, onIr }) {
         </SeccionEstadisticas>
       </div>
 
-      {tareasPendientes === 0 && (
-        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted, textAlign: "center" }}>Todo al día — no hay pendientes urgentes por ahora.</p>
-      )}
+      {tareasPendientes === 0 && <EstadoVacio icono="✅" texto="Todo al día — no hay pendientes urgentes por ahora." />}
     </div>
+  );
+}
+
+function BotonPendiente({ texto, onClick }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        width: "100%",
+        textAlign: "left",
+        fontFamily: "Inter, sans-serif",
+        fontSize: 13,
+        fontWeight: 600,
+        color: COLORS.ink,
+        background: COLORS.surfaceSoft,
+        border: `1px solid ${COLORS.border}`,
+        borderRadius: 8,
+        padding: "10px 14px",
+        cursor: "pointer",
+      }}
+    >
+      <span>{texto}</span>
+      <span style={{ color: COLORS.muted }}>→</span>
+    </button>
   );
 }
 
