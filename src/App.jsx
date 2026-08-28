@@ -2137,6 +2137,27 @@ function TabButton({ active, onClick, children }) {
   );
 }
 
+const ICONOS_TAB = {
+  resumen: "M3 10.5 10 4l7 6.5M5 9v7h10V9",
+  clientes: "M7 8.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Zm7 1a2 2 0 1 0 0-4 2 2 0 0 0 0 4ZM2.5 16c.4-2.8 2.3-4.5 4.5-4.5s4.1 1.7 4.5 4.5M12 11.7c1.9.2 3.2 1.6 3.5 3.8",
+  vigilancia: "M10 3v14M6 6h8M6 6 3 11.5a3 3 0 0 0 6 0L6 6Zm8 0-3 5.5a3 3 0 0 0 6 0L14 6ZM6.5 17h7",
+  contabilidad: "M2.5 6.5h15v9h-15v-9Zm0 2.8h15M5.5 12.7h3",
+  contenido: "M4 4.5h12v12H4v-12Zm0 3.3h12M7 3v3M13 3v3M6.5 11h2M11.5 11h2M6.5 14h2M11.5 14h2",
+  documentos: "M6 3.5h6l3 3v10h-9v-13Zm6 0v3h3M8 10.5l4-1-1 4-4 1 1-4Z",
+  reportes: "M4 16.5v-6M9 16.5v-10M14 16.5v-3.5M2.5 16.5h15",
+  usuarios: "M10 12.7a2.7 2.7 0 1 0 0-5.4 2.7 2.7 0 0 0 0 5.4Zm7-2.7a7 7 0 0 1-.1 1.2l1.6 1.2-1.5 2.6-1.9-.7c-.4.3-.9.6-1.4.8l-.3 2H8.6l-.3-2c-.5-.2-1-.5-1.4-.8l-1.9.7-1.5-2.6 1.6-1.2A7 7 0 0 1 5 10c0-.4 0-.8.1-1.2L3.5 7.6l1.5-2.6 1.9.7c.4-.3.9-.6 1.4-.8l.3-2h2.8l.3 2c.5.2 1 .5 1.4.8l1.9-.7 1.5 2.6-1.6 1.2c.1.4.1.8.1 1.2Z",
+};
+
+function IconoTab({ tipo }) {
+  const d = ICONOS_TAB[tipo];
+  if (!d) return null;
+  return (
+    <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d={d} />
+    </svg>
+  );
+}
+
 function SidebarButton({ active, onClick, children, color, icono }) {
   const c = color || "#2F80ED";
   return (
@@ -2163,20 +2184,8 @@ function SidebarButton({ active, onClick, children, color, icono }) {
         boxShadow: active ? `0 0 0 1px ${c}40, 0 4px 14px ${c}26` : "none",
       }}
     >
-      <span
-        style={{
-          width: 22,
-          height: 22,
-          borderRadius: 7,
-          background: `${c}30`,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          fontSize: 12.5,
-          flexShrink: 0,
-        }}
-      >
-        {icono}
+      <span style={{ display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, opacity: active ? 1 : 0.85 }}>
+        <IconoTab tipo={icono} />
       </span>
       {children}
     </button>
@@ -6593,42 +6602,42 @@ export default function App() {
 
         <div style={{ display: "flex", flexDirection: "column", gap: 8, flex: 1 }}>
           {puedeVer("resumen") && (
-            <SidebarButton active={tab === "resumen"} onClick={() => setTab("resumen")} color="#2F80ED" icono="🏠">
+            <SidebarButton active={tab === "resumen"} onClick={() => setTab("resumen")} color="#2F80ED" icono="resumen">
               Resumen
             </SidebarButton>
           )}
           {puedeVer("clientes") && (
-            <SidebarButton active={tab === "clientes"} onClick={() => setTab("clientes")} color="#14B8A6" icono="👥">
+            <SidebarButton active={tab === "clientes"} onClick={() => setTab("clientes")} color="#14B8A6" icono="clientes">
               Clientes
             </SidebarButton>
           )}
           {puedeVer("vigilancia") && (
-            <SidebarButton active={tab === "vigilancia"} onClick={() => setTab("vigilancia")} color="#F5A524" icono="⚖️">
+            <SidebarButton active={tab === "vigilancia"} onClick={() => setTab("vigilancia")} color="#F5A524" icono="vigilancia">
               Vigilancia judicial
             </SidebarButton>
           )}
           {puedeVer("contabilidad") && (
-            <SidebarButton active={tab === "contabilidad"} onClick={() => setTab("contabilidad")} color="#F43F5E" icono="💳">
+            <SidebarButton active={tab === "contabilidad"} onClick={() => setTab("contabilidad")} color="#F43F5E" icono="contabilidad">
               Contabilidad
             </SidebarButton>
           )}
           {puedeVer("contenido") && (
-            <SidebarButton active={tab === "contenido"} onClick={() => setTab("contenido")} color="#8B5CF6" icono="🗓️">
+            <SidebarButton active={tab === "contenido"} onClick={() => setTab("contenido")} color="#8B5CF6" icono="contenido">
               Calendario de contenido
             </SidebarButton>
           )}
           {puedeVer("documentos") && (
-            <SidebarButton active={tab === "documentos"} onClick={irADocumentos} color="#10B981" icono="✍️">
+            <SidebarButton active={tab === "documentos"} onClick={irADocumentos} color="#10B981" icono="documentos">
               Firmar documentos
             </SidebarButton>
           )}
           {puedeVer("reportes") && (
-            <SidebarButton active={tab === "reportes"} onClick={() => setTab("reportes")} color="#0EA5E9" icono="📊">
+            <SidebarButton active={tab === "reportes"} onClick={() => setTab("reportes")} color="#0EA5E9" icono="reportes">
               Reportes
             </SidebarButton>
           )}
           {usuarioActual.rol === "Administrador" && (
-            <SidebarButton active={tab === "usuarios"} onClick={() => setTab("usuarios")} color="#6B7480" icono="⚙️">
+            <SidebarButton active={tab === "usuarios"} onClick={() => setTab("usuarios")} color="#6B7480" icono="usuarios">
               Usuarios y permisos
             </SidebarButton>
           )}
