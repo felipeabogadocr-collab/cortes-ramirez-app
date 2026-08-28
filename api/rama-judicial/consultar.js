@@ -91,7 +91,6 @@ export default async function handler(req, res) {
         departamento: campo(proceso, "departamento", "Departamento"),
         sujetosProcesales: campo(proceso, "sujetosProcesales", "SujetosProcesales"),
         fechaUltimaActuacion: campo(proceso, "fechaUltimaActuacion", "FechaUltimaActuacion"),
-        tipoProceso: campo(proceso, "tipoProceso", "TipoProceso"),
       },
       ultimaActuacion: actuacionesNormalizadas[0] || null,
       actuaciones: actuacionesNormalizadas.slice(0, 15),

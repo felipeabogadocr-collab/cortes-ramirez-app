@@ -2700,6 +2700,25 @@ async function consultarRamaJudicial(radicado) {
   return data;
 }
 
+async function explicarActuacion(actuacion, anotacion) {
+  const response = await fetch("/api/assistant", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: "claude-sonnet-4-6",
+      max_tokens: 300,
+      system:
+        `Eres un asistente para un abogado colombiano. Te doy el nombre de una actuación judicial y su anotación tal como aparecen en la Rama Judicial. ` +
+        `Responde en máximo 3 frases cortas, en español sencillo (sin tecnicismos innecesarios): primero explica qué significa esta actuación en términos prácticos, ` +
+        `y luego sugiere la acción concreta que el abogado debería tomar a continuación (ej: "presentar memorial", "impulsar el proceso", "esperar el vencimiento del término", "notificar al cliente", etc.). ` +
+        `No agregues introducciones ni despedidas, ve directo a la explicación y la sugerencia.`,
+      messages: [{ role: "user", content: `Actuación: ${actuacion}\nAnotación: ${anotacion || "(sin anotación)"}` }],
+    }),
+  });
+  const data = await response.json();
+  return (data.content || []).map((b) => b.text || "").join("").trim();
+}
+
 function VigilanciaTab() {
   const { ids } = useIndex("indice-clientes", false);
   const [clientes, setClientes] = useState({});
@@ -2707,6 +2726,8 @@ function VigilanciaTab() {
   const [resultados, setResultados] = useState({});
   const [errores, setErrores] = useState({});
   const [consultandoTodos, setConsultandoTodos] = useState(false);
+  const [explicaciones, setExplicaciones] = useState({});
+  const [explicando, setExplicando] = useState(null);
 
   const cargar = useCallback(async () => {
     const entries = {};
@@ -2779,6 +2800,19 @@ function VigilanciaTab() {
     await agregarNovedad(id, texto);
     await guardarComoVista(id, data);
     await cambiarEstadoVigilancia(id, "Con novedad");
+  };
+
+  const pedirExplicacion = async (id) => {
+    const data = resultados[id];
+    if (!data?.ultimaActuacion) return;
+    setExplicando(id);
+    try {
+      const texto = await explicarActuacion(data.ultimaActuacion.actuacion, data.ultimaActuacion.anotacion);
+      setExplicaciones((prev) => ({ ...prev, [id]: texto || "No pude generar una explicación en este momento." }));
+    } catch (e) {
+      setExplicaciones((prev) => ({ ...prev, [id]: "No pude generar una explicación en este momento." }));
+    }
+    setExplicando(null);
   };
 
   const conRadicado = ids.filter((id) => clientes[id]?.radicado?.trim());
@@ -2917,13 +2951,26 @@ function VigilanciaTab() {
                       {resultado.ultimaActuacion.anotacion}
                     </p>
                   )}
-                  <button
-                    className="drx-btn-primary"
-                    style={{ ...buttonPrimary, marginTop: 10, fontSize: 12, padding: "6px 12px" }}
-                    onClick={() => agregarComoNovedad(id)}
-                  >
-                    + Agregar a la línea de tiempo
-                  </button>
+                  <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
+                    <button className="drx-btn-primary" style={{ ...buttonPrimary, fontSize: 12, padding: "6px 12px" }} onClick={() => agregarComoNovedad(id)}>
+                      + Agregar a la línea de tiempo
+                    </button>
+                    <button
+                      className="drx-btn-ghost"
+                      style={{ ...buttonGhost, fontSize: 12, padding: "6px 12px" }}
+                      onClick={() => pedirExplicacion(id)}
+                      disabled={explicando === id}
+                    >
+                      {explicando === id ? "Analizando…" : "💡 Explicar y sugerir con IA"}
+                    </button>
+                  </div>
+                  {explicaciones[id] && (
+                    <div style={{ marginTop: 10, background: COLORS.accentSoft, border: "1px solid #C7D6EA", borderRadius: 8, padding: 10 }}>
+                      <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.navy, margin: 0, whiteSpace: "pre-wrap", lineHeight: 1.5 }}>
+                        {explicaciones[id]}
+                      </p>
+                    </div>
+                  )}
                 </div>
               )}
 
