@@ -2994,6 +2994,7 @@ function ClientesTab({ usuarioActual }) {
   const [filtro, setFiltro] = useState("");
   const [copiado, setCopiado] = useState("");
   const [orden, setOrden] = useState("recientes");
+  const [soloSinRadicado, setSoloSinRadicado] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -3055,7 +3056,7 @@ function ClientesTab({ usuarioActual }) {
   });
 
   const textoFiltro = filtro.trim().toLowerCase();
-  const idsFiltrados = textoFiltro
+  let idsFiltrados = textoFiltro
     ? idsOrdenados.filter((id) => {
         const c = clientes[id];
         if (!c) return false;
@@ -3066,6 +3067,7 @@ function ClientesTab({ usuarioActual }) {
         );
       })
     : idsOrdenados;
+  if (soloSinRadicado) idsFiltrados = idsFiltrados.filter((id) => !clientes[id]?.radicado?.trim());
 
   return (
     <div>
@@ -3110,6 +3112,10 @@ function ClientesTab({ usuarioActual }) {
             A-Z
           </button>
         </div>
+        <label style={{ display: "flex", alignItems: "center", gap: 6, fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.inkSoft, cursor: "pointer" }}>
+          <input type="checkbox" checked={soloSinRadicado} onChange={(e) => setSoloSinRadicado(e.target.checked)} />
+          Solo sin radicado
+        </label>
       </div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
         <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted, margin: 0 }}>
@@ -3313,6 +3319,11 @@ function ClientesTab({ usuarioActual }) {
                         {copiado === `tel-${id}` ? "✓ Copiado" : c.telefono}
                       </span>
                     )}
+                    {c.telefono && (
+                      <a href={`tel:${c.telefono.replace(/[^0-9+]/g, "")}`} title="Llamar" style={{ color: COLORS.accentBright, textDecoration: "none", fontWeight: 600 }}>
+                        📞 Llamar
+                      </a>
+                    )}
                     {c.telefono && c.email && "·"}
                     {c.email && (
                       <span
@@ -3336,8 +3347,21 @@ function ClientesTab({ usuarioActual }) {
                       </span>
                     )}
                     {c.radicado && (
-                      <span style={{ fontFamily: "monospace", fontSize: 11, padding: "3px 9px", borderRadius: 20, background: COLORS.surfaceSoft, color: COLORS.inkSoft, border: `1px solid ${COLORS.border}` }}>
-                        Radicado: {c.radicado}
+                      <span
+                        title="Copiar radicado"
+                        onClick={() => copiar(c.radicado, `rad-${id}`)}
+                        style={{
+                          fontFamily: "monospace",
+                          fontSize: 11,
+                          padding: "3px 9px",
+                          borderRadius: 20,
+                          background: copiado === `rad-${id}` ? "#E4EEE2" : COLORS.surfaceSoft,
+                          color: copiado === `rad-${id}` ? "#2F5D3A" : COLORS.inkSoft,
+                          border: `1px solid ${copiado === `rad-${id}` ? "#C9E0C4" : COLORS.border}`,
+                          cursor: "pointer",
+                        }}
+                      >
+                        {copiado === `rad-${id}` ? "✓ Copiado" : `Radicado: ${c.radicado}`}
                       </span>
                     )}
                     <span
@@ -8319,6 +8343,24 @@ function UsuariosPermisosTab({ usuarioActual, onDespachoRenombrado }) {
   const [error, setError] = useState("");
   const [creando, setCreando] = useState(false);
   const [eliminandoId, setEliminandoId] = useState(null);
+  const [enviandoResetId, setEnviandoResetId] = useState(null);
+  const [resetEnviadoId, setResetEnviadoId] = useState(null);
+
+  const enviarResetContrasena = async (u) => {
+    setEnviandoResetId(u.id);
+    setError("");
+    try {
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(u.email, {
+        redirectTo: typeof window !== "undefined" ? window.location.origin : undefined,
+      });
+      if (resetError) throw resetError;
+      setResetEnviadoId(u.id);
+      setTimeout(() => setResetEnviadoId(null), 4000);
+    } catch (e) {
+      setError("No se pudo enviar el correo de restablecimiento.");
+    }
+    setEnviandoResetId(null);
+  };
 
   const eliminarUsuarioClick = async (u) => {
     if (!window.confirm(`¿Eliminar el acceso de ${u.nombre}? Ya no podrá iniciar sesión. No se puede deshacer.`)) return;
@@ -8593,16 +8635,26 @@ function UsuariosPermisosTab({ usuarioActual, onDespachoRenombrado }) {
                     <UltimaSesionUsuario usuarioId={u.id} />
                   </p>
                 </div>
-                {u.id !== usuarioActualId && (
+                <div style={{ display: "flex", gap: 8 }}>
                   <button
                     className="drx-btn-ghost"
-                    style={{ ...buttonGhost, color: "#B42318", borderColor: "#F3C6C0", fontSize: 12, padding: "6px 12px" }}
-                    onClick={() => eliminarUsuarioClick(u)}
-                    disabled={eliminandoId === u.id}
+                    style={{ ...buttonGhost, fontSize: 12, padding: "6px 12px" }}
+                    onClick={() => enviarResetContrasena(u)}
+                    disabled={enviandoResetId === u.id}
                   >
-                    {eliminandoId === u.id ? "Eliminando…" : "Eliminar acceso"}
+                    {resetEnviadoId === u.id ? "✓ Correo enviado" : enviandoResetId === u.id ? "Enviando…" : "Restablecer contraseña"}
                   </button>
-                )}
+                  {u.id !== usuarioActualId && (
+                    <button
+                      className="drx-btn-ghost"
+                      style={{ ...buttonGhost, color: "#B42318", borderColor: "#F3C6C0", fontSize: 12, padding: "6px 12px" }}
+                      onClick={() => eliminarUsuarioClick(u)}
+                      disabled={eliminandoId === u.id}
+                    >
+                      {eliminandoId === u.id ? "Eliminando…" : "Eliminar acceso"}
+                    </button>
+                  )}
+                </div>
               </div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
                 {SECCIONES_PERMISOS.map((s) => (
