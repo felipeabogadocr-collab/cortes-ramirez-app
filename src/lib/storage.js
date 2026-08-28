@@ -59,6 +59,7 @@ export async function storageGet(key) {
         .from(table)
         .select("id")
         .eq("despacho_id", despachoActualId)
+        .is("eliminado_en", null)
         .order("created_at", { ascending: false });
       if (error) throw error;
       return JSON.stringify((data || []).map((r) => r.id));
@@ -83,6 +84,7 @@ export async function storageGet(key) {
           .select("data")
           .eq("id", id)
           .eq("despacho_id", despachoActualId)
+          .is("eliminado_en", null)
           .maybeSingle();
         if (error) throw error;
         return data ? JSON.stringify(data.data) : null;
@@ -119,14 +121,72 @@ export async function storageGet(key) {
 }
 
 async function syncIndexTable(table, newIds) {
-  const { data, error } = await supabase.from(table).select("id").eq("despacho_id", despachoActualId);
+  const { data, error } = await supabase.from(table).select("id").eq("despacho_id", despachoActualId).is("eliminado_en", null);
   if (error) throw error;
   const currentIds = (data || []).map((r) => r.id);
   const toDelete = currentIds.filter((id) => !newIds.includes(id));
   if (toDelete.length > 0) {
-    const { error: delError } = await supabase.from(table).delete().eq("despacho_id", despachoActualId).in("id", toDelete);
+    // Borrado suave: se marca con fecha en vez de borrarse de una, para
+    // poder recuperarlo desde la Papelera si fue un error.
+    const { error: delError } = await supabase
+      .from(table)
+      .update({ eliminado_en: new Date().toISOString() })
+      .eq("despacho_id", despachoActualId)
+      .in("id", toDelete);
     if (delError) throw delError;
   }
+}
+
+// Papelera --------------------------------------------------------------
+// Los tres tipos de registro que se pueden "eliminar" desde la app en
+// realidad solo se marcan con eliminado_en (ver syncIndexTable arriba).
+// Estas funciones permiten verlos, recuperarlos o borrarlos para siempre.
+
+const TABLAS_PAPELERA = { clientes: "clientes", documentos: "documentos", casos: "casos" };
+
+export async function obtenerPapelera(tipo) {
+  const table = TABLAS_PAPELERA[tipo];
+  if (!table || !despachoActualId) return [];
+  const { data, error } = await supabase
+    .from(table)
+    .select("id, data, eliminado_en")
+    .eq("despacho_id", despachoActualId)
+    .not("eliminado_en", "is", null)
+    .order("eliminado_en", { ascending: false });
+  if (error) {
+    console.error("obtenerPapelera error", tipo, error);
+    return [];
+  }
+  return data || [];
+}
+
+export async function restaurarDePapelera(tipo, id) {
+  const table = TABLAS_PAPELERA[tipo];
+  if (!table) return false;
+  const { error } = await supabase.from(table).update({ eliminado_en: null }).eq("despacho_id", despachoActualId).eq("id", id);
+  return !error;
+}
+
+export async function eliminarDefinitivo(tipo, id) {
+  const table = TABLAS_PAPELERA[tipo];
+  if (!table) return false;
+  const { error } = await supabase.from(table).delete().eq("despacho_id", despachoActualId).eq("id", id);
+  return !error;
+}
+
+// Búsqueda global ---------------------------------------------------------
+
+export async function buscarGlobal(texto) {
+  const consulta = (texto || "").trim();
+  if (!despachoActualId || consulta.length < 2) return [];
+  const patron = `%${consulta}%`;
+  const [clientesRes, documentosRes] = await Promise.all([
+    supabase.from("clientes").select("id, data").eq("despacho_id", despachoActualId).is("eliminado_en", null).ilike("data->>nombre", patron).limit(6),
+    supabase.from("documentos").select("id, data").eq("despacho_id", despachoActualId).is("eliminado_en", null).ilike("data->>titulo", patron).limit(6),
+  ]);
+  const clientes = (clientesRes.data || []).map((r) => ({ tipo: "cliente", id: r.id, titulo: r.data?.nombre || "(sin nombre)" }));
+  const documentos = (documentosRes.data || []).map((r) => ({ tipo: "documento", id: r.id, titulo: r.data?.titulo || "(sin título)" }));
+  return [...clientes, ...documentos];
 }
 
 export async function storageSet(key, value) {

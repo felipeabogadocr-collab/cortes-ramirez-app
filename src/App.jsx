@@ -88,6 +88,22 @@ function formatoCOP(valor) {
 const MEDIOS_PAGO = ["Nequi", "Daviplata", "Nu", "Cuenta bancaria", "Llave"];
 const DIAS_AVISO_PROXIMO_PAGO = 3;
 
+function exportarCSV(nombreArchivo, columnas, filas) {
+  const escapar = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+  const encabezado = columnas.map((c) => escapar(c.titulo)).join(",");
+  const lineas = filas.map((f) => columnas.map((c) => escapar(c.valor(f))).join(","));
+  const csv = [encabezado, ...lineas].join("\n");
+  const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = nombreArchivo;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
 function generarReciboImagen(cliente, pago) {
   return new Promise((resolve) => {
     const width = 720;
@@ -200,7 +216,16 @@ function ensureFonts() {
   document.head.appendChild(link);
 }
 
-import { storageGet, storageSet, setDespachoActual, getNombreDespacho } from "./lib/storage";
+import {
+  storageGet,
+  storageSet,
+  setDespachoActual,
+  getNombreDespacho,
+  buscarGlobal,
+  obtenerPapelera,
+  restaurarDePapelera,
+  eliminarDefinitivo,
+} from "./lib/storage";
 
 function useIndex(key, shared) {
   const [ids, setIds] = useState([]);
@@ -1854,11 +1879,14 @@ function DocumentoConFirmas({ doc, previewFirmante, onMovePreview }) {
 }
 
 // ---------- Vista pública: firmar documento ----------
+const DIAS_VENCIMIENTO_FIRMA = 30;
+
 function VistaFirma() {
   const [codigo, setCodigo] = useState("");
   const [doc, setDoc] = useState(null);
   const [buscando, setBuscando] = useState(false);
   const [notFound, setNotFound] = useState(false);
+  const [expirado, setExpirado] = useState(false);
 
   const [nombre, setNombre] = useState("");
   const [tipoId, setTipoId] = useState(TIPOS_ID[0]);
@@ -1874,6 +1902,7 @@ function VistaFirma() {
     if (!code) return;
     setBuscando(true);
     setNotFound(false);
+    setExpirado(false);
     const raw = await storageGet(`documento:${code}`, true);
     setBuscando(false);
     if (!raw) {
@@ -1882,6 +1911,16 @@ function VistaFirma() {
       return;
     }
     const parsed = JSON.parse(raw);
+    const yaFirmado = (parsed.firmantes || []).length > 0;
+    const dias = parsed.creadoEn ? Math.floor((Date.now() - new Date(parsed.creadoEn).getTime()) / 86400000) : 0;
+    if (!yaFirmado && dias > DIAS_VENCIMIENTO_FIRMA) {
+      // El enlace de firma vence a los 30 días si nadie lo ha firmado, por
+      // seguridad. Un documento ya firmado se puede seguir consultando como
+      // comprobante, sin vencimiento.
+      setExpirado(true);
+      setDoc(null);
+      return;
+    }
     setDoc({ id: code, firmantes: [], ...parsed });
   };
 
@@ -1963,6 +2002,11 @@ function VistaFirma() {
           {notFound && (
             <p style={{ color: "#B42318", fontSize: 13, marginTop: 10, fontFamily: "Inter, sans-serif" }}>
               No encontramos ningún documento con ese código. Verifícalo con tu abogado.
+            </p>
+          )}
+          {expirado && (
+            <p style={{ color: "#B42318", fontSize: 13, marginTop: 10, fontFamily: "Inter, sans-serif" }}>
+              Este enlace de firma venció (los enlaces sin firmar duran {DIAS_VENCIMIENTO_FIRMA} días por seguridad). Pídele a tu abogado que te comparta uno nuevo.
             </p>
           )}
           <button className="drx-btn-primary" style={{ ...buttonPrimary, marginTop: 14 }} onClick={buscar} disabled={buscando}>
@@ -2125,6 +2169,96 @@ function SidebarButton({ active, onClick, children, color }) {
   );
 }
 
+function BuscadorGlobal({ onIr }) {
+  const [q, setQ] = useState("");
+  const [resultados, setResultados] = useState([]);
+  const [abierto, setAbierto] = useState(false);
+  const [buscando, setBuscando] = useState(false);
+
+  useEffect(() => {
+    const texto = q.trim();
+    if (texto.length < 2) {
+      setResultados([]);
+      return;
+    }
+    setBuscando(true);
+    const timer = setTimeout(async () => {
+      const encontrados = await buscarGlobal(texto);
+      setResultados(encontrados);
+      setBuscando(false);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [q]);
+
+  const ir = (tabDestino) => {
+    onIr(tabDestino);
+    setAbierto(false);
+    setQ("");
+    setResultados([]);
+  };
+
+  return (
+    <div style={{ position: "relative", flex: 1, maxWidth: 320 }}>
+      <input
+        className="drx-input"
+        style={{ ...inputStyle, width: "100%" }}
+        placeholder="🔍 Buscar cliente o documento..."
+        value={q}
+        onChange={(e) => {
+          setQ(e.target.value);
+          setAbierto(true);
+        }}
+        onFocus={() => setAbierto(true)}
+        onBlur={() => setTimeout(() => setAbierto(false), 150)}
+      />
+      {abierto && q.trim().length >= 2 && (
+        <div
+          style={{
+            position: "absolute",
+            top: "110%",
+            left: 0,
+            right: 0,
+            background: COLORS.panel,
+            border: `1px solid ${COLORS.border}`,
+            borderRadius: 8,
+            boxShadow: "0 8px 20px rgba(0,0,0,0.15)",
+            zIndex: 30,
+            maxHeight: 320,
+            overflowY: "auto",
+          }}
+        >
+          {buscando && (
+            <p style={{ padding: 12, fontSize: 12.5, color: COLORS.muted, fontFamily: "Inter, sans-serif", margin: 0 }}>Buscando…</p>
+          )}
+          {!buscando && resultados.length === 0 && (
+            <p style={{ padding: 12, fontSize: 12.5, color: COLORS.muted, fontFamily: "Inter, sans-serif", margin: 0 }}>Sin resultados.</p>
+          )}
+          {resultados.map((r) => (
+            <button
+              key={`${r.tipo}-${r.id}`}
+              onMouseDown={() => ir(r.tipo === "cliente" ? "clientes" : "documentos")}
+              style={{
+                display: "block",
+                width: "100%",
+                textAlign: "left",
+                background: "none",
+                border: "none",
+                borderBottom: `1px solid ${COLORS.border}`,
+                padding: "10px 12px",
+                cursor: "pointer",
+                fontFamily: "Inter, sans-serif",
+              }}
+            >
+              <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: COLORS.ink }}>{r.titulo}</p>
+              <p style={{ margin: "2px 0 0", fontSize: 11, color: COLORS.muted }}>{r.tipo === "cliente" ? "Cliente" : "Documento"}</p>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 const FORM_CLIENTE_INICIAL = {
   nombre: "",
   telefono: "",
@@ -2134,6 +2268,7 @@ const FORM_CLIENTE_INICIAL = {
   radicado: "",
   notas: "",
   planPago: null,
+  valorTotal: "",
 };
 
 const FRECUENCIAS_PAGO = ["Semanal", "Quincenal", "Mensual", "Pago único", "Otro"];
@@ -2361,13 +2496,37 @@ function ClientesTab({ usuarioActual }) {
   return (
     <div>
       <EncabezadoSeccion titulo="Clientes" color="#14B8A6" />
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
         <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted, margin: 0 }}>
           {ids.length} cliente{ids.length !== 1 ? "s" : ""} · ordenados por última actuación
         </p>
-        <button className="drx-btn-primary" style={buttonPrimary} onClick={() => setShowForm((s) => !s)}>
-          {showForm ? "Cancelar" : "+ Nuevo cliente"}
-        </button>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button
+            className="drx-btn-ghost"
+            style={buttonGhost}
+            onClick={() =>
+              exportarCSV(
+                "clientes.csv",
+                [
+                  { titulo: "Nombre", valor: (id) => clientes[id]?.nombre },
+                  { titulo: "Teléfono", valor: (id) => clientes[id]?.telefono },
+                  { titulo: "Correo", valor: (id) => clientes[id]?.email },
+                  { titulo: "Radicado", valor: (id) => clientes[id]?.radicado },
+                  { titulo: "Tipo de proceso", valor: (id) => clientes[id]?.tipoProceso },
+                  { titulo: "Área", valor: (id) => clientes[id]?.areaProceso },
+                  { titulo: "Valor total acordado", valor: (id) => clientes[id]?.valorTotal },
+                  { titulo: "Notas", valor: (id) => clientes[id]?.notas },
+                ],
+                idsOrdenados
+              )
+            }
+          >
+            Exportar CSV
+          </button>
+          <button className="drx-btn-primary" style={buttonPrimary} onClick={() => setShowForm((s) => !s)}>
+            {showForm ? "Cancelar" : "+ Nuevo cliente"}
+          </button>
+        </div>
       </div>
 
       {showForm && (
@@ -2402,6 +2561,16 @@ function ClientesTab({ usuarioActual }) {
                   </option>
                 ))}
               </select>
+            </Field>
+            <Field label="Valor total acordado (opcional)">
+              <input
+                className="drx-input"
+                style={inputStyle}
+                type="number"
+                value={form.valorTotal}
+                onChange={(e) => setForm({ ...form, valorTotal: e.target.value })}
+                placeholder="Ej: 3000000"
+              />
             </Field>
           </div>
           <div style={{ marginTop: 12, marginBottom: 12 }}>
@@ -2454,6 +2623,15 @@ function ClientesTab({ usuarioActual }) {
                         </option>
                       ))}
                     </select>
+                  </Field>
+                  <Field label="Valor total acordado (opcional)">
+                    <input
+                      className="drx-input"
+                      style={inputStyle}
+                      type="number"
+                      value={formEdicion.valorTotal || ""}
+                      onChange={(e) => setFormEdicion({ ...formEdicion, valorTotal: e.target.value })}
+                    />
                   </Field>
                 </div>
                 <div style={{ marginTop: 12, marginBottom: 12 }}>
@@ -3238,9 +3416,31 @@ function ContabilidadTab({ usuarioActual }) {
         </div>
       )}
 
-      <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted, marginBottom: 16 }}>
-        {ids.length} cliente{ids.length !== 1 ? "s" : ""} registrado{ids.length !== 1 ? "s" : ""}
-      </p>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
+        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted, margin: 0 }}>
+          {ids.length} cliente{ids.length !== 1 ? "s" : ""} registrado{ids.length !== 1 ? "s" : ""}
+        </p>
+        <button
+          className="drx-btn-ghost"
+          style={buttonGhost}
+          onClick={() => {
+            const filas = ids.flatMap((id) => (clientes[id]?.pagos || []).map((p) => ({ cliente: clientes[id].nombre, pago: p })));
+            exportarCSV(
+              "pagos.csv",
+              [
+                { titulo: "Cliente", valor: (f) => f.cliente },
+                { titulo: "Fecha", valor: (f) => new Date(f.pago.fecha).toLocaleDateString("es-CO") },
+                { titulo: "Medio de pago", valor: (f) => f.pago.medioPago },
+                { titulo: "Valor", valor: (f) => f.pago.valor },
+                { titulo: "Concepto", valor: (f) => f.pago.concepto },
+              ],
+              filas
+            );
+          }}
+        >
+          Exportar CSV
+        </button>
+      </div>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         {ids.map((id) => {
@@ -3248,6 +3448,8 @@ function ContabilidadTab({ usuarioActual }) {
           if (!c) return null;
           const pagos = c.pagos || [];
           const totalPagado = pagos.reduce((sum, p) => sum + (Number(p.valor) || 0), 0);
+          const valorTotal = Number(c.valorTotal) || 0;
+          const saldo = valorTotal > 0 ? valorTotal - totalPagado : null;
 
           return (
             <Card key={id}>
@@ -3257,6 +3459,23 @@ function ContabilidadTab({ usuarioActual }) {
                   <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.muted, margin: "4px 0 0" }}>
                     {pagos.length} pago{pagos.length !== 1 ? "s" : ""} registrado{pagos.length !== 1 ? "s" : ""} · Total: {formatoCOP(totalPagado)}
                   </p>
+                  {saldo !== null && (
+                    <p
+                      style={{
+                        display: "inline-block",
+                        marginTop: 6,
+                        fontFamily: "Inter, sans-serif",
+                        fontSize: 11.5,
+                        fontWeight: 700,
+                        padding: "2px 9px",
+                        borderRadius: 20,
+                        background: saldo <= 0 ? "#DCFCE7" : "#FEF3E2",
+                        color: saldo <= 0 ? "#166534" : "#B45309",
+                      }}
+                    >
+                      {saldo <= 0 ? "Al día" : `Debe ${formatoCOP(saldo)}`}
+                    </p>
+                  )}
                 </div>
                 <button className="drx-btn-ghost" style={buttonGhost} onClick={() => setFormAbiertoId(formAbiertoId === id ? null : id)}>
                   {formAbiertoId === id ? "Cancelar" : "+ Registrar pago"}
@@ -5342,8 +5561,115 @@ function UsuariosPermisosTab({ usuarioActual, onDespachoRenombrado }) {
         })}
       </div>
 
+      <PapeleraPanel />
       <PanelAuditoria />
     </div>
+  );
+}
+
+const TIPOS_PAPELERA = [
+  { tipo: "clientes", etiqueta: "Clientes", campo: "nombre" },
+  { tipo: "documentos", etiqueta: "Documentos", campo: "titulo" },
+];
+
+function PapeleraPanel() {
+  const [abierto, setAbierto] = useState(false);
+  const [cargado, setCargado] = useState(false);
+  const [items, setItems] = useState({ clientes: [], documentos: [] });
+
+  const cargar = useCallback(async () => {
+    const [clientes, documentos] = await Promise.all([obtenerPapelera("clientes"), obtenerPapelera("documentos")]);
+    setItems({ clientes, documentos });
+    setCargado(true);
+  }, []);
+
+  useEffect(() => {
+    if (abierto && !cargado) cargar();
+  }, [abierto, cargado, cargar]);
+
+  const restaurar = async (tipo, id) => {
+    await restaurarDePapelera(tipo, id);
+    cargar();
+  };
+
+  const borrarDefinitivo = async (tipo, id) => {
+    if (!window.confirm("Esto borra el registro para siempre, sin poder recuperarlo. ¿Seguro?")) return;
+    await eliminarDefinitivo(tipo, id);
+    cargar();
+  };
+
+  const totalItems = items.clientes.length + items.documentos.length;
+
+  return (
+    <Card style={{ marginTop: 20 }}>
+      <button
+        onClick={() => setAbierto((a) => !a)}
+        style={{ background: "none", border: "none", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%", padding: 0 }}
+      >
+        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, fontWeight: 700, color: COLORS.ink, margin: 0 }}>
+          🗑️ Papelera {cargado ? `(${totalItems})` : ""}
+        </p>
+        <span style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.muted }}>{abierto ? "Ocultar ▲" : "Ver ▼"}</span>
+      </button>
+
+      {abierto && (
+        <div style={{ marginTop: 14 }}>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, marginBottom: 14 }}>
+            Lo que se elimina desde Clientes o Firmar documentos queda aquí, no se borra de una. Puedes recuperarlo o borrarlo para siempre.
+          </p>
+          {TIPOS_PAPELERA.map(({ tipo, etiqueta, campo }) => (
+            <div key={tipo} style={{ marginBottom: 16 }}>
+              <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, fontWeight: 700, color: COLORS.headingText, marginBottom: 8 }}>{etiqueta}</p>
+              {items[tipo].length === 0 && cargado && (
+                <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, margin: 0 }}>Vacía.</p>
+              )}
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                {items[tipo].map((r) => {
+                  const dias = Math.floor((Date.now() - new Date(r.eliminado_en).getTime()) / 86400000);
+                  return (
+                    <div
+                      key={r.id}
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        flexWrap: "wrap",
+                        gap: 8,
+                        background: COLORS.accentSoft,
+                        border: `1px solid ${COLORS.border}`,
+                        borderRadius: 8,
+                        padding: "8px 12px",
+                      }}
+                    >
+                      <div>
+                        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, fontWeight: 600, color: COLORS.ink, margin: 0 }}>
+                          {r.data?.[campo] || "(sin nombre)"}
+                        </p>
+                        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11, color: COLORS.muted, margin: "2px 0 0" }}>
+                          Eliminado hace {dias} día{dias !== 1 ? "s" : ""}
+                        </p>
+                      </div>
+                      <div style={{ display: "flex", gap: 8 }}>
+                        <button className="drx-btn-ghost" style={{ ...buttonGhost, padding: "5px 10px", fontSize: 12 }} onClick={() => restaurar(tipo, r.id)}>
+                          Restaurar
+                        </button>
+                        <button
+                          className="drx-btn-ghost"
+                          style={{ ...buttonGhost, padding: "5px 10px", fontSize: 12, color: "#B42318", borderColor: "#F3B4AC" }}
+                          onClick={() => borrarDefinitivo(tipo, r.id)}
+                        >
+                          Borrar para siempre
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </Card>
   );
 }
 
@@ -5701,7 +6027,7 @@ export default function App() {
             borderBottom: `1px solid ${COLORS.border}`,
             padding: "16px 28px",
             display: "flex",
-            justifyContent: "flex-end",
+            justifyContent: "space-between",
             alignItems: "center",
             gap: 10,
             position: "sticky",
@@ -5709,47 +6035,50 @@ export default function App() {
             zIndex: 20,
           }}
         >
-          <button
-            onClick={() => setMostrarNotificaciones(true)}
-            title="Notificaciones"
-            style={{
-              position: "relative",
-              background: "transparent",
-              border: `1px solid ${COLORS.border}`,
-              borderRadius: 8,
-              width: 38,
-              height: 38,
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              color: COLORS.headingText,
-            }}
-          >
-            <IconoCampana />
-            {notificaciones > 0 && (
-              <span
-                style={{
-                  position: "absolute",
-                  top: -6,
-                  right: -6,
-                  background: "#E24B4A",
-                  color: "#FFFFFF",
-                  borderRadius: 20,
-                  fontSize: 10,
-                  fontWeight: 700,
-                  padding: "1px 5px",
-                  fontFamily: "Inter, sans-serif",
-                }}
-              >
-                {notificaciones}
-              </span>
-            )}
-          </button>
-          <button className="drx-btn-ghost" style={buttonGhost} onClick={() => setModoPublico(true)}>
-            Ver vista del cliente ↗
-          </button>
-          <BotonTema oscuro={oscuro} onClick={alternar} />
+          <BuscadorGlobal onIr={setTab} />
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
+            <button
+              onClick={() => setMostrarNotificaciones(true)}
+              title="Notificaciones"
+              style={{
+                position: "relative",
+                background: "transparent",
+                border: `1px solid ${COLORS.border}`,
+                borderRadius: 8,
+                width: 38,
+                height: 38,
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                color: COLORS.headingText,
+              }}
+            >
+              <IconoCampana />
+              {notificaciones > 0 && (
+                <span
+                  style={{
+                    position: "absolute",
+                    top: -6,
+                    right: -6,
+                    background: "#E24B4A",
+                    color: "#FFFFFF",
+                    borderRadius: 20,
+                    fontSize: 10,
+                    fontWeight: 700,
+                    padding: "1px 5px",
+                    fontFamily: "Inter, sans-serif",
+                  }}
+                >
+                  {notificaciones}
+                </span>
+              )}
+            </button>
+            <button className="drx-btn-ghost" style={buttonGhost} onClick={() => setModoPublico(true)}>
+              Ver vista del cliente ↗
+            </button>
+            <BotonTema oscuro={oscuro} onClick={alternar} />
+          </div>
         </div>
 
         <div style={{ padding: "28px 28px 40px", flex: 1 }}>

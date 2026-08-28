@@ -102,6 +102,12 @@ create table if not exists auditoria (
 alter table clientes add column if not exists despacho_id uuid references despachos (id);
 alter table documentos add column if not exists despacho_id uuid references despachos (id);
 alter table casos add column if not exists despacho_id uuid references despachos (id);
+
+-- Papelera: en vez de borrar de una, se marca con fecha y se puede
+-- restaurar o borrar para siempre desde "Usuarios y permisos".
+alter table clientes add column if not exists eliminado_en timestamptz;
+alter table documentos add column if not exists eliminado_en timestamptz;
+alter table casos add column if not exists eliminado_en timestamptz;
 alter table chats add column if not exists despacho_id uuid references despachos (id);
 alter table app_settings add column if not exists despacho_id uuid references despachos (id);
 alter table perfiles add column if not exists despacho_id uuid references despachos (id);
@@ -161,6 +167,9 @@ create index if not exists clientes_despacho_idx on clientes (despacho_id);
 create index if not exists documentos_despacho_idx on documentos (despacho_id);
 create index if not exists casos_despacho_idx on casos (despacho_id);
 create index if not exists perfiles_despacho_idx on perfiles (despacho_id);
+create index if not exists clientes_eliminado_idx on clientes (despacho_id, eliminado_en);
+create index if not exists documentos_eliminado_idx on documentos (despacho_id, eliminado_en);
+create index if not exists casos_eliminado_idx on casos (despacho_id, eliminado_en);
 
 -- Funciones auxiliares para las políticas de seguridad -----------------------
 -- security definer: se ejecutan saltándose RLS por dentro, para poder leer
@@ -245,7 +254,7 @@ security definer
 stable
 set search_path = public
 as $$
-  select data from documentos where id = p_id;
+  select data from documentos where id = p_id and eliminado_en is null;
 $$;
 
 create or replace function guardar_firma_documento(p_id text, p_data jsonb)
@@ -254,7 +263,7 @@ language sql
 security definer
 set search_path = public
 as $$
-  update documentos set data = p_data, updated_at = now() where id = p_id;
+  update documentos set data = p_data, updated_at = now() where id = p_id and eliminado_en is null;
 $$;
 
 grant execute on function obtener_documento_publico(text) to anon, authenticated;
