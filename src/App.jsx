@@ -2557,6 +2557,28 @@ function VistaPreviaAnimada() {
   );
 }
 
+// Pequeña etiqueta en mayúsculas arriba de un <h2> — le da a cada sección de
+// la landing la misma jerarquía tipográfica de "kicker" que usan las páginas
+// de producto más cuidadas, en vez de que cada título flote solo.
+function Kicker({ texto }) {
+  return (
+    <p
+      style={{
+        fontFamily: "Inter, sans-serif",
+        fontSize: 11,
+        fontWeight: 800,
+        letterSpacing: 1.4,
+        textTransform: "uppercase",
+        color: COLORS.accentBright,
+        textAlign: "center",
+        margin: "0 0 8px",
+      }}
+    >
+      {texto}
+    </p>
+  );
+}
+
 const COLORES_AVATAR = ["#2F80ED", "#14B8A6", "#8B5CF6", "#F5A524", "#F43F5E", "#10B981", "#0EA5E9"];
 
 function AvatarIniciales({ nombre, size = 34 }) {
@@ -6325,14 +6347,14 @@ const PLANES_PRECIO = [
 ];
 
 const FUNCIONES_LANDING = [
-  { titulo: "Resumen", color: "#2F80ED", texto: "Un panel que te dice qué necesita tu atención hoy — pagos pendientes, novedades judiciales, documentos por firmar — no solo números sueltos." },
-  { titulo: "Clientes", color: "#14B8A6", texto: "Ficha completa por cliente: contacto, proceso, radicado, plan de pago y valor acordado. Búsqueda instantánea y filtros, incluso con cientos de clientes." },
-  { titulo: "Vigilancia judicial", color: "#F5A524", texto: "Consulta en vivo a la Rama Judicial por radicado. Una IA te explica cada actuación en palabras simples y sugiere el siguiente paso. Revisión automática todos los días, sin que tengas que entrar." },
-  { titulo: "Contabilidad", color: "#F43F5E", texto: "Registra pagos, genera recibos automáticos y controla quién debe y cuánto — con recordatorios listos para enviar por WhatsApp con un clic." },
-  { titulo: "Calendario de contenido", color: "#8B5CF6", texto: "Un Community Manager con IA que te propone ideas de contenido para Instagram, Facebook y TikTok, pensadas para atraer clientes del despacho." },
-  { titulo: "Firmar documentos", color: "#10B981", texto: "Comparte un código con tu cliente y firma electrónicamente desde el celular, sin instalar nada. Los enlaces sin firmar vencen solos a los 30 días." },
-  { titulo: "Portal del cliente", color: "#2F80ED", texto: "Tus clientes consultan el estado de su proceso y su estado de cuenta cuando quieran, sin tener que llamarte ni escribirte." },
-  { titulo: "Reportes", color: "#0EA5E9", texto: "Ingresos por mes, procesos por estado y carga de trabajo por abogado — para decidir con datos reales, no con intuición." },
+  { titulo: "Resumen", color: "#2F80ED", icono: "📊", texto: "Un panel que te dice qué necesita tu atención hoy — pagos pendientes, novedades judiciales, documentos por firmar — no solo números sueltos." },
+  { titulo: "Clientes", color: "#14B8A6", icono: "👥", texto: "Ficha completa por cliente: contacto, proceso, radicado, plan de pago y valor acordado. Búsqueda instantánea y filtros, incluso con cientos de clientes." },
+  { titulo: "Vigilancia judicial", color: "#F5A524", icono: "⚖️", texto: "Consulta en vivo a la Rama Judicial por radicado. Una IA te explica cada actuación en palabras simples y sugiere el siguiente paso. Revisión automática todos los días, sin que tengas que entrar." },
+  { titulo: "Contabilidad", color: "#F43F5E", icono: "💳", texto: "Registra pagos, genera recibos automáticos y controla quién debe y cuánto — con recordatorios listos para enviar por WhatsApp con un clic." },
+  { titulo: "Calendario de contenido", color: "#8B5CF6", icono: "📅", texto: "Un Community Manager con IA que te propone ideas de contenido para Instagram, Facebook y TikTok, pensadas para atraer clientes del despacho." },
+  { titulo: "Firmar documentos", color: "#10B981", icono: "✍️", texto: "Comparte un código con tu cliente y firma electrónicamente desde el celular, sin instalar nada. Los enlaces sin firmar vencen solos a los 30 días." },
+  { titulo: "Portal del cliente", color: "#2F80ED", icono: "🔗", texto: "Tus clientes consultan el estado de su proceso y su estado de cuenta cuando quieran, sin tener que llamarte ni escribirte." },
+  { titulo: "Reportes", color: "#0EA5E9", icono: "📈", texto: "Ingresos por mes, procesos por estado y carga de trabajo por abogado — para decidir con datos reales, no con intuición." },
 ];
 
 const FAQ_LANDING = [
@@ -6534,6 +6556,22 @@ function TerminosUso() {
 
 function LandingPage({ onRegistrar, onIniciarSesion }) {
   const { oscuro, alternar } = useTema();
+  const [progresoScroll, setProgresoScroll] = useState(0);
+  const [scrolleado, setScrolleado] = useState(false);
+  const [mostrarSubir, setMostrarSubir] = useState(false);
+
+  useEffect(() => {
+    const alScroll = () => {
+      const alto = document.documentElement.scrollHeight - window.innerHeight;
+      setProgresoScroll(alto > 0 ? Math.min(100, (window.scrollY / alto) * 100) : 0);
+      setScrolleado(window.scrollY > 20);
+      setMostrarSubir(window.scrollY > 600);
+    };
+    window.addEventListener("scroll", alScroll, { passive: true });
+    alScroll();
+    return () => window.removeEventListener("scroll", alScroll);
+  }, []);
+
   return (
     <div className={oscuro ? "drx-tema-oscuro" : "drx-tema-claro"} style={{ background: COLORS.bg, minHeight: "100%" }}>
       <GlobalStyle />
@@ -6556,13 +6594,19 @@ function LandingPage({ onRegistrar, onIniciarSesion }) {
           position: "sticky",
           top: 0,
           zIndex: 30,
-          background: COLORS.panel,
+          background: scrolleado ? `${COLORS.panel}E6` : COLORS.panel,
+          backdropFilter: scrolleado ? "blur(8px)" : "none",
+          WebkitBackdropFilter: scrolleado ? "blur(8px)" : "none",
           borderBottom: `1px solid ${COLORS.border}`,
           borderTop: `3px solid ${COLORS.accentBright}`,
-          boxShadow: "0 2px 12px rgba(10,35,66,0.08)",
+          boxShadow: scrolleado ? "0 4px 18px rgba(10,35,66,0.12)" : "0 2px 12px rgba(10,35,66,0.08)",
+          transition: "box-shadow 0.2s ease, background 0.2s ease",
         }}
       >
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 24px", maxWidth: 1040, margin: "0 auto", flexWrap: "wrap", gap: 12 }}>
+        <div style={{ position: "absolute", left: 0, right: 0, bottom: -2, height: 2, background: COLORS.border }}>
+          <div style={{ width: `${progresoScroll}%`, height: "100%", background: COLORS.accentBright, transition: "width 0.1s linear" }} />
+        </div>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: scrolleado ? "10px 24px" : "14px 24px", maxWidth: 1040, margin: "0 auto", flexWrap: "wrap", gap: 12, transition: "padding 0.2s ease" }}>
           <InsigniaPlataforma />
           <div style={{ display: "flex", alignItems: "center", gap: 22, flexWrap: "wrap" }}>
             <a href="#funciones" className="drx-navlink" style={navLinkStyle}>Funciones</a>
@@ -6614,29 +6658,65 @@ function LandingPage({ onRegistrar, onIniciarSesion }) {
             pointerEvents: "none",
           }}
         />
-        <Pill>⚖️ Software de gestión legal para despachos en Colombia</Pill>
+        <span
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 8,
+            border: `1px solid #C7D6EA`,
+            borderRadius: 20,
+            padding: "7px 18px",
+            fontFamily: "Inter, sans-serif",
+            fontSize: 12,
+            fontWeight: 700,
+            letterSpacing: 0.3,
+            color: COLORS.navy,
+            background: COLORS.accentSoft,
+          }}
+        >
+          <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#10B981", animation: "drx-pulse 1.8s ease-in-out infinite" }} />
+          Software de gestión legal para despachos en Colombia
+        </span>
         <h1
           style={{
             fontFamily: "Inter, sans-serif",
-            fontSize: 38,
+            fontSize: 48,
             fontWeight: 800,
-            letterSpacing: 0.3,
-            color: COLORS.headingText,
-            margin: "22px auto 16px",
-            maxWidth: 640,
-            lineHeight: 1.2,
+            letterSpacing: -0.5,
+            margin: "26px auto 18px",
+            maxWidth: 680,
+            lineHeight: 1.12,
           }}
         >
-          Todo tu despacho, en un solo lugar
+          <span style={{ color: COLORS.headingText }}>Todo tu despacho, </span>
+          <span
+            style={{
+              background: `linear-gradient(100deg, ${COLORS.navy}, ${COLORS.accentBright} 55%, #14B8A6)`,
+              WebkitBackgroundClip: "text",
+              backgroundClip: "text",
+              color: "transparent",
+            }}
+          >
+            en un solo lugar
+          </span>
         </h1>
-        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, color: COLORS.muted, maxWidth: 560, margin: "0 auto 30px", lineHeight: 1.6 }}>
-          Clientes, procesos judiciales, cobros, documentos con firma electrónica y contenido para redes sociales — con
-          inteligencia artificial que te ayuda en el día a día. Sin instalar nada, desde el celular o el computador.
+        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 16, color: COLORS.muted, maxWidth: 580, margin: "0 auto 34px", lineHeight: 1.65 }}>
+          Clientes, procesos judiciales, cobros, documentos con <strong style={{ color: COLORS.inkSoft }}>firma electrónica</strong> y
+          contenido para redes sociales — con inteligencia artificial que te ayuda en el día a día. Sin instalar nada,
+          desde el celular o el computador.
         </p>
         <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
           <button className="drx-btn-primary" style={{ ...buttonPrimary, padding: "14px 28px", fontSize: 14 }} onClick={onRegistrar}>
             Registrar mi despacho
           </button>
+        </div>
+        <div style={{ display: "flex", gap: 20, justifyContent: "center", flexWrap: "wrap", marginTop: 18 }}>
+          {["Sin instalar nada", "Datos protegidos (Ley 1581 de 2012)", "Firma electrónica válida (Ley 527 de 1999)"].map((t) => (
+            <span key={t} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontFamily: "Inter, sans-serif", fontSize: 11.5, color: COLORS.muted }}>
+              <span style={{ color: "#10B981", fontWeight: 800 }}>✓</span>
+              {t}
+            </span>
+          ))}
         </div>
 
         <VistaPreviaAnimada />
@@ -6658,7 +6738,55 @@ function LandingPage({ onRegistrar, onIniciarSesion }) {
       </div>
 
       <div style={{ maxWidth: 1040, margin: "0 auto", padding: "0 20px 60px" }}>
-        <h2 id="funciones" style={{ fontFamily: "Inter, sans-serif", fontSize: 22, fontWeight: 800, color: COLORS.headingText, textAlign: "center", marginBottom: 8, marginTop: 20, scrollMarginTop: 90 }}>
+        <Kicker texto="Cómo funciona" />
+        <h2 style={{ fontFamily: "Inter, sans-serif", fontSize: 22, fontWeight: 800, color: COLORS.headingText, textAlign: "center", marginBottom: 8, marginTop: 0 }}>
+          De cero a operando, en tres pasos
+        </h2>
+        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted, textAlign: "center", marginBottom: 34 }}>
+          No hay nada que instalar ni configurar a mano — empiezas a usarlo el mismo día.
+        </p>
+        <div style={{ position: "relative", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 24, marginBottom: 64 }}>
+          <div
+            aria-hidden="true"
+            style={{ position: "absolute", top: 22, left: "16%", right: "16%", height: 2, background: `linear-gradient(90deg, ${COLORS.border}, ${COLORS.accentBright}, ${COLORS.border})`, display: window?.innerWidth < 720 ? "none" : "block" }}
+          />
+          {[
+            { n: "1", titulo: "Registra tu despacho", texto: "Con tu correo y el nombre del despacho — sin tarjeta de crédito ni formularios largos." },
+            { n: "2", titulo: "Invita a tu equipo", texto: "Agrega abogados y asistentes, cada uno con el rol y los permisos que le correspondan." },
+            { n: "3", titulo: "Empieza a gestionar", texto: "Carga tus clientes y procesos, y desde ahí Nomos vigila, cobra y firma contigo." },
+          ].map((paso, i) => (
+            <AlEntrar key={paso.n} retraso={i * 90}>
+              <div style={{ textAlign: "center", position: "relative" }}>
+                <div
+                  style={{
+                    width: 44,
+                    height: 44,
+                    borderRadius: "50%",
+                    background: COLORS.navy,
+                    color: "#FFFFFF",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontFamily: "Inter, sans-serif",
+                    fontWeight: 800,
+                    fontSize: 17,
+                    margin: "0 auto 14px",
+                    boxShadow: "0 8px 20px rgba(10,35,66,0.25)",
+                  }}
+                >
+                  {paso.n}
+                </div>
+                <p style={{ fontFamily: "Inter, sans-serif", fontSize: 14.5, fontWeight: 700, color: COLORS.headingText, marginBottom: 6 }}>{paso.titulo}</p>
+                <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.muted, lineHeight: 1.6, margin: 0, maxWidth: 240, marginLeft: "auto", marginRight: "auto" }}>
+                  {paso.texto}
+                </p>
+              </div>
+            </AlEntrar>
+          ))}
+        </div>
+
+        <Kicker texto="Todo en un solo lugar" />
+        <h2 id="funciones" style={{ fontFamily: "Inter, sans-serif", fontSize: 22, fontWeight: 800, color: COLORS.headingText, textAlign: "center", marginBottom: 8, marginTop: 0, scrollMarginTop: 90 }}>
           Qué encuentras adentro
         </h2>
         <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted, textAlign: "center", marginBottom: 30 }}>
@@ -6667,7 +6795,23 @@ function LandingPage({ onRegistrar, onIniciarSesion }) {
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 16, marginBottom: 60 }}>
           {FUNCIONES_LANDING.map((f, i) => (
             <AlEntrar key={f.titulo} retraso={(i % 4) * 60}>
-              <Card style={{ borderLeft: `4px solid ${f.color}` }}>
+              <Card style={{ borderTop: `3px solid ${f.color}` }}>
+                <div
+                  style={{
+                    width: 38,
+                    height: 38,
+                    borderRadius: 10,
+                    background: `${f.color}1A`,
+                    color: f.color,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    marginBottom: 12,
+                    fontSize: 18,
+                  }}
+                >
+                  {f.icono || "•"}
+                </div>
                 <p style={{ fontFamily: "Inter, sans-serif", fontSize: 14.5, fontWeight: 700, color: f.color, marginBottom: 8 }}>{f.titulo}</p>
                 <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.inkSoft, lineHeight: 1.6, margin: 0 }}>{f.texto}</p>
               </Card>
@@ -6675,7 +6819,8 @@ function LandingPage({ onRegistrar, onIniciarSesion }) {
           ))}
         </div>
 
-        <h2 style={{ fontFamily: "Inter, sans-serif", fontSize: 22, fontWeight: 800, color: COLORS.headingText, textAlign: "center", marginBottom: 8 }}>
+        <Kicker texto="La comparación" />
+        <h2 style={{ fontFamily: "Inter, sans-serif", fontSize: 22, fontWeight: 800, color: COLORS.headingText, textAlign: "center", marginBottom: 8, marginTop: 0 }}>
           El antes y el después
         </h2>
         <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted, textAlign: "center", marginBottom: 24 }}>
@@ -6726,7 +6871,8 @@ function LandingPage({ onRegistrar, onIniciarSesion }) {
           </AlEntrar>
         </div>
 
-        <h2 id="seguridad" style={{ fontFamily: "Inter, sans-serif", fontSize: 22, fontWeight: 800, color: COLORS.headingText, textAlign: "center", marginBottom: 8, scrollMarginTop: 90 }}>
+        <Kicker texto="Datos sensibles, en serio" />
+        <h2 id="seguridad" style={{ fontFamily: "Inter, sans-serif", fontSize: 22, fontWeight: 800, color: COLORS.headingText, textAlign: "center", marginBottom: 8, marginTop: 0, scrollMarginTop: 90 }}>
           Seguridad
         </h2>
         <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted, textAlign: "center", marginBottom: 24 }}>
@@ -6745,7 +6891,8 @@ function LandingPage({ onRegistrar, onIniciarSesion }) {
           </Card>
         </AlEntrar>
 
-        <h2 id="planes" style={{ fontFamily: "Inter, sans-serif", fontSize: 22, fontWeight: 800, color: COLORS.headingText, textAlign: "center", marginBottom: 8, scrollMarginTop: 90 }}>
+        <Kicker texto="Sin sorpresas" />
+        <h2 id="planes" style={{ fontFamily: "Inter, sans-serif", fontSize: 22, fontWeight: 800, color: COLORS.headingText, textAlign: "center", marginBottom: 8, marginTop: 0, scrollMarginTop: 90 }}>
           Planes
         </h2>
         <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted, textAlign: "center", marginBottom: 6 }}>
@@ -6758,6 +6905,7 @@ function LandingPage({ onRegistrar, onIniciarSesion }) {
             <Card
               style={{
                 border: p.destacado ? `2px solid ${COLORS.accentBright}` : `1px solid ${COLORS.border}`,
+                borderTop: `4px solid ${p.destacado ? COLORS.accentBright : COLORS.navy}`,
                 boxShadow: p.destacado ? "0 10px 30px rgba(30,95,180,0.18)" : "none",
                 position: "relative",
               }}
@@ -6782,7 +6930,23 @@ function LandingPage({ onRegistrar, onIniciarSesion }) {
                   Más elegido
                 </span>
               )}
-              <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, fontWeight: 700, color: COLORS.headingText, margin: "6px 0 4px" }}>{p.nombre}</p>
+              <div
+                style={{
+                  width: 34,
+                  height: 34,
+                  borderRadius: 9,
+                  background: p.destacado ? COLORS.accentSoft : COLORS.surfaceSoft,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: 16,
+                  marginBottom: 10,
+                  marginTop: 6,
+                }}
+              >
+                {p.destacado ? "🏛️" : "👤"}
+              </div>
+              <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, fontWeight: 700, color: COLORS.headingText, margin: "0 0 4px" }}>{p.nombre}</p>
               <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, marginBottom: 14, minHeight: 32, lineHeight: 1.5 }}>{p.descripcion}</p>
               <p style={{ fontFamily: "Inter, sans-serif", margin: "0 0 16px" }}>
                 <span style={{ fontSize: 30, fontWeight: 800, color: COLORS.headingText }}>{p.precio}</span>
@@ -6814,7 +6978,8 @@ function LandingPage({ onRegistrar, onIniciarSesion }) {
           </button>
         </div>
 
-        <h2 id="faq" style={{ fontFamily: "Inter, sans-serif", fontSize: 22, fontWeight: 800, color: COLORS.headingText, textAlign: "center", marginBottom: 24, scrollMarginTop: 90 }}>
+        <Kicker texto="Antes de escribirnos" />
+        <h2 id="faq" style={{ fontFamily: "Inter, sans-serif", fontSize: 22, fontWeight: 800, color: COLORS.headingText, textAlign: "center", marginBottom: 24, marginTop: 0, scrollMarginTop: 90 }}>
           Preguntas frecuentes
         </h2>
         <div className="drx-faq" style={{ display: "flex", flexDirection: "column", gap: 10, maxWidth: 680, margin: "0 auto" }}>
@@ -6841,6 +7006,38 @@ function LandingPage({ onRegistrar, onIniciarSesion }) {
           ))}
         </div>
       </div>
+
+      <AlEntrar>
+        <div
+          style={{
+            margin: "0 20px 40px",
+            maxWidth: 1000,
+            marginLeft: "auto",
+            marginRight: "auto",
+            background: `linear-gradient(120deg, ${COLORS.navy}, #143c72)`,
+            borderRadius: 20,
+            padding: "44px 28px",
+            textAlign: "center",
+            position: "relative",
+            overflow: "hidden",
+          }}
+        >
+          <div aria-hidden="true" style={{ position: "absolute", top: -100, right: -80, width: 260, height: 260, borderRadius: "50%", background: "rgba(255,255,255,0.05)" }} />
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 24, fontWeight: 800, color: "#FFFFFF", margin: "0 0 10px", position: "relative" }}>
+            ¿Listo para dejar el papel atrás?
+          </p>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13.5, color: "#C4D3E8", margin: "0 0 24px", maxWidth: 480, marginLeft: "auto", marginRight: "auto", position: "relative" }}>
+            Registra tu despacho hoy y empieza a gestionar clientes, procesos y firmas desde un solo lugar.
+          </p>
+          <button
+            className="drx-btn-primary"
+            style={{ ...buttonPrimary, padding: "14px 30px", fontSize: 14, position: "relative", background: "#FFFFFF", color: COLORS.navy }}
+            onClick={onRegistrar}
+          >
+            Registrar mi despacho
+          </button>
+        </div>
+      </AlEntrar>
 
       <div style={{ background: COLORS.navy, padding: "44px 24px 26px", marginTop: 20 }}>
         <div
@@ -6937,6 +7134,35 @@ function LandingPage({ onRegistrar, onIniciarSesion }) {
           <path d="M12 2a10 10 0 0 0-8.6 15L2 22l5.1-1.3A10 10 0 1 0 12 2Zm0 18.2c-1.6 0-3.1-.4-4.5-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2Z" />
         </svg>
       </a>
+
+      <button
+        onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+        aria-label="Volver arriba"
+        style={{
+          position: "fixed",
+          bottom: 24,
+          left: 24,
+          width: 44,
+          height: 44,
+          borderRadius: "50%",
+          background: COLORS.navy,
+          border: "none",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          boxShadow: "0 8px 20px rgba(10,35,66,0.3)",
+          zIndex: 40,
+          cursor: "pointer",
+          opacity: mostrarSubir ? 1 : 0,
+          transform: mostrarSubir ? "translateY(0)" : "translateY(12px)",
+          pointerEvents: mostrarSubir ? "auto" : "none",
+          transition: "opacity 0.25s ease, transform 0.25s ease",
+        }}
+      >
+        <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M4 12l6-6 6 6" />
+        </svg>
+      </button>
     </div>
   );
 }
