@@ -11,7 +11,7 @@
 // verificación de correo.
 
 import { supabaseAdmin } from "../_lib/supabaseAdmin.js";
-import { permisosPorDefecto, notificacionesPorDefecto } from "../_lib/defaults.js";
+import { permisosPorDefecto, notificacionesPorDefecto, esEmailValido } from "../_lib/defaults.js";
 import { dentroDelLimite } from "../_lib/rateLimit.js";
 
 export default async function handler(req, res) {
@@ -23,6 +23,9 @@ export default async function handler(req, res) {
   const { nombreDespacho, nombre, email, userId, sitioWeb, segundosLlenando } = req.body || {};
   if (!nombreDespacho?.trim() || !nombre?.trim() || !email?.trim() || !userId) {
     return res.status(400).json({ error: "Faltan datos" });
+  }
+  if (!esEmailValido(email)) {
+    return res.status(400).json({ error: "El correo no tiene un formato válido" });
   }
 
   // Anti-spam: "sitioWeb" es un campo trampa invisible para personas (ver

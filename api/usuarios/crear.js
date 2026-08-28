@@ -7,7 +7,7 @@
 // api/despachos/crear.js en su lugar.
 
 import { supabaseAdmin } from "../_lib/supabaseAdmin.js";
-import { permisosPorDefecto, notificacionesPorDefecto, validarContrasena } from "../_lib/defaults.js";
+import { permisosPorDefecto, notificacionesPorDefecto, validarContrasena, esEmailValido } from "../_lib/defaults.js";
 import { dentroDelLimite } from "../_lib/rateLimit.js";
 
 const ROLES_VALIDOS = new Set(["Administrador", "Abogado", "Asistente"]);
@@ -21,6 +21,9 @@ export default async function handler(req, res) {
   const { nombre, email, contrasena, rol } = req.body || {};
   if (!nombre?.trim() || !email?.trim() || !contrasena?.trim()) {
     return res.status(400).json({ error: "Faltan nombre, correo o contraseña" });
+  }
+  if (!esEmailValido(email)) {
+    return res.status(400).json({ error: "El correo no tiene un formato válido" });
   }
   const errorContrasena = validarContrasena(contrasena);
   if (errorContrasena) {

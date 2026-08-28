@@ -15,6 +15,13 @@ export function notificacionesPorDefecto() {
   return { firmas: true, clientes: true, pagos: true, contenido: true };
 }
 
+// Validación básica de formato (no exhaustiva a propósito): rechaza basura
+// obvia antes de que llegue a Supabase Auth o a un correo, sin bloquear
+// direcciones raras pero válidas.
+export function esEmailValido(email) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email || "").trim());
+}
+
 // Exige al menos 10 caracteres, una letra y un número — evita contraseñas
 // triviales tipo "12345678" sin ser tan estricto como para frustrar al
 // usuario con símbolos obligatorios.
