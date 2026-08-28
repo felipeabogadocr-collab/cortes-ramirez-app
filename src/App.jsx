@@ -5070,6 +5070,7 @@ function DocumentosTab() {
   const [formEdicionDoc, setFormEdicionDoc] = useState({});
   const [filtro, setFiltro] = useState("");
   const [integridad, setIntegridad] = useState({});
+  const [filtroEstadoDoc, setFiltroEstadoDoc] = useState("Todos");
 
   const cargar = useCallback(async () => {
     const entries = {};
@@ -5230,13 +5231,28 @@ function DocumentosTab() {
   };
 
   const textoFiltro = filtro.trim().toLowerCase();
-  const idsFiltrados = textoFiltro
+  const idsPorTexto = textoFiltro
     ? ids.filter((id) => {
         const d = docs[id];
         if (!d) return false;
         return d.titulo?.toLowerCase().includes(textoFiltro) || d.cliente?.toLowerCase().includes(textoFiltro);
       })
     : ids;
+
+  // Prioriza lo que necesita acción: primero lo que falta que firme el
+  // abogado (el cliente ya firmó y está esperando), luego lo pendiente, y
+  // al final lo ya completado — para no tener que buscarlo entre lo
+  // terminado.
+  const ordenEstadoDoc = { falta_abogado: 0, pendiente: 1, listo: 2 };
+  const idsOrdenadosPorEstado = [...idsPorTexto].sort((a, b) => {
+    const ea = calcularEstado(docs[a]?.firmantes || []);
+    const eb = calcularEstado(docs[b]?.firmantes || []);
+    return (ordenEstadoDoc[ea] ?? 1) - (ordenEstadoDoc[eb] ?? 1);
+  });
+  const idsFiltrados =
+    filtroEstadoDoc === "Todos"
+      ? idsOrdenadosPorEstado
+      : idsOrdenadosPorEstado.filter((id) => calcularEstado(docs[id]?.firmantes || []) === filtroEstadoDoc);
 
   return (
     <div>
@@ -5259,6 +5275,39 @@ function DocumentosTab() {
           {showForm ? "Cancelar" : "+ Nuevo documento"}
         </button>
       </div>
+
+      {ids.length > 0 && (
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
+          {[
+            { key: "Todos", texto: "Todos" },
+            { key: "falta_abogado", texto: "Falta tu firma" },
+            { key: "pendiente", texto: "Pendiente" },
+            { key: "listo", texto: "Listo" },
+          ].map(({ key, texto }) => {
+            const cantidad = key === "Todos" ? ids.length : ids.filter((id) => calcularEstado(docs[id]?.firmantes || []) === key).length;
+            const activo = filtroEstadoDoc === key;
+            return (
+              <button
+                key={key}
+                onClick={() => setFiltroEstadoDoc(key)}
+                style={{
+                  fontFamily: "Inter, sans-serif",
+                  fontSize: 12,
+                  fontWeight: 600,
+                  padding: "6px 12px",
+                  borderRadius: 999,
+                  border: `1px solid ${activo ? COLORS.navy : COLORS.border}`,
+                  background: activo ? COLORS.navy : "#fff",
+                  color: activo ? "#fff" : COLORS.inkSoft,
+                  cursor: "pointer",
+                }}
+              >
+                {texto} ({cantidad})
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {showForm && (
         <Card style={{ marginBottom: 16 }}>
@@ -5407,6 +5456,11 @@ function DocumentosTab() {
                   <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted, margin: "4px 0 0" }}>
                     Cliente: {d.cliente || "—"}
                   </p>
+                  {d.creadoEn && (
+                    <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, color: COLORS.muted, margin: "3px 0 0" }}>
+                      Creado el {new Date(d.creadoEn).toLocaleDateString("es-CO", { dateStyle: "medium" })}
+                    </p>
+                  )}
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6 }}>
                   <EstadoBadge estado={estado} />
