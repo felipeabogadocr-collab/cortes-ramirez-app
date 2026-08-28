@@ -510,6 +510,8 @@ const GlobalStyle = () => (
     .drx-fade-in { animation: drx-fade-in 0.22s ease; }
     @keyframes drx-spin { to { transform: rotate(360deg); } }
     .drx-card:hover { transform: translateY(-1px); }
+    @keyframes drx-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+    @keyframes drx-mesh { 0%, 100% { transform: translate(0, 0) scale(1); } 50% { transform: translate(3%, -4%) scale(1.08); } }
   `}</style>
 );
 
@@ -2380,6 +2382,44 @@ function IconoTab({ tipo }) {
     <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
       <path d={d} />
     </svg>
+  );
+}
+
+// Revela su contenido con un fade + slide hacia arriba la primera vez que
+// entra en el viewport — usado en la landing para que la página se sienta
+// viva al hacer scroll, en vez de estática.
+function AlEntrar({ children, retraso = 0, style }) {
+  const ref = useRef(null);
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(
+      ([entrada]) => {
+        if (entrada.isIntersecting) {
+          setVisible(true);
+          obs.disconnect();
+        }
+      },
+      { threshold: 0.15 }
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
+
+  return (
+    <div
+      ref={ref}
+      style={{
+        opacity: visible ? 1 : 0,
+        transform: visible ? "translateY(0)" : "translateY(22px)",
+        transition: `opacity 0.6s ease ${retraso}ms, transform 0.6s ease ${retraso}ms`,
+        ...style,
+      }}
+    >
+      {children}
+    </div>
   );
 }
 
@@ -6411,7 +6451,35 @@ function LandingPage({ onRegistrar, onIniciarSesion }) {
         </div>
       </div>
 
-      <div className="drx-glow" style={{ textAlign: "center", padding: "40px 20px 50px" }}>
+      <div className="drx-glow" style={{ textAlign: "center", padding: "40px 20px 50px", position: "relative", overflow: "hidden" }}>
+        <div
+          aria-hidden="true"
+          style={{
+            position: "absolute",
+            top: -120,
+            left: "10%",
+            width: 320,
+            height: 320,
+            borderRadius: "50%",
+            background: "radial-gradient(circle, rgba(30,95,180,0.22) 0%, rgba(30,95,180,0) 70%)",
+            animation: "drx-mesh 10s ease-in-out infinite",
+            pointerEvents: "none",
+          }}
+        />
+        <div
+          aria-hidden="true"
+          style={{
+            position: "absolute",
+            top: -60,
+            right: "8%",
+            width: 260,
+            height: 260,
+            borderRadius: "50%",
+            background: "radial-gradient(circle, rgba(20,184,166,0.18) 0%, rgba(20,184,166,0) 70%)",
+            animation: "drx-mesh 13s ease-in-out infinite reverse",
+            pointerEvents: "none",
+          }}
+        />
         <Pill>⚖️ Software de gestión legal para despachos en Colombia</Pill>
         <h1
           style={{
@@ -6437,36 +6505,77 @@ function LandingPage({ onRegistrar, onIniciarSesion }) {
           </button>
         </div>
 
-        <div
-          style={{
-            maxWidth: 720,
-            margin: "40px auto 0",
-            background: COLORS.navy,
-            borderRadius: 18,
-            padding: "36px 28px",
-            position: "relative",
-            overflow: "hidden",
-            boxShadow: "0 24px 60px rgba(10,35,66,0.35)",
-          }}
-        >
-          <div style={{ position: "absolute", top: -160, right: -140, width: 380, height: 380, borderRadius: "50%", background: "#143c72" }} />
-          <div style={{ position: "relative", display: "flex", alignItems: "center", gap: 18, flexWrap: "wrap", justifyContent: "center" }}>
-            <div style={{ width: 64, height: 64, borderRadius: 16, background: "#FFFFFF", display: "flex", alignItems: "center", justifyContent: "center", color: COLORS.navy, flexShrink: 0 }}>
-              <IconoNomos size={34} />
+        <div style={{ maxWidth: 780, margin: "44px auto 0", animation: "drx-float 6s ease-in-out infinite" }}>
+          <div
+            style={{
+              background: COLORS.navy,
+              borderRadius: 16,
+              overflow: "hidden",
+              boxShadow: "0 30px 70px rgba(10,35,66,0.4)",
+              border: "1px solid #143c72",
+              textAlign: "left",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 16px", borderBottom: "1px solid #143c72" }}>
+              <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#F5A524" }} />
+              <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#F43F5E" }} />
+              <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#10B981" }} />
+              <span style={{ marginLeft: 10, fontFamily: "Inter, sans-serif", fontSize: 11, color: "#7C93B8" }}>nomos — panel del despacho</span>
             </div>
-            <div style={{ textAlign: "left" }}>
-              <p style={{ fontFamily: "Inter, sans-serif", fontSize: 26, fontWeight: 800, color: "#FFFFFF", margin: 0 }}>Nomos</p>
-              <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: "#9FB6D6", margin: "4px 0 0" }}>Gestión legal para despachos de abogados</p>
+            <div style={{ display: "flex", minHeight: 260 }}>
+              <div style={{ width: 46, background: "#0d2c54", padding: "16px 0", display: "flex", flexDirection: "column", alignItems: "center", gap: 16, flexShrink: 0 }}>
+                <div style={{ width: 28, height: 28, borderRadius: 8, background: "#FFFFFF", display: "flex", alignItems: "center", justifyContent: "center", color: COLORS.navy }}>
+                  <IconoNomos size={16} />
+                </div>
+                {["resumen", "clientes", "vigilancia", "contabilidad", "documentos"].map((tab, i) => (
+                  <div
+                    key={tab}
+                    style={{
+                      width: 28,
+                      height: 28,
+                      borderRadius: 8,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      background: i === 0 ? COLORS.accentBright : "transparent",
+                      color: i === 0 ? "#FFFFFF" : "#7C93B8",
+                    }}
+                  >
+                    <IconoTab tipo={tab} />
+                  </div>
+                ))}
+              </div>
+              <div style={{ flex: 1, padding: "18px 20px" }}>
+                <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11, color: "#9FB6D6", margin: "0 0 12px", textTransform: "uppercase", letterSpacing: 0.5 }}>
+                  Resumen de hoy
+                </p>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, marginBottom: 16 }}>
+                  {[
+                    { etiqueta: "Recaudado hoy", valor: "$2.4M", color: "#14B8A6" },
+                    { etiqueta: "Clientes activos", valor: "38", color: "#8B5CF6" },
+                    { etiqueta: "Con novedad", valor: "3", color: "#F5A524" },
+                  ].map((s) => (
+                    <div key={s.etiqueta} style={{ background: "#0d2c54", borderRadius: 10, padding: "10px 12px" }}>
+                      <p style={{ fontFamily: "Inter, sans-serif", fontSize: 9.5, color: "#9FB6D6", margin: 0 }}>{s.etiqueta}</p>
+                      <p style={{ fontFamily: "Inter, sans-serif", fontSize: 17, fontWeight: 800, color: s.color, margin: "3px 0 0" }}>{s.valor}</p>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ background: "#0d2c54", borderRadius: 10, padding: "12px 14px", display: "flex", alignItems: "flex-end", gap: 8, height: 78 }}>
+                  {[38, 55, 44, 70, 60, 82, 68].map((h, i) => (
+                    <div key={i} style={{ flex: 1, height: `${h}%`, borderRadius: 3, background: i === 5 ? COLORS.accentBright : "#1e5fb4" }} />
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
           <p
             style={{
-              position: "relative",
               fontFamily: "Inter, sans-serif",
               fontSize: 12.5,
-              color: "#D7E2F1",
+              color: COLORS.muted,
               textAlign: "center",
-              marginTop: 20,
+              marginTop: 18,
             }}
           >
             Clientes · Vigilancia judicial · Firma electrónica · Contabilidad · Contenido con IA
@@ -6482,11 +6591,13 @@ function LandingPage({ onRegistrar, onIniciarSesion }) {
           Cada pestaña de la app resuelve una parte real de la operación de un despacho.
         </p>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 16, marginBottom: 60 }}>
-          {FUNCIONES_LANDING.map((f) => (
-            <Card key={f.titulo} style={{ borderLeft: `4px solid ${f.color}` }}>
-              <p style={{ fontFamily: "Inter, sans-serif", fontSize: 14.5, fontWeight: 700, color: f.color, marginBottom: 8 }}>{f.titulo}</p>
-              <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.inkSoft, lineHeight: 1.6, margin: 0 }}>{f.texto}</p>
-            </Card>
+          {FUNCIONES_LANDING.map((f, i) => (
+            <AlEntrar key={f.titulo} retraso={(i % 4) * 60}>
+              <Card style={{ borderLeft: `4px solid ${f.color}` }}>
+                <p style={{ fontFamily: "Inter, sans-serif", fontSize: 14.5, fontWeight: 700, color: f.color, marginBottom: 8 }}>{f.titulo}</p>
+                <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.inkSoft, lineHeight: 1.6, margin: 0 }}>{f.texto}</p>
+              </Card>
+            </AlEntrar>
           ))}
         </div>
 
@@ -6496,16 +6607,18 @@ function LandingPage({ onRegistrar, onIniciarSesion }) {
         <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted, textAlign: "center", marginBottom: 24 }}>
           Se registra información sensible de tus clientes — la protegemos en serio.
         </p>
-        <Card style={{ marginBottom: 60 }}>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "10px 24px" }}>
-            {SEGURIDAD_LANDING.map((s, i) => (
-              <div key={i} style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
-                <span style={{ color: "#10B981", fontWeight: 800, fontSize: 14, lineHeight: 1.5 }}>✓</span>
-                <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.inkSoft, lineHeight: 1.6, margin: 0 }}>{s}</p>
-              </div>
-            ))}
-          </div>
-        </Card>
+        <AlEntrar>
+          <Card style={{ marginBottom: 60 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "10px 24px" }}>
+              {SEGURIDAD_LANDING.map((s, i) => (
+                <div key={i} style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+                  <span style={{ color: "#10B981", fontWeight: 800, fontSize: 14, lineHeight: 1.5 }}>✓</span>
+                  <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.inkSoft, lineHeight: 1.6, margin: 0 }}>{s}</p>
+                </div>
+              ))}
+            </div>
+          </Card>
+        </AlEntrar>
 
         <h2 id="planes" style={{ fontFamily: "Inter, sans-serif", fontSize: 22, fontWeight: 800, color: COLORS.headingText, textAlign: "center", marginBottom: 8, scrollMarginTop: 90 }}>
           Planes
@@ -6515,9 +6628,9 @@ function LandingPage({ onRegistrar, onIniciarSesion }) {
         </p>
         <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, textAlign: "center", marginBottom: 30 }}>Pesos colombianos, IVA no incluido.</p>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 16, marginBottom: 50 }}>
-          {PLANES_PRECIO.map((p) => (
+          {PLANES_PRECIO.map((p, i) => (
+            <AlEntrar key={p.nombre} retraso={i * 90}>
             <Card
-              key={p.nombre}
               style={{
                 border: p.destacado ? `2px solid ${COLORS.accentBright}` : `1px solid ${COLORS.border}`,
                 boxShadow: p.destacado ? "0 10px 30px rgba(30,95,180,0.18)" : "none",
@@ -6566,6 +6679,7 @@ function LandingPage({ onRegistrar, onIniciarSesion }) {
                 Empezar
               </button>
             </Card>
+            </AlEntrar>
           ))}
         </div>
 
