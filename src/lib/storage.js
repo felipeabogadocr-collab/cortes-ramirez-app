@@ -26,13 +26,13 @@ export function getNombreDespacho() {
 }
 
 // "documento" es la excepción: el link de firma que reciben los clientes
-// funciona sin iniciar sesión, así que su lectura/escritura por id puntual
-// NO se filtra por despacho (se apoya en que el id es un código aleatorio
-// impredecible). El índice de documentos (listado dentro de la app) sí se
-// filtra, porque ese solo se usa autenticado.
+// funciona sin iniciar sesión. Ese caso NO pasa por esta tabla genérica: se
+// maneja aparte, más abajo, con funciones de base de datos que solo dejan
+// leer/firmar UN documento puntual por su código (nunca listar la tabla
+// completa). El índice de documentos (listado dentro de la app) sí se
+// filtra por despacho, porque ese solo se usa autenticado.
 const RECORD_TABLES = {
   cliente: { table: "clientes", filtrarDespacho: true },
-  documento: { table: "documentos", filtrarDespacho: false },
   caso: { table: "casos", filtrarDespacho: true },
 };
 
@@ -73,6 +73,24 @@ export async function storageGet(key) {
         .maybeSingle();
       if (error) throw error;
       return data ? data.value : null;
+    }
+
+    if (key.startsWith("documento:")) {
+      const id = key.slice("documento:".length);
+      if (despachoActualId) {
+        const { data, error } = await supabase
+          .from("documentos")
+          .select("data")
+          .eq("id", id)
+          .eq("despacho_id", despachoActualId)
+          .maybeSingle();
+        if (error) throw error;
+        return data ? JSON.stringify(data.data) : null;
+      }
+      // Sin sesión (cliente firmando): solo este documento puntual, vía función segura.
+      const { data, error } = await supabase.rpc("obtener_documento_publico", { p_id: id });
+      if (error) throw error;
+      return data ? JSON.stringify(data) : null;
     }
 
     const record = parseRecordKey(key);
@@ -127,6 +145,22 @@ export async function storageSet(key, value) {
       return true;
     }
 
+    if (key.startsWith("documento:")) {
+      const id = key.slice("documento:".length);
+      const parsed = JSON.parse(value);
+      if (despachoActualId) {
+        const { error } = await supabase
+          .from("documentos")
+          .upsert({ id, despacho_id: despachoActualId, data: parsed, updated_at: new Date().toISOString() });
+        if (error) throw error;
+        return true;
+      }
+      // Sin sesión (cliente firmando): solo actualiza este documento puntual, vía función segura.
+      const { error } = await supabase.rpc("guardar_firma_documento", { p_id: id, p_data: parsed });
+      if (error) throw error;
+      return true;
+    }
+
     const record = parseRecordKey(key);
     if (record) {
       const parsed = JSON.parse(value);
@@ -134,12 +168,7 @@ export async function storageSet(key, value) {
         id: record.id,
         data: parsed,
         updated_at: new Date().toISOString(),
-        // Para "documento", solo se manda despacho_id cuando se conoce (o
-        // sea, dentro de la app, con sesión iniciada). Así, cuando un
-        // cliente firma sin sesión, el upsert no borra el despacho_id que
-        // ya tenía el documento (Supabase deja intactas las columnas que no
-        // se incluyen en el upsert).
-        ...(record.filtrarDespacho || despachoActualId ? { despacho_id: despachoActualId } : {}),
+        despacho_id: despachoActualId,
       };
       const { error } = await supabase.from(record.table).upsert(row);
       if (error) throw error;

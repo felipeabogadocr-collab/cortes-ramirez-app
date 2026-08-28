@@ -186,12 +186,13 @@ grant execute on function soy_administrador() to authenticated;
 drop function if exists hay_administrador();
 
 -- Row Level Security ---------------------------------------------------------
--- Cada despacho solo puede ver y modificar sus propios datos. "documentos"
--- sigue siendo la excepción a propósito: el link de firma que reciben los
--- clientes (#firmar + código) funciona sin que el cliente inicie sesión, así
--- que esa tabla se queda con acceso anónimo. Es un pendiente conocido para
--- una fase futura (firma con enlaces de un solo uso en vez de una tabla
--- legible completa).
+-- Cada despacho solo puede ver y modificar sus propios datos. "documentos" ya
+-- NO se deja con acceso público abierto (antes cualquiera con la llave anon
+-- podía leer los documentos de TODOS los despachos, no solo el que tuviera el
+-- código). El flujo de firma sin sesión (#firmar + código) ahora pasa por dos
+-- funciones "security definer" (más abajo) que solo permiten leer o firmar UN
+-- documento puntual si ya se conoce su código exacto — nunca listar ni ver
+-- los demás.
 
 alter table clientes enable row level security;
 alter table casos enable row level security;
@@ -206,10 +207,11 @@ do $$
 declare
   t text;
 begin
-  foreach t in array array['clientes', 'casos', 'chats', 'app_settings']
+  foreach t in array array['clientes', 'casos', 'chats', 'app_settings', 'documentos']
   loop
     execute format('drop policy if exists "allow anon full access" on %I;', t);
     execute format('drop policy if exists "usuarios autenticados acceso completo" on %I;', t);
+    execute format('drop policy if exists "acceso publico para firma" on %I;', t);
     execute format('drop policy if exists "mismo despacho" on %I;', t);
     execute format(
       'create policy "mismo despacho" on %I for all using (despacho_id = mi_despacho_id()) with check (despacho_id = mi_despacho_id());',
@@ -218,9 +220,31 @@ begin
   end loop;
 end $$;
 
-drop policy if exists "allow anon full access" on documentos;
-drop policy if exists "acceso publico para firma" on documentos;
-create policy "acceso publico para firma" on documentos for all using (true) with check (true);
+-- Acceso público para firma electrónica (sin sesión) -------------------------
+-- Solo estas dos funciones pueden tocar documentos sin autenticación, y solo
+-- de a un documento a la vez, por su código exacto (nunca un listado).
+
+create or replace function obtener_documento_publico(p_id text)
+returns jsonb
+language sql
+security definer
+stable
+set search_path = public
+as $$
+  select data from documentos where id = p_id;
+$$;
+
+create or replace function guardar_firma_documento(p_id text, p_data jsonb)
+returns void
+language sql
+security definer
+set search_path = public
+as $$
+  update documentos set data = p_data, updated_at = now() where id = p_id;
+$$;
+
+grant execute on function obtener_documento_publico(text) to anon, authenticated;
+grant execute on function guardar_firma_documento(text, jsonb) to anon, authenticated;
 
 drop policy if exists "usuarios autenticados leen perfiles" on perfiles;
 drop policy if exists "mismo despacho leen perfiles" on perfiles;
