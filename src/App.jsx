@@ -2423,6 +2423,140 @@ function AlEntrar({ children, retraso = 0, style }) {
   );
 }
 
+// Vista previa animada del panel real usada en el hero de la landing:
+// alterna sola cada pocos segundos entre dos "pantallas" (Resumen, y
+// Vigilancia + Firmas) para mostrar más del producto sin que el visitante
+// tenga que hacer nada.
+function VistaPreviaAnimada() {
+  const [pantalla, setPantalla] = useState(0);
+
+  useEffect(() => {
+    const intervalo = setInterval(() => setPantalla((p) => (p + 1) % 2), 4200);
+    return () => clearInterval(intervalo);
+  }, []);
+
+  const tabs = ["resumen", "clientes", "vigilancia", "contabilidad", "documentos"];
+  const tabActivo = pantalla === 0 ? "resumen" : "vigilancia";
+
+  return (
+    <div style={{ maxWidth: 780, margin: "44px auto 0", animation: "drx-float 6s ease-in-out infinite" }}>
+      <div
+        style={{
+          background: COLORS.navy,
+          borderRadius: 16,
+          overflow: "hidden",
+          boxShadow: "0 30px 70px rgba(10,35,66,0.4)",
+          border: "1px solid #143c72",
+          textAlign: "left",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 16px", borderBottom: "1px solid #143c72" }}>
+          <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#F5A524" }} />
+          <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#F43F5E" }} />
+          <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#10B981" }} />
+          <span style={{ marginLeft: 10, fontFamily: "Inter, sans-serif", fontSize: 11, color: "#7C93B8" }}>nomos — panel del despacho</span>
+        </div>
+        <div style={{ display: "flex", minHeight: 260 }}>
+          <div style={{ width: 46, background: "#0d2c54", padding: "16px 0", display: "flex", flexDirection: "column", alignItems: "center", gap: 16, flexShrink: 0 }}>
+            <div style={{ width: 28, height: 28, borderRadius: 8, background: "#FFFFFF", display: "flex", alignItems: "center", justifyContent: "center", color: COLORS.navy }}>
+              <IconoNomos size={16} />
+            </div>
+            {tabs.map((tab) => (
+              <div
+                key={tab}
+                style={{
+                  width: 28,
+                  height: 28,
+                  borderRadius: 8,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  background: tab === tabActivo ? COLORS.accentBright : "transparent",
+                  color: tab === tabActivo ? "#FFFFFF" : "#7C93B8",
+                  transition: "background 0.3s ease",
+                }}
+              >
+                <IconoTab tipo={tab} />
+              </div>
+            ))}
+          </div>
+          <div style={{ flex: 1, padding: "18px 20px" }}>
+            {pantalla === 0 ? (
+              <div key="pantalla-resumen" className="drx-fade-in">
+                <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11, color: "#9FB6D6", margin: "0 0 12px", textTransform: "uppercase", letterSpacing: 0.5 }}>
+                  Resumen de hoy
+                </p>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, marginBottom: 16 }}>
+                  {[
+                    { etiqueta: "Recaudado hoy", valor: "$2.4M", color: "#14B8A6" },
+                    { etiqueta: "Clientes activos", valor: "38", color: "#8B5CF6" },
+                    { etiqueta: "Con novedad", valor: "3", color: "#F5A524" },
+                  ].map((s) => (
+                    <div key={s.etiqueta} style={{ background: "#0d2c54", borderRadius: 10, padding: "10px 12px" }}>
+                      <p style={{ fontFamily: "Inter, sans-serif", fontSize: 9.5, color: "#9FB6D6", margin: 0 }}>{s.etiqueta}</p>
+                      <p style={{ fontFamily: "Inter, sans-serif", fontSize: 17, fontWeight: 800, color: s.color, margin: "3px 0 0" }}>{s.valor}</p>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ background: "#0d2c54", borderRadius: 10, padding: "12px 14px", display: "flex", alignItems: "flex-end", gap: 8, height: 78 }}>
+                  {[38, 55, 44, 70, 60, 82, 68].map((h, i) => (
+                    <div key={i} style={{ flex: 1, height: `${h}%`, borderRadius: 3, background: i === 5 ? COLORS.accentBright : "#1e5fb4" }} />
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div key="pantalla-vigilancia" className="drx-fade-in">
+                <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11, color: "#9FB6D6", margin: "0 0 12px", textTransform: "uppercase", letterSpacing: 0.5 }}>
+                  Vigilancia judicial y firmas
+                </p>
+                <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 14 }}>
+                  {[
+                    { nombre: "Proceso 2024-00187", estado: "Con novedad", color: "#F5A524" },
+                    { nombre: "Proceso 2023-00542", estado: "En trámite", color: "#2F80ED" },
+                  ].map((p) => (
+                    <div key={p.nombre} style={{ background: "#0d2c54", borderRadius: 8, padding: "8px 12px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <span style={{ fontFamily: "monospace", fontSize: 11, color: "#D7E2F1" }}>{p.nombre}</span>
+                      <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontFamily: "Inter, sans-serif", fontSize: 9.5, fontWeight: 700, color: p.color }}>
+                        <span style={{ width: 6, height: 6, borderRadius: "50%", background: p.color }} />
+                        {p.estado}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ background: "#0d2c54", borderRadius: 10, padding: "12px 14px", display: "flex", alignItems: "center", gap: 12 }}>
+                  <div style={{ width: 30, height: 30, borderRadius: "50%", background: "#10B981", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                    <span style={{ color: "#FFFFFF", fontWeight: 800, fontSize: 14 }}>✓</span>
+                  </div>
+                  <div>
+                    <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, fontWeight: 700, color: "#FFFFFF", margin: 0 }}>Contrato firmado electrónicamente</p>
+                    <p style={{ fontFamily: "Inter, sans-serif", fontSize: 9.5, color: "#9FB6D6", margin: "2px 0 0" }}>Cliente y abogado · con hash de integridad</p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+      <div style={{ display: "flex", justifyContent: "center", gap: 6, marginTop: 14 }}>
+        {[0, 1].map((i) => (
+          <span key={i} style={{ width: 6, height: 6, borderRadius: "50%", background: pantalla === i ? COLORS.accentBright : "#C7D6EA", transition: "background 0.3s ease" }} />
+        ))}
+      </div>
+      <p
+        style={{
+          fontFamily: "Inter, sans-serif",
+          fontSize: 12.5,
+          color: COLORS.muted,
+          textAlign: "center",
+          marginTop: 10,
+        }}
+      >
+        Clientes · Vigilancia judicial · Firma electrónica · Contabilidad · Contenido con IA
+      </p>
+    </div>
+  );
+}
+
 const COLORES_AVATAR = ["#2F80ED", "#14B8A6", "#8B5CF6", "#F5A524", "#F43F5E", "#10B981", "#0EA5E9"];
 
 function AvatarIniciales({ nombre, size = 34 }) {
@@ -6505,82 +6639,22 @@ function LandingPage({ onRegistrar, onIniciarSesion }) {
           </button>
         </div>
 
-        <div style={{ maxWidth: 780, margin: "44px auto 0", animation: "drx-float 6s ease-in-out infinite" }}>
-          <div
-            style={{
-              background: COLORS.navy,
-              borderRadius: 16,
-              overflow: "hidden",
-              boxShadow: "0 30px 70px rgba(10,35,66,0.4)",
-              border: "1px solid #143c72",
-              textAlign: "left",
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 16px", borderBottom: "1px solid #143c72" }}>
-              <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#F5A524" }} />
-              <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#F43F5E" }} />
-              <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#10B981" }} />
-              <span style={{ marginLeft: 10, fontFamily: "Inter, sans-serif", fontSize: 11, color: "#7C93B8" }}>nomos — panel del despacho</span>
-            </div>
-            <div style={{ display: "flex", minHeight: 260 }}>
-              <div style={{ width: 46, background: "#0d2c54", padding: "16px 0", display: "flex", flexDirection: "column", alignItems: "center", gap: 16, flexShrink: 0 }}>
-                <div style={{ width: 28, height: 28, borderRadius: 8, background: "#FFFFFF", display: "flex", alignItems: "center", justifyContent: "center", color: COLORS.navy }}>
-                  <IconoNomos size={16} />
-                </div>
-                {["resumen", "clientes", "vigilancia", "contabilidad", "documentos"].map((tab, i) => (
-                  <div
-                    key={tab}
-                    style={{
-                      width: 28,
-                      height: 28,
-                      borderRadius: 8,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      background: i === 0 ? COLORS.accentBright : "transparent",
-                      color: i === 0 ? "#FFFFFF" : "#7C93B8",
-                    }}
-                  >
-                    <IconoTab tipo={tab} />
-                  </div>
-                ))}
-              </div>
-              <div style={{ flex: 1, padding: "18px 20px" }}>
-                <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11, color: "#9FB6D6", margin: "0 0 12px", textTransform: "uppercase", letterSpacing: 0.5 }}>
-                  Resumen de hoy
-                </p>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, marginBottom: 16 }}>
-                  {[
-                    { etiqueta: "Recaudado hoy", valor: "$2.4M", color: "#14B8A6" },
-                    { etiqueta: "Clientes activos", valor: "38", color: "#8B5CF6" },
-                    { etiqueta: "Con novedad", valor: "3", color: "#F5A524" },
-                  ].map((s) => (
-                    <div key={s.etiqueta} style={{ background: "#0d2c54", borderRadius: 10, padding: "10px 12px" }}>
-                      <p style={{ fontFamily: "Inter, sans-serif", fontSize: 9.5, color: "#9FB6D6", margin: 0 }}>{s.etiqueta}</p>
-                      <p style={{ fontFamily: "Inter, sans-serif", fontSize: 17, fontWeight: 800, color: s.color, margin: "3px 0 0" }}>{s.valor}</p>
-                    </div>
-                  ))}
-                </div>
-                <div style={{ background: "#0d2c54", borderRadius: 10, padding: "12px 14px", display: "flex", alignItems: "flex-end", gap: 8, height: 78 }}>
-                  {[38, 55, 44, 70, 60, 82, 68].map((h, i) => (
-                    <div key={i} style={{ flex: 1, height: `${h}%`, borderRadius: 3, background: i === 5 ? COLORS.accentBright : "#1e5fb4" }} />
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-          <p
-            style={{
-              fontFamily: "Inter, sans-serif",
-              fontSize: 12.5,
-              color: COLORS.muted,
-              textAlign: "center",
-              marginTop: 18,
-            }}
-          >
-            Clientes · Vigilancia judicial · Firma electrónica · Contabilidad · Contenido con IA
-          </p>
-        </div>
+        <VistaPreviaAnimada />
+
+        <div
+          aria-hidden="true"
+          style={{
+            position: "absolute",
+            bottom: -140,
+            left: "38%",
+            width: 300,
+            height: 300,
+            borderRadius: "50%",
+            background: "radial-gradient(circle, rgba(139,92,246,0.16) 0%, rgba(139,92,246,0) 70%)",
+            animation: "drx-mesh 15s ease-in-out infinite",
+            pointerEvents: "none",
+          }}
+        />
       </div>
 
       <div style={{ maxWidth: 1040, margin: "0 auto", padding: "0 20px 60px" }}>
@@ -6599,6 +6673,57 @@ function LandingPage({ onRegistrar, onIniciarSesion }) {
               </Card>
             </AlEntrar>
           ))}
+        </div>
+
+        <h2 style={{ fontFamily: "Inter, sans-serif", fontSize: 22, fontWeight: 800, color: COLORS.headingText, textAlign: "center", marginBottom: 8 }}>
+          El antes y el después
+        </h2>
+        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted, textAlign: "center", marginBottom: 24 }}>
+          Lo que hoy le toma a un despacho hacer a mano, con Nomos pasa solo.
+        </p>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 18, marginBottom: 60 }}>
+          <AlEntrar>
+            <div style={{ background: COLORS.surfaceSoft, border: `1px solid ${COLORS.border}`, borderRadius: 14, padding: 22, opacity: 0.9 }}>
+              <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, fontWeight: 700, color: COLORS.muted, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 14 }}>
+                Sin Nomos, hoy
+              </p>
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                {[
+                  "Expedientes repartidos entre carpetas físicas y chats de WhatsApp",
+                  "Recordar de memoria a quién le toca pagar y cuándo",
+                  "Revisar la Rama Judicial proceso por proceso, uno por uno",
+                  "Imprimir, firmar a mano y escanear cada documento",
+                  "Armar reportes en Excel cuando alcanza el tiempo",
+                ].map((t, i) => (
+                  <div key={i} style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+                    <span style={{ color: "#B42318", fontWeight: 800, fontSize: 13 }}>✕</span>
+                    <span style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.inkSoft, lineHeight: 1.5 }}>{t}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </AlEntrar>
+          <AlEntrar retraso={100}>
+            <div style={{ background: COLORS.navy, borderRadius: 14, padding: 22, boxShadow: "0 16px 40px rgba(10,35,66,0.25)" }}>
+              <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, fontWeight: 700, color: "#9FB6D6", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 14 }}>
+                Con Nomos
+              </p>
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                {[
+                  "Todo el expediente de cada cliente en un solo lugar, con línea de tiempo",
+                  "Recordatorios automáticos de pagos por vencer, listos para enviar por WhatsApp",
+                  "El estado de todos los procesos con un clic, todos los días",
+                  "Firma electrónica válida (Ley 527 de 1999), en minutos, desde el celular",
+                  "Reportes que se arman solos y siempre están al día",
+                ].map((t, i) => (
+                  <div key={i} style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+                    <span style={{ color: "#10B981", fontWeight: 800, fontSize: 13 }}>✓</span>
+                    <span style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: "#E4EBF5", lineHeight: 1.5 }}>{t}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </AlEntrar>
         </div>
 
         <h2 id="seguridad" style={{ fontFamily: "Inter, sans-serif", fontSize: 22, fontWeight: 800, color: COLORS.headingText, textAlign: "center", marginBottom: 8, scrollMarginTop: 90 }}>
