@@ -73,6 +73,17 @@ create table if not exists perfiles (
   creado_en timestamptz not null default now()
 );
 
+-- Límite de tasa (anti-spam en endpoints públicos) --------------------------
+
+create table if not exists limite_solicitudes (
+  id bigserial primary key,
+  ip text not null,
+  ruta text not null,
+  creado_en timestamptz not null default now()
+);
+
+create index if not exists limite_solicitudes_ip_ruta_idx on limite_solicitudes (ruta, ip, creado_en desc);
+
 -- Registro de auditoría ------------------------------------------------------
 
 create table if not exists auditoria (
@@ -202,6 +213,9 @@ alter table perfiles enable row level security;
 alter table auditoria enable row level security;
 alter table documentos enable row level security;
 alter table despachos enable row level security;
+alter table limite_solicitudes enable row level security;
+-- Sin políticas a propósito: solo la llamamos desde el servidor con la
+-- llave service_role (que se salta RLS), nunca desde el navegador.
 
 do $$
 declare

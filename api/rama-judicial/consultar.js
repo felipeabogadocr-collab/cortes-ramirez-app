@@ -5,6 +5,9 @@
 //
 // GET /api/rama-judicial/consultar?radicado=11001310300120240012300
 
+import { supabaseAdmin } from "../_lib/supabaseAdmin.js";
+import { dentroDelLimite } from "../_lib/rateLimit.js";
+
 const BASE = "https://consultaprocesos.ramajudicial.gov.co:448/api/v2";
 
 function limpiarRadicado(radicado) {
@@ -30,6 +33,12 @@ export default async function handler(req, res) {
   const radicado = limpiarRadicado(req.query.radicado);
   if (radicado.length < 11) {
     return res.status(400).json({ error: "Número de radicado inválido" });
+  }
+
+  const admin = supabaseAdmin();
+  const puedeContinuar = await dentroDelLimite(admin, req, "rama-judicial/consultar", 30, 60);
+  if (!puedeContinuar) {
+    return res.status(429).json({ error: "Demasiadas consultas. Espera un momento e inténtalo de nuevo." });
   }
 
   const headers = {

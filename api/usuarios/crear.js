@@ -8,6 +8,7 @@
 
 import { supabaseAdmin } from "../_lib/supabaseAdmin.js";
 import { permisosPorDefecto, notificacionesPorDefecto, validarContrasena } from "../_lib/defaults.js";
+import { dentroDelLimite } from "../_lib/rateLimit.js";
 
 const ROLES_VALIDOS = new Set(["Administrador", "Abogado", "Asistente"]);
 
@@ -27,6 +28,11 @@ export default async function handler(req, res) {
   }
 
   const admin = supabaseAdmin();
+
+  const puedeContinuar = await dentroDelLimite(admin, req, "usuarios/crear", 20, 60);
+  if (!puedeContinuar) {
+    return res.status(429).json({ error: "Demasiados intentos. Espera un momento e inténtalo de nuevo." });
+  }
 
   try {
     const authHeader = req.headers.authorization || "";

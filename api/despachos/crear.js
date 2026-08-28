@@ -12,6 +12,7 @@
 
 import { supabaseAdmin } from "../_lib/supabaseAdmin.js";
 import { permisosPorDefecto, notificacionesPorDefecto } from "../_lib/defaults.js";
+import { dentroDelLimite } from "../_lib/rateLimit.js";
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
@@ -25,6 +26,11 @@ export default async function handler(req, res) {
   }
 
   const admin = supabaseAdmin();
+
+  const puedeContinuar = await dentroDelLimite(admin, req, "despachos/crear", 5, 60);
+  if (!puedeContinuar) {
+    return res.status(429).json({ error: "Demasiados intentos. Espera un momento e inténtalo de nuevo." });
+  }
 
   try {
     const { data: userData, error: userError } = await admin.auth.admin.getUserById(userId);

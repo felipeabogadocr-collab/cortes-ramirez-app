@@ -8,6 +8,9 @@
 // de la app. Esta función se encarga de traducir en ambos sentidos hacia el
 // formato que espera Gemini.
 
+import { supabaseAdmin } from "./_lib/supabaseAdmin.js";
+import { dentroDelLimite } from "./_lib/rateLimit.js";
+
 const GEMINI_MODEL = "gemini-2.0-flash";
 const MAX_TOKENS_CAP = 2000;
 
@@ -91,6 +94,12 @@ export default async function handler(req, res) {
   const { max_tokens, system, tools, messages } = req.body || {};
   if (!messages) {
     return res.status(400).json({ error: "Falta 'messages' en el cuerpo de la solicitud" });
+  }
+
+  const admin = supabaseAdmin();
+  const puedeContinuar = await dentroDelLimite(admin, req, "assistant", 60, 60);
+  if (!puedeContinuar) {
+    return res.status(429).json({ error: "Demasiadas solicitudes al asistente. Espera un momento e inténtalo de nuevo." });
   }
 
   const body = {
