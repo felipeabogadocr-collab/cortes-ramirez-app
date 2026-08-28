@@ -20,9 +20,25 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: "Método no permitido" });
   }
 
-  const { nombreDespacho, nombre, email, userId } = req.body || {};
+  const { nombreDespacho, nombre, email, userId, sitioWeb, segundosLlenando } = req.body || {};
   if (!nombreDespacho?.trim() || !nombre?.trim() || !email?.trim() || !userId) {
     return res.status(400).json({ error: "Faltan datos" });
+  }
+
+  // Anti-spam: "sitioWeb" es un campo trampa invisible para personas (ver
+  // LoginGate en el frontend) — si viene lleno, es casi seguro un bot. Y un
+  // envío en menos de 1.5 segundos es demasiado rápido para que una persona
+  // haya alcanzado a escribir el nombre del despacho a mano (el umbral es
+  // bajo a propósito, para no rechazar por error a alguien que usa
+  // autocompletado del navegador). En ambos casos se responde como si
+  // hubiera funcionado (sin decirle al bot qué detectamos) pero no se crea
+  // nada. Nota: la cuenta de Supabase Auth ya se creó del lado del
+  // navegador antes de llegar aquí (es necesaria para el correo de
+  // confirmación) — queda huérfana sin perfil ni despacho, sin acceso a
+  // nada, un costo mínimo aceptable de esta protección gratuita.
+  if (sitioWeb || (typeof segundosLlenando === "number" && segundosLlenando < 1.5)) {
+    console.warn("Registro de despacho bloqueado por señales de spam");
+    return res.status(200).json({ perfil: null, despacho: null });
   }
 
   const admin = supabaseAdmin();

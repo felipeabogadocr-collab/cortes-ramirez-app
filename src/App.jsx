@@ -6209,6 +6209,14 @@ function LoginGate({ onIngresar, onCancelar, pantallaInicial }) {
   const [contrasena, setContrasena] = useState("");
   const [error, setError] = useState("");
   const [enviando, setEnviando] = useState(false);
+  // Anti-spam del formulario de registro: "sitioWeb" es un campo trampa que
+  // ningún humano llena (está oculto visualmente, no con display:none, para
+  // que los rellenadores automáticos de formularios sí lo detecten y caigan
+  // en la trampa); "iniciadoEn" marca cuándo se mostró el formulario — un
+  // envío en menos de 1.5 segundos es casi seguro un bot, no una persona
+  // llenando el formulario a mano.
+  const [sitioWeb, setSitioWeb] = useState("");
+  const [iniciadoEn] = useState(() => Date.now());
 
   useEffect(() => {
     ensureFonts();
@@ -6243,7 +6251,14 @@ function LoginGate({ onIngresar, onCancelar, pantallaInicial }) {
       const response = await fetch("/api/despachos/crear", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ nombreDespacho: nombreDespacho.trim(), nombre: nombre.trim(), email: email.trim(), userId: signUpData.user.id }),
+        body: JSON.stringify({
+          nombreDespacho: nombreDespacho.trim(),
+          nombre: nombre.trim(),
+          email: email.trim(),
+          userId: signUpData.user.id,
+          sitioWeb,
+          segundosLlenando: (Date.now() - iniciadoEn) / 1000,
+        }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "No se pudo crear el despacho.");
@@ -6325,6 +6340,13 @@ function LoginGate({ onIngresar, onCancelar, pantallaInicial }) {
               completamente separados de los de cualquier otro despacho.
             </p>
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              {/* Campo trampa para bots: invisible para personas, pero un
+                  rellenador automático de formularios sí lo encuentra y lo
+                  llena. Si llega lleno, el servidor rechaza el registro. */}
+              <div style={{ position: "absolute", left: "-9999px", width: 1, height: 1, overflow: "hidden" }} aria-hidden="true">
+                <label htmlFor="sitio-web-empresa">Sitio web</label>
+                <input id="sitio-web-empresa" type="text" tabIndex={-1} autoComplete="off" value={sitioWeb} onChange={(e) => setSitioWeb(e.target.value)} />
+              </div>
               <Field label="Nombre del despacho">
                 <input
                   className="drx-input"
