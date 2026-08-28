@@ -2457,6 +2457,7 @@ function ClientesTab({ usuarioActual }) {
   const [editandoId, setEditandoId] = useState(null);
   const [formEdicion, setFormEdicion] = useState({});
   const [filtro, setFiltro] = useState("");
+  const [copiado, setCopiado] = useState("");
 
   useEffect(() => {
     (async () => {
@@ -2468,6 +2469,12 @@ function ClientesTab({ usuarioActual }) {
       setClientes(entries);
     })();
   }, [ids]);
+
+  const copiar = (texto, etiqueta) => {
+    navigator.clipboard?.writeText(texto);
+    setCopiado(etiqueta);
+    setTimeout(() => setCopiado(""), 1500);
+  };
 
   const guardar = async () => {
     if (!form.nombre.trim()) return;
@@ -2725,8 +2732,26 @@ function ClientesTab({ usuarioActual }) {
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                 <div style={{ flex: 1 }}>
                   <p style={{ fontFamily: "Inter, sans-serif", fontSize: 17, fontWeight: 700, margin: 0, color: COLORS.ink }}>{c.nombre}</p>
-                  <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted, margin: "4px 0 0" }}>
-                    {[c.telefono, c.email].filter(Boolean).join(" · ")}
+                  <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted, margin: "4px 0 0", display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
+                    {c.telefono && (
+                      <span
+                        title="Copiar teléfono"
+                        onClick={() => copiar(c.telefono, `tel-${id}`)}
+                        style={{ cursor: "pointer", textDecoration: copiado === `tel-${id}` ? "none" : "underline dotted", color: copiado === `tel-${id}` ? "#1DA851" : COLORS.muted }}
+                      >
+                        {copiado === `tel-${id}` ? "✓ Copiado" : c.telefono}
+                      </span>
+                    )}
+                    {c.telefono && c.email && "·"}
+                    {c.email && (
+                      <span
+                        title="Copiar correo"
+                        onClick={() => copiar(c.email, `mail-${id}`)}
+                        style={{ cursor: "pointer", textDecoration: copiado === `mail-${id}` ? "none" : "underline dotted", color: copiado === `mail-${id}` ? "#1DA851" : COLORS.muted }}
+                      >
+                        {copiado === `mail-${id}` ? "✓ Copiado" : c.email}
+                      </span>
+                    )}
                   </p>
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
                     {c.tipoProceso && (
