@@ -353,6 +353,15 @@ create policy "administradores leen auditoria del mismo despacho" on auditoria
   for select
   using (soy_administrador() and despacho_id = mi_despacho_id());
 
+-- Cualquier usuario (no solo administradores) puede ver SUS PROPIOS inicios
+-- de sesión anteriores — nada más, ninguna otra fila de auditoría — para que
+-- la app le pueda avisar "tu última sesión fue el ..." y así note si alguien
+-- más entró con su cuenta.
+drop policy if exists "cada usuario lee sus propios inicios de sesion" on auditoria;
+create policy "cada usuario lee sus propios inicios de sesion" on auditoria
+  for select
+  using (usuario_id = auth.uid() and accion = 'inicio_sesion');
+
 drop policy if exists "usuarios autenticados leen su despacho" on despachos;
 create policy "usuarios autenticados leen su despacho" on despachos
   for select

@@ -6396,7 +6396,7 @@ function MedidorFuerzaContrasena({ valor }) {
 const PLANES_PRECIO = [
   {
     nombre: "Abogado",
-    precio: "$79.000",
+    precio: "$35.000",
     periodo: "/mes por abogado",
     descripcion: "Para el abogado independiente que quiere dejar el Excel y el WhatsApp desordenado.",
     caracteristicas: ["1 usuario", "Hasta 30 clientes activos", "Firma electrónica de documentos", "Vigilancia judicial automática", "Portal del cliente"],
@@ -6404,7 +6404,7 @@ const PLANES_PRECIO = [
   },
   {
     nombre: "Despacho",
-    precio: "$199.000",
+    precio: "$89.000",
     periodo: "/mes",
     descripcion: "Para despachos con varios abogados que necesitan trabajar coordinados.",
     caracteristicas: ["Usuarios ilimitados", "Clientes ilimitados", "Todas las funciones de Abogado", "Reportes y carga de trabajo por abogado", "Roles y permisos por usuario", "Soporte prioritario"],
@@ -7694,6 +7694,7 @@ function LoginGate({ onIngresar, onCancelar, pantallaInicial }) {
       if (!response.ok) throw new Error(data.error || "No se pudo crear el despacho.");
 
       if (signUpData.session) {
+        marcarLoginRecienHecho();
         onIngresar();
       } else {
         setPantalla("registro-enviado");
@@ -7729,6 +7730,7 @@ function LoginGate({ onIngresar, onCancelar, pantallaInicial }) {
     guardarJSONLocal(LLAVE_INTENTOS_LOGIN, { intentos: 0, bloqueadoHasta: 0 });
     setBloqueadoHasta(0);
     setEnviando(false);
+    marcarLoginRecienHecho();
     onIngresar();
   };
 
@@ -8192,6 +8194,35 @@ function UsuariosPermisosTab({ usuarioActual, onDespachoRenombrado }) {
   };
 
   const [respaldando, setRespaldando] = useState(false);
+  const [pidiendoContrasenaRespaldo, setPidiendoContrasenaRespaldo] = useState(false);
+  const [contrasenaRespaldo, setContrasenaRespaldo] = useState("");
+  const [errorRespaldo, setErrorRespaldo] = useState("");
+  const LLAVE_COOLDOWN_RESPALDO = "nomos_cooldown_respaldo";
+  const [proximoRespaldoDisponible, setProximoRespaldoDisponible] = useState(() => leerJSONLocal(LLAVE_COOLDOWN_RESPALDO, {})[usuarioActual.id] || 0);
+  const segundosEsperaRespaldo = useCuentaRegresiva(proximoRespaldoDisponible);
+
+  // Descargar TODA la información del despacho de un clic es justo lo que
+  // buscaría alguien que robó una sesión activa (un computador desatendido,
+  // una cookie robada) — pedir la contraseña otra vez aquí, aparte de la del
+  // login, frena ese ataque puntual aunque ya esté "adentro". El enfriamiento
+  // evita además que se use para sacar el respaldo una y otra vez seguido.
+  const confirmarRespaldo = async () => {
+    if (!contrasenaRespaldo.trim() || segundosEsperaRespaldo > 0) return;
+    setErrorRespaldo("");
+    const { error: reauthError } = await supabase.auth.signInWithPassword({ email: usuarioActual.email, password: contrasenaRespaldo });
+    if (reauthError) {
+      setErrorRespaldo("Contraseña incorrecta.");
+      return;
+    }
+    setContrasenaRespaldo("");
+    setPidiendoContrasenaRespaldo(false);
+    const proximo = Date.now() + 5 * 60 * 1000;
+    const mapa = leerJSONLocal(LLAVE_COOLDOWN_RESPALDO, {});
+    mapa[usuarioActual.id] = proximo;
+    guardarJSONLocal(LLAVE_COOLDOWN_RESPALDO, mapa);
+    setProximoRespaldoDisponible(proximo);
+    await descargarRespaldo();
+  };
 
   const descargarRespaldo = async () => {
     setRespaldando(true);
@@ -8283,9 +8314,40 @@ function UsuariosPermisosTab({ usuarioActual, onDespachoRenombrado }) {
           como está en este momento. Guárdalo en tu computador o en la nube (Google Drive, etc.). Recomendado: descárgalo
           cada semana o antes de cualquier cambio grande.
         </p>
-        <button className="drx-btn-primary" style={{ ...buttonPrimary, background: "#10B981" }} onClick={descargarRespaldo} disabled={respaldando}>
-          {respaldando ? "Generando respaldo…" : "⬇️ Descargar respaldo completo"}
-        </button>
+        {!pidiendoContrasenaRespaldo ? (
+          <button
+            className="drx-btn-primary"
+            style={{ ...buttonPrimary, background: "#10B981" }}
+            onClick={() => setPidiendoContrasenaRespaldo(true)}
+            disabled={respaldando || segundosEsperaRespaldo > 0}
+          >
+            {segundosEsperaRespaldo > 0 ? `Vuelve a intentar en ${segundosEsperaRespaldo}s` : "⬇️ Descargar respaldo completo"}
+          </button>
+        ) : (
+          <div style={{ maxWidth: 320 }}>
+            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.inkSoft, marginBottom: 8 }}>
+              Por seguridad, escribe tu contraseña otra vez para confirmar la descarga.
+            </p>
+            <CampoContrasena valor={contrasenaRespaldo} onChange={setContrasenaRespaldo} onEnter={confirmarRespaldo} autoFocus />
+            {errorRespaldo && <p style={{ color: "#B42318", fontSize: 12, marginTop: 6, fontFamily: "Inter, sans-serif" }}>{errorRespaldo}</p>}
+            <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+              <button
+                className="drx-btn-ghost"
+                style={buttonGhost}
+                onClick={() => {
+                  setPidiendoContrasenaRespaldo(false);
+                  setContrasenaRespaldo("");
+                  setErrorRespaldo("");
+                }}
+              >
+                Cancelar
+              </button>
+              <button className="drx-btn-primary" style={{ ...buttonPrimary, background: "#10B981" }} onClick={confirmarRespaldo} disabled={respaldando || !contrasenaRespaldo.trim()}>
+                {respaldando ? "Generando respaldo…" : "Confirmar y descargar"}
+              </button>
+            </div>
+          </div>
+        )}
       </Card>
 
       <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 16 }}>
@@ -8625,6 +8687,33 @@ function EstablecerContrasenaNueva({ onListo }) {
   );
 }
 
+// Marca que se puso justo antes de un inicio de sesión (o registro) real,
+// hecho a mano en el formulario — a diferencia de cuando Supabase restaura
+// sola una sesión ya existente al abrir o recargar la página, lo cual
+// también dispara el evento "SIGNED_IN" pero no es un inicio de sesión
+// nuevo. Sin esto, el saludo de voz y el registro de auditoría de "inicio de
+// sesión" se repetirían cada vez que se abre la app, no solo al ingresar.
+const LLAVE_LOGIN_RECIEN_HECHO = "nomos_login_recien_hecho";
+
+function marcarLoginRecienHecho() {
+  try {
+    sessionStorage.setItem(LLAVE_LOGIN_RECIEN_HECHO, "1");
+  } catch {
+    // Si sessionStorage falla, en el peor caso no se saluda ni se
+    // registra ese inicio de sesión puntual — no rompe nada.
+  }
+}
+
+function consumirLoginRecienHecho() {
+  try {
+    const marcado = sessionStorage.getItem(LLAVE_LOGIN_RECIEN_HECHO) === "1";
+    if (marcado) sessionStorage.removeItem(LLAVE_LOGIN_RECIEN_HECHO);
+    return marcado;
+  } catch {
+    return false;
+  }
+}
+
 // Saludo por voz al iniciar sesión, usando la síntesis de voz que trae el
 // navegador (Web Speech API) — sin ningún servicio ni costo externo, nunca
 // sale de tu propio computador. Si el navegador no la soporta, simplemente
@@ -8658,6 +8747,7 @@ export default function App() {
   const [modoPublico, setModoPublico] = useState(isFirmaView);
   const [modoPortal, setModoPortal] = useState(isPortalView);
   const [usuarioActual, setUsuarioActual] = useState(null);
+  const [ultimaSesionAnterior, setUltimaSesionAnterior] = useState(null);
   const [sesionCargada, setSesionCargada] = useState(false);
   const [cambiandoUsuario, setCambiandoUsuario] = useState(false);
   const [tab, setTab] = useState("resumen");
@@ -8694,7 +8784,18 @@ export default function App() {
       ? { ...perfil, email: user.email, despachoNombre: perfil.despachos?.nombre || "", despachoActivo: perfil.despachos?.activo !== false }
       : null;
     setUsuarioActual(usuario);
-    if (registrarLogin && usuario) {
+    if (registrarLogin && usuario && consumirLoginRecienHecho()) {
+      // Antes de registrar ESTE inicio de sesión, buscamos cuál fue el
+      // anterior — para poder avisarle "tu última sesión fue el ..." y que
+      // note si alguien más entró con su cuenta sin que fuera él.
+      const { data: sesionesPrevias } = await supabase
+        .from("auditoria")
+        .select("creado_en")
+        .eq("usuario_id", usuario.id)
+        .eq("accion", "inicio_sesion")
+        .order("creado_en", { ascending: false })
+        .limit(1);
+      if (sesionesPrevias?.[0]?.creado_en) setUltimaSesionAnterior(sesionesPrevias[0].creado_en);
       registrarAuditoria(usuario, "inicio_sesion", "sesion", null, {});
       saludarPorVoz(usuario.nombre);
     }
@@ -9036,6 +9137,35 @@ export default function App() {
         </div>
 
         <div style={{ padding: "28px 28px 40px", flex: 1 }}>
+          {ultimaSesionAnterior && (
+            <div
+              style={{
+                maxWidth: 760,
+                margin: "0 auto 16px",
+                background: COLORS.accentSoft,
+                border: "1px solid #C7D6EA",
+                borderRadius: 10,
+                padding: "10px 16px",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                gap: 10,
+                flexWrap: "wrap",
+              }}
+            >
+              <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.navy, margin: 0 }}>
+                🛡️ Tu última sesión fue el{" "}
+                {new Date(ultimaSesionAnterior).toLocaleString("es-CO", { dateStyle: "medium", timeStyle: "short" })}. Si no fuiste tú, cambia tu
+                contraseña ya mismo.
+              </p>
+              <button
+                onClick={() => setUltimaSesionAnterior(null)}
+                style={{ background: "none", border: "none", cursor: "pointer", color: COLORS.navy, fontSize: 14, flexShrink: 0 }}
+              >
+                ✕
+              </button>
+            </div>
+          )}
           <div key={tab} className="drx-fade-in" style={{ maxWidth: 760, margin: "0 auto" }}>
             {tab === "resumen" && puedeVer("resumen") && <ResumenTab nombre={usuarioActual.nombre} usuarioId={usuarioActual.id} onIr={setTab} />}
             {tab === "clientes" && puedeVer("clientes") && <ClientesTab usuarioActual={usuarioActual} />}
