@@ -12,8 +12,17 @@ import { supabase } from "./supabaseClient";
  */
 
 let despachoActualId = null;
-export function setDespachoActual(id) {
+let despachoActualNombre = "";
+export function setDespachoActual(id, nombre) {
   despachoActualId = id || null;
+  despachoActualNombre = nombre || "";
+}
+
+// Para textos (PDFs, WhatsApp, recibos, etc.) que antes decían siempre
+// "Cortés Ramírez Abogados" a mano: ahora usan el nombre del despacho de la
+// sesión activa, para que la misma app sirva a cualquier despacho.
+export function getNombreDespacho() {
+  return despachoActualNombre || "tu despacho";
 }
 
 // "documento" es la excepción: el link de firma que reciben los clientes

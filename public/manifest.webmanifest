@@ -1,7 +1,7 @@
 {
-  "name": "Cortés Ramírez Abogados",
-  "short_name": "Cortés Ramírez",
-  "description": "Gestión de clientes, documentos, contabilidad y vigilancia judicial del despacho.",
+  "name": "CROS — Gestión legal",
+  "short_name": "CROS",
+  "description": "Gestión de clientes, documentos, contabilidad y vigilancia judicial para despachos de abogados.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

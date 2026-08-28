@@ -106,10 +106,10 @@ function generarReciboImagen(cliente, pago) {
     const dibujarResto = () => {
       ctx.fillStyle = "#FFFFFF";
       ctx.font = "700 27px Georgia";
-      ctx.fillText("Cortés Ramírez Abogados", 165, 78);
+      ctx.fillText(getNombreDespacho(), 165, 78);
       ctx.font = "italic 16px Georgia";
       ctx.fillStyle = "#B9CBE5";
-      ctx.fillText("Abogados & Asociados", 165, 104);
+      ctx.fillText("Recibo de pago", 165, 104);
 
       ctx.fillStyle = "#0A2342";
       ctx.font = "700 25px Georgia";
@@ -153,7 +153,7 @@ function generarReciboImagen(cliente, pago) {
       ctx.fillStyle = "#8B8577";
       ctx.font = "400 12px Arial";
       ctx.fillText(`Recibo N.º ${pago.id}`, 44, height - 86);
-      ctx.fillText("Comprobante generado electrónicamente · Cortés Ramírez Abogados & Asociados", 44, height - 62);
+      ctx.fillText(`Comprobante generado electrónicamente · ${getNombreDespacho()}`, 44, height - 62);
 
       resolve(canvas.toDataURL("image/png"));
     };
@@ -200,7 +200,7 @@ function ensureFonts() {
   document.head.appendChild(link);
 }
 
-import { storageGet, storageSet, setDespachoActual } from "./lib/storage";
+import { storageGet, storageSet, setDespachoActual, getNombreDespacho } from "./lib/storage";
 
 function useIndex(key, shared) {
   const [ids, setIds] = useState([]);
@@ -366,7 +366,7 @@ async function descargarPdfFirmado(doc) {
     pdf.text(f.textoFirma || f.nombre || "", marginX + 12, y + 20);
     pdf.setFont("helvetica", "normal");
     pdf.setFontSize(9);
-    const etiqueta = f.rol === "abogado" ? "Cortés Ramírez Abogados · firmado electrónicamente" : "Firmado electrónicamente";
+    const etiqueta = f.rol === "abogado" ? `${getNombreDespacho()} · firmado electrónicamente` : "Firmado electrónicamente";
     pdf.text(etiqueta, marginX + 12, y + 34);
     pdf.text(`${f.tipoId || ""} ${f.numeroId || ""}`.trim(), marginX + 12, y + 47);
     if (f.firmadoEn) {
@@ -1211,7 +1211,7 @@ async function ejecutarHerramienta(nombreHerramienta, input) {
     pdf.text(input.titulo || "Informe de Operación", marginX, 50);
     pdf.setFontSize(11);
     pdf.setFont("helvetica", "normal");
-    pdf.text("Cortés Ramírez Abogados & Asociados", marginX, 70);
+    pdf.text(getNombreDespacho(), marginX, 70);
 
     y = 130;
     pdf.setTextColor(11, 18, 32);
@@ -1383,7 +1383,7 @@ function AsistenteIA({ nombre, usuarioId, onAccionCompletada }) {
     try {
       const contexto = await construirContextoOperacion();
       const systemPrompt =
-        `Eres el asistente virtual de Cortés Ramírez Abogados & Asociados, dentro de su panel de gestión (la plataforma CR OS). Le hablas a ${nombre}, el abogado dueño del despacho, como lo haría un empresario visionario: con confianza, ambición sana, y viendo siempre oportunidades de crecer el negocio. Incluyes de forma natural y respetuosa una referencia a Dios en tus respuestas cuando encaje (por ejemplo, dar gracias por el progreso, pedir sabiduría, o reconocer que el esfuerzo y la fe van de la mano), sin exagerar ni forzarlo en cada frase. ` +
+        `Eres el asistente virtual de ${getNombreDespacho()}, dentro de su panel de gestión (la plataforma CROS). Le hablas a ${nombre}, el abogado dueño del despacho, como lo haría un empresario visionario: con confianza, ambición sana, y viendo siempre oportunidades de crecer el negocio. Incluyes de forma natural y respetuosa una referencia a Dios en tus respuestas cuando encaje (por ejemplo, dar gracias por el progreso, pedir sabiduría, o reconocer que el esfuerzo y la fe van de la mano), sin exagerar ni forzarlo en cada frase. ` +
         `Actúas como un verdadero experto en contabilidad de despachos legales, en redes sociales y marketing para abogados, y en gestión de operaciones legales — da consejos con ese nivel de criterio, no genéricos. ` +
         `Eres el cerebro de la operación del despacho: puedes crear y editar clientes, crear casos, registrar pagos y generarles su recibo automáticamente, agregar actuaciones a la línea de tiempo de un cliente, actualizar el estado de vigilancia judicial, crear usuarios nuevos con acceso al panel, registrar métricas de redes sociales, generar un informe en PDF con el diagnóstico del despacho, generar un reporte en Excel con todos los pagos, leer imágenes, PDF y documentos de Word que te envíen, y dar ideas prácticas de gestión, negocio y contenido. Cuando te pregunten qué puedes hacer, cuéntalo con entusiasmo y de forma concreta. ` +
         `Usa las herramientas disponibles para actuar de verdad cuando te lo pidan (no solo describir qué harías), y confirma siempre al final qué hiciste. Este es el estado actual del despacho:\n\n${contexto}\n\nResponde en español, de forma cercana, breve y con visión de negocio.`;
@@ -1566,7 +1566,7 @@ function ResumenTab({ nombre, usuarioId, onIr }) {
     <div>
       <div className="drx-glow" style={{ textAlign: "center", padding: "30px 16px 34px" }}>
         <div style={{ marginBottom: 18 }}>
-          <Pill>⚖️ Cortés Ramírez Abogados — Panel de gestión</Pill>
+          <Pill>⚖️ {getNombreDespacho()} — Panel de gestión</Pill>
         </div>
         <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted, marginBottom: 10 }}>Hola, {nombre}</p>
         <h1 style={{ fontFamily: "Inter, sans-serif", fontSize: 34, fontWeight: 800, letterSpacing: 0.5, textTransform: "uppercase", color: COLORS.headingText, margin: 0, lineHeight: 1.2 }}>
@@ -1717,7 +1717,7 @@ function SelloFirma({ nombre, tipoId, numeroId, fecha, compact, rol }) {
             textTransform: "uppercase",
           }}
         >
-          {esAbogado ? "Cortés Ramírez Abogados · firmado" : "Firmado electrónicamente"}
+          {esAbogado ? `${getNombreDespacho()} · firmado` : "Firmado electrónicamente"}
         </span>
       </div>
       {(tipoId || numeroId) && (
@@ -1932,7 +1932,7 @@ function VistaFirma() {
         </div>
         <div>
           <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, letterSpacing: 1.5, color: "#9FB6D6", textTransform: "uppercase", margin: 0 }}>
-            Cortés Ramírez Abogados
+            CROS
           </p>
           <h1 style={{ fontFamily: "Inter, sans-serif", fontSize: 24, fontWeight: 700, color: "#FFFFFF", margin: "4px 0 0" }}>
             Firma de documento
@@ -3036,7 +3036,7 @@ function enviarRecordatorioPago(cliente) {
   const numero = numeroWhatsappCliente(cliente.telefono);
   const fechaTexto = new Date(cliente.proximoPago.fecha).toLocaleDateString("es-CO", { dateStyle: "long" });
   const valorTexto = cliente.proximoPago.valorEsperado ? ` por un valor de ${formatoCOP(cliente.proximoPago.valorEsperado)}` : "";
-  const mensaje = `Hola ${cliente.nombre || ""} 👋\n\nEspero te encuentres muy bien. Te escribimos de parte de *Cortés Ramírez Abogados* para recordarte, de la manera más cordial, que tu próximo pago está programado para el ${fechaTexto}${valorTexto}.\n\nSi ya realizaste el pago, no te preocupes por este mensaje y quedamos atentos a la confirmación. Cualquier duda, con gusto te ayudamos.\n\n¡Gracias por tu confianza y que tengas un excelente día!`;
+  const mensaje = `Hola ${cliente.nombre || ""} 👋\n\nEspero te encuentres muy bien. Te escribimos de parte de *${getNombreDespacho()}* para recordarte, de la manera más cordial, que tu próximo pago está programado para el ${fechaTexto}${valorTexto}.\n\nSi ya realizaste el pago, no te preocupes por este mensaje y quedamos atentos a la confirmación. Cualquier duda, con gusto te ayudamos.\n\n¡Gracias por tu confianza y que tengas un excelente día!`;
   window.open(`https://wa.me/${numero}?text=${encodeURIComponent(mensaje)}`, "_blank");
 }
 
@@ -3113,7 +3113,7 @@ function ReciboCard({ cliente, pago }) {
   const numero = numeroWhatsappCliente(cliente.telefono);
 
   const enviarPorWhatsapp = () => {
-    const mensaje = `Hola ${cliente.nombre || ""} 👋\n\n*Cortés Ramírez Abogados* te confirma la recepción de tu pago:\n\n💳 Medio: ${pago.medioPago}\n💰 Valor: ${formatoCOP(pago.valor)}\n📅 Fecha: ${new Date(pago.fecha).toLocaleDateString("es-CO", { dateStyle: "long" })}${pago.concepto ? `\n📝 Concepto: ${pago.concepto}` : ""}\n\nTe adjuntamos el recibo. ¡Gracias por tu confianza!`;
+    const mensaje = `Hola ${cliente.nombre || ""} 👋\n\n*${getNombreDespacho()}* te confirma la recepción de tu pago:\n\n💳 Medio: ${pago.medioPago}\n💰 Valor: ${formatoCOP(pago.valor)}\n📅 Fecha: ${new Date(pago.fecha).toLocaleDateString("es-CO", { dateStyle: "long" })}${pago.concepto ? `\n📝 Concepto: ${pago.concepto}` : ""}\n\nTe adjuntamos el recibo. ¡Gracias por tu confianza!`;
     window.open(`https://wa.me/${numero}?text=${encodeURIComponent(mensaje)}`, "_blank");
   };
 
@@ -3336,7 +3336,7 @@ async function generarIdeasCalendario(tema, estrategia) {
       model: "claude-sonnet-4-6",
       max_tokens: 600,
       system:
-        `Eres un community manager experto y estratega de contenido para Cortés Ramírez Abogados, un despacho de abogados en Colombia que publica en Instagram, Facebook y TikTok. ` +
+        `Eres un community manager experto y estratega de contenido para ${getNombreDespacho()}, un despacho de abogados en Colombia que publica en Instagram, Facebook y TikTok. ` +
         `Genera 5 ideas de contenido concretas, poderosas y variadas (educativas, cercanas, casos de éxito sin romper confidencialidad, detrás de cámaras, tendencias, formatos de video corto, etc.), pensadas para atraer seguidores del nicho correcto y convertirlos en clientes potenciales.` +
         (tema ? ` Enfocadas en: ${tema}.` : ".") +
         (contexto ? ` ${contexto}` : "") +
@@ -3578,7 +3578,7 @@ function CommunityManagerIA({ estrategia, onGuardarIdeas }) {
     try {
       const contexto = contextoEstrategia(estrategia);
       const systemPrompt =
-        `Eres un community manager experto y estratega de contenido para Cortés Ramírez Abogados, un despacho de abogados en Colombia con cuentas en Instagram, Facebook y TikTok (@felipeabogadocr y @cortesramirezabogados_). ` +
+        `Eres un community manager experto y estratega de contenido para ${getNombreDespacho()}, un despacho de abogados en Colombia con cuentas en Instagram, Facebook y TikTok. ` +
         `Ayudas a la persona encargada de contenido (que no es abogada) a crear un plan de contenido poderoso: ideas concretas de video o post con gancho (hook), guion corto, caption sugerido y hashtags relevantes; estrategia de crecimiento para convertir seguidores en un nicho fiel de clientes potenciales; y consejos de formato y tendencias específicos de Instagram, Facebook y TikTok. Sé específico y práctico, nunca genérico. ` +
         (contexto ? `${contexto} ` : "") +
         `Responde siempre en español, en un tono cercano y motivador, con listas y pasos claros cuando aplique.`;
@@ -4136,7 +4136,7 @@ function DocumentosTab() {
     const pasos = ENLACE_FIRMA
       ? `1️⃣ Haz clic aquí: ${ENLACE_FIRMA}\n2️⃣ Cuando te lo pida, escribe este código: *${id}*\n3️⃣ Sigue los pasos en pantalla para firmar`
       : `1️⃣ Ingresa al aplicativo de firmas\n2️⃣ Escribe este código: *${id}*\n3️⃣ Sigue los pasos en pantalla para firmar`;
-    const mensaje = `Hola ${d.cliente || ""} 👋\n\n*Cortés Ramírez Abogados* te comparte el documento *"${d.titulo}"* para tu firma electrónica.\n\n${pasos}\n\nCualquier duda, escríbenos por este mismo medio.`;
+    const mensaje = `Hola ${d.cliente || ""} 👋\n\n*${getNombreDespacho()}* te comparte el documento *"${d.titulo}"* para tu firma electrónica.\n\n${pasos}\n\nCualquier duda, escríbenos por este mismo medio.`;
     const url = `https://wa.me/${numero}?text=${encodeURIComponent(mensaje)}`;
     window.open(url, "_blank");
   };
@@ -4146,7 +4146,7 @@ function DocumentosTab() {
     const firmaAbogado = (d.firmantes || []).find((f) => f.rol === "abogado");
     const numero = `${d.whatsappIndicativo || ""}${(d.whatsappNumero || "").replace(/[^0-9]/g, "")}`;
     const fechaCliente = firmaCliente ? new Date(firmaCliente.firmadoEn).toLocaleDateString("es-CO", { dateStyle: "long" }) : "";
-    const mensaje = `Hola ${d.cliente || ""}, tu documento "${d.titulo}" quedó firmado el ${fechaCliente} y también fue firmado por ${firmaAbogado ? firmaAbogado.nombre : "tu abogado"} de Cortés Ramírez Abogados. Ya está listo.\n\nTe adjuntamos el PDF firmado.`;
+    const mensaje = `Hola ${d.cliente || ""}, tu documento "${d.titulo}" quedó firmado el ${fechaCliente} y también fue firmado por ${firmaAbogado ? firmaAbogado.nombre : "tu abogado"} de ${getNombreDespacho()}. Ya está listo.\n\nTe adjuntamos el PDF firmado.`;
     const url = `https://wa.me/${numero}?text=${encodeURIComponent(mensaje)}`;
     window.open(url, "_blank");
   };
@@ -4957,7 +4957,7 @@ function LoginGate({ onIngresar, onCancelar }) {
               ? "Confirma tu correo"
               : pantalla === "recuperar" || pantalla === "recuperacion-enviada"
                 ? "Recuperar contraseña"
-                : "Cortés Ramírez Abogados"}
+                : "Panel de gestión legal"}
         </h1>
 
         {pantalla === "registro" && (
@@ -4973,7 +4973,7 @@ function LoginGate({ onIngresar, onCancelar }) {
                   style={inputStyle}
                   value={nombreDespacho}
                   onChange={(e) => setNombreDespacho(e.target.value)}
-                  placeholder="Ej: Cortés Ramírez Abogados"
+                  placeholder="Ej: García & Asociados"
                   autoFocus
                 />
               </Field>
@@ -5140,7 +5140,7 @@ function LoginGate({ onIngresar, onCancelar }) {
   );
 }
 
-function UsuariosPermisosTab({ usuarioActual }) {
+function UsuariosPermisosTab({ usuarioActual, onDespachoRenombrado }) {
   const usuarioActualId = usuarioActual.id;
   const { usuarios, crear: crearUsuario, actualizar } = useUsuariosDespacho();
   const [mostrarForm, setMostrarForm] = useState(false);
@@ -5150,6 +5150,21 @@ function UsuariosPermisosTab({ usuarioActual }) {
   const [rol, setRol] = useState("Asistente");
   const [error, setError] = useState("");
   const [creando, setCreando] = useState(false);
+  const [nombreDespachoEdit, setNombreDespachoEdit] = useState(getNombreDespacho());
+  const [editandoDespacho, setEditandoDespacho] = useState(false);
+  const [guardandoDespacho, setGuardandoDespacho] = useState(false);
+
+  const guardarNombreDespacho = async () => {
+    if (!nombreDespachoEdit.trim()) return;
+    setGuardandoDespacho(true);
+    const { error: renombrarError } = await supabase.from("despachos").update({ nombre: nombreDespachoEdit.trim() }).eq("id", usuarioActual.despacho_id);
+    setGuardandoDespacho(false);
+    if (!renombrarError) {
+      setDespachoActual(usuarioActual.despacho_id, nombreDespachoEdit.trim());
+      onDespachoRenombrado?.(nombreDespachoEdit.trim());
+      setEditandoDespacho(false);
+    }
+  };
 
   const crear = async () => {
     if (!nombre.trim() || !email.trim() || !contrasena.trim()) return;
@@ -5197,6 +5212,43 @@ function UsuariosPermisosTab({ usuarioActual }) {
       >
         Solo tú, como Administrador, puedes crear usuarios y decidir qué puede ver cada uno.
       </div>
+
+      <Card style={{ marginBottom: 20 }}>
+        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, fontWeight: 600, color: COLORS.headingText, marginBottom: 4 }}>Nombre del despacho</p>
+        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, marginBottom: 10 }}>
+          Aparece en el menú, los PDFs, los recibos y los mensajes de WhatsApp que manda la app.
+        </p>
+        {editandoDespacho ? (
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            <input
+              className="drx-input"
+              style={{ ...inputStyle, flex: 1, minWidth: 200 }}
+              value={nombreDespachoEdit}
+              onChange={(e) => setNombreDespachoEdit(e.target.value)}
+            />
+            <button className="drx-btn-primary" style={buttonPrimary} onClick={guardarNombreDespacho} disabled={guardandoDespacho || !nombreDespachoEdit.trim()}>
+              {guardandoDespacho ? "Guardando…" : "Guardar"}
+            </button>
+            <button
+              className="drx-btn-ghost"
+              style={buttonGhost}
+              onClick={() => {
+                setNombreDespachoEdit(getNombreDespacho());
+                setEditandoDespacho(false);
+              }}
+            >
+              Cancelar
+            </button>
+          </div>
+        ) : (
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
+            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, fontWeight: 700, color: COLORS.ink, margin: 0 }}>{getNombreDespacho()}</p>
+            <button className="drx-btn-ghost" style={buttonGhost} onClick={() => setEditandoDespacho(true)}>
+              Editar
+            </button>
+          </div>
+        )}
+      </Card>
 
       <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 16 }}>
         <button className="drx-btn-primary" style={buttonPrimary} onClick={() => setMostrarForm((s) => !s)}>
@@ -5461,9 +5513,9 @@ export default function App() {
       setUsuarioActual(null);
       return;
     }
-    const { data: perfil } = await supabase.from("perfiles").select("*").eq("id", user.id).maybeSingle();
-    setDespachoActual(perfil?.despacho_id || null);
-    const usuario = perfil ? { ...perfil, email: user.email } : null;
+    const { data: perfil } = await supabase.from("perfiles").select("*, despachos(nombre)").eq("id", user.id).maybeSingle();
+    setDespachoActual(perfil?.despacho_id || null, perfil?.despachos?.nombre || "");
+    const usuario = perfil ? { ...perfil, email: user.email, despachoNombre: perfil.despachos?.nombre || "" } : null;
     setUsuarioActual(usuario);
     if (registrarLogin && usuario) {
       registrarAuditoria(usuario, "inicio_sesion", "sesion", null, {});
@@ -5578,10 +5630,7 @@ export default function App() {
             <span style={{ fontFamily: "Inter, sans-serif", fontSize: 20, fontWeight: 800, letterSpacing: 1.5, color: "#FFFFFF", lineHeight: 1 }}>CROS</span>
           </div>
           <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, fontWeight: 600, color: "#D7E2F1", margin: 0, lineHeight: 1.15, textAlign: "center" }}>
-            Cortés Ramírez
-          </p>
-          <p style={{ fontFamily: "'Source Serif 4', serif", fontSize: 11, fontStyle: "italic", color: "#8FA3C4", margin: "2px 0 0", textAlign: "center" }}>
-            Abogados &amp; Asociados
+            {getNombreDespacho()}
           </p>
         </div>
 
@@ -5711,7 +5760,12 @@ export default function App() {
             {tab === "contabilidad" && puedeVer("contabilidad") && <ContabilidadTab usuarioActual={usuarioActual} />}
             {tab === "contenido" && puedeVer("contenido") && <ContenidoTab />}
             {tab === "documentos" && puedeVer("documentos") && <DocumentosTab />}
-            {tab === "usuarios" && usuarioActual.rol === "Administrador" && <UsuariosPermisosTab usuarioActual={usuarioActual} />}
+            {tab === "usuarios" && usuarioActual.rol === "Administrador" && (
+              <UsuariosPermisosTab
+                usuarioActual={usuarioActual}
+                onDespachoRenombrado={(nuevoNombre) => setUsuarioActual((prev) => (prev ? { ...prev, despachoNombre: nuevoNombre } : prev))}
+              />
+            )}
           </div>
         </div>
 
@@ -5719,10 +5773,10 @@ export default function App() {
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
             <InsigniaPlataforma />
             <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, fontWeight: 700, color: COLORS.headingText, margin: "0 0 6px" }}>
-              Cortés Ramírez Abogados &amp; Asociados
+              {getNombreDespacho()}
             </p>
             <p style={{ textAlign: "center", fontFamily: "Inter, sans-serif", fontSize: 11, color: COLORS.muted, margin: 0 }}>
-              Desarrollado por <strong style={{ color: COLORS.headingText }}>Felipe Cortés Ramírez</strong>, CEO. Todos los derechos reservados.
+              CROS — desarrollado por <strong style={{ color: COLORS.headingText }}>Felipe Cortés Ramírez</strong>, CEO. Todos los derechos reservados.
             </p>
           </div>
         </div>

@@ -247,3 +247,9 @@ drop policy if exists "usuarios autenticados leen su despacho" on despachos;
 create policy "usuarios autenticados leen su despacho" on despachos
   for select
   using (id = mi_despacho_id());
+
+drop policy if exists "administradores renombran su despacho" on despachos;
+create policy "administradores renombran su despacho" on despachos
+  for update
+  using (soy_administrador() and id = mi_despacho_id())
+  with check (id = mi_despacho_id());
