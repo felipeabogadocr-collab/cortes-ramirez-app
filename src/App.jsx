@@ -8059,10 +8059,31 @@ function PlataformaTab() {
 
   const pendientes = despachos.filter((d) => !d.activo);
   const activos = despachos.filter((d) => d.activo);
+  const HACE_7_DIAS = Date.now() - 7 * 24 * 60 * 60 * 1000;
+  const activosUsandoEstaSemana = activos.filter((d) => d.ultimaActividad && new Date(d.ultimaActividad).getTime() >= HACE_7_DIAS).length;
+
+  const textoUltimaActividad = (fecha) => {
+    if (!fecha) return "sin inicios de sesión registrados todavía";
+    const dias = Math.floor((Date.now() - new Date(fecha).getTime()) / (24 * 60 * 60 * 1000));
+    if (dias <= 0) return "activo hoy";
+    if (dias === 1) return "activo ayer";
+    return `última actividad hace ${dias} días`;
+  };
 
   return (
     <div>
       <EncabezadoSeccion titulo="Plataforma" color="#DC2626" />
+
+      {!cargando && activos.length > 0 && (
+        <Card style={{ marginBottom: 18, borderLeft: "4px solid #2F80ED" }}>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, fontWeight: 700, color: COLORS.muted, textTransform: "uppercase", letterSpacing: 0.5, margin: 0 }}>
+            Uso real, no solo pago
+          </p>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 22, fontWeight: 800, color: COLORS.ink, margin: "4px 0 0" }}>
+            {activosUsandoEstaSemana} de {activos.length} despachos activos entraron esta semana
+          </p>
+        </Card>
+      )}
       <div
         style={{
           background: "#FEF3E2",
@@ -8123,6 +8144,9 @@ function PlataformaTab() {
                     <p style={{ fontFamily: "Inter, sans-serif", fontSize: 14, fontWeight: 700, color: COLORS.ink, margin: 0 }}>{d.nombre}</p>
                     <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, color: COLORS.muted, margin: "2px 0 0" }}>
                       {d.adminEmail || "sin administrador"} · registrado {new Date(d.creado_en).toLocaleDateString("es-CO", { dateStyle: "medium" })}
+                    </p>
+                    <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, fontWeight: 600, color: d.ultimaActividad && new Date(d.ultimaActividad).getTime() >= HACE_7_DIAS ? "#166534" : "#B45309", margin: "2px 0 0" }}>
+                      {textoUltimaActividad(d.ultimaActividad)}
                     </p>
                   </div>
                   <button className="drx-btn-ghost" style={buttonGhost} onClick={() => alternarActivo(d)} disabled={cambiando === d.id}>

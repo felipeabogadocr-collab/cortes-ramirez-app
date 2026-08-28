@@ -39,7 +39,28 @@ export default async function handler(req, res) {
       if (p.despacho_id) adminsPorDespacho[p.despacho_id] = p.email;
     });
 
-    const resultado = (despachos || []).map((d) => ({ ...d, adminEmail: adminsPorDespacho[d.id] || null }));
+    // Última actividad real de cada despacho (para saber quién de verdad
+    // está usando lo que pagó, no solo quién pagó). "inicio_sesion" ya se
+    // registra en cada login real — con eso alcanza sin tener que sumar
+    // otra tabla.
+    const ultimaActividadPorDespacho = {};
+    const { data: ultimosLogins } = await admin
+      .from("auditoria")
+      .select("despacho_id, creado_en")
+      .eq("accion", "inicio_sesion")
+      .order("creado_en", { ascending: false })
+      .limit(2000);
+    (ultimosLogins || []).forEach((registro) => {
+      if (registro.despacho_id && !ultimaActividadPorDespacho[registro.despacho_id]) {
+        ultimaActividadPorDespacho[registro.despacho_id] = registro.creado_en;
+      }
+    });
+
+    const resultado = (despachos || []).map((d) => ({
+      ...d,
+      adminEmail: adminsPorDespacho[d.id] || null,
+      ultimaActividad: ultimaActividadPorDespacho[d.id] || null,
+    }));
     return res.status(200).json({ despachos: resultado });
   }
 
