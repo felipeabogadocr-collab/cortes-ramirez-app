@@ -269,6 +269,55 @@ $$;
 grant execute on function obtener_documento_publico(text) to anon, authenticated;
 grant execute on function guardar_firma_documento(text, jsonb) to anon, authenticated;
 
+-- Portal del cliente (sin sesión) --------------------------------------------
+-- El cliente entra a #portal y escribe el código que le compartió su
+-- abogado (el id del cliente, igual de impredecible que el código de
+-- firma). Esta función arma a propósito solo un subconjunto seguro de la
+-- información: nombre, proceso, estado de cuenta y documentos — nunca las
+-- notas internas del abogado ni los datos de otros clientes.
+
+create or replace function obtener_portal_cliente(p_id text)
+returns jsonb
+language plpgsql
+security definer
+stable
+set search_path = public
+as $$
+declare
+  cliente_data jsonb;
+  docs jsonb;
+begin
+  select data into cliente_data from clientes where id = p_id and eliminado_en is null;
+  if cliente_data is null then
+    return null;
+  end if;
+
+  select coalesce(
+    jsonb_agg(jsonb_build_object('titulo', data->>'titulo', 'firmado', jsonb_array_length(coalesce(data->'firmantes', '[]'::jsonb)) > 0)),
+    '[]'::jsonb
+  )
+  into docs
+  from documentos
+  where eliminado_en is null
+    and lower(data->>'cliente') = lower(cliente_data->>'nombre');
+
+  return jsonb_build_object(
+    'nombre', cliente_data->'nombre',
+    'tipoProceso', cliente_data->'tipoProceso',
+    'areaProceso', cliente_data->'areaProceso',
+    'radicado', cliente_data->'radicado',
+    'valorTotal', cliente_data->'valorTotal',
+    'pagos', (
+      select coalesce(jsonb_agg(jsonb_build_object('fecha', p->'fecha', 'valor', p->'valor', 'concepto', p->'concepto')), '[]'::jsonb)
+      from jsonb_array_elements(coalesce(cliente_data->'pagos', '[]'::jsonb)) p
+    ),
+    'documentos', docs
+  );
+end;
+$$;
+
+grant execute on function obtener_portal_cliente(text) to anon, authenticated;
+
 drop policy if exists "usuarios autenticados leen perfiles" on perfiles;
 drop policy if exists "mismo despacho leen perfiles" on perfiles;
 create policy "mismo despacho leen perfiles" on perfiles

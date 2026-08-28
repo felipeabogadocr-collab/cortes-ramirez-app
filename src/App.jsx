@@ -2696,7 +2696,18 @@ function ClientesTab({ usuarioActual }) {
                   </div>
                   {c.notas && <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.inkSoft, margin: "8px 0 0" }}>{c.notas}</p>}
                 </div>
-                <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+                <div style={{ display: "flex", gap: 8, flexShrink: 0, flexWrap: "wrap" }}>
+                  <button
+                    className="drx-btn-ghost"
+                    style={{ ...buttonGhost, background: "#1DA851", color: "#FFFFFF", border: "none" }}
+                    onClick={() => {
+                      const numero = numeroWhatsappCliente(c.telefono);
+                      const mensaje = `Hola ${c.nombre || ""} 👋\n\n*${getNombreDespacho()}* te comparte acceso a tu portal personal, donde puedes ver el estado de tu proceso y tu estado de cuenta cuando quieras.\n\n1️⃣ Ingresa aquí: ${window.location.origin}/#portal\n2️⃣ Escribe este código: *${id}*`;
+                      window.open(`https://wa.me/${numero}?text=${encodeURIComponent(mensaje)}`, "_blank");
+                    }}
+                  >
+                    Compartir portal ↗
+                  </button>
                   <button className="drx-btn-ghost" style={buttonGhost} onClick={() => empezarEdicion(id)}>
                     Editar
                   </button>
@@ -2897,6 +2908,193 @@ function CasosTab() {
           <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted }}>Aún no has registrado casos.</p>
         )}
       </div>
+    </div>
+  );
+}
+
+function VistaPortalCliente() {
+  const [codigo, setCodigo] = useState("");
+  const [cliente, setCliente] = useState(null);
+  const [buscando, setBuscando] = useState(false);
+  const [notFound, setNotFound] = useState(false);
+
+  const [procesoInfo, setProcesoInfo] = useState(null);
+  const [consultandoProceso, setConsultandoProceso] = useState(false);
+  const [errorProceso, setErrorProceso] = useState("");
+
+  const buscar = async () => {
+    const code = codigo.trim();
+    if (!code) return;
+    setBuscando(true);
+    setNotFound(false);
+    setCliente(null);
+    setProcesoInfo(null);
+    const { data, error } = await supabase.rpc("obtener_portal_cliente", { p_id: code });
+    setBuscando(false);
+    if (error || !data) {
+      setNotFound(true);
+      return;
+    }
+    setCliente(data);
+  };
+
+  const consultarProceso = async () => {
+    if (!cliente?.radicado) return;
+    setConsultandoProceso(true);
+    setErrorProceso("");
+    try {
+      const data = await consultarRamaJudicial(cliente.radicado);
+      setProcesoInfo(data);
+    } catch (e) {
+      setErrorProceso("No pudimos consultar el proceso en este momento. Intenta de nuevo en un rato.");
+    }
+    setConsultandoProceso(false);
+  };
+
+  const totalPagado = (cliente?.pagos || []).reduce((sum, p) => sum + (Number(p.valor) || 0), 0);
+  const valorTotal = Number(cliente?.valorTotal) || 0;
+  const saldo = valorTotal > 0 ? valorTotal - totalPagado : null;
+
+  return (
+    <div style={{ maxWidth: 760, margin: "0 auto", padding: "0 20px 40px" }}>
+      <div style={{ background: COLORS.navy, margin: "0 -20px 28px", padding: "24px 20px", display: "flex", alignItems: "center", gap: 14 }}>
+        <div style={{ width: 48, height: 48, borderRadius: 12, background: "#FFFFFF", display: "flex", alignItems: "center", justifyContent: "center", color: COLORS.navy, flexShrink: 0 }}>
+          <IconoCros size={26} />
+        </div>
+        <div>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, letterSpacing: 1.5, color: "#9FB6D6", textTransform: "uppercase", margin: 0 }}>CROS</p>
+          <h1 style={{ fontFamily: "Inter, sans-serif", fontSize: 24, fontWeight: 700, color: "#FFFFFF", margin: "4px 0 0" }}>Portal del cliente</h1>
+        </div>
+      </div>
+
+      {!cliente && (
+        <Card>
+          <Field label="Código de acceso (te lo compartió tu abogado)">
+            <input
+              className="drx-input"
+              style={{ ...inputStyle, fontWeight: 700, fontSize: 16, fontFamily: "monospace", textAlign: "center" }}
+              value={codigo}
+              onChange={(e) => setCodigo(e.target.value)}
+              placeholder="Código de acceso"
+              onKeyDown={(e) => e.key === "Enter" && buscar()}
+            />
+          </Field>
+          {notFound && (
+            <p style={{ color: "#B42318", fontSize: 13, marginTop: 10, fontFamily: "Inter, sans-serif" }}>
+              No encontramos ninguna cuenta con ese código. Verifícalo con tu abogado.
+            </p>
+          )}
+          <button className="drx-btn-primary" style={{ ...buttonPrimary, marginTop: 14 }} onClick={buscar} disabled={buscando}>
+            {buscando ? "Buscando..." : "Ver mi información"}
+          </button>
+        </Card>
+      )}
+
+      {cliente && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          <Card>
+            <h2 style={{ fontFamily: "Inter, sans-serif", fontSize: 19, fontWeight: 700, margin: 0, color: COLORS.ink }}>Hola, {cliente.nombre}</h2>
+            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted, margin: "4px 0 0" }}>
+              {cliente.tipoProceso} · {cliente.areaProceso}
+            </p>
+          </Card>
+
+          {cliente.radicado && (
+            <Card>
+              <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, fontWeight: 700, color: COLORS.ink, marginBottom: 8 }}>Estado del proceso</p>
+              <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.muted, marginBottom: 12 }}>Radicado: {cliente.radicado}</p>
+              <button className="drx-btn-primary" style={buttonPrimary} onClick={consultarProceso} disabled={consultandoProceso}>
+                {consultandoProceso ? "Consultando..." : "Consultar estado actual"}
+              </button>
+              {errorProceso && <p style={{ color: "#B42318", fontSize: 12.5, marginTop: 10, fontFamily: "Inter, sans-serif" }}>{errorProceso}</p>}
+              {procesoInfo && (
+                <div style={{ marginTop: 14 }}>
+                  {procesoInfo.encontrado ? (
+                    <>
+                      <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.muted, marginBottom: 6 }}>{procesoInfo.proceso?.despacho}</p>
+                      {procesoInfo.ultimaActuacion ? (
+                        <div style={{ background: COLORS.accentSoft, borderRadius: 8, padding: 12 }}>
+                          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, fontWeight: 700, color: COLORS.ink, margin: 0 }}>
+                            {procesoInfo.ultimaActuacion.actuacion}
+                          </p>
+                          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, margin: "4px 0 0" }}>
+                            {new Date(procesoInfo.ultimaActuacion.fecha).toLocaleDateString("es-CO", { dateStyle: "long" })}
+                          </p>
+                          {procesoInfo.ultimaActuacion.anotacion && (
+                            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.inkSoft, margin: "6px 0 0" }}>
+                              {procesoInfo.ultimaActuacion.anotacion}
+                            </p>
+                          )}
+                        </div>
+                      ) : (
+                        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.muted }}>Sin actuaciones registradas todavía.</p>
+                      )}
+                    </>
+                  ) : (
+                    <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.muted }}>No encontramos este radicado en la Rama Judicial.</p>
+                  )}
+                </div>
+              )}
+            </Card>
+          )}
+
+          {valorTotal > 0 && (
+            <Card>
+              <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, fontWeight: 700, color: COLORS.ink, marginBottom: 8 }}>Estado de cuenta</p>
+              <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted, margin: 0 }}>
+                Total acordado: {formatoCOP(valorTotal)} · Pagado: {formatoCOP(totalPagado)}
+              </p>
+              <p
+                style={{
+                  display: "inline-block",
+                  marginTop: 8,
+                  fontFamily: "Inter, sans-serif",
+                  fontSize: 12.5,
+                  fontWeight: 700,
+                  padding: "3px 10px",
+                  borderRadius: 20,
+                  background: saldo <= 0 ? "#DCFCE7" : "#FEF3E2",
+                  color: saldo <= 0 ? "#166534" : "#B45309",
+                }}
+              >
+                {saldo <= 0 ? "Al día" : `Saldo pendiente: ${formatoCOP(saldo)}`}
+              </p>
+            </Card>
+          )}
+
+          {cliente.pagos?.length > 0 && (
+            <Card>
+              <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, fontWeight: 700, color: COLORS.ink, marginBottom: 10 }}>Pagos registrados</p>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {[...cliente.pagos]
+                  .sort((a, b) => new Date(b.fecha) - new Date(a.fecha))
+                  .map((p, i) => (
+                    <div key={i} style={{ display: "flex", justifyContent: "space-between", fontFamily: "Inter, sans-serif", fontSize: 12.5 }}>
+                      <span style={{ color: COLORS.muted }}>
+                        {new Date(p.fecha).toLocaleDateString("es-CO", { dateStyle: "medium" })} · {p.concepto || "Pago"}
+                      </span>
+                      <span style={{ color: COLORS.ink, fontWeight: 600 }}>{formatoCOP(p.valor)}</span>
+                    </div>
+                  ))}
+              </div>
+            </Card>
+          )}
+
+          {cliente.documentos?.length > 0 && (
+            <Card>
+              <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, fontWeight: 700, color: COLORS.ink, marginBottom: 10 }}>Documentos</p>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {cliente.documentos.map((d, i) => (
+                  <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontFamily: "Inter, sans-serif", fontSize: 12.5 }}>
+                    <span style={{ color: COLORS.ink }}>{d.titulo}</span>
+                    <span style={{ color: d.firmado ? "#166534" : "#B45309", fontWeight: 700 }}>{d.firmado ? "Firmado" : "Pendiente de firma"}</span>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -4695,6 +4893,7 @@ function useNotificacionesPanel(prefs) {
   const [pagosPendientes, setPagosPendientes] = useState([]);
   const [contenidoPendiente, setContenidoPendiente] = useState([]);
   const [contenidoVencido, setContenidoVencido] = useState([]);
+  const [novedadesJudiciales, setNovedadesJudiciales] = useState([]);
   const notifPrefs = prefs || notificacionesPorDefecto();
 
   const cargar = useCallback(async () => {
@@ -4719,6 +4918,7 @@ function useNotificacionesPanel(prefs) {
     const idsClientes = idsClientesRaw ? JSON.parse(idsClientesRaw) : [];
     const inactivos = [];
     const pendientesPago = [];
+    const novedades = [];
     for (const id of idsClientes) {
       const raw = await storageGet(`cliente:${id}`, false);
       if (!raw) continue;
@@ -4733,9 +4933,13 @@ function useNotificacionesPanel(prefs) {
           pendientesPago.push({ cliente: c, dias: diasPago });
         }
       }
+      if (c.estadoVigilancia === "Con novedad") {
+        novedades.push({ nombre: c.nombre, radicado: c.radicado });
+      }
     }
     setClientesInactivos(inactivos);
     setPagosPendientes(pendientesPago.sort((a, b) => a.dias - b.dias));
+    setNovedadesJudiciales(novedades);
 
     const idsContenidoRaw = await storageGet("indice-contenido", true);
     const idsContenido = idsContenidoRaw ? JSON.parse(idsContenidoRaw) : [];
@@ -4767,7 +4971,8 @@ function useNotificacionesPanel(prefs) {
     (notifPrefs.firmas !== false ? firmasNuevas.length : 0) +
     (notifPrefs.clientes !== false ? clientesInactivos.length : 0) +
     (notifPrefs.pagos !== false ? pagosPendientes.length : 0) +
-    (notifPrefs.contenido !== false ? contenidoPendiente.length + contenidoVencido.length : 0);
+    (notifPrefs.contenido !== false ? contenidoPendiente.length + contenidoVencido.length : 0) +
+    (notifPrefs.vigilancia !== false ? novedadesJudiciales.length : 0);
 
   return {
     count,
@@ -4776,6 +4981,7 @@ function useNotificacionesPanel(prefs) {
     pagosPendientes: notifPrefs.pagos !== false ? pagosPendientes : [],
     contenidoPendiente: notifPrefs.contenido !== false ? contenidoPendiente : [],
     contenidoVencido: notifPrefs.contenido !== false ? contenidoVencido : [],
+    novedadesJudiciales: notifPrefs.vigilancia !== false ? novedadesJudiciales : [],
     marcarFirmasVistas,
     reload: cargar,
   };
@@ -4787,11 +4993,13 @@ function ModalNotificaciones({
   pagosPendientes,
   contenidoPendiente,
   contenidoVencido,
+  novedadesJudiciales,
   onCerrar,
   onMarcarVistas,
   onIrADocumentos,
   onIrAClientes,
   onIrAContenido,
+  onIrAVigilancia,
 }) {
   return (
     <div
@@ -4924,7 +5132,28 @@ function ModalNotificaciones({
               </button>
             </div>
           ) : (
-            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.muted }}>No hay contenido pendiente ni vencido.</p>
+            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.muted, marginBottom: 18 }}>No hay contenido pendiente ni vencido.</p>
+          )}
+
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, fontWeight: 700, color: "#B45309", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 10 }}>
+            ⚖️ Novedades judiciales
+          </p>
+          {novedadesJudiciales.length > 0 ? (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {novedadesJudiciales.map((n, i) => (
+                <div key={i} style={{ background: "#FEF3E2", borderRadius: 8, padding: "10px 12px" }}>
+                  <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, fontWeight: 600, color: "#92400E", margin: 0 }}>{n.nombre}</p>
+                  <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11, color: "#B45309", margin: "2px 0 0" }}>
+                    Actuación nueva detectada{n.radicado ? ` — radicado ${n.radicado}` : ""}
+                  </p>
+                </div>
+              ))}
+              <button className="drx-btn-ghost" style={{ ...buttonGhost, fontSize: 12, padding: "6px 12px", alignSelf: "flex-start" }} onClick={onIrAVigilancia}>
+                Ver vigilancia judicial
+              </button>
+            </div>
+          ) : (
+            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.muted }}>Sin novedades judiciales por revisar.</p>
           )}
         </div>
       </div>
@@ -4952,6 +5181,7 @@ const NOTIF_CATEGORIAS = [
   { id: "clientes", nombre: "Clientes sin actividad" },
   { id: "pagos", nombre: "Pagos pendientes" },
   { id: "contenido", nombre: "Contenido pendiente o vencido" },
+  { id: "vigilancia", nombre: "Novedades judiciales" },
 ];
 
 function notificacionesPorDefecto() {
@@ -5811,7 +6041,9 @@ export default function App() {
   }, []);
 
   const isFirmaView = typeof window !== "undefined" && window.location.hash.replace("#", "") === "firmar";
+  const isPortalView = typeof window !== "undefined" && window.location.hash.replace("#", "") === "portal";
   const [modoPublico, setModoPublico] = useState(isFirmaView);
+  const [modoPortal, setModoPortal] = useState(isPortalView);
   const [usuarioActual, setUsuarioActual] = useState(null);
   const [sesionCargada, setSesionCargada] = useState(false);
   const [cambiandoUsuario, setCambiandoUsuario] = useState(false);
@@ -5824,6 +6056,7 @@ export default function App() {
     pagosPendientes,
     contenidoPendiente,
     contenidoVencido,
+    novedadesJudiciales,
     marcarFirmasVistas,
   } = useNotificacionesPanel(usuarioActual?.notificaciones);
   const { oscuro, alternar } = useTema();
@@ -5872,7 +6105,7 @@ export default function App() {
     setCambiandoUsuario(false);
   }, []);
 
-  useCierreSesionPorInactividad(!!usuarioActual && !modoPublico, cerrarSesion);
+  useCierreSesionPorInactividad(!!usuarioActual && !modoPublico && !modoPortal, cerrarSesion);
 
   if (modoPublico) {
     return (
@@ -5882,6 +6115,23 @@ export default function App() {
         <p style={{ textAlign: "center", paddingBottom: 24 }}>
           <button
             onClick={() => setModoPublico(false)}
+            style={{ background: "none", border: "none", color: COLORS.muted, textDecoration: "underline", cursor: "pointer", fontFamily: "Inter, sans-serif", fontSize: 12 }}
+          >
+            Volver al panel del despacho
+          </button>
+        </p>
+      </div>
+    );
+  }
+
+  if (modoPortal) {
+    return (
+      <div style={{ background: COLORS.bg, minHeight: "100%" }}>
+        <GlobalStyle />
+        <VistaPortalCliente />
+        <p style={{ textAlign: "center", paddingBottom: 24 }}>
+          <button
+            onClick={() => setModoPortal(false)}
             style={{ background: "none", border: "none", color: COLORS.muted, textDecoration: "underline", cursor: "pointer", fontFamily: "Inter, sans-serif", fontSize: 12 }}
           >
             Volver al panel del despacho
@@ -5920,6 +6170,10 @@ export default function App() {
   };
   const irAContenido = () => {
     setTab("contenido");
+    setMostrarNotificaciones(false);
+  };
+  const irAVigilancia = () => {
+    setTab("vigilancia");
     setMostrarNotificaciones(false);
   };
 
@@ -6118,11 +6372,13 @@ export default function App() {
           pagosPendientes={pagosPendientes}
           contenidoPendiente={contenidoPendiente}
           contenidoVencido={contenidoVencido}
+          novedadesJudiciales={novedadesJudiciales}
           onCerrar={() => setMostrarNotificaciones(false)}
           onMarcarVistas={marcarFirmasVistas}
           onIrADocumentos={irADocumentos}
           onIrAClientes={irAClientes}
           onIrAContenido={irAContenido}
+          onIrAVigilancia={irAVigilancia}
         />
       )}
     </div>

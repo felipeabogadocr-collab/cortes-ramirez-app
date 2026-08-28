@@ -7,32 +7,12 @@
 
 import { supabaseAdmin } from "../_lib/supabaseAdmin.js";
 import { dentroDelLimite } from "../_lib/rateLimit.js";
-
-const BASE = "https://consultaprocesos.ramajudicial.gov.co:448/api/v2";
-
-function limpiarRadicado(radicado) {
-  return (radicado || "").replace(/\D/g, "");
-}
-
-// La Rama Judicial ha cambiado el nombre exacto de algunos campos entre
-// versiones de su API interna. Estas funciones son tolerantes: prueban
-// varios nombres posibles para no romperse por un cambio menor.
-function campo(obj, ...nombres) {
-  for (const n of nombres) {
-    if (obj && obj[n] !== undefined && obj[n] !== null) return obj[n];
-  }
-  return null;
-}
+import { consultarProceso } from "../_lib/ramaJudicial.js";
 
 export default async function handler(req, res) {
   if (req.method !== "GET") {
     res.setHeader("Allow", "GET");
     return res.status(405).json({ error: "Método no permitido" });
-  }
-
-  const radicado = limpiarRadicado(req.query.radicado);
-  if (radicado.length < 11) {
-    return res.status(400).json({ error: "Número de radicado inválido" });
   }
 
   const admin = supabaseAdmin();
@@ -41,72 +21,13 @@ export default async function handler(req, res) {
     return res.status(429).json({ error: "Demasiadas consultas. Espera un momento e inténtalo de nuevo." });
   }
 
-  const headers = {
-    Accept: "application/json",
-    "User-Agent": "Mozilla/5.0 (compatible; CortesRamirezAbogados/1.0)",
-  };
-
   try {
-    const busquedaUrl = `${BASE}/Procesos/Consulta/NumeroRadicacion?numero=${radicado}&SoloActivos=false&pagina=1`;
-    const busquedaRes = await fetch(busquedaUrl, { headers });
-    if (!busquedaRes.ok) {
-      throw new Error(`La Rama Judicial respondió ${busquedaRes.status} al buscar el radicado`);
-    }
-    const busquedaData = await busquedaRes.json();
-    const procesos = busquedaData?.procesos || busquedaData?.Procesos || [];
-
-    if (!procesos.length) {
-      return res.status(200).json({ encontrado: false });
-    }
-
-    const proceso = procesos[0];
-    const idProceso = campo(proceso, "idProceso", "IdProceso", "id");
-    const debug = req.query.debug === "1";
-    const debugInfo = { idProceso, claves: Object.keys(proceso) };
-
-    let actuaciones = [];
-    if (idProceso) {
-      const actuacionesUrl = `${BASE}/Proceso/Actuaciones/${idProceso}?pagina=1`;
-      const actuacionesRes = await fetch(actuacionesUrl, { headers });
-      debugInfo.actuacionesUrl = actuacionesUrl;
-      debugInfo.actuacionesStatus = actuacionesRes.status;
-      const actuacionesTexto = await actuacionesRes.text();
-      if (debug) debugInfo.actuacionesRespuestaCruda = actuacionesTexto.slice(0, 1500);
-      if (actuacionesRes.ok) {
-        try {
-          const actuacionesData = JSON.parse(actuacionesTexto);
-          actuaciones = actuacionesData?.actuaciones || actuacionesData?.Actuaciones || [];
-          if (debug) debugInfo.actuacionesClaves = Array.isArray(actuacionesData) ? "es-array" : Object.keys(actuacionesData || {});
-        } catch (e) {
-          debugInfo.errorParseando = e.message;
-        }
-      }
-    }
-
-    const actuacionesNormalizadas = actuaciones
-      .map((a) => ({
-        fecha: campo(a, "fechaActuacion", "FechaActuacion"),
-        actuacion: campo(a, "actuacion", "Actuacion"),
-        anotacion: campo(a, "anotacion", "Anotacion"),
-      }))
-      .filter((a) => a.fecha)
-      .sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
-
-    return res.status(200).json({
-      encontrado: true,
-      idProceso,
-      proceso: {
-        despacho: campo(proceso, "despacho", "Despacho"),
-        departamento: campo(proceso, "departamento", "Departamento"),
-        sujetosProcesales: campo(proceso, "sujetosProcesales", "SujetosProcesales"),
-        fechaUltimaActuacion: campo(proceso, "fechaUltimaActuacion", "FechaUltimaActuacion"),
-      },
-      ultimaActuacion: actuacionesNormalizadas[0] || null,
-      actuaciones: actuacionesNormalizadas.slice(0, 15),
-      consultadoEn: new Date().toISOString(),
-      ...(debug ? { debug: debugInfo } : {}),
-    });
+    const data = await consultarProceso(req.query.radicado, { debug: req.query.debug === "1" });
+    return res.status(200).json(data);
   } catch (err) {
+    if (err.status === 400) {
+      return res.status(400).json({ error: err.message });
+    }
     console.error("Error consultando Rama Judicial:", err);
     return res.status(502).json({
       error:
