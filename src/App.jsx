@@ -4014,6 +4014,19 @@ function ReportesTab() {
     });
   });
   const maxIngresoMes = Math.max(1, ...Object.values(ingresosPorMes));
+  const claveMesActual = mesesEtiquetas[mesesEtiquetas.length - 1].clave;
+  const claveMesAnterior = mesesEtiquetas[mesesEtiquetas.length - 2]?.clave;
+  const ingresoMesActual = ingresosPorMes[claveMesActual] || 0;
+  const ingresoMesAnterior = claveMesAnterior ? ingresosPorMes[claveMesAnterior] || 0 : 0;
+  const cambioMensual = ingresoMesAnterior > 0 ? Math.round(((ingresoMesActual - ingresoMesAnterior) / ingresoMesAnterior) * 100) : null;
+
+  // Cartera pendiente total (mismo criterio que en Contabilidad).
+  const carteraPendienteTotal = listaClientes.reduce((sum, c) => {
+    const totalPagado = (c.pagos || []).reduce((s, p) => s + (Number(p.valor) || 0), 0);
+    const valorTotal = Number(c.valorTotal) || 0;
+    const saldo = valorTotal > 0 ? valorTotal - totalPagado : 0;
+    return saldo > 0 ? sum + saldo : sum;
+  }, 0);
 
   // Procesos por estado.
   const conteoEstados = Object.fromEntries(ESTADOS_VIGILANCIA.map((e) => [e, 0]));
@@ -4047,6 +4060,34 @@ function ReportesTab() {
     <div>
       <EncabezadoSeccion titulo="Reportes" color="#0EA5E9" />
 
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, marginBottom: 20 }}>
+        <Card>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, fontWeight: 700, color: COLORS.muted, textTransform: "uppercase", letterSpacing: 0.5, margin: 0 }}>
+            Clientes activos
+          </p>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 24, fontWeight: 800, color: COLORS.ink, margin: "4px 0 0" }}>{listaClientes.length}</p>
+        </Card>
+        <Card>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, fontWeight: 700, color: COLORS.muted, textTransform: "uppercase", letterSpacing: 0.5, margin: 0 }}>
+            Ingreso este mes
+          </p>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 24, fontWeight: 800, color: "#166534", margin: "4px 0 0" }}>{formatoCOP(ingresoMesActual)}</p>
+          {cambioMensual !== null && (
+            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, fontWeight: 600, color: cambioMensual >= 0 ? "#166534" : "#B42318", margin: "3px 0 0" }}>
+              {cambioMensual >= 0 ? "▲" : "▼"} {Math.abs(cambioMensual)}% vs. mes anterior
+            </p>
+          )}
+        </Card>
+        <Card>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, fontWeight: 700, color: COLORS.muted, textTransform: "uppercase", letterSpacing: 0.5, margin: 0 }}>
+            Cartera pendiente
+          </p>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 24, fontWeight: 800, color: carteraPendienteTotal > 0 ? "#B42318" : COLORS.ink, margin: "4px 0 0" }}>
+            {formatoCOP(carteraPendienteTotal)}
+          </p>
+        </Card>
+      </div>
+
       <Card style={{ marginBottom: 16 }}>
         <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, fontWeight: 700, color: COLORS.ink, marginBottom: 4 }}>Ingresos por mes</p>
         <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, marginBottom: 14 }}>
@@ -4063,7 +4104,7 @@ function ReportesTab() {
           <BarraReporte key={estado} etiqueta={estado} valor={conteoEstados[estado]} maximo={maxEstado} color={COLOR_ESTADO[estado]} />
         ))}
         {sinRevisar > 0 && <BarraReporte etiqueta="Sin revisar todavía" valor={sinRevisar} maximo={maxEstado} color="#94A3B8" />}
-        {listaClientes.length === 0 && <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.muted }}>Aún no hay clientes registrados.</p>}
+        {listaClientes.length === 0 && <EstadoVacio icono="📊" texto="Aún no hay clientes registrados." />}
       </Card>
 
       <Card>
@@ -4071,7 +4112,7 @@ function ReportesTab() {
         <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, marginBottom: 14 }}>
           Cuántos clientes tiene asignados cada uno. Se asigna desde "Clientes" al crear o editar un cliente.
         </p>
-        {filasCarga.length === 0 && <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.muted }}>Aún no hay clientes registrados.</p>}
+        {filasCarga.length === 0 && <EstadoVacio icono="📊" texto="Aún no hay clientes registrados." />}
         {filasCarga.map(([nombre, n]) => (
           <BarraReporte key={nombre} etiqueta={nombre} valor={n} maximo={maxCarga} color="#7C3AED" />
         ))}
