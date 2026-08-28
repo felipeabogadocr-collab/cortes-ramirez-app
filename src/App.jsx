@@ -3825,6 +3825,20 @@ function VigilanciaTab() {
   const [explicaciones, setExplicaciones] = useState({});
   const [explicando, setExplicando] = useState(null);
   const [filtroEstado, setFiltroEstado] = useState("Todos");
+  const [radicadoCopiado, setRadicadoCopiado] = useState("");
+  const [explicacionCopiada, setExplicacionCopiada] = useState("");
+
+  const copiarRadicado = (radicado, id) => {
+    navigator.clipboard?.writeText(radicado);
+    setRadicadoCopiado(id);
+    setTimeout(() => setRadicadoCopiado(""), 1500);
+  };
+
+  const copiarExplicacion = (texto, id) => {
+    navigator.clipboard?.writeText(texto);
+    setExplicacionCopiada(id);
+    setTimeout(() => setExplicacionCopiada(""), 1500);
+  };
 
   const cargar = useCallback(async () => {
     const entries = {};
@@ -4058,7 +4072,23 @@ function VigilanciaTab() {
                   <AvatarIniciales nombre={c.nombre} />
                   <div>
                   <p style={{ fontFamily: "Inter, sans-serif", fontSize: 16, fontWeight: 700, margin: 0, color: COLORS.ink }}>{c.nombre}</p>
-                  <p style={{ fontFamily: "monospace", fontSize: 12.5, color: COLORS.inkSoft, margin: "4px 0 0" }}>Radicado: {c.radicado}</p>
+                  <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.inkSoft, margin: "4px 0 0", display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                    <span
+                      title="Copiar radicado"
+                      onClick={() => copiarRadicado(c.radicado, id)}
+                      style={{ fontFamily: "monospace", cursor: "pointer", color: radicadoCopiado === id ? "#1DA851" : COLORS.inkSoft, textDecoration: radicadoCopiado === id ? "none" : "underline dotted" }}
+                    >
+                      {radicadoCopiado === id ? "✓ Copiado" : `Radicado: ${c.radicado}`}
+                    </span>
+                    <a
+                      href="https://consultaprocesos.ramajudicial.gov.co/procesos"
+                      target="_blank"
+                      rel="noreferrer"
+                      style={{ color: COLORS.accentBright, fontSize: 11.5, fontWeight: 600, textDecoration: "none" }}
+                    >
+                      Ver en Rama Judicial ↗
+                    </a>
+                  </p>
                   <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, margin: "3px 0 0" }}>
                     {c.tipoProceso} · {c.areaProceso} {dias !== null && `· última novedad hace ${dias} día${dias !== 1 ? "s" : ""}`}
                   </p>
@@ -4134,6 +4164,13 @@ function VigilanciaTab() {
                       <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.navy, margin: 0, whiteSpace: "pre-wrap", lineHeight: 1.5 }}>
                         {explicaciones[id]}
                       </p>
+                      <button
+                        className="drx-btn-ghost"
+                        style={{ ...buttonGhost, fontSize: 11, padding: "4px 10px", marginTop: 8 }}
+                        onClick={() => copiarExplicacion(explicaciones[id], id)}
+                      >
+                        {explicacionCopiada === id ? "✓ Copiado" : "📋 Copiar"}
+                      </button>
                     </div>
                   )}
                 </div>
