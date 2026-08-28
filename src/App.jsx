@@ -6751,7 +6751,7 @@ function LandingPage({ onRegistrar, onIniciarSesion }) {
           position: "sticky",
           top: 0,
           zIndex: 30,
-          background: scrolleado ? `${COLORS.panel}E6` : COLORS.panel,
+          background: scrolleado ? (oscuro ? "rgba(26,33,44,0.92)" : "rgba(255,255,255,0.92)") : COLORS.panel,
           backdropFilter: scrolleado ? "blur(8px)" : "none",
           WebkitBackdropFilter: scrolleado ? "blur(8px)" : "none",
           borderBottom: `1px solid ${COLORS.border}`,
