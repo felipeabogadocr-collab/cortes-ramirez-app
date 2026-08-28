@@ -74,6 +74,35 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true });
   }
 
-  res.setHeader("Allow", "GET, POST");
+  if (req.method === "DELETE") {
+    // Borra por completo un despacho — pensado sobre todo para los que
+    // quedaron "Pendientes de activar" sin que nadie coordine el pago
+    // (pruebas, registros de spam que pasaron el filtro, gente que se
+    // arrepintió) y que si no se quedan ahí acumulados para siempre. Se
+    // borra también el usuario Administrador huérfano de Auth, para no
+    // dejar una cuenta fantasma que ya no tiene despacho.
+    const despachoId = req.body?.despachoId || req.query?.despachoId;
+    if (!despachoId) return res.status(400).json({ error: "Falta el id del despacho" });
+
+    const { data: perfilesDelDespacho } = await admin.from("perfiles").select("id").eq("despacho_id", despachoId);
+
+    // Borrado defensivo de cualquier dato que ya se haya alcanzado a crear
+    // bajo ese despacho — normalmente no hay nada, porque nunca se activó.
+    const tablasConDespacho = ["clientes", "documentos", "casos", "chats", "app_settings", "auditoria"];
+    for (const tabla of tablasConDespacho) {
+      await admin.from(tabla).delete().eq("despacho_id", despachoId);
+    }
+
+    for (const perfil of perfilesDelDespacho || []) {
+      await admin.from("perfiles").delete().eq("id", perfil.id);
+      await admin.auth.admin.deleteUser(perfil.id).catch(() => {});
+    }
+
+    const { error } = await admin.from("despachos").delete().eq("id", despachoId);
+    if (error) return res.status(500).json({ error: error.message });
+    return res.status(200).json({ ok: true });
+  }
+
+  res.setHeader("Allow", "GET, POST, DELETE");
   return res.status(405).json({ error: "Método no permitido" });
 }

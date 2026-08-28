@@ -8106,6 +8106,27 @@ function PlataformaTab() {
     setCambiando(null);
   };
 
+  const eliminarDespacho = async (despacho) => {
+    if (!window.confirm(`¿Eliminar por completo "${despacho.nombre}"? Esto borra su registro y la cuenta de quien se registró. No se puede deshacer.`)) {
+      return;
+    }
+    setCambiando(despacho.id);
+    try {
+      const { data: sesionData } = await supabase.auth.getSession();
+      const token = sesionData?.session?.access_token;
+      const response = await fetch("/api/plataforma/despachos", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ despachoId: despacho.id }),
+      });
+      if (!response.ok) throw new Error("No se pudo eliminar.");
+      setDespachos((prev) => prev.filter((d) => d.id !== despacho.id));
+    } catch (e) {
+      setError(e.message);
+    }
+    setCambiando(null);
+  };
+
   const pendientes = despachos.filter((d) => !d.activo);
   const activos = despachos.filter((d) => d.activo);
   const HACE_7_DIAS = Date.now() - 7 * 24 * 60 * 60 * 1000;
@@ -8168,14 +8189,24 @@ function PlataformaTab() {
                       {d.adminEmail || "sin administrador"} · registrado {new Date(d.creado_en).toLocaleDateString("es-CO", { dateStyle: "medium" })}
                     </p>
                   </div>
-                  <button
-                    className="drx-btn-primary"
-                    style={{ ...buttonPrimary, background: "#10B981" }}
-                    onClick={() => alternarActivo(d)}
-                    disabled={cambiando === d.id}
-                  >
-                    {cambiando === d.id ? "Activando…" : "✓ Activar acceso"}
-                  </button>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button
+                      className="drx-btn-ghost"
+                      style={{ ...buttonGhost, color: "#B42318", borderColor: "#F3C6C0" }}
+                      onClick={() => eliminarDespacho(d)}
+                      disabled={cambiando === d.id}
+                    >
+                      Eliminar
+                    </button>
+                    <button
+                      className="drx-btn-primary"
+                      style={{ ...buttonPrimary, background: "#10B981" }}
+                      onClick={() => alternarActivo(d)}
+                      disabled={cambiando === d.id}
+                    >
+                      {cambiando === d.id ? "…" : "✓ Activar acceso"}
+                    </button>
+                  </div>
                 </div>
               </Card>
             ))}
