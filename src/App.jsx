@@ -3711,6 +3711,7 @@ function ContabilidadTab({ usuarioActual }) {
   const { ids } = useIndex("indice-clientes", false);
   const [clientes, setClientes] = useState({});
   const [formAbiertoId, setFormAbiertoId] = useState(null);
+  const [filtro, setFiltro] = useState("");
 
   const cargar = useCallback(async () => {
     const entries = {};
@@ -3765,6 +3766,9 @@ function ContabilidadTab({ usuarioActual }) {
     .filter(({ dias }) => dias !== null && dias <= DIAS_AVISO_PROXIMO_PAGO)
     .sort((a, b) => a.dias - b.dias);
 
+  const textoFiltro = filtro.trim().toLowerCase();
+  const idsFiltrados = textoFiltro ? ids.filter((id) => clientes[id]?.nombre?.toLowerCase().includes(textoFiltro)) : ids;
+
   return (
     <div>
       <EncabezadoSeccion titulo="Contabilidad" color="#F43F5E" />
@@ -3792,15 +3796,25 @@ function ContabilidadTab({ usuarioActual }) {
         </div>
       )}
 
+      <div style={{ marginBottom: 14 }}>
+        <input
+          className="drx-input"
+          style={{ ...inputStyle, maxWidth: 320 }}
+          placeholder="Filtrar por nombre de cliente..."
+          value={filtro}
+          onChange={(e) => setFiltro(e.target.value)}
+        />
+      </div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
         <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted, margin: 0 }}>
-          {ids.length} cliente{ids.length !== 1 ? "s" : ""} registrado{ids.length !== 1 ? "s" : ""}
+          {idsFiltrados.length} cliente{idsFiltrados.length !== 1 ? "s" : ""}
+          {filtro.trim() ? ` de ${ids.length}` : " registrado" + (ids.length !== 1 ? "s" : "")}
         </p>
         <button
           className="drx-btn-ghost"
           style={buttonGhost}
           onClick={() => {
-            const filas = ids.flatMap((id) => (clientes[id]?.pagos || []).map((p) => ({ cliente: clientes[id].nombre, pago: p })));
+            const filas = idsFiltrados.flatMap((id) => (clientes[id]?.pagos || []).map((p) => ({ cliente: clientes[id].nombre, pago: p })));
             exportarCSV(
               "pagos.csv",
               [
@@ -3819,7 +3833,7 @@ function ContabilidadTab({ usuarioActual }) {
       </div>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-        {ids.map((id) => {
+        {idsFiltrados.map((id) => {
           const c = clientes[id];
           if (!c) return null;
           const pagos = c.pagos || [];
@@ -3873,6 +3887,9 @@ function ContabilidadTab({ usuarioActual }) {
           );
         })}
         {ids.length === 0 && <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted }}>Registra clientes primero desde la pestaña Clientes.</p>}
+        {ids.length > 0 && idsFiltrados.length === 0 && (
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted }}>Ningún cliente coincide con "{filtro}".</p>
+        )}
       </div>
     </div>
   );
