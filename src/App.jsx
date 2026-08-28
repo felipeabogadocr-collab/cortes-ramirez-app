@@ -2442,6 +2442,7 @@ function ClientesTab({ usuarioActual }) {
   const [showForm, setShowForm] = useState(false);
   const [editandoId, setEditandoId] = useState(null);
   const [formEdicion, setFormEdicion] = useState({});
+  const [filtro, setFiltro] = useState("");
 
   useEffect(() => {
     (async () => {
@@ -2495,12 +2496,35 @@ function ClientesTab({ usuarioActual }) {
     return fb.localeCompare(fa);
   });
 
+  const textoFiltro = filtro.trim().toLowerCase();
+  const idsFiltrados = textoFiltro
+    ? idsOrdenados.filter((id) => {
+        const c = clientes[id];
+        if (!c) return false;
+        return (
+          c.nombre?.toLowerCase().includes(textoFiltro) ||
+          c.radicado?.toLowerCase().includes(textoFiltro) ||
+          c.telefono?.toLowerCase().includes(textoFiltro)
+        );
+      })
+    : idsOrdenados;
+
   return (
     <div>
       <EncabezadoSeccion titulo="Clientes" color="#14B8A6" />
+      <div style={{ marginBottom: 14 }}>
+        <input
+          className="drx-input"
+          style={{ ...inputStyle, maxWidth: 320 }}
+          placeholder="Filtrar por nombre, radicado o teléfono..."
+          value={filtro}
+          onChange={(e) => setFiltro(e.target.value)}
+        />
+      </div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
         <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted, margin: 0 }}>
-          {ids.length} cliente{ids.length !== 1 ? "s" : ""} · ordenados por última actuación
+          {idsFiltrados.length} cliente{idsFiltrados.length !== 1 ? "s" : ""}
+          {textoFiltro ? ` de ${ids.length}` : " · ordenados por última actuación"}
         </p>
         <div style={{ display: "flex", gap: 8 }}>
           <button
@@ -2598,7 +2622,7 @@ function ClientesTab({ usuarioActual }) {
       )}
 
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-        {idsOrdenados.map((id) => {
+        {idsFiltrados.map((id) => {
           const c = clientes[id];
           if (!c) return null;
 
@@ -2756,6 +2780,9 @@ function ClientesTab({ usuarioActual }) {
         })}
         {ids.length === 0 && !showForm && (
           <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted }}>Aún no has registrado clientes.</p>
+        )}
+        {ids.length > 0 && idsFiltrados.length === 0 && (
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted }}>Ningún cliente coincide con "{filtro}".</p>
         )}
       </div>
     </div>
