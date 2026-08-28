@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import Logo from "./components/Logo.jsx";
 import Footer from "./components/Footer.jsx";
+import BarChart from "./components/BarChart.jsx";
+import PanelChat from "./components/PanelChat.jsx";
 
 const SESSION_KEY = "folio_panel_clave";
 
@@ -31,7 +33,7 @@ function PasswordGate({ onUnlock }) {
       } catch {
         // si el navegador bloquea sessionStorage, igual dejamos entrar
       }
-      onUnlock(datos);
+      onUnlock(datos, clave);
     } catch (e) {
       setError(e.message);
     } finally {
@@ -115,19 +117,84 @@ function Stat({ label, value }) {
   );
 }
 
-function Dashboard({ datos }) {
-  const { totalRegistros, totalDocumentos, porHerramienta, leads } = datos;
+function ChartCard({ title, children }) {
+  return (
+    <div style={{ marginBottom: 28 }}>
+      <h2 className="uppercase" style={{ fontSize: 15, letterSpacing: 0.6, marginBottom: 10 }}>
+        {title}
+      </h2>
+      <div className="card" style={{ padding: "18px 16px 10px" }}>{children}</div>
+    </div>
+  );
+}
+
+function formatFechaCorta(fecha) {
+  const [, mes, dia] = fecha.split("-");
+  return `${dia}/${mes}`;
+}
+
+function Dashboard({ datos, password }) {
+  const [generando, setGenerando] = useState(false);
+  const [errorInforme, setErrorInforme] = useState("");
+
+  async function generarInforme() {
+    setGenerando(true);
+    setErrorInforme("");
+    try {
+      const resp = await fetch("/api/panel-ai", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password, modo: "informe" }),
+      });
+      const json = await resp.json();
+      if (!resp.ok) throw new Error(json.error || "No se pudo generar el análisis.");
+      const { generarInformePdf } = await import("./lib/informe.js");
+      await generarInformePdf(datos, json.respuesta);
+    } catch (e) {
+      setErrorInforme(e.message);
+    } finally {
+      setGenerando(false);
+    }
+  }
+
+  const {
+    totalRegistros,
+    totalDocumentos,
+    porHerramienta,
+    leads,
+    registrosPorDiaSemana,
+    registrosPorFecha,
+    documentosPorFecha,
+  } = datos;
 
   return (
     <div style={{ minHeight: "100dvh", display: "flex", flexDirection: "column", background: "var(--bg)" }}>
       <header style={{ borderBottom: "1px solid var(--border)", background: "var(--panel)", padding: "16px 20px" }}>
-        <div style={{ maxWidth: 900, margin: "0 auto", display: "flex", alignItems: "center", gap: 12 }}>
-          <Logo size={34} />
-          <div>
-            <div className="uppercase" style={{ fontWeight: 800, fontSize: 17, letterSpacing: 1 }}>
-              Panel de Folio
+        <div
+          style={{
+            maxWidth: 900,
+            margin: "0 auto",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 12,
+            flexWrap: "wrap",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <Logo size={34} />
+            <div>
+              <div className="uppercase" style={{ fontWeight: 800, fontSize: 17, letterSpacing: 1 }}>
+                Panel de Folio
+              </div>
+              <div style={{ fontSize: 11, color: "var(--muted)" }}>Solo tú puedes ver esta página</div>
             </div>
-            <div style={{ fontSize: 11, color: "var(--muted)" }}>Solo tú puedes ver esta página</div>
+          </div>
+          <div style={{ textAlign: "right" }}>
+            <button className="btn-primary" onClick={generarInforme} disabled={generando}>
+              {generando ? "Generando…" : "📄 Generar informe PDF"}
+            </button>
+            {errorInforme && <p style={{ color: "var(--danger)", fontSize: 11.5, marginTop: 6 }}>{errorInforme}</p>}
           </div>
         </div>
       </header>
@@ -138,11 +205,35 @@ function Dashboard({ datos }) {
           <Stat label="Documentos procesados" value={totalDocumentos} />
         </div>
 
+        <ChartCard title="Registros por día (últimos 14 días)">
+          <BarChart
+            data={registrosPorFecha.map((d) => ({ label: d.fecha, total: d.total }))}
+            formatLabel={(d) => formatFechaCorta(d.label)}
+          />
+        </ChartCard>
+
+        <ChartCard title="Registros por día de la semana">
+          <BarChart data={registrosPorDiaSemana.map((d) => ({ label: d.dia.slice(0, 3), total: d.total }))} color="var(--accent)" />
+        </ChartCard>
+
+        {documentosPorFecha.some((d) => d.total > 0) && (
+          <ChartCard title="Documentos procesados por día (últimos 14 días)">
+            <BarChart
+              data={documentosPorFecha.map((d) => ({ label: d.fecha, total: d.total }))}
+              formatLabel={(d) => formatFechaCorta(d.label)}
+              color="var(--brand)"
+            />
+          </ChartCard>
+        )}
+
         {porHerramienta.length > 0 && (
           <>
             <h2 className="uppercase" style={{ fontSize: 15, letterSpacing: 0.6, marginBottom: 10 }}>
               Documentos por herramienta
             </h2>
+            <div className="card" style={{ padding: "18px 16px 10px", marginBottom: 12 }}>
+              <BarChart data={porHerramienta.map((d) => ({ label: d.herramienta, total: d.total }))} color="var(--brand)" />
+            </div>
             <div className="card" style={{ overflow: "hidden", marginBottom: 28 }}>
               {porHerramienta.map((row, i) => (
                 <div
@@ -192,6 +283,11 @@ function Dashboard({ datos }) {
             </table>
           </div>
         )}
+
+        <h2 className="uppercase" style={{ fontSize: 15, letterSpacing: 0.6, margin: "28px 0 10px" }}>
+          Preguntarle a la IA
+        </h2>
+        <PanelChat password={password} />
       </main>
 
       <Footer />
@@ -201,6 +297,7 @@ function Dashboard({ datos }) {
 
 export default function Panel() {
   const [datos, setDatos] = useState(null);
+  const [password, setPassword] = useState("");
   const [revisandoSesion, setRevisandoSesion] = useState(true);
 
   useEffect(() => {
@@ -215,7 +312,10 @@ export default function Panel() {
       return;
     }
     pedirDatos(claveGuardada)
-      .then(setDatos)
+      .then((d) => {
+        setDatos(d);
+        setPassword(claveGuardada);
+      })
       .catch(() => {
         try {
           sessionStorage.removeItem(SESSION_KEY);
@@ -227,6 +327,15 @@ export default function Panel() {
   }, []);
 
   if (revisandoSesion) return null;
-  if (!datos) return <PasswordGate onUnlock={setDatos} />;
-  return <Dashboard datos={datos} />;
+  if (!datos) {
+    return (
+      <PasswordGate
+        onUnlock={(d, clave) => {
+          setDatos(d);
+          setPassword(clave);
+        }}
+      />
+    );
+  }
+  return <Dashboard datos={datos} password={password} />;
 }

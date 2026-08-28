@@ -51,6 +51,8 @@ entorno (solo no se guardan registros ni funciona `/panel` — ver siguiente sec
      **sin** el prefijo `VITE_` (para que nunca llegue al navegador).
    - `PANEL_PASSWORD` — la contraseña para entrar a `/panel`. Tipo **Secret**, sin prefijo
      `VITE_`.
+   - `GEMINI_API_KEY` — para el chat de IA y el informe en PDF del panel (ver abajo). Es la
+     misma clave gratuita de Google AI Studio que ya usa la app interna del despacho.
 3. Vuelve a desplegar. Ya cada registro (nombre + celular) queda guardado, y cada documento
    procesado queda contado por herramienta.
 4. Entra a `/panel` (ej. `https://folio-pdf-omega.vercel.app/panel`) con la contraseña que
@@ -60,6 +62,15 @@ La lista de personas registradas (nombre y celular) se muestra directo en `/pane
 lee desde una función serverless (`api/panel-leads.js`) que usa la llave `service_role` de
 Supabase — esa llave nunca llega al navegador, solo vive en el servidor de Vercel, y la
 función exige la contraseña antes de devolver cualquier dato.
+
+El panel también incluye:
+- **Gráficas** de registros por día, por día de la semana, y documentos por herramienta.
+- **Chat con IA** (`api/panel-ai.js`) para preguntar sobre los datos en lenguaje natural.
+- **Generar informe PDF**: pide un análisis breve a la IA y arma un PDF (con `pdf-lib`, en el
+  navegador) con los números, las tablas y las recomendaciones.
+
+Todo esto vive detrás de la misma contraseña de `/panel` — es decir, solo para el
+administrador, nunca visible para quienes usan Folio.
 
 ## Firma electrónica
 
