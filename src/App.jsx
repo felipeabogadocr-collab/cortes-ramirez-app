@@ -2693,9 +2693,20 @@ function CasosTab() {
 
 const ESTADOS_VIGILANCIA = ["En trámite", "Con novedad", "Pendiente de revisión", "Finalizado"];
 
+async function consultarRamaJudicial(radicado) {
+  const response = await fetch(`/api/rama-judicial/consultar?radicado=${encodeURIComponent(radicado)}`);
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || "No se pudo consultar la Rama Judicial");
+  return data;
+}
+
 function VigilanciaTab() {
   const { ids } = useIndex("indice-clientes", false);
   const [clientes, setClientes] = useState({});
+  const [consultando, setConsultando] = useState(null);
+  const [resultados, setResultados] = useState({});
+  const [errores, setErrores] = useState({});
+  const [consultandoTodos, setConsultandoTodos] = useState(false);
 
   const cargar = useCallback(async () => {
     const entries = {};
@@ -2723,9 +2734,87 @@ function VigilanciaTab() {
     const actualizado = { ...c, timeline: [...(c.timeline || []), nuevaEntrada], ultimaActuacion: new Date().toISOString() };
     await storageSet(`cliente:${id}`, JSON.stringify(actualizado), false);
     setClientes((prev) => ({ ...prev, [id]: actualizado }));
+    return actualizado;
+  };
+
+  // Consulta un cliente puntual y solo muestra el resultado (no toca nada
+  // todavía) — el abogado decide si lo agrega a la línea de tiempo.
+  const consultarUno = async (id) => {
+    const c = clientes[id];
+    setConsultando(id);
+    setErrores((prev) => ({ ...prev, [id]: null }));
+    try {
+      const data = await consultarRamaJudicial(c.radicado);
+      setResultados((prev) => ({ ...prev, [id]: data }));
+    } catch (e) {
+      setErrores((prev) => ({ ...prev, [id]: e.message }));
+    }
+    setConsultando(null);
+  };
+
+  // "Marcar visto en Rama Judicial": guarda cuál fue la última actuación que
+  // ya se revisó, para poder comparar en la próxima consulta y avisar solo
+  // de lo nuevo.
+  const guardarComoVista = async (id, data) => {
+    const c = clientes[id];
+    const actualizado = {
+      ...c,
+      ramaJudicial: {
+        idProceso: data.idProceso,
+        despacho: data.proceso?.despacho || null,
+        ultimaActuacionVistaFecha: data.ultimaActuacion?.fecha || null,
+        consultadoEn: data.consultadoEn,
+      },
+    };
+    await storageSet(`cliente:${id}`, JSON.stringify(actualizado), false);
+    setClientes((prev) => ({ ...prev, [id]: actualizado }));
+  };
+
+  const agregarComoNovedad = async (id) => {
+    const data = resultados[id];
+    if (!data?.ultimaActuacion) return;
+    const texto = `Rama Judicial (${data.proceso?.despacho || "despacho no informado"}) — ${data.ultimaActuacion.actuacion || "Actuación"}${
+      data.ultimaActuacion.anotacion ? `: ${data.ultimaActuacion.anotacion}` : ""
+    }`;
+    await agregarNovedad(id, texto);
+    await guardarComoVista(id, data);
+    await cambiarEstadoVigilancia(id, "Con novedad");
   };
 
   const conRadicado = ids.filter((id) => clientes[id]?.radicado?.trim());
+
+  // Consulta todos los procesos con radicado y marca automáticamente "Con
+  // novedad" (y agrega la actuación a la línea de tiempo) solo en los que
+  // tengan una actuación más reciente que la última vez que se revisó.
+  const consultarTodos = async () => {
+    setConsultandoTodos(true);
+    for (const id of conRadicado) {
+      const c = clientes[id];
+      try {
+        const data = await consultarRamaJudicial(c.radicado);
+        setResultados((prev) => ({ ...prev, [id]: data }));
+        setErrores((prev) => ({ ...prev, [id]: null }));
+        const fechaVista = c.ramaJudicial?.ultimaActuacionVistaFecha;
+        const fechaNueva = data.ultimaActuacion?.fecha;
+        if (fechaNueva && (!fechaVista || new Date(fechaNueva) > new Date(fechaVista))) {
+          const texto = `Rama Judicial (${data.proceso?.despacho || "despacho no informado"}) — ${data.ultimaActuacion.actuacion || "Actuación"}${
+            data.ultimaActuacion.anotacion ? `: ${data.ultimaActuacion.anotacion}` : ""
+          }`;
+          const actualizado = await agregarNovedad(id, texto);
+          await guardarComoVista(id, data);
+          await storageSet(
+            `cliente:${id}`,
+            JSON.stringify({ ...actualizado, estadoVigilancia: "Con novedad", ramaJudicial: { idProceso: data.idProceso, despacho: data.proceso?.despacho || null, ultimaActuacionVistaFecha: fechaNueva, consultadoEn: data.consultadoEn } }),
+            false
+          );
+        }
+      } catch (e) {
+        setErrores((prev) => ({ ...prev, [id]: e.message }));
+      }
+    }
+    await cargar();
+    setConsultandoTodos(false);
+  };
 
   return (
     <div>
@@ -2744,19 +2833,28 @@ function VigilanciaTab() {
         }}
       >
         <strong>⚖️ Sobre esta sección:</strong> aquí centralizas los procesos que tienen número de radicado. La consulta{" "}
-        <strong>automática</strong> con la Rama Judicial no está disponible todavía — el Estado no ofrece una API pública
-        gratuita para esto, así que se necesita un servicio de consulta programada aparte cuando publiquemos la versión
-        final. Por ahora, registra aquí manualmente el estado y las novedades de cada proceso.
+        <strong>"Consultar Rama Judicial"</strong> trae el estado real desde la Consulta de Procesos Nacional Unificada
+        (el mismo buscador público de la Rama Judicial, por número de radicado — no existe una API oficial del Estado
+        para esto, así que si algún día cambian su página puede dejar de funcionar y hay que ajustarlo).
       </div>
 
-      <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted, marginBottom: 16 }}>
-        {conRadicado.length} proceso{conRadicado.length !== 1 ? "s" : ""} con radicado registrado
-      </p>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
+        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted, margin: 0 }}>
+          {conRadicado.length} proceso{conRadicado.length !== 1 ? "s" : ""} con radicado registrado
+        </p>
+        {conRadicado.length > 0 && (
+          <button className="drx-btn-primary" style={buttonPrimary} onClick={consultarTodos} disabled={consultandoTodos}>
+            {consultandoTodos ? "Consultando todos…" : "🔄 Consultar Rama Judicial (todos)"}
+          </button>
+        )}
+      </div>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         {conRadicado.map((id) => {
           const c = clientes[id];
           const dias = diasDesde(c.ultimaActuacion);
+          const resultado = resultados[id];
+          const errorConsulta = errores[id];
           return (
             <Card key={id}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
@@ -2766,6 +2864,11 @@ function VigilanciaTab() {
                   <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, margin: "3px 0 0" }}>
                     {c.tipoProceso} · {c.areaProceso} {dias !== null && `· última novedad hace ${dias} día${dias !== 1 ? "s" : ""}`}
                   </p>
+                  {c.ramaJudicial?.consultadoEn && (
+                    <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11, color: COLORS.muted, margin: "3px 0 0" }}>
+                      Última consulta a Rama Judicial: {new Date(c.ramaJudicial.consultadoEn).toLocaleString("es-CO", { dateStyle: "medium", timeStyle: "short" })}
+                    </p>
+                  )}
                 </div>
                 <select
                   className="drx-input"
@@ -2780,6 +2883,50 @@ function VigilanciaTab() {
                   ))}
                 </select>
               </div>
+
+              <button
+                className="drx-btn-ghost"
+                style={{ ...buttonGhost, fontSize: 12.5, padding: "7px 14px", marginBottom: 10 }}
+                onClick={() => consultarUno(id)}
+                disabled={consultando === id}
+              >
+                {consultando === id ? "Consultando…" : "🔄 Consultar Rama Judicial"}
+              </button>
+
+              {errorConsulta && (
+                <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: "#B42318", marginBottom: 10 }}>{errorConsulta}</p>
+              )}
+
+              {resultado && resultado.encontrado === false && (
+                <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, marginBottom: 10 }}>
+                  No se encontró ningún proceso con ese radicado en la Rama Judicial.
+                </p>
+              )}
+
+              {resultado?.encontrado && resultado.ultimaActuacion && (
+                <div style={{ background: COLORS.surfaceSoft, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: 12, marginBottom: 10 }}>
+                  <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, fontWeight: 600, color: COLORS.muted, marginBottom: 4 }}>
+                    Última actuación en Rama Judicial ({resultado.proceso?.despacho || "despacho no informado"})
+                  </p>
+                  <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.ink, margin: 0 }}>
+                    {new Date(resultado.ultimaActuacion.fecha).toLocaleDateString("es-CO", { dateStyle: "medium" })} —{" "}
+                    <strong>{resultado.ultimaActuacion.actuacion}</strong>
+                  </p>
+                  {resultado.ultimaActuacion.anotacion && (
+                    <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.inkSoft, margin: "4px 0 0" }}>
+                      {resultado.ultimaActuacion.anotacion}
+                    </p>
+                  )}
+                  <button
+                    className="drx-btn-primary"
+                    style={{ ...buttonPrimary, marginTop: 10, fontSize: 12, padding: "6px 12px" }}
+                    onClick={() => agregarComoNovedad(id)}
+                  >
+                    + Agregar a la línea de tiempo
+                  </button>
+                </div>
+              )}
+
               <LineaDeTiempo cliente={c} onAgregar={(nota) => agregarNovedad(id, nota)} />
             </Card>
           );
