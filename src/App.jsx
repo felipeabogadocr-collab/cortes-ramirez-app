@@ -6587,7 +6587,30 @@ function LandingPage({ onRegistrar, onIniciarSesion }) {
         .drx-faq summary::-webkit-details-marker { display: none; }
         .drx-faq summary::after { content: "+"; display: block; text-align: center; font-size: 16px; color: ${COLORS.accentBright}; margin-top: 4px; }
         .drx-faq details[open] summary::after { content: "−"; }
+        @keyframes drx-subir { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: translateY(0); } }
+        .drx-hero-item { opacity: 0; animation: drx-subir 0.7s ease forwards; }
+        .drx-cta-shine { position: relative; overflow: hidden; }
+        .drx-cta-shine::after {
+          content: ""; position: absolute; top: 0; left: -60%; width: 40%; height: 100%;
+          background: linear-gradient(115deg, transparent, rgba(255,255,255,0.45), transparent);
+          transform: skewX(-20deg); transition: left 0.55s ease;
+        }
+        .drx-cta-shine:hover::after { left: 130%; }
       `}</style>
+
+      <div
+        aria-hidden="true"
+        style={{
+          position: "fixed",
+          inset: 0,
+          pointerEvents: "none",
+          zIndex: 1,
+          opacity: 0.035,
+          mixBlendMode: "overlay",
+          backgroundImage:
+            "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\")",
+        }}
+      />
 
       <div
         style={{
@@ -6659,6 +6682,7 @@ function LandingPage({ onRegistrar, onIniciarSesion }) {
           }}
         />
         <span
+          className="drx-hero-item"
           style={{
             display: "inline-flex",
             alignItems: "center",
@@ -6672,12 +6696,14 @@ function LandingPage({ onRegistrar, onIniciarSesion }) {
             letterSpacing: 0.3,
             color: COLORS.navy,
             background: COLORS.accentSoft,
+            animationDelay: "0s",
           }}
         >
           <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#10B981", animation: "drx-pulse 1.8s ease-in-out infinite" }} />
           Software de gestión legal para despachos en Colombia
         </span>
         <h1
+          className="drx-hero-item"
           style={{
             fontFamily: "Inter, sans-serif",
             fontSize: 48,
@@ -6686,6 +6712,7 @@ function LandingPage({ onRegistrar, onIniciarSesion }) {
             margin: "26px auto 18px",
             maxWidth: 680,
             lineHeight: 1.12,
+            animationDelay: "0.1s",
           }}
         >
           <span style={{ color: COLORS.headingText }}>Todo tu despacho, </span>
@@ -6700,17 +6727,17 @@ function LandingPage({ onRegistrar, onIniciarSesion }) {
             en un solo lugar
           </span>
         </h1>
-        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 16, color: COLORS.muted, maxWidth: 580, margin: "0 auto 34px", lineHeight: 1.65 }}>
+        <p className="drx-hero-item" style={{ fontFamily: "Inter, sans-serif", fontSize: 16, color: COLORS.muted, maxWidth: 580, margin: "0 auto 34px", lineHeight: 1.65, animationDelay: "0.2s" }}>
           Clientes, procesos judiciales, cobros, documentos con <strong style={{ color: COLORS.inkSoft }}>firma electrónica</strong> y
           contenido para redes sociales — con inteligencia artificial que te ayuda en el día a día. Sin instalar nada,
           desde el celular o el computador.
         </p>
-        <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
-          <button className="drx-btn-primary" style={{ ...buttonPrimary, padding: "14px 28px", fontSize: 14 }} onClick={onRegistrar}>
+        <div className="drx-hero-item" style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap", animationDelay: "0.3s" }}>
+          <button className="drx-btn-primary drx-cta-shine" style={{ ...buttonPrimary, padding: "14px 28px", fontSize: 14 }} onClick={onRegistrar}>
             Registrar mi despacho
           </button>
         </div>
-        <div style={{ display: "flex", gap: 20, justifyContent: "center", flexWrap: "wrap", marginTop: 18 }}>
+        <div className="drx-hero-item" style={{ display: "flex", gap: 20, justifyContent: "center", flexWrap: "wrap", marginTop: 18, animationDelay: "0.4s" }}>
           {["Sin instalar nada", "Datos protegidos (Ley 1581 de 2012)", "Firma electrónica válida (Ley 527 de 1999)"].map((t) => (
             <span key={t} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontFamily: "Inter, sans-serif", fontSize: 11.5, color: COLORS.muted }}>
               <span style={{ color: "#10B981", fontWeight: 800 }}>✓</span>
@@ -6719,7 +6746,9 @@ function LandingPage({ onRegistrar, onIniciarSesion }) {
           ))}
         </div>
 
-        <VistaPreviaAnimada />
+        <div className="drx-hero-item" style={{ animationDelay: "0.5s" }}>
+          <VistaPreviaAnimada />
+        </div>
 
         <div
           aria-hidden="true"
@@ -6815,6 +6844,102 @@ function LandingPage({ onRegistrar, onIniciarSesion }) {
                 <p style={{ fontFamily: "Inter, sans-serif", fontSize: 14.5, fontWeight: 700, color: f.color, marginBottom: 8 }}>{f.titulo}</p>
                 <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.inkSoft, lineHeight: 1.6, margin: 0 }}>{f.texto}</p>
               </Card>
+            </AlEntrar>
+          ))}
+        </div>
+
+        <Kicker texto="En detalle" />
+        <h2 style={{ fontFamily: "Inter, sans-serif", fontSize: 22, fontWeight: 800, color: COLORS.headingText, textAlign: "center", marginBottom: 44 }}>
+          Lo que más usan los despachos
+        </h2>
+        <div style={{ display: "flex", flexDirection: "column", gap: 56, marginBottom: 64 }}>
+          {[
+            {
+              kicker: "Vigilancia judicial",
+              titulo: "La Rama Judicial, vigilada sola todos los días",
+              texto: "Registras el radicado una vez y Nomos consulta el proceso automáticamente cada día. Cuando hay una actuación nueva, una IA te la explica en palabras simples y te sugiere el siguiente paso — no vuelves a revisar procesos uno por uno.",
+              color: "#F5A524",
+              contenido: (
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {[
+                    { nombre: "Proceso 2024-00187", estado: "Con novedad", color: "#F5A524" },
+                    { nombre: "Proceso 2023-00542", estado: "En trámite", color: "#2F80ED" },
+                    { nombre: "Proceso 2022-00931", estado: "Finalizado", color: "#10B981" },
+                  ].map((p) => (
+                    <div key={p.nombre} style={{ background: "#0d2c54", borderRadius: 8, padding: "9px 12px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <span style={{ fontFamily: "monospace", fontSize: 11, color: "#D7E2F1" }}>{p.nombre}</span>
+                      <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontFamily: "Inter, sans-serif", fontSize: 9.5, fontWeight: 700, color: p.color }}>
+                        <span style={{ width: 6, height: 6, borderRadius: "50%", background: p.color }} />
+                        {p.estado}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ),
+            },
+            {
+              kicker: "Firma electrónica",
+              titulo: "Firmas con validez legal, desde el celular",
+              texto: "Compartes un código con tu cliente y firma sin instalar nada. Cada firma queda con hash de integridad, consentimiento expreso e IP capturada del lado del servidor — con base en la Ley 527 de 1999, y verificable después si el documento se modificó.",
+              color: "#10B981",
+              contenido: (
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  <div style={{ background: "#0d2c54", borderRadius: 10, padding: "12px 14px", display: "flex", alignItems: "center", gap: 12 }}>
+                    <div style={{ width: 30, height: 30, borderRadius: "50%", background: "#10B981", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                      <span style={{ color: "#FFFFFF", fontWeight: 800, fontSize: 14 }}>✓</span>
+                    </div>
+                    <div>
+                      <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, fontWeight: 700, color: "#FFFFFF", margin: 0 }}>Contrato de prestación de servicios</p>
+                      <p style={{ fontFamily: "Inter, sans-serif", fontSize: 9.5, color: "#9FB6D6", margin: "2px 0 0" }}>Firmado por cliente y abogado</p>
+                    </div>
+                  </div>
+                  <div style={{ background: "#0d2c54", borderRadius: 8, padding: "8px 12px", fontFamily: "monospace", fontSize: 9.5, color: "#7C93B8", wordBreak: "break-all" }}>
+                    hash: 8f3a2c…e91d — íntegro ✓
+                  </div>
+                </div>
+              ),
+            },
+            {
+              kicker: "Reportes",
+              titulo: "Decide con datos reales, no con intuición",
+              texto: "Ingresos por mes, procesos por estado y carga de trabajo por abogado, siempre actualizados y sin armar nada en Excel. Sabes cuánto entró este mes y cuánto falta por cobrar con solo entrar a la pestaña.",
+              color: "#0EA5E9",
+              contenido: (
+                <div>
+                  <div style={{ background: "#0d2c54", borderRadius: 10, padding: "12px 14px", display: "flex", alignItems: "flex-end", gap: 8, height: 84, marginBottom: 10 }}>
+                    {[30, 48, 40, 62, 58, 75, 66].map((h, i) => (
+                      <div key={i} style={{ flex: 1, height: `${h}%`, borderRadius: 3, background: i === 5 ? "#0EA5E9" : "#1e5fb4" }} />
+                    ))}
+                  </div>
+                  <div style={{ background: "#0d2c54", borderRadius: 8, padding: "9px 12px", display: "flex", justifyContent: "space-between" }}>
+                    <span style={{ fontFamily: "Inter, sans-serif", fontSize: 10, color: "#9FB6D6" }}>Ingreso este mes</span>
+                    <span style={{ fontFamily: "Inter, sans-serif", fontSize: 12, fontWeight: 800, color: "#10B981" }}>▲ 18%</span>
+                  </div>
+                </div>
+              ),
+            },
+          ].map((f, i) => (
+            <AlEntrar key={f.kicker}>
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: i % 2 === 0 ? "row" : "row-reverse",
+                  flexWrap: "wrap",
+                  alignItems: "center",
+                  gap: 36,
+                }}
+              >
+                <div style={{ flex: "1 1 320px" }}>
+                  <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11, fontWeight: 800, letterSpacing: 1, textTransform: "uppercase", color: f.color, marginBottom: 8 }}>
+                    {f.kicker}
+                  </p>
+                  <p style={{ fontFamily: "Inter, sans-serif", fontSize: 19, fontWeight: 800, color: COLORS.headingText, marginBottom: 10, lineHeight: 1.35 }}>{f.titulo}</p>
+                  <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.inkSoft, lineHeight: 1.65, margin: 0 }}>{f.texto}</p>
+                </div>
+                <div style={{ flex: "1 1 320px" }}>
+                  <div style={{ background: COLORS.navy, borderRadius: 14, padding: 18, boxShadow: "0 18px 40px rgba(10,35,66,0.22)" }}>{f.contenido}</div>
+                </div>
+              </div>
             </AlEntrar>
           ))}
         </div>
