@@ -6413,14 +6413,14 @@ const PLANES_PRECIO = [
 ];
 
 const FUNCIONES_LANDING = [
-  { titulo: "Resumen", color: "#2F80ED", icono: "📊", texto: "Lo que necesita tu atención hoy, en un solo panel." },
-  { titulo: "Clientes", color: "#14B8A6", icono: "👥", texto: "Ficha completa por cliente, con búsqueda instantánea." },
-  { titulo: "Vigilancia judicial", color: "#F5A524", icono: "⚖️", texto: "La Rama Judicial, consultada y explicada por IA." },
-  { titulo: "Contabilidad", color: "#F43F5E", icono: "💳", texto: "Pagos, recibos y cobros listos para WhatsApp." },
-  { titulo: "Calendario de contenido", color: "#8B5CF6", icono: "📅", texto: "Ideas de redes sociales generadas con IA." },
-  { titulo: "Firmar documentos", color: "#10B981", icono: "✍️", texto: "Firma electrónica desde el celular, sin instalar nada." },
-  { titulo: "Portal del cliente", color: "#2F80ED", icono: "🔗", texto: "Tus clientes consultan su caso sin llamarte." },
-  { titulo: "Reportes", color: "#0EA5E9", icono: "📈", texto: "Ingresos y carga de trabajo, con datos reales." },
+  { titulo: "Resumen", color: "#2F80ED", iconoTab: "resumen", texto: "Lo que necesita tu atención hoy, en un solo panel." },
+  { titulo: "Clientes", color: "#14B8A6", iconoTab: "clientes", texto: "Ficha completa por cliente, con búsqueda instantánea." },
+  { titulo: "Vigilancia judicial", color: "#F5A524", iconoTab: "vigilancia", texto: "La Rama Judicial, consultada y explicada por IA." },
+  { titulo: "Contabilidad", color: "#F43F5E", iconoTab: "contabilidad", texto: "Pagos, recibos y cobros listos para WhatsApp." },
+  { titulo: "Calendario de contenido", color: "#8B5CF6", iconoTab: "contenido", texto: "Ideas de redes sociales generadas con IA." },
+  { titulo: "Firmar documentos", color: "#10B981", iconoTab: "documentos", texto: "Firma electrónica desde el celular, sin instalar nada." },
+  { titulo: "Portal del cliente", color: "#2F80ED", iconoTab: "usuarios", texto: "Tus clientes consultan su caso sin llamarte." },
+  { titulo: "Reportes", color: "#0EA5E9", iconoTab: "reportes", texto: "Ingresos y carga de trabajo, con datos reales." },
 ];
 
 const FAQ_LANDING = [
@@ -6458,15 +6458,86 @@ const FAQ_LANDING = [
   },
 ];
 
+// Íconos de línea propios (mismo lenguaje visual que IconoTab) para la
+// sección de Seguridad de la landing — sin usar emojis, que en algunos
+// sistemas se ven a color y desentonan con el resto del diseño monocromo.
+function IconoSeguridad({ tipo, size = 18 }) {
+  const props = { width: size, height: size, viewBox: "0 0 20 20", fill: "none", stroke: "currentColor", strokeWidth: 1.5, strokeLinecap: "round", strokeLinejoin: "round" };
+  switch (tipo) {
+    case "candado":
+      return (
+        <svg {...props}>
+          <rect x="5" y="9" width="10" height="8" rx="1.5" />
+          <path d="M7 9V6a3 3 0 0 1 6 0v3" />
+        </svg>
+      );
+    case "aislamiento":
+      return (
+        <svg {...props}>
+          <rect x="3" y="3" width="6" height="6" rx="1" />
+          <rect x="11" y="11" width="6" height="6" rx="1" />
+        </svg>
+      );
+    case "auditoria":
+      return (
+        <svg {...props}>
+          <path d="M6 3h6l3 3v11H6V3Z" />
+          <path d="M8 9.5h4M8 12.5h4M8 15h2" />
+        </svg>
+      );
+    case "escudo":
+      return (
+        <svg {...props}>
+          <path d="M10 2.5 16 5v4.5c0 4-2.5 6.7-6 7.5-3.5-.8-6-3.5-6-7.5V5l6-2.5Z" />
+          <path d="M7.3 10 9 11.7 12.7 8" />
+        </svg>
+      );
+    case "descarga":
+      return (
+        <svg {...props}>
+          <path d="M10 3v8" />
+          <path d="M6.7 8 10 11.3 13.3 8" />
+          <path d="M4.5 16.5h11" />
+        </svg>
+      );
+    case "transito":
+      return (
+        <svg {...props}>
+          <path d="M3.5 10h13" />
+          <path d="M3.5 10l3.2-3.2M3.5 10l3.2 3.2" />
+          <path d="M16.5 10l-3.2-3.2M16.5 10l-3.2 3.2" />
+        </svg>
+      );
+    case "reloj":
+      return (
+        <svg {...props}>
+          <circle cx="10" cy="10" r="7.2" />
+          <path d="M10 6v4l3 2" />
+        </svg>
+      );
+    case "firma":
+      return (
+        <svg {...props}>
+          <path d="M4 15.7 13 6.7a1.4 1.4 0 0 1 2 2L6 17.7H4v-2Z" />
+          <path d="M3 17.7h13.5" />
+        </svg>
+      );
+    default:
+      return null;
+  }
+}
+
+const ICONOS_SEGURIDAD_ORDEN = ["candado", "aislamiento", "auditoria", "escudo", "descarga", "transito", "reloj", "firma"];
+
 const SEGURIDAD_LANDING = [
-  { titulo: "Autenticación real", texto: "Contraseñas nunca en texto plano, con verificación por correo." },
-  { titulo: "Aislamiento total", texto: "Cada despacho ve únicamente sus propios datos." },
-  { titulo: "Registro de auditoría", texto: "Constancia de quién hizo qué y cuándo." },
-  { titulo: "Freno a ataques", texto: "Límite automático de intentos, con espera creciente." },
-  { titulo: "Respaldo descargable", texto: "Toda tu información, exportable cuando quieras." },
-  { titulo: "Conexión cifrada", texto: "HTTPS con cabeceras de seguridad activas." },
-  { titulo: "Sesión con vencimiento", texto: "Cierre automático si dejas el computador sin usar." },
-  { titulo: "Firma verificable", texto: "Hash de integridad e IP en cada firma electrónica." },
+  { titulo: "Autenticación real", texto: "Contraseñas cifradas, nunca en texto plano." },
+  { titulo: "Aislamiento total", texto: "Cada despacho ve solo lo suyo." },
+  { titulo: "Registro de auditoría", texto: "Constancia de cada acción realizada." },
+  { titulo: "Freno a ataques", texto: "Espera automática tras intentos fallidos." },
+  { titulo: "Respaldo descargable", texto: "Tu información, exportable cuando quieras." },
+  { titulo: "Conexión cifrada", texto: "Toda la conexión viaja protegida." },
+  { titulo: "Sesión con vencimiento", texto: "Se cierra sola si la dejas abierta." },
+  { titulo: "Firma verificable", texto: "Cada firma queda con huella digital." },
 ];
 
 function PoliticaPrivacidad() {
@@ -6908,7 +6979,7 @@ function LandingPage({ onRegistrar, onIniciarSesion }) {
                     fontSize: 18,
                   }}
                 >
-                  {f.icono || "•"}
+                  <IconoTab tipo={f.iconoTab} />
                 </div>
                 <p style={{ fontFamily: "Inter, sans-serif", fontSize: 14.5, fontWeight: 700, color: f.color, marginBottom: 8 }}>{f.titulo}</p>
                 <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.inkSoft, lineHeight: 1.6, margin: 0 }}>{f.texto}</p>
@@ -7094,7 +7165,7 @@ function LandingPage({ onRegistrar, onIniciarSesion }) {
                       marginBottom: 10,
                     }}
                   >
-                    {["🔒", "🏢", "📝", "🚫", "💾", "🔐", "⏱️", "🖋️"][i % 8]}
+                    <IconoSeguridad tipo={ICONOS_SEGURIDAD_ORDEN[i % ICONOS_SEGURIDAD_ORDEN.length]} />
                   </div>
                   <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, fontWeight: 700, color: COLORS.headingText, margin: "0 0 4px" }}>{s.titulo}</p>
                   <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.inkSoft, lineHeight: 1.5, margin: 0 }}>{s.texto}</p>
@@ -7697,8 +7768,9 @@ function LoginGate({ onIngresar, onCancelar, pantallaInicial }) {
           width: 300,
           height: 300,
           borderRadius: "50%",
-          background: "radial-gradient(circle, rgba(30,95,180,0.16) 0%, rgba(30,95,180,0) 70%)",
+          background: `radial-gradient(circle, rgba(30,95,180,${oscuro ? 0.32 : 0.16}) 0%, rgba(30,95,180,0) 70%)`,
           animation: "drx-mesh 12s ease-in-out infinite",
+          transition: "background 0.3s ease",
           pointerEvents: "none",
         }}
       />
@@ -7711,8 +7783,9 @@ function LoginGate({ onIngresar, onCancelar, pantallaInicial }) {
           width: 260,
           height: 260,
           borderRadius: "50%",
-          background: "radial-gradient(circle, rgba(20,184,166,0.14) 0%, rgba(20,184,166,0) 70%)",
+          background: `radial-gradient(circle, rgba(20,184,166,${oscuro ? 0.28 : 0.14}) 0%, rgba(20,184,166,0) 70%)`,
           animation: "drx-mesh 15s ease-in-out infinite reverse",
+          transition: "background 0.3s ease",
           pointerEvents: "none",
         }}
       />
