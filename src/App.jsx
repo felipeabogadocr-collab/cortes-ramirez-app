@@ -56,6 +56,15 @@ const TIPOS_ID = ["Cédula de ciudadanía", "Cédula de extranjería", "Pasaport
 // Número de WhatsApp del despacho (con indicativo, sin espacios ni +), usado en el botón "¿Tienes dudas?"
 const NUMERO_WHATSAPP_DESPACHO = "573192875428";
 
+// Tope de tamaño para cualquier archivo que el navegador procese (subida de
+// documentos, adjuntos al asistente con IA): protege contra que un archivo
+// enorme (a propósito o por error) trabe la pestaña convirtiéndolo a base64,
+// o dispare un cobro innecesario al enviarlo entero a la IA.
+const TAMANO_MAX_ARCHIVO_MB = 8;
+function archivoDemasiadoGrande(file) {
+  return file.size > TAMANO_MAX_ARCHIVO_MB * 1024 * 1024;
+}
+
 const TIPOS_PROCESO = ["Ordinario", "Verbal", "Verbal sumario", "Ejecutivo", "Declarativo", "Tutela", "Arbitraje", "Otro"];
 const AREAS_PROCESO = ["Civil", "Penal", "Laboral", "Familia", "Comercial", "Administrativo", "Constitucional", "Otro"];
 const COLOR_AREA_PROCESO = {
@@ -1468,6 +1477,11 @@ function AsistenteIA({ nombre, usuarioId, onAccionCompletada }) {
     if (!file) return;
     e.target.value = "";
     const nombreArchivo = file.name.toLowerCase();
+
+    if (archivoDemasiadoGrande(file)) {
+      setAdjunto({ tipoBloque: "error", nombre: `${file.name} (pesa más de ${TAMANO_MAX_ARCHIVO_MB} MB)` });
+      return;
+    }
 
     if (file.type.startsWith("image/")) {
       const base64 = await fileToBase64(file);
@@ -5394,6 +5408,12 @@ function DocumentosTab() {
     setErrorArchivo("");
     const nombre = file.name.toLowerCase();
 
+    if (archivoDemasiadoGrande(file)) {
+      e.target.value = "";
+      setErrorArchivo(`Ese archivo pesa demasiado (máximo ${TAMANO_MAX_ARCHIVO_MB} MB). Prueba con uno más liviano.`);
+      return;
+    }
+
     if (nombre.endsWith(".pdf")) {
       e.target.value = "";
       setErrorArchivo(
@@ -7442,6 +7462,48 @@ function PantallaPendienteActivacion({ usuarioActual, onCerrarSesion }) {
   );
 }
 
+// Freno del lado del cliente contra intentos repetidos de inicio de sesión y
+// contra el "bombardeo" de correos de recuperación de contraseña. No
+// reemplaza los límites del servidor (Supabase Auth ya los tiene) — es una
+// capa adicional, y por eso se guarda en localStorage: así sobrevive a
+// recargar la página, que es lo primero que probaría alguien para saltársela.
+const LLAVE_INTENTOS_LOGIN = "nomos_intentos_login";
+const LLAVE_COOLDOWN_RECUPERACION = "nomos_cooldown_recuperacion";
+
+function leerJSONLocal(llave, porDefecto) {
+  try {
+    const raw = localStorage.getItem(llave);
+    return raw ? JSON.parse(raw) : porDefecto;
+  } catch {
+    return porDefecto;
+  }
+}
+
+function guardarJSONLocal(llave, valor) {
+  try {
+    localStorage.setItem(llave, JSON.stringify(valor));
+  } catch {
+    // localStorage puede fallar (modo incógnito estricto, cuota llena) — el
+    // freno simplemente no persiste entre recargas en ese caso, sin romper
+    // el inicio de sesión.
+  }
+}
+
+function useCuentaRegresiva(hastaCuando) {
+  const [segundos, setSegundos] = useState(0);
+  useEffect(() => {
+    if (!hastaCuando) {
+      setSegundos(0);
+      return;
+    }
+    const tick = () => setSegundos(Math.max(0, Math.ceil((hastaCuando - Date.now()) / 1000)));
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [hastaCuando]);
+  return segundos;
+}
+
 function LoginGate({ onIngresar, onCancelar, pantallaInicial }) {
   const { oscuro, alternar } = useTema();
   const [pantalla, setPantalla] = useState(pantallaInicial || "login"); // login | registro
@@ -7459,6 +7521,10 @@ function LoginGate({ onIngresar, onCancelar, pantallaInicial }) {
   // llenando el formulario a mano.
   const [sitioWeb, setSitioWeb] = useState("");
   const [iniciadoEn] = useState(() => Date.now());
+  const [bloqueadoHasta, setBloqueadoHasta] = useState(() => leerJSONLocal(LLAVE_INTENTOS_LOGIN, {}).bloqueadoHasta || 0);
+  const segundosBloqueoLogin = useCuentaRegresiva(bloqueadoHasta);
+  const [proximoEnvioRecuperacion, setProximoEnvioRecuperacion] = useState(() => leerJSONLocal(LLAVE_COOLDOWN_RECUPERACION, {}).proximoEnvio || 0);
+  const segundosEsperaRecuperacion = useCuentaRegresiva(proximoEnvioRecuperacion);
 
   useEffect(() => {
     ensureFonts();
@@ -7526,26 +7592,46 @@ function LoginGate({ onIngresar, onCancelar, pantallaInicial }) {
   };
 
   const iniciarSesion = async () => {
-    if (!email.trim() || !contrasena.trim()) return;
+    if (!email.trim() || !contrasena.trim() || segundosBloqueoLogin > 0) return;
     setEnviando(true);
     setError("");
     const { error: loginError } = await supabase.auth.signInWithPassword({ email: email.trim(), password: contrasena });
     if (loginError) {
+      const anterior = leerJSONLocal(LLAVE_INTENTOS_LOGIN, { intentos: 0 });
+      const intentos = (anterior.intentos || 0) + 1;
+      // A partir del 5º intento fallido seguido, cada uno duplica la espera
+      // (30s, 60s, 120s…) hasta un tope de 5 minutos — suficiente para
+      // frenar un ataque automatizado sin castigar a alguien que
+      // simplemente se equivocó de contraseña una o dos veces.
+      let nuevoBloqueo = 0;
+      if (intentos >= 5) {
+        nuevoBloqueo = Date.now() + Math.min(30 * 2 ** (intentos - 5), 300) * 1000;
+        setBloqueadoHasta(nuevoBloqueo);
+      }
+      guardarJSONLocal(LLAVE_INTENTOS_LOGIN, { intentos, bloqueadoHasta: nuevoBloqueo });
       setError("Correo o contraseña incorrectos.");
       setEnviando(false);
       return;
     }
+    guardarJSONLocal(LLAVE_INTENTOS_LOGIN, { intentos: 0, bloqueadoHasta: 0 });
+    setBloqueadoHasta(0);
     setEnviando(false);
     onIngresar();
   };
 
   const enviarRecuperacion = async () => {
-    if (!email.trim()) return;
+    if (!email.trim() || segundosEsperaRecuperacion > 0) return;
     setEnviando(true);
     setError("");
     const { error: recError } = await supabase.auth.resetPasswordForEmail(email.trim(), {
       redirectTo: typeof window !== "undefined" ? window.location.origin : undefined,
     });
+    // El freno se aplica hayamos podido enviar el correo o no — evita que
+    // alguien use este formulario para bombardear de correos de
+    // recuperación la bandeja de entrada de otra persona.
+    const proximo = Date.now() + 45 * 1000;
+    setProximoEnvioRecuperacion(proximo);
+    guardarJSONLocal(LLAVE_COOLDOWN_RECUPERACION, { proximoEnvio: proximo });
     setEnviando(false);
     if (recError) {
       setError("No pudimos enviar el correo. Verifica la dirección e intenta de nuevo.");
@@ -7681,13 +7767,18 @@ function LoginGate({ onIngresar, onCancelar, pantallaInicial }) {
               </Field>
             </div>
             {error && <p style={{ color: "#B42318", fontSize: 12.5, marginTop: 10, fontFamily: "Inter, sans-serif" }}>{error}</p>}
+            {segundosBloqueoLogin > 0 && (
+              <p style={{ color: "#B45309", fontSize: 12, marginTop: 10, fontFamily: "Inter, sans-serif" }}>
+                Demasiados intentos fallidos. Espera {segundosBloqueoLogin}s antes de volver a intentar.
+              </p>
+            )}
             <button
               className="drx-btn-primary"
               style={{ ...buttonPrimary, width: "100%", marginTop: 16 }}
               onClick={iniciarSesion}
-              disabled={enviando || !email.trim() || !contrasena.trim()}
+              disabled={enviando || !email.trim() || !contrasena.trim() || segundosBloqueoLogin > 0}
             >
-              {enviando ? "Ingresando…" : "Ingresar"}
+              {segundosBloqueoLogin > 0 ? `Espera ${segundosBloqueoLogin}s` : enviando ? "Ingresando…" : "Ingresar"}
             </button>
             <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11, color: COLORS.muted, marginTop: 14, textAlign: "center" }}>
               <button
@@ -7731,9 +7822,9 @@ function LoginGate({ onIngresar, onCancelar, pantallaInicial }) {
               className="drx-btn-primary"
               style={{ ...buttonPrimary, width: "100%", marginTop: 16 }}
               onClick={enviarRecuperacion}
-              disabled={enviando || !email.trim()}
+              disabled={enviando || !email.trim() || segundosEsperaRecuperacion > 0}
             >
-              {enviando ? "Enviando…" : "Enviar enlace de recuperación"}
+              {segundosEsperaRecuperacion > 0 ? `Espera ${segundosEsperaRecuperacion}s` : enviando ? "Enviando…" : "Enviar enlace de recuperación"}
             </button>
             <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11, color: COLORS.muted, marginTop: 14, textAlign: "center" }}>
               <button
