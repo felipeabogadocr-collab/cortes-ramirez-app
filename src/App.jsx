@@ -4646,6 +4646,7 @@ function DocumentosTab() {
   const [errorArchivo, setErrorArchivo] = useState("");
   const [editandoDocId, setEditandoDocId] = useState(null);
   const [formEdicionDoc, setFormEdicionDoc] = useState({});
+  const [filtro, setFiltro] = useState("");
 
   const cargar = useCallback(async () => {
     const entries = {};
@@ -4788,12 +4789,31 @@ function DocumentosTab() {
     setPreviewAbogado(null);
   };
 
+  const textoFiltro = filtro.trim().toLowerCase();
+  const idsFiltrados = textoFiltro
+    ? ids.filter((id) => {
+        const d = docs[id];
+        if (!d) return false;
+        return d.titulo?.toLowerCase().includes(textoFiltro) || d.cliente?.toLowerCase().includes(textoFiltro);
+      })
+    : ids;
+
   return (
     <div>
       <EncabezadoSeccion titulo="Firmar documentos" color="#10B981" />
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+      <div style={{ marginBottom: 14 }}>
+        <input
+          className="drx-input"
+          style={{ ...inputStyle, maxWidth: 320 }}
+          placeholder="Filtrar por título o cliente..."
+          value={filtro}
+          onChange={(e) => setFiltro(e.target.value)}
+        />
+      </div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
         <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted, margin: 0 }}>
-          {ids.length} documento{ids.length !== 1 ? "s" : ""} · comparte el código con tus clientes para que firmen
+          {idsFiltrados.length} documento{idsFiltrados.length !== 1 ? "s" : ""}
+          {filtro.trim() ? ` de ${ids.length}` : ""} · comparte el código con tus clientes para que firmen
         </p>
         <button className="drx-btn-primary" style={buttonPrimary} onClick={() => setShowForm((s) => !s)}>
           {showForm ? "Cancelar" : "+ Nuevo documento"}
@@ -4870,7 +4890,7 @@ function DocumentosTab() {
       )}
 
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-        {ids.map((id) => {
+        {idsFiltrados.map((id) => {
           const d = docs[id];
           if (!d) return null;
           const firmantes = d.firmantes || [];
@@ -5059,6 +5079,9 @@ function DocumentosTab() {
         })}
         {ids.length === 0 && !showForm && (
           <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted }}>Aún no has creado documentos para firma.</p>
+        )}
+        {ids.length > 0 && idsFiltrados.length === 0 && (
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted }}>Ningún documento coincide con "{filtro}".</p>
         )}
       </div>
     </div>
