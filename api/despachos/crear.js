@@ -59,9 +59,12 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "Ya existe un despacho para esta cuenta." });
     }
 
+    // Nace inactivo a propósito: queda pendiente de que el superadmin de la
+    // plataforma lo active desde /api/plataforma/despachos.js, tras
+    // coordinar el pago (ver PantallaPendienteActivacion en el frontend).
     const { data: despacho, error: despachoError } = await admin
       .from("despachos")
-      .insert({ nombre: nombreDespacho.trim() })
+      .insert({ nombre: nombreDespacho.trim(), activo: false })
       .select()
       .single();
     if (despachoError) throw despachoError;

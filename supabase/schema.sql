@@ -113,6 +113,16 @@ alter table app_settings add column if not exists despacho_id uuid references de
 alter table perfiles add column if not exists despacho_id uuid references despachos (id);
 alter table auditoria add column if not exists despacho_id uuid references despachos (id);
 
+-- Activación de cuenta (pago) y superadministrador ---------------------------
+-- "activo" en true por defecto para no afectar despachos que ya existían
+-- antes de esta migración; los despachos NUEVOS se crean con activo=false
+-- desde api/despachos/crear.js, y quedan pendientes de que el superadmin
+-- los active tras coordinar el pago (ver PantallaPendienteActivacion).
+alter table despachos add column if not exists activo boolean not null default true;
+alter table perfiles add column if not exists es_superadmin boolean not null default false;
+
+update perfiles set es_superadmin = true where email = 'felipeabogadocr@gmail.com';
+
 -- Migrar datos existentes a un despacho "Cortés Ramírez Abogados" -----------
 -- Si esta base de datos ya tenía información de antes de que existiera el
 -- concepto de despacho, se crea uno y se le asigna todo lo huérfano. Si ya

@@ -6064,10 +6064,46 @@ function LandingPage({ onRegistrar, onIniciarSesion }) {
             Registrar mi despacho
           </button>
         </div>
+
+        <div
+          style={{
+            maxWidth: 720,
+            margin: "40px auto 0",
+            background: COLORS.navy,
+            borderRadius: 18,
+            padding: "36px 28px",
+            position: "relative",
+            overflow: "hidden",
+            boxShadow: "0 24px 60px rgba(10,35,66,0.35)",
+          }}
+        >
+          <div style={{ position: "absolute", top: -160, right: -140, width: 380, height: 380, borderRadius: "50%", background: "#143c72" }} />
+          <div style={{ position: "relative", display: "flex", alignItems: "center", gap: 18, flexWrap: "wrap", justifyContent: "center" }}>
+            <div style={{ width: 64, height: 64, borderRadius: 16, background: "#FFFFFF", display: "flex", alignItems: "center", justifyContent: "center", color: COLORS.navy, flexShrink: 0 }}>
+              <IconoNomos size={34} />
+            </div>
+            <div style={{ textAlign: "left" }}>
+              <p style={{ fontFamily: "Inter, sans-serif", fontSize: 26, fontWeight: 800, color: "#FFFFFF", margin: 0 }}>Nomos</p>
+              <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: "#9FB6D6", margin: "4px 0 0" }}>Gestión legal para despachos de abogados</p>
+            </div>
+          </div>
+          <p
+            style={{
+              position: "relative",
+              fontFamily: "Inter, sans-serif",
+              fontSize: 12.5,
+              color: "#D7E2F1",
+              textAlign: "center",
+              marginTop: 20,
+            }}
+          >
+            Clientes · Vigilancia judicial · Firma electrónica · Contabilidad · Contenido con IA
+          </p>
+        </div>
       </div>
 
       <div style={{ maxWidth: 1040, margin: "0 auto", padding: "0 20px 60px" }}>
-        <h2 id="funciones" style={{ fontFamily: "Inter, sans-serif", fontSize: 22, fontWeight: 800, color: COLORS.headingText, textAlign: "center", marginBottom: 8, scrollMarginTop: 90 }}>
+        <h2 id="funciones" style={{ fontFamily: "Inter, sans-serif", fontSize: 22, fontWeight: 800, color: COLORS.headingText, textAlign: "center", marginBottom: 8, marginTop: 20, scrollMarginTop: 90 }}>
           Qué encuentras adentro
         </h2>
         <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted, textAlign: "center", marginBottom: 30 }}>
@@ -6196,6 +6232,83 @@ function LandingPage({ onRegistrar, onIniciarSesion }) {
           </div>
         </div>
       </div>
+
+      <a
+        href={`https://wa.me/${NUMERO_WHATSAPP_DESPACHO}?text=${encodeURIComponent("Hola, tengo una pregunta sobre Nomos.")}`}
+        target="_blank"
+        rel="noreferrer"
+        title="Escríbenos por WhatsApp"
+        style={{
+          position: "fixed",
+          bottom: 22,
+          right: 22,
+          width: 56,
+          height: 56,
+          borderRadius: "50%",
+          background: "#1DA851",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          boxShadow: "0 8px 20px rgba(0,0,0,0.25)",
+          zIndex: 40,
+          textDecoration: "none",
+        }}
+      >
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="#FFFFFF">
+          <path d="M17.5 14.4c-.3-.1-1.7-.8-2-1-.3-.1-.5-.1-.7.1-.2.3-.8 1-1 1.2-.2.2-.4.2-.6.1-.3-.1-1.3-.5-2.5-1.5-.9-.8-1.5-1.8-1.7-2.1-.2-.3 0-.5.1-.6.1-.1.3-.4.4-.5.1-.2.2-.3.3-.5.1-.2 0-.4 0-.5 0-.1-.7-1.6-.9-2.2-.2-.5-.5-.5-.7-.5h-.6c-.2 0-.5.1-.8.4-.3.3-1 1-1 2.4s1.1 2.8 1.2 3c.1.2 2.2 3.4 5.4 4.7.8.3 1.4.5 1.8.7.8.2 1.5.2 2 .1.6-.1 1.7-.7 2-1.4.2-.7.2-1.2.1-1.4-.1-.1-.3-.2-.6-.3Z" />
+          <path d="M12 2a10 10 0 0 0-8.6 15L2 22l5.1-1.3A10 10 0 1 0 12 2Zm0 18.2c-1.6 0-3.1-.4-4.5-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2Z" />
+        </svg>
+      </a>
+    </div>
+  );
+}
+
+function PantallaPendienteActivacion({ usuarioActual, onCerrarSesion }) {
+  const { oscuro, alternar } = useTema();
+  const mensaje = `Hola, quiero activar mi cuenta en Nomos.\n\nDespacho: ${usuarioActual.despachoNombre}\nCorreo: ${usuarioActual.email}`;
+  return (
+    <div
+      className={`${oscuro ? "drx-tema-oscuro" : "drx-tema-claro"} drx-glow`}
+      style={{ minHeight: "100%", background: COLORS.bg, display: "flex", alignItems: "center", justifyContent: "center", padding: 24, position: "relative" }}
+    >
+      <GlobalStyle />
+      <div style={{ position: "absolute", top: 20, right: 20 }}>
+        <BotonTema oscuro={oscuro} onClick={alternar} />
+      </div>
+      <Card style={{ maxWidth: 440, width: "100%", textAlign: "center" }}>
+        <InsigniaPlataforma grande />
+        <h1 style={{ fontFamily: "Inter, sans-serif", fontSize: 20, fontWeight: 800, color: COLORS.headingText, margin: "0 0 10px" }}>
+          Tu cuenta está casi lista
+        </h1>
+        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted, lineHeight: 1.6, marginBottom: 22 }}>
+          Ya confirmamos tu correo y creamos <strong>{usuarioActual.despachoNombre}</strong>. Solo falta coordinar el pago
+          para activar el acceso — escríbenos por WhatsApp y lo dejamos listo.
+        </p>
+        <a
+          href={`https://wa.me/${NUMERO_WHATSAPP_DESPACHO}?text=${encodeURIComponent(mensaje)}`}
+          target="_blank"
+          rel="noreferrer"
+          style={{
+            ...buttonPrimary,
+            background: "#1DA851",
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 8,
+            width: "100%",
+            textDecoration: "none",
+            boxSizing: "border-box",
+          }}
+        >
+          💬 Escribir por WhatsApp para activar
+        </a>
+        <button
+          onClick={onCerrarSesion}
+          style={{ background: "none", border: "none", color: COLORS.muted, fontSize: 12, cursor: "pointer", fontFamily: "Inter, sans-serif", textDecoration: "underline", marginTop: 16 }}
+        >
+          Cerrar sesión
+        </button>
+      </Card>
     </div>
   );
 }
@@ -6247,6 +6360,15 @@ function LoginGate({ onIngresar, onCancelar, pantallaInicial }) {
       });
       if (signUpError) throw signUpError;
       if (!signUpData.user) throw new Error("No se pudo crear la cuenta.");
+      // Cuando el correo ya tiene una cuenta confirmada, Supabase no lo dice
+      // directamente (por seguridad, para no revelar qué correos existen),
+      // pero devuelve "identities" vacío en vez de la identidad nueva —
+      // así se puede distinguir sin debilitar esa protección.
+      if (Array.isArray(signUpData.user.identities) && signUpData.user.identities.length === 0) {
+        setError("Ya existe una cuenta con este correo. Inicia sesión, o si olvidaste tu contraseña, recupérala.");
+        setEnviando(false);
+        return;
+      }
 
       const response = await fetch("/api/despachos/crear", {
         method: "POST",
@@ -6516,6 +6638,131 @@ function LoginGate({ onIngresar, onCancelar, pantallaInicial }) {
           verifica el servidor.
         </p>
       </Card>
+    </div>
+  );
+}
+
+function PlataformaTab() {
+  const [despachos, setDespachos] = useState([]);
+  const [cargando, setCargando] = useState(true);
+  const [error, setError] = useState("");
+  const [cambiando, setCambiando] = useState(null);
+
+  const cargar = useCallback(async () => {
+    setCargando(true);
+    setError("");
+    try {
+      const { data: sesionData } = await supabase.auth.getSession();
+      const token = sesionData?.session?.access_token;
+      const response = await fetch("/api/plataforma/despachos", { headers: { Authorization: `Bearer ${token}` } });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "No se pudo cargar la lista de despachos.");
+      setDespachos(data.despachos || []);
+    } catch (e) {
+      setError(e.message);
+    }
+    setCargando(false);
+  }, []);
+
+  useEffect(() => {
+    cargar();
+  }, [cargar]);
+
+  const alternarActivo = async (despacho) => {
+    setCambiando(despacho.id);
+    try {
+      const { data: sesionData } = await supabase.auth.getSession();
+      const token = sesionData?.session?.access_token;
+      const response = await fetch("/api/plataforma/despachos", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ despachoId: despacho.id, activo: !despacho.activo }),
+      });
+      if (!response.ok) throw new Error("No se pudo actualizar.");
+      setDespachos((prev) => prev.map((d) => (d.id === despacho.id ? { ...d, activo: !d.activo } : d)));
+    } catch (e) {
+      setError(e.message);
+    }
+    setCambiando(null);
+  };
+
+  const pendientes = despachos.filter((d) => !d.activo);
+  const activos = despachos.filter((d) => d.activo);
+
+  return (
+    <div>
+      <EncabezadoSeccion titulo="Plataforma" color="#DC2626" />
+      <div
+        style={{
+          background: "#FEF3E2",
+          border: "1px solid #FCE3B8",
+          borderRadius: 10,
+          padding: "12px 16px",
+          marginBottom: 18,
+          fontFamily: "Inter, sans-serif",
+          fontSize: 12.5,
+          color: "#92400E",
+        }}
+      >
+        Solo tú ves esta pestaña. Aquí activas el acceso de un despacho nuevo después de coordinar el pago por WhatsApp,
+        o desactivas uno que dejó de pagar.
+      </div>
+
+      {error && <p style={{ color: "#B42318", fontSize: 13, marginBottom: 14, fontFamily: "Inter, sans-serif" }}>{error}</p>}
+      {cargando && <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted }}>Cargando…</p>}
+
+      {!cargando && (
+        <>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, fontWeight: 700, color: "#B45309", marginBottom: 10 }}>
+            Pendientes de activar ({pendientes.length})
+          </p>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 24 }}>
+            {pendientes.length === 0 && <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.muted }}>Ninguno por ahora.</p>}
+            {pendientes.map((d) => (
+              <Card key={d.id} style={{ borderLeft: "4px solid #F5A524" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
+                  <div>
+                    <p style={{ fontFamily: "Inter, sans-serif", fontSize: 14, fontWeight: 700, color: COLORS.ink, margin: 0 }}>{d.nombre}</p>
+                    <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, color: COLORS.muted, margin: "2px 0 0" }}>
+                      {d.adminEmail || "sin administrador"} · registrado {new Date(d.creado_en).toLocaleDateString("es-CO", { dateStyle: "medium" })}
+                    </p>
+                  </div>
+                  <button
+                    className="drx-btn-primary"
+                    style={{ ...buttonPrimary, background: "#10B981" }}
+                    onClick={() => alternarActivo(d)}
+                    disabled={cambiando === d.id}
+                  >
+                    {cambiando === d.id ? "Activando…" : "✓ Activar acceso"}
+                  </button>
+                </div>
+              </Card>
+            ))}
+          </div>
+
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, fontWeight: 700, color: "#166534", marginBottom: 10 }}>
+            Activos ({activos.length})
+          </p>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {activos.length === 0 && <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.muted }}>Ninguno todavía.</p>}
+            {activos.map((d) => (
+              <Card key={d.id} style={{ borderLeft: "4px solid #10B981" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
+                  <div>
+                    <p style={{ fontFamily: "Inter, sans-serif", fontSize: 14, fontWeight: 700, color: COLORS.ink, margin: 0 }}>{d.nombre}</p>
+                    <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, color: COLORS.muted, margin: "2px 0 0" }}>
+                      {d.adminEmail || "sin administrador"} · registrado {new Date(d.creado_en).toLocaleDateString("es-CO", { dateStyle: "medium" })}
+                    </p>
+                  </div>
+                  <button className="drx-btn-ghost" style={buttonGhost} onClick={() => alternarActivo(d)} disabled={cambiando === d.id}>
+                    {cambiando === d.id ? "…" : "Desactivar"}
+                  </button>
+                </div>
+              </Card>
+            ))}
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -7051,9 +7298,11 @@ export default function App() {
       setUsuarioActual(null);
       return;
     }
-    const { data: perfil } = await supabase.from("perfiles").select("*, despachos(nombre)").eq("id", user.id).maybeSingle();
+    const { data: perfil } = await supabase.from("perfiles").select("*, despachos(nombre, activo)").eq("id", user.id).maybeSingle();
     setDespachoActual(perfil?.despacho_id || null, perfil?.despachos?.nombre || "");
-    const usuario = perfil ? { ...perfil, email: user.email, despachoNombre: perfil.despachos?.nombre || "" } : null;
+    const usuario = perfil
+      ? { ...perfil, email: user.email, despachoNombre: perfil.despachos?.nombre || "", despachoActivo: perfil.despachos?.activo !== false }
+      : null;
     setUsuarioActual(usuario);
     if (registrarLogin && usuario) {
       registrarAuditoria(usuario, "inicio_sesion", "sesion", null, {});
@@ -7169,6 +7418,10 @@ export default function App() {
     );
   }
 
+  if (!usuarioActual.despachoActivo && !usuarioActual.es_superadmin) {
+    return <PantallaPendienteActivacion usuarioActual={usuarioActual} onCerrarSesion={cerrarSesion} />;
+  }
+
   const irADocumentos = () => {
     setTab("documentos");
     setMostrarNotificaciones(false);
@@ -7262,6 +7515,11 @@ export default function App() {
           {usuarioActual.rol === "Administrador" && (
             <SidebarButton active={tab === "usuarios"} onClick={() => setTab("usuarios")} color="#6B7480" icono="usuarios">
               Usuarios y permisos
+            </SidebarButton>
+          )}
+          {usuarioActual.es_superadmin && (
+            <SidebarButton active={tab === "plataforma"} onClick={() => setTab("plataforma")} color="#DC2626" icono="usuarios">
+              Plataforma
             </SidebarButton>
           )}
         </div>
@@ -7364,6 +7622,7 @@ export default function App() {
                 onDespachoRenombrado={(nuevoNombre) => setUsuarioActual((prev) => (prev ? { ...prev, despachoNombre: nuevoNombre } : prev))}
               />
             )}
+            {tab === "plataforma" && usuarioActual.es_superadmin && <PlataformaTab />}
           </div>
         </div>
 
