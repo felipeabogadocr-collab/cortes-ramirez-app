@@ -1742,6 +1742,22 @@ function ResumenTab({ nombre, usuarioId, onIr }) {
           <br />
           <span style={{ fontSize: 12, color: COLORS.muted, fontStyle: "normal" }}>— {versiculo.ref}</span>
         </p>
+        <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap", marginTop: 24 }}>
+          {[
+            { texto: "+ Nuevo cliente", tab: "clientes" },
+            { texto: "+ Nuevo documento", tab: "documentos" },
+            { texto: "+ Registrar pago", tab: "contabilidad" },
+          ].map((a) => (
+            <button
+              key={a.tab}
+              className="drx-btn-ghost"
+              style={{ ...buttonGhost, background: COLORS.panel }}
+              onClick={() => onIr(a.tab)}
+            >
+              {a.texto}
+            </button>
+          ))}
+        </div>
       </div>
 
       {(() => {
@@ -5179,6 +5195,7 @@ function ContenidoTab() {
   const [editandoId, setEditandoId] = useState(null);
   const [temaIdeas, setTemaIdeas] = useState("");
   const [generandoIdeas, setGenerandoIdeas] = useState(false);
+  const [ideaCopiada, setIdeaCopiada] = useState("");
 
   const lista = Object.values(items);
   const porFecha = {};
@@ -5306,6 +5323,17 @@ function ContenidoTab() {
               >
                 <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.inkSoft, margin: 0, flex: 1, minWidth: 160 }}>{idea.texto}</p>
                 <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                  <button
+                    className="drx-btn-ghost"
+                    style={{ ...buttonGhost, fontSize: 11.5, padding: "5px 10px" }}
+                    onClick={() => {
+                      navigator.clipboard?.writeText(idea.texto);
+                      setIdeaCopiada(idea.id);
+                      setTimeout(() => setIdeaCopiada(""), 1500);
+                    }}
+                  >
+                    {ideaCopiada === idea.id ? "✓ Copiado" : "📋 Copiar"}
+                  </button>
                   <button className="drx-btn-ghost" style={{ ...buttonGhost, fontSize: 11.5, padding: "5px 10px" }} onClick={() => usarIdea(idea)}>
                     + Al calendario
                   </button>
