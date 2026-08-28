@@ -52,12 +52,13 @@ export default async function handler(req, res) {
 
     const proceso = procesos[0];
     const idProceso = campo(proceso, "idProceso", "IdProceso", "id");
+    const idConexion = campo(proceso, "idConexion", "IdConexion");
     const debug = req.query.debug === "1";
-    const debugInfo = { idProceso, claves: Object.keys(proceso) };
+    const debugInfo = { idProceso, idConexion, claves: Object.keys(proceso) };
 
     let actuaciones = [];
     if (idProceso) {
-      const actuacionesUrl = `${BASE}/Procesos/${idProceso}/Actuaciones?pagina=1`;
+      const actuacionesUrl = `${BASE}/Actuaciones/Consulta/Proceso?idProceso=${idProceso}&idConexion=${idConexion || 0}&pagina=1&Filtro=`;
       const actuacionesRes = await fetch(actuacionesUrl, { headers });
       debugInfo.actuacionesUrl = actuacionesUrl;
       debugInfo.actuacionesStatus = actuacionesRes.status;
