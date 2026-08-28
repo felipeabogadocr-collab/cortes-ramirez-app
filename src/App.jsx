@@ -2690,6 +2690,7 @@ function BuscadorGlobal({ onIr }) {
   const [resultados, setResultados] = useState([]);
   const [abierto, setAbierto] = useState(false);
   const [buscando, setBuscando] = useState(false);
+  const [indiceActivo, setIndiceActivo] = useState(-1);
   const inputRef = useRef(null);
 
   useEffect(() => {
@@ -2702,6 +2703,7 @@ function BuscadorGlobal({ onIr }) {
     const timer = setTimeout(async () => {
       const encontrados = await buscarGlobal(texto);
       setResultados(encontrados);
+      setIndiceActivo(-1);
       setBuscando(false);
     }, 300);
     return () => clearTimeout(timer);
@@ -2740,6 +2742,22 @@ function BuscadorGlobal({ onIr }) {
         }}
         onFocus={() => setAbierto(true)}
         onBlur={() => setTimeout(() => setAbierto(false), 150)}
+        onKeyDown={(e) => {
+          if (!resultados.length) return;
+          if (e.key === "ArrowDown") {
+            e.preventDefault();
+            setIndiceActivo((i) => (i + 1) % resultados.length);
+          } else if (e.key === "ArrowUp") {
+            e.preventDefault();
+            setIndiceActivo((i) => (i <= 0 ? resultados.length - 1 : i - 1));
+          } else if (e.key === "Enter" && indiceActivo >= 0) {
+            e.preventDefault();
+            const r = resultados[indiceActivo];
+            ir(r.tipo === "cliente" ? "clientes" : "documentos");
+          } else if (e.key === "Escape") {
+            setAbierto(false);
+          }
+        }}
       />
       {abierto && q.trim().length >= 2 && (
         <div
@@ -2763,15 +2781,16 @@ function BuscadorGlobal({ onIr }) {
           {!buscando && resultados.length === 0 && (
             <p style={{ padding: 12, fontSize: 12.5, color: COLORS.muted, fontFamily: "Inter, sans-serif", margin: 0 }}>Sin resultados.</p>
           )}
-          {resultados.map((r) => (
+          {resultados.map((r, i) => (
             <button
               key={`${r.tipo}-${r.id}`}
               onMouseDown={() => ir(r.tipo === "cliente" ? "clientes" : "documentos")}
+              onMouseEnter={() => setIndiceActivo(i)}
               style={{
                 display: "block",
                 width: "100%",
                 textAlign: "left",
-                background: "none",
+                background: i === indiceActivo ? COLORS.accentSoft : "none",
                 border: "none",
                 borderBottom: `1px solid ${COLORS.border}`,
                 padding: "10px 12px",
@@ -6334,7 +6353,26 @@ function useUsuariosDespacho() {
     if (!error) setUsuarios((prev) => prev.map((u) => (u.id === id ? { ...u, ...cambios } : u)));
   };
 
-  return { usuarios, cargado, crear, actualizar, reload: cargar };
+  // Revocar el acceso de alguien que ya no debería tenerlo (dejó el
+  // despacho, etc.) — también pasa por la función serverless, porque borrar
+  // la cuenta de Supabase Auth necesita la llave service_role.
+  const eliminar = async (id) => {
+    const { data: sesionData } = await supabase.auth.getSession();
+    const token = sesionData?.session?.access_token;
+    const response = await fetch("/api/usuarios/eliminar", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({ usuarioId: id }),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || "No se pudo eliminar el usuario");
+    setUsuarios((prev) => prev.filter((u) => u.id !== id));
+  };
+
+  return { usuarios, cargado, crear, actualizar, eliminar, reload: cargar };
 }
 
 // Marca de Nomos: tres barras redondeadas en escalera descendente — evoca
@@ -8242,9 +8280,37 @@ function PlataformaTab() {
   );
 }
 
+// Los administradores ya pueden leer toda la auditoría de su despacho (ver
+// política RLS "administradores leen auditoria del mismo despacho"), así que
+// esto no necesita ningún permiso nuevo — solo faltaba mostrarlo.
+function UltimaSesionUsuario({ usuarioId }) {
+  const [fecha, setFecha] = useState(undefined);
+
+  useEffect(() => {
+    let cancelado = false;
+    (async () => {
+      const { data } = await supabase
+        .from("auditoria")
+        .select("creado_en")
+        .eq("usuario_id", usuarioId)
+        .eq("accion", "inicio_sesion")
+        .order("creado_en", { ascending: false })
+        .limit(1);
+      if (!cancelado) setFecha(data?.[0]?.creado_en || null);
+    })();
+    return () => {
+      cancelado = true;
+    };
+  }, [usuarioId]);
+
+  if (fecha === undefined) return "Cargando última sesión…";
+  if (!fecha) return "Sin inicios de sesión registrados todavía";
+  return `Última sesión: ${new Date(fecha).toLocaleString("es-CO", { dateStyle: "medium", timeStyle: "short" })}`;
+}
+
 function UsuariosPermisosTab({ usuarioActual, onDespachoRenombrado }) {
   const usuarioActualId = usuarioActual.id;
-  const { usuarios, crear: crearUsuario, actualizar } = useUsuariosDespacho();
+  const { usuarios, crear: crearUsuario, actualizar, eliminar: eliminarUsuario } = useUsuariosDespacho();
   const [mostrarForm, setMostrarForm] = useState(false);
   const [nombre, setNombre] = useState("");
   const [email, setEmail] = useState("");
@@ -8252,6 +8318,20 @@ function UsuariosPermisosTab({ usuarioActual, onDespachoRenombrado }) {
   const [rol, setRol] = useState("Asistente");
   const [error, setError] = useState("");
   const [creando, setCreando] = useState(false);
+  const [eliminandoId, setEliminandoId] = useState(null);
+
+  const eliminarUsuarioClick = async (u) => {
+    if (!window.confirm(`¿Eliminar el acceso de ${u.nombre}? Ya no podrá iniciar sesión. No se puede deshacer.`)) return;
+    setEliminandoId(u.id);
+    setError("");
+    try {
+      await eliminarUsuario(u.id);
+      registrarAuditoria(usuarioActual, "eliminar_usuario", "usuario", u.id, { nombre: u.nombre, rol: u.rol });
+    } catch (e) {
+      setError(e.message || "No se pudo eliminar el usuario.");
+    }
+    setEliminandoId(null);
+  };
   const [nombreDespachoEdit, setNombreDespachoEdit] = useState(getNombreDespacho());
   const [editandoDespacho, setEditandoDespacho] = useState(false);
   const [guardandoDespacho, setGuardandoDespacho] = useState(false);
@@ -8501,7 +8581,7 @@ function UsuariosPermisosTab({ usuarioActual, onDespachoRenombrado }) {
           const permisos = u.permisos || permisosPorDefecto(u.rol);
           return (
             <Card key={u.id}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12, flexWrap: "wrap", gap: 8 }}>
                 <div>
                   <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, fontWeight: 700, color: COLORS.ink, margin: 0 }}>
                     {u.nombre} {u.id === usuarioActualId && <span style={{ color: COLORS.muted, fontWeight: 400, fontSize: 12 }}>(tú)</span>}
@@ -8509,7 +8589,20 @@ function UsuariosPermisosTab({ usuarioActual, onDespachoRenombrado }) {
                   <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, margin: "2px 0 0" }}>
                     {u.email} · {u.rol}
                   </p>
+                  <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11, color: COLORS.muted, margin: "2px 0 0" }}>
+                    <UltimaSesionUsuario usuarioId={u.id} />
+                  </p>
                 </div>
+                {u.id !== usuarioActualId && (
+                  <button
+                    className="drx-btn-ghost"
+                    style={{ ...buttonGhost, color: "#B42318", borderColor: "#F3C6C0", fontSize: 12, padding: "6px 12px" }}
+                    onClick={() => eliminarUsuarioClick(u)}
+                    disabled={eliminandoId === u.id}
+                  >
+                    {eliminandoId === u.id ? "Eliminando…" : "Eliminar acceso"}
+                  </button>
+                )}
               </div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
                 {SECCIONES_PERMISOS.map((s) => (
@@ -8867,6 +8960,14 @@ export default function App() {
     clientesSinRadicado,
     marcarFirmasVistas,
   } = useNotificacionesPanel(usuarioActual?.notificaciones);
+
+  // Título de la pestaña del navegador con el número de pendientes, al
+  // estilo Gmail — así se nota algo nuevo sin tener que tener la pestaña de
+  // Nomos abierta y a la vista todo el tiempo.
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    document.title = usuarioActual && notificaciones > 0 ? `(${notificaciones}) Nomos — Panel` : "Nomos — Gestión legal";
+  }, [notificaciones, usuarioActual]);
   const { oscuro, alternar } = useTema();
 
   const [modoRecuperacion, setModoRecuperacion] = useState(false);
