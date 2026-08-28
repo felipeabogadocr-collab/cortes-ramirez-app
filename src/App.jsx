@@ -3498,6 +3498,7 @@ function VigilanciaTab() {
   const [consultandoTodos, setConsultandoTodos] = useState(false);
   const [explicaciones, setExplicaciones] = useState({});
   const [explicando, setExplicando] = useState(null);
+  const [filtroEstado, setFiltroEstado] = useState("Todos");
 
   const cargar = useCallback(async () => {
     const entries = {};
@@ -3588,6 +3589,20 @@ function VigilanciaTab() {
   const conRadicado = ids.filter((id) => clientes[id]?.radicado?.trim());
   const sinRadicado = ids.filter((id) => !clientes[id]?.radicado?.trim());
 
+  // Prioriza "Con novedad" arriba de todo — son los procesos que realmente
+  // necesitan atención hoy — y dentro de cada estado respeta el orden en
+  // que ya venían (por ultimaActuacion / creación).
+  const ordenEstadoPrioridad = { "Con novedad": 0, "Pendiente de revisión": 1, "En trámite": 2, "Finalizado": 3 };
+  const conRadicadoOrdenados = [...conRadicado].sort((a, b) => {
+    const pa = ordenEstadoPrioridad[clientes[a]?.estadoVigilancia] ?? 1;
+    const pb = ordenEstadoPrioridad[clientes[b]?.estadoVigilancia] ?? 1;
+    return pa - pb;
+  });
+  const conRadicadoFiltrados =
+    filtroEstado === "Todos"
+      ? conRadicadoOrdenados
+      : conRadicadoOrdenados.filter((id) => (clientes[id]?.estadoVigilancia || ESTADOS_VIGILANCIA[0]) === filtroEstado);
+
   // Consulta todos los procesos con radicado y marca automáticamente "Con
   // novedad" (y agrega la actuación a la línea de tiempo) solo en los que
   // tengan una actuación más reciente que la última vez que se revisó.
@@ -3664,7 +3679,7 @@ function VigilanciaTab() {
         </div>
       )}
 
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, flexWrap: "wrap", gap: 10 }}>
         <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted, margin: 0 }}>
           {conRadicado.length} proceso{conRadicado.length !== 1 ? "s" : ""} con radicado registrado
         </p>
@@ -3675,16 +3690,47 @@ function VigilanciaTab() {
         )}
       </div>
 
+      {conRadicado.length > 0 && (
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
+          {["Todos", ...ESTADOS_VIGILANCIA].map((estado) => {
+            const cantidad =
+              estado === "Todos" ? conRadicado.length : conRadicado.filter((id) => (clientes[id]?.estadoVigilancia || ESTADOS_VIGILANCIA[0]) === estado).length;
+            const activo = filtroEstado === estado;
+            return (
+              <button
+                key={estado}
+                onClick={() => setFiltroEstado(estado)}
+                style={{
+                  fontFamily: "Inter, sans-serif",
+                  fontSize: 12,
+                  fontWeight: 600,
+                  padding: "6px 12px",
+                  borderRadius: 999,
+                  border: `1px solid ${activo ? COLORS.navy : COLORS.border}`,
+                  background: activo ? COLORS.navy : "#fff",
+                  color: activo ? "#fff" : COLORS.inkSoft,
+                  cursor: "pointer",
+                }}
+              >
+                {estado} ({cantidad})
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-        {conRadicado.map((id) => {
+        {conRadicadoFiltrados.map((id) => {
           const c = clientes[id];
           const dias = diasDesde(c.ultimaActuacion);
           const resultado = resultados[id];
           const errorConsulta = errores[id];
           return (
-            <Card key={id} style={{ borderLeft: "4px solid #F5A524" }}>
+            <Card key={id} style={{ borderLeft: `4px solid ${COLOR_AREA_PROCESO[c.areaProceso] || "#F5A524"}` }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
-                <div>
+                <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+                  <AvatarIniciales nombre={c.nombre} />
+                  <div>
                   <p style={{ fontFamily: "Inter, sans-serif", fontSize: 16, fontWeight: 700, margin: 0, color: COLORS.ink }}>{c.nombre}</p>
                   <p style={{ fontFamily: "monospace", fontSize: 12.5, color: COLORS.inkSoft, margin: "4px 0 0" }}>Radicado: {c.radicado}</p>
                   <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, margin: "3px 0 0" }}>
@@ -3695,6 +3741,7 @@ function VigilanciaTab() {
                       Última consulta a Rama Judicial: {new Date(c.ramaJudicial.consultadoEn).toLocaleString("es-CO", { dateStyle: "medium", timeStyle: "short" })}
                     </p>
                   )}
+                  </div>
                 </div>
                 <select
                   className="drx-input"
@@ -3771,9 +3818,10 @@ function VigilanciaTab() {
           );
         })}
         {conRadicado.length === 0 && (
-          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted }}>
-            Ningún cliente tiene número de radicado registrado todavía. Agrégalo desde la pestaña Clientes.
-          </p>
+          <EstadoVacio icono="⚖️" texto="Ningún cliente tiene número de radicado registrado todavía. Agrégalo desde la pestaña Clientes." />
+        )}
+        {conRadicado.length > 0 && conRadicadoFiltrados.length === 0 && (
+          <EstadoVacio icono="🔍" texto={`Ningún proceso en estado "${filtroEstado}".`} />
         )}
       </div>
     </div>
