@@ -2269,6 +2269,7 @@ const FORM_CLIENTE_INICIAL = {
   notas: "",
   planPago: null,
   valorTotal: "",
+  abogadoAsignado: "",
 };
 
 const FRECUENCIAS_PAGO = ["Semanal", "Quincenal", "Mensual", "Pago único", "Otro"];
@@ -2435,6 +2436,7 @@ function LineaDeTiempo({ cliente, onAgregar }) {
 
 function ClientesTab({ usuarioActual }) {
   const { ids, addId, removeId } = useIndex("indice-clientes", false);
+  const { usuarios: abogadosDespacho } = useUsuariosDespacho();
   const [clientes, setClientes] = useState({});
   const [form, setForm] = useState(FORM_CLIENTE_INICIAL);
   const [showForm, setShowForm] = useState(false);
@@ -2572,6 +2574,16 @@ function ClientesTab({ usuarioActual }) {
                 placeholder="Ej: 3000000"
               />
             </Field>
+            <Field label="Abogado asignado (opcional)">
+              <select className="drx-input" style={inputStyle} value={form.abogadoAsignado} onChange={(e) => setForm({ ...form, abogadoAsignado: e.target.value })}>
+                <option value="">Sin asignar</option>
+                {abogadosDespacho.map((u) => (
+                  <option key={u.id} value={u.nombre}>
+                    {u.nombre}
+                  </option>
+                ))}
+              </select>
+            </Field>
           </div>
           <div style={{ marginTop: 12, marginBottom: 12 }}>
             <Field label="Notas">
@@ -2632,6 +2644,21 @@ function ClientesTab({ usuarioActual }) {
                       value={formEdicion.valorTotal || ""}
                       onChange={(e) => setFormEdicion({ ...formEdicion, valorTotal: e.target.value })}
                     />
+                  </Field>
+                  <Field label="Abogado asignado (opcional)">
+                    <select
+                      className="drx-input"
+                      style={inputStyle}
+                      value={formEdicion.abogadoAsignado || ""}
+                      onChange={(e) => setFormEdicion({ ...formEdicion, abogadoAsignado: e.target.value })}
+                    >
+                      <option value="">Sin asignar</option>
+                      {abogadosDespacho.map((u) => (
+                        <option key={u.id} value={u.nombre}>
+                          {u.nombre}
+                        </option>
+                      ))}
+                    </select>
                   </Field>
                 </div>
                 <div style={{ marginTop: 12, marginBottom: 12 }}>
@@ -3525,6 +3552,130 @@ function ReciboCard({ cliente, pago }) {
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+function BarraReporte({ etiqueta, valor, maximo, color, formatoValor }) {
+  const porcentaje = maximo > 0 ? Math.max(4, Math.round((valor / maximo) * 100)) : 0;
+  return (
+    <div style={{ marginBottom: 10 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+        <span style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.inkSoft }}>{etiqueta}</span>
+        <span style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, fontWeight: 700, color: COLORS.ink }}>{formatoValor ? formatoValor(valor) : valor}</span>
+      </div>
+      <div style={{ background: COLORS.accentSoft, borderRadius: 6, height: 10, overflow: "hidden" }}>
+        <div style={{ width: `${porcentaje}%`, height: "100%", background: color, borderRadius: 6 }} />
+      </div>
+    </div>
+  );
+}
+
+function ReportesTab() {
+  const { ids } = useIndex("indice-clientes", false);
+  const { usuarios } = useUsuariosDespacho();
+  const [clientes, setClientes] = useState({});
+  const [cargando, setCargando] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      const entries = {};
+      for (const id of ids) {
+        const raw = await storageGet(`cliente:${id}`, false);
+        if (raw) entries[id] = JSON.parse(raw);
+      }
+      setClientes(entries);
+      setCargando(false);
+    })();
+  }, [ids]);
+
+  const listaClientes = Object.values(clientes);
+
+  // Ingresos por mes (últimos 6 meses, incluyendo el actual).
+  const mesesEtiquetas = [];
+  const hoy = new Date();
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(hoy.getFullYear(), hoy.getMonth() - i, 1);
+    mesesEtiquetas.push({ clave: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`, etiqueta: d.toLocaleDateString("es-CO", { month: "short", year: "2-digit" }) });
+  }
+  const ingresosPorMes = Object.fromEntries(mesesEtiquetas.map((m) => [m.clave, 0]));
+  let ingresoTotalHistorico = 0;
+  listaClientes.forEach((c) => {
+    (c.pagos || []).forEach((p) => {
+      const valor = Number(p.valor) || 0;
+      ingresoTotalHistorico += valor;
+      const clave = p.fecha?.slice(0, 7);
+      if (clave && ingresosPorMes[clave] !== undefined) ingresosPorMes[clave] += valor;
+    });
+  });
+  const maxIngresoMes = Math.max(1, ...Object.values(ingresosPorMes));
+
+  // Procesos por estado.
+  const conteoEstados = Object.fromEntries(ESTADOS_VIGILANCIA.map((e) => [e, 0]));
+  let sinRevisar = 0;
+  listaClientes.forEach((c) => {
+    if (c.estadoVigilancia && conteoEstados[c.estadoVigilancia] !== undefined) conteoEstados[c.estadoVigilancia]++;
+    else sinRevisar++;
+  });
+  const maxEstado = Math.max(1, ...Object.values(conteoEstados), sinRevisar);
+  const COLOR_ESTADO = { "En trámite": "#2F80ED", "Con novedad": "#F5A524", "Pendiente de revisión": "#8B5CF6", Finalizado: "#10B981" };
+
+  // Carga de trabajo por abogado.
+  const cargaPorAbogado = {};
+  listaClientes.forEach((c) => {
+    const nombre = c.abogadoAsignado?.trim() || "Sin asignar";
+    cargaPorAbogado[nombre] = (cargaPorAbogado[nombre] || 0) + 1;
+  });
+  const filasCarga = Object.entries(cargaPorAbogado).sort((a, b) => b[1] - a[1]);
+  const maxCarga = Math.max(1, ...filasCarga.map(([, n]) => n));
+
+  if (cargando) {
+    return (
+      <div>
+        <EncabezadoSeccion titulo="Reportes" color="#0EA5E9" />
+        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted }}>Cargando…</p>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <EncabezadoSeccion titulo="Reportes" color="#0EA5E9" />
+
+      <Card style={{ marginBottom: 16 }}>
+        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, fontWeight: 700, color: COLORS.ink, marginBottom: 4 }}>Ingresos por mes</p>
+        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, marginBottom: 14 }}>
+          Histórico total recaudado: {formatoCOP(ingresoTotalHistorico)}
+        </p>
+        {mesesEtiquetas.map((m) => (
+          <BarraReporte key={m.clave} etiqueta={m.etiqueta} valor={ingresosPorMes[m.clave]} maximo={maxIngresoMes} color="#2F80ED" formatoValor={formatoCOP} />
+        ))}
+      </Card>
+
+      <Card style={{ marginBottom: 16 }}>
+        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, fontWeight: 700, color: COLORS.ink, marginBottom: 14 }}>Procesos por estado</p>
+        {ESTADOS_VIGILANCIA.map((estado) => (
+          <BarraReporte key={estado} etiqueta={estado} valor={conteoEstados[estado]} maximo={maxEstado} color={COLOR_ESTADO[estado]} />
+        ))}
+        {sinRevisar > 0 && <BarraReporte etiqueta="Sin revisar todavía" valor={sinRevisar} maximo={maxEstado} color="#94A3B8" />}
+        {listaClientes.length === 0 && <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.muted }}>Aún no hay clientes registrados.</p>}
+      </Card>
+
+      <Card>
+        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, fontWeight: 700, color: COLORS.ink, marginBottom: 4 }}>Carga de trabajo por abogado</p>
+        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, marginBottom: 14 }}>
+          Cuántos clientes tiene asignados cada uno. Se asigna desde "Clientes" al crear o editar un cliente.
+        </p>
+        {filasCarga.length === 0 && <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.muted }}>Aún no hay clientes registrados.</p>}
+        {filasCarga.map(([nombre, n]) => (
+          <BarraReporte key={nombre} etiqueta={nombre} valor={n} maximo={maxCarga} color="#7C3AED" />
+        ))}
+        {usuarios.length > 0 && filasCarga.length > 0 && (
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, color: COLORS.muted, marginTop: 10 }}>
+            {usuarios.length} usuario{usuarios.length !== 1 ? "s" : ""} en el despacho.
+          </p>
+        )}
+      </Card>
     </div>
   );
 }
@@ -5168,12 +5319,13 @@ const SECCIONES_PERMISOS = [
   { id: "contabilidad", nombre: "Contabilidad" },
   { id: "contenido", nombre: "Calendario de contenido" },
   { id: "documentos", nombre: "Firmar documentos" },
+  { id: "reportes", nombre: "Reportes" },
 ];
 
 function permisosPorDefecto(rol) {
   const todos = Object.fromEntries(SECCIONES_PERMISOS.map((s) => [s.id, true]));
   if (rol === "Administrador" || rol === "Abogado") return todos;
-  return { resumen: true, clientes: true, casos: true, vigilancia: false, contabilidad: false, contenido: false, documentos: true };
+  return { resumen: true, clientes: true, casos: true, vigilancia: false, contabilidad: false, contenido: false, documentos: true, reportes: false };
 }
 
 const NOTIF_CATEGORIAS = [
@@ -6245,6 +6397,11 @@ export default function App() {
               Firmar documentos
             </SidebarButton>
           )}
+          {puedeVer("reportes") && (
+            <SidebarButton active={tab === "reportes"} onClick={() => setTab("reportes")} color="#0EA5E9">
+              Reportes
+            </SidebarButton>
+          )}
           {usuarioActual.rol === "Administrador" && (
             <SidebarButton active={tab === "usuarios"} onClick={() => setTab("usuarios")} color="#6B7480">
               Usuarios y permisos
@@ -6343,6 +6500,7 @@ export default function App() {
             {tab === "contabilidad" && puedeVer("contabilidad") && <ContabilidadTab usuarioActual={usuarioActual} />}
             {tab === "contenido" && puedeVer("contenido") && <ContenidoTab />}
             {tab === "documentos" && puedeVer("documentos") && <DocumentosTab />}
+            {tab === "reportes" && puedeVer("reportes") && <ReportesTab />}
             {tab === "usuarios" && usuarioActual.rol === "Administrador" && (
               <UsuariosPermisosTab
                 usuarioActual={usuarioActual}
