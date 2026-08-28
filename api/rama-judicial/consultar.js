@@ -52,14 +52,25 @@ export default async function handler(req, res) {
 
     const proceso = procesos[0];
     const idProceso = campo(proceso, "idProceso", "IdProceso", "id");
+    const debug = req.query.debug === "1";
+    const debugInfo = { idProceso, claves: Object.keys(proceso) };
 
     let actuaciones = [];
     if (idProceso) {
       const actuacionesUrl = `${BASE}/Procesos/${idProceso}/Actuaciones?pagina=1`;
       const actuacionesRes = await fetch(actuacionesUrl, { headers });
+      debugInfo.actuacionesUrl = actuacionesUrl;
+      debugInfo.actuacionesStatus = actuacionesRes.status;
+      const actuacionesTexto = await actuacionesRes.text();
+      if (debug) debugInfo.actuacionesRespuestaCruda = actuacionesTexto.slice(0, 1500);
       if (actuacionesRes.ok) {
-        const actuacionesData = await actuacionesRes.json();
-        actuaciones = actuacionesData?.actuaciones || actuacionesData?.Actuaciones || [];
+        try {
+          const actuacionesData = JSON.parse(actuacionesTexto);
+          actuaciones = actuacionesData?.actuaciones || actuacionesData?.Actuaciones || [];
+          if (debug) debugInfo.actuacionesClaves = Array.isArray(actuacionesData) ? "es-array" : Object.keys(actuacionesData || {});
+        } catch (e) {
+          debugInfo.errorParseando = e.message;
+        }
       }
     }
 
@@ -85,6 +96,7 @@ export default async function handler(req, res) {
       ultimaActuacion: actuacionesNormalizadas[0] || null,
       actuaciones: actuacionesNormalizadas.slice(0, 15),
       consultadoEn: new Date().toISOString(),
+      ...(debug ? { debug: debugInfo } : {}),
     });
   } catch (err) {
     console.error("Error consultando Rama Judicial:", err);
