@@ -58,6 +58,16 @@ const NUMERO_WHATSAPP_DESPACHO = "573192875428";
 
 const TIPOS_PROCESO = ["Ordinario", "Verbal", "Verbal sumario", "Ejecutivo", "Declarativo", "Tutela", "Arbitraje", "Otro"];
 const AREAS_PROCESO = ["Civil", "Penal", "Laboral", "Familia", "Comercial", "Administrativo", "Constitucional", "Otro"];
+const COLOR_AREA_PROCESO = {
+  Civil: "#2F80ED",
+  Penal: "#DC2626",
+  Laboral: "#F5A524",
+  Familia: "#8B5CF6",
+  Comercial: "#10B981",
+  Administrativo: "#0EA5E9",
+  Constitucional: "#6B7480",
+  Otro: "#14B8A6",
+};
 const DIAS_ALERTA_INACTIVIDAD = 8;
 
 function diasDesde(fechaISO) {
@@ -2681,6 +2691,7 @@ function ClientesTab({ usuarioActual }) {
   const [formEdicion, setFormEdicion] = useState({});
   const [filtro, setFiltro] = useState("");
   const [copiado, setCopiado] = useState("");
+  const [orden, setOrden] = useState("recientes");
 
   useEffect(() => {
     (async () => {
@@ -2735,6 +2746,7 @@ function ClientesTab({ usuarioActual }) {
   };
 
   const idsOrdenados = [...ids].sort((a, b) => {
+    if (orden === "az") return (clientes[a]?.nombre || "").localeCompare(clientes[b]?.nombre || "");
     const fa = clientes[a]?.ultimaActuacion || "";
     const fb = clientes[b]?.ultimaActuacion || "";
     return fb.localeCompare(fa);
@@ -2756,19 +2768,51 @@ function ClientesTab({ usuarioActual }) {
   return (
     <div>
       <EncabezadoSeccion titulo="Clientes" color="#14B8A6" />
-      <div style={{ marginBottom: 14 }}>
+      <div style={{ marginBottom: 14, display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
         <input
           className="drx-input"
-          style={{ ...inputStyle, maxWidth: 320 }}
+          style={{ ...inputStyle, maxWidth: 320, flex: 1, minWidth: 220 }}
           placeholder="Filtrar por nombre, radicado o teléfono..."
           value={filtro}
           onChange={(e) => setFiltro(e.target.value)}
         />
+        <div style={{ display: "flex", border: `1px solid ${COLORS.border}`, borderRadius: 8, overflow: "hidden" }}>
+          <button
+            onClick={() => setOrden("recientes")}
+            style={{
+              border: "none",
+              padding: "8px 14px",
+              fontFamily: "Inter, sans-serif",
+              fontSize: 12,
+              fontWeight: 600,
+              cursor: "pointer",
+              background: orden === "recientes" ? COLORS.accentSoft : COLORS.panel,
+              color: orden === "recientes" ? COLORS.navy : COLORS.muted,
+            }}
+          >
+            Recientes
+          </button>
+          <button
+            onClick={() => setOrden("az")}
+            style={{
+              border: "none",
+              padding: "8px 14px",
+              fontFamily: "Inter, sans-serif",
+              fontSize: 12,
+              fontWeight: 600,
+              cursor: "pointer",
+              background: orden === "az" ? COLORS.accentSoft : COLORS.panel,
+              color: orden === "az" ? COLORS.navy : COLORS.muted,
+            }}
+          >
+            A-Z
+          </button>
+        </div>
       </div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
         <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted, margin: 0 }}>
           {idsFiltrados.length} cliente{idsFiltrados.length !== 1 ? "s" : ""}
-          {textoFiltro ? ` de ${ids.length}` : " · ordenados por última actuación"}
+          {textoFiltro ? ` de ${ids.length}` : orden === "az" ? " · orden alfabético" : " · ordenados por última actuación"}
         </p>
         <div style={{ display: "flex", gap: 8 }}>
           <button
@@ -2951,9 +2995,11 @@ function ClientesTab({ usuarioActual }) {
           const inactivo = dias !== null && dias >= DIAS_ALERTA_INACTIVIDAD;
 
           return (
-            <Card key={id} style={{ borderLeft: "4px solid #14B8A6" }}>
+            <Card key={id} style={{ borderLeft: `4px solid ${COLOR_AREA_PROCESO[c.areaProceso] || "#14B8A6"}` }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                <div style={{ flex: 1 }}>
+                <div style={{ flex: 1, display: "flex", gap: 12 }}>
+                  <AvatarIniciales nombre={c.nombre} />
+                  <div style={{ flex: 1 }}>
                   <p style={{ fontFamily: "Inter, sans-serif", fontSize: 17, fontWeight: 700, margin: 0, color: COLORS.ink }}>{c.nombre}</p>
                   <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted, margin: "4px 0 0", display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
                     {c.telefono && (
@@ -3008,6 +3054,7 @@ function ClientesTab({ usuarioActual }) {
                     </span>
                   </div>
                   {c.notas && <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.inkSoft, margin: "8px 0 0" }}>{c.notas}</p>}
+                  </div>
                 </div>
                 <div style={{ display: "flex", gap: 8, flexShrink: 0, flexWrap: "wrap" }}>
                   <button
@@ -3995,6 +4042,7 @@ function ContabilidadTab({ usuarioActual }) {
   const [clientes, setClientes] = useState({});
   const [formAbiertoId, setFormAbiertoId] = useState(null);
   const [filtro, setFiltro] = useState("");
+  const [soloPendientes, setSoloPendientes] = useState(false);
 
   const cargar = useCallback(async () => {
     const entries = {};
@@ -4049,12 +4097,31 @@ function ContabilidadTab({ usuarioActual }) {
     .filter(({ dias }) => dias !== null && dias <= DIAS_AVISO_PROXIMO_PAGO)
     .sort((a, b) => a.dias - b.dias);
 
+  const saldoDe = (c) => {
+    const totalPagado = (c?.pagos || []).reduce((sum, p) => sum + (Number(p.valor) || 0), 0);
+    const valorTotal = Number(c?.valorTotal) || 0;
+    return valorTotal > 0 ? valorTotal - totalPagado : null;
+  };
+  const carteraTotal = ids.reduce((sum, id) => {
+    const saldo = saldoDe(clientes[id]);
+    return saldo && saldo > 0 ? sum + saldo : sum;
+  }, 0);
+
   const textoFiltro = filtro.trim().toLowerCase();
-  const idsFiltrados = textoFiltro ? ids.filter((id) => clientes[id]?.nombre?.toLowerCase().includes(textoFiltro)) : ids;
+  let idsFiltrados = textoFiltro ? ids.filter((id) => clientes[id]?.nombre?.toLowerCase().includes(textoFiltro)) : ids;
+  if (soloPendientes) idsFiltrados = idsFiltrados.filter((id) => (saldoDe(clientes[id]) || 0) > 0);
 
   return (
     <div>
       <EncabezadoSeccion titulo="Contabilidad" color="#F43F5E" />
+      {carteraTotal > 0 && (
+        <Card style={{ marginBottom: 20, borderLeft: "4px solid #F43F5E", background: "#FEF2F2" }}>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, fontWeight: 700, color: "#B45309", textTransform: "uppercase", letterSpacing: 0.5, margin: 0 }}>
+            Cartera pendiente total
+          </p>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 26, fontWeight: 800, color: "#B42318", margin: "4px 0 0" }}>{formatoCOP(carteraTotal)}</p>
+        </Card>
+      )}
       {proximosPagos.length > 0 && (
         <div style={{ marginBottom: 20 }}>
           <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, fontWeight: 700, color: "#B45309", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 10 }}>
@@ -4079,14 +4146,18 @@ function ContabilidadTab({ usuarioActual }) {
         </div>
       )}
 
-      <div style={{ marginBottom: 14 }}>
+      <div style={{ marginBottom: 14, display: "flex", gap: 14, flexWrap: "wrap", alignItems: "center" }}>
         <input
           className="drx-input"
-          style={{ ...inputStyle, maxWidth: 320 }}
+          style={{ ...inputStyle, maxWidth: 320, flex: 1, minWidth: 220 }}
           placeholder="Filtrar por nombre de cliente..."
           value={filtro}
           onChange={(e) => setFiltro(e.target.value)}
         />
+        <label style={{ display: "flex", alignItems: "center", gap: 6, fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.inkSoft, cursor: "pointer" }}>
+          <input type="checkbox" checked={soloPendientes} onChange={(e) => setSoloPendientes(e.target.checked)} />
+          Solo con saldo pendiente
+        </label>
       </div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
         <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted, margin: 0 }}>
@@ -4127,7 +4198,9 @@ function ContabilidadTab({ usuarioActual }) {
           return (
             <Card key={id} style={{ borderLeft: "4px solid #F43F5E" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                <div>
+                <div style={{ display: "flex", gap: 12 }}>
+                  <AvatarIniciales nombre={c.nombre} />
+                  <div>
                   <p style={{ fontFamily: "Inter, sans-serif", fontSize: 17, fontWeight: 700, margin: 0, color: COLORS.ink }}>{c.nombre}</p>
                   <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.muted, margin: "4px 0 0" }}>
                     {pagos.length} pago{pagos.length !== 1 ? "s" : ""} registrado{pagos.length !== 1 ? "s" : ""} · Total: {formatoCOP(totalPagado)}
@@ -4149,6 +4222,7 @@ function ContabilidadTab({ usuarioActual }) {
                       {saldo <= 0 ? "Al día" : `Debe ${formatoCOP(saldo)}`}
                     </p>
                   )}
+                  </div>
                 </div>
                 <button className="drx-btn-ghost" style={buttonGhost} onClick={() => setFormAbiertoId(formAbiertoId === id ? null : id)}>
                   {formAbiertoId === id ? "Cancelar" : "+ Registrar pago"}
