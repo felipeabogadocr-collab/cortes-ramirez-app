@@ -5594,6 +5594,25 @@ function DocumentosTab() {
     setTimeout(() => setCopiedId(null), 1500);
   };
 
+  // Crea un documento nuevo a partir de uno existente, sin firmas ni código
+  // de firma (es un documento distinto) — útil para reutilizar plantillas
+  // (contratos, poderes) sin escribir todo desde cero cada vez.
+  const duplicarDocumento = async (id) => {
+    const original = docs[id];
+    if (!original) return;
+    const nuevoId = uid();
+    const copia = {
+      ...original,
+      titulo: `${original.titulo} (copia)`,
+      cliente: "",
+      whatsappNumero: "",
+      firmantes: [],
+      creadoEn: new Date().toISOString(),
+    };
+    await storageSet(`documento:${nuevoId}`, JSON.stringify(copia), true);
+    await addId(nuevoId);
+  };
+
   const empezarEdicionDoc = (id) => {
     setEditandoDocId(id);
     setFormEdicionDoc(docs[id]);
@@ -5906,6 +5925,17 @@ function DocumentosTab() {
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6 }}>
                   <EstadoBadge estado={estado} />
+                  {estado === "pendiente" &&
+                    d.creadoEn &&
+                    (() => {
+                      const diasRestantes = 30 - (diasDesde(d.creadoEn) || 0);
+                      if (diasRestantes > 5) return null;
+                      return (
+                        <span style={{ fontFamily: "Inter, sans-serif", fontSize: 10.5, fontWeight: 700, color: diasRestantes <= 0 ? "#B42318" : "#B45309" }}>
+                          {diasRestantes <= 0 ? "⚠ Enlace vencido" : `⏱ Vence en ${diasRestantes} día${diasRestantes !== 1 ? "s" : ""}`}
+                        </span>
+                      );
+                    })()}
                   {integridad[id] === "ok" && (
                     <span style={{ fontFamily: "Inter, sans-serif", fontSize: 10.5, fontWeight: 700, color: "#166534" }} title="El contenido no ha cambiado desde que se firmó">
                       ✓ Integridad verificada
@@ -6016,6 +6046,9 @@ function DocumentosTab() {
                   )}
                   <button className="drx-btn-ghost" style={{ ...buttonGhost, padding: "4px 10px", fontSize: 12 }} onClick={() => empezarEdicionDoc(id)}>
                     Editar
+                  </button>
+                  <button className="drx-btn-ghost" style={{ ...buttonGhost, padding: "4px 10px", fontSize: 12 }} onClick={() => duplicarDocumento(id)} title="Crear un documento nuevo con el mismo contenido, sin firmas">
+                    Duplicar
                   </button>
                   <button
                     className="drx-btn-ghost"
