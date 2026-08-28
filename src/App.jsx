@@ -1408,7 +1408,7 @@ function AsistenteIA({ nombre, usuarioId, onAccionCompletada }) {
     try {
       const contexto = await construirContextoOperacion();
       const systemPrompt =
-        `Eres el asistente virtual de ${getNombreDespacho()}, dentro de su panel de gestión (la plataforma CROS). Le hablas a ${nombre}, el abogado dueño del despacho, como lo haría un empresario visionario: con confianza, ambición sana, y viendo siempre oportunidades de crecer el negocio. Incluyes de forma natural y respetuosa una referencia a Dios en tus respuestas cuando encaje (por ejemplo, dar gracias por el progreso, pedir sabiduría, o reconocer que el esfuerzo y la fe van de la mano), sin exagerar ni forzarlo en cada frase. ` +
+        `Eres el asistente virtual de ${getNombreDespacho()}, dentro de su panel de gestión (la plataforma Nomos). Le hablas a ${nombre}, el abogado dueño del despacho, como lo haría un empresario visionario: con confianza, ambición sana, y viendo siempre oportunidades de crecer el negocio. Incluyes de forma natural y respetuosa una referencia a Dios en tus respuestas cuando encaje (por ejemplo, dar gracias por el progreso, pedir sabiduría, o reconocer que el esfuerzo y la fe van de la mano), sin exagerar ni forzarlo en cada frase. ` +
         `Actúas como un verdadero experto en contabilidad de despachos legales, en redes sociales y marketing para abogados, y en gestión de operaciones legales — da consejos con ese nivel de criterio, no genéricos. ` +
         `Eres el cerebro de la operación del despacho: puedes crear y editar clientes, crear casos, registrar pagos y generarles su recibo automáticamente, agregar actuaciones a la línea de tiempo de un cliente, actualizar el estado de vigilancia judicial, crear usuarios nuevos con acceso al panel, registrar métricas de redes sociales, generar un informe en PDF con el diagnóstico del despacho, generar un reporte en Excel con todos los pagos, leer imágenes, PDF y documentos de Word que te envíen, y dar ideas prácticas de gestión, negocio y contenido. Cuando te pregunten qué puedes hacer, cuéntalo con entusiasmo y de forma concreta. ` +
         `Usa las herramientas disponibles para actuar de verdad cuando te lo pidan (no solo describir qué harías), y confirma siempre al final qué hiciste. Este es el estado actual del despacho:\n\n${contexto}\n\nResponde en español, de forma cercana, breve y con visión de negocio.`;
@@ -1967,11 +1967,11 @@ function VistaFirma() {
     <div style={{ maxWidth: 760, margin: "0 auto", padding: "0 20px 40px" }}>
       <div style={{ background: COLORS.navy, margin: "0 -20px 28px", padding: "24px 20px", display: "flex", alignItems: "center", gap: 14 }}>
         <div style={{ width: 48, height: 48, borderRadius: 12, background: "#FFFFFF", display: "flex", alignItems: "center", justifyContent: "center", color: COLORS.navy, flexShrink: 0 }}>
-          <IconoCros size={26} />
+          <IconoNomos size={26} />
         </div>
         <div>
           <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, letterSpacing: 1.5, color: "#9FB6D6", textTransform: "uppercase", margin: 0 }}>
-            CROS
+            Nomos
           </p>
           <h1 style={{ fontFamily: "Inter, sans-serif", fontSize: 24, fontWeight: 700, color: "#FFFFFF", margin: "4px 0 0" }}>
             Firma de documento
@@ -3076,10 +3076,10 @@ function VistaPortalCliente() {
     <div style={{ maxWidth: 760, margin: "0 auto", padding: "0 20px 40px" }}>
       <div style={{ background: COLORS.navy, margin: "0 -20px 28px", padding: "24px 20px", display: "flex", alignItems: "center", gap: 14 }}>
         <div style={{ width: 48, height: 48, borderRadius: 12, background: "#FFFFFF", display: "flex", alignItems: "center", justifyContent: "center", color: COLORS.navy, flexShrink: 0 }}>
-          <IconoCros size={26} />
+          <IconoNomos size={26} />
         </div>
         <div>
-          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, letterSpacing: 1.5, color: "#9FB6D6", textTransform: "uppercase", margin: 0 }}>CROS</p>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, letterSpacing: 1.5, color: "#9FB6D6", textTransform: "uppercase", margin: 0 }}>Nomos</p>
           <h1 style={{ fontFamily: "Inter, sans-serif", fontSize: 24, fontWeight: 700, color: "#FFFFFF", margin: "4px 0 0" }}>Portal del cliente</h1>
         </div>
       </div>
@@ -5573,10 +5573,16 @@ function useUsuariosDespacho() {
   return { usuarios, cargado, crear, actualizar, reload: cargar };
 }
 
-function IconoCros({ size = 16 }) {
+// Marca de Nomos: tres barras redondeadas en escalera descendente — evoca
+// la jerarquía de normas (norma constitucional, ley, reglamento) sin caer en
+// los clichés visuales del sector (balanza, martillo, columna). Funciona
+// igual de bien como ícono suelto que como parte del isotipo con caja.
+function IconoNomos({ size = 16 }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path d="M18.5 6.5a9 9 0 1 0 0 11" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" />
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+      <rect x="4" y="4.3" width="16" height="3.4" rx="1.7" />
+      <rect x="4" y="10.3" width="11" height="3.4" rx="1.7" />
+      <rect x="4" y="16.3" width="6" height="3.4" rx="1.7" />
     </svg>
   );
 }
@@ -5599,10 +5605,10 @@ function InsigniaPlataforma({ grande }) {
           flexShrink: 0,
         }}
       >
-        <IconoCros size={tamañoIcono} />
+        <IconoNomos size={tamañoIcono} />
       </div>
       <span style={{ fontFamily: "Inter, sans-serif", fontSize: grande ? 26 : 14, fontWeight: 800, letterSpacing: grande ? 2 : 1.5, color: COLORS.headingText, lineHeight: 1 }}>
-        CROS
+        Nomos
       </span>
     </div>
   );
@@ -5824,7 +5830,7 @@ function LandingPage({ onRegistrar, onIniciarSesion }) {
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
           <InsigniaPlataforma />
           <p style={{ textAlign: "center", fontFamily: "Inter, sans-serif", fontSize: 11, color: COLORS.muted, margin: 0 }}>
-            CROS — desarrollado por <strong style={{ color: COLORS.headingText }}>Felipe Cortés Ramírez</strong>, CEO. Todos los derechos reservados.
+            Nomos — desarrollado por <strong style={{ color: COLORS.headingText }}>Felipe Cortés Ramírez</strong>, CEO. Todos los derechos reservados.
           </p>
         </div>
       </div>
@@ -6813,9 +6819,9 @@ export default function App() {
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "4px 6px 20px", marginBottom: 20, borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
           <div style={{ display: "inline-flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
             <div style={{ width: 40, height: 40, borderRadius: 11, background: "#FFFFFF", display: "flex", alignItems: "center", justifyContent: "center", color: COLORS.navy, flexShrink: 0 }}>
-              <IconoCros size={22} />
+              <IconoNomos size={22} />
             </div>
-            <span style={{ fontFamily: "Inter, sans-serif", fontSize: 20, fontWeight: 800, letterSpacing: 1.5, color: "#FFFFFF", lineHeight: 1 }}>CROS</span>
+            <span style={{ fontFamily: "Inter, sans-serif", fontSize: 20, fontWeight: 800, letterSpacing: 1.5, color: "#FFFFFF", lineHeight: 1 }}>Nomos</span>
           </div>
           <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, fontWeight: 600, color: "#D7E2F1", margin: 0, lineHeight: 1.15, textAlign: "center" }}>
             {getNombreDespacho()}
@@ -6973,7 +6979,7 @@ export default function App() {
               {getNombreDespacho()}
             </p>
             <p style={{ textAlign: "center", fontFamily: "Inter, sans-serif", fontSize: 11, color: COLORS.muted, margin: 0 }}>
-              CROS — desarrollado por <strong style={{ color: COLORS.headingText }}>Felipe Cortés Ramírez</strong>, CEO. Todos los derechos reservados.
+              Nomos — desarrollado por <strong style={{ color: COLORS.headingText }}>Felipe Cortés Ramírez</strong>, CEO. Todos los derechos reservados.
             </p>
           </div>
         </div>
