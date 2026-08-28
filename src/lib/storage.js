@@ -174,6 +174,22 @@ export async function eliminarDefinitivo(tipo, id) {
   return !error;
 }
 
+// Firma pública de documentos ----------------------------------------------
+// Cuando firma alguien SIN sesión (el cliente, desde #firmar), no se escribe
+// directo a Supabase desde el navegador: pasa por esta función serverless
+// para poder registrar la IP real de quien firmó (ver api/documentos/firmar.js).
+
+export async function firmarDocumentoPublico(id, data) {
+  const response = await fetch("/api/documentos/firmar", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ codigo: id, data }),
+  });
+  const json = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(json.error || "No se pudo guardar la firma");
+  return json;
+}
+
 // Búsqueda global ---------------------------------------------------------
 
 export async function buscarGlobal(texto) {
@@ -206,17 +222,13 @@ export async function storageSet(key, value) {
     }
 
     if (key.startsWith("documento:")) {
+      // Sin sesión (cliente firmando #firmar) no pasa por aquí: usa
+      // firmarDocumentoPublico(), que sí captura la IP en el servidor.
       const id = key.slice("documento:".length);
       const parsed = JSON.parse(value);
-      if (despachoActualId) {
-        const { error } = await supabase
-          .from("documentos")
-          .upsert({ id, despacho_id: despachoActualId, data: parsed, updated_at: new Date().toISOString() });
-        if (error) throw error;
-        return true;
-      }
-      // Sin sesión (cliente firmando): solo actualiza este documento puntual, vía función segura.
-      const { error } = await supabase.rpc("guardar_firma_documento", { p_id: id, p_data: parsed });
+      const { error } = await supabase
+        .from("documentos")
+        .upsert({ id, despacho_id: despachoActualId, data: parsed, updated_at: new Date().toISOString() });
       if (error) throw error;
       return true;
     }

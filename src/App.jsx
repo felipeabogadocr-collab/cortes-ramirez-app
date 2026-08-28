@@ -104,6 +104,21 @@ function exportarCSV(nombreArchivo, columnas, filas) {
   URL.revokeObjectURL(url);
 }
 
+// SHA-256 en hexadecimal, usado como hash de integridad de documentos: al
+// firmar, se guarda el hash del contenido en ese momento; al ver el
+// documento después, se recalcula y se compara — si no coincide, alguien lo
+// modificó después de firmado (Ley 527 de 1999, art. 7).
+async function sha256Hex(texto) {
+  try {
+    const bytes = new TextEncoder().encode(texto || "");
+    const digest = await crypto.subtle.digest("SHA-256", bytes);
+    return Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, "0")).join("");
+  } catch (e) {
+    // Navegador sin Web Crypto (muy raro): sin hash, no rompe el flujo.
+    return null;
+  }
+}
+
 function generarReciboImagen(cliente, pago) {
   return new Promise((resolve) => {
     const width = 720;
@@ -225,6 +240,7 @@ import {
   obtenerPapelera,
   restaurarDePapelera,
   eliminarDefinitivo,
+  firmarDocumentoPublico,
 } from "./lib/storage";
 
 function useIndex(key, shared) {
@@ -1960,16 +1976,7 @@ function VistaFirma() {
     // de la firma: sirve para demostrar después que el texto firmado no fue
     // alterado (Ley 527 de 1999, art. 7 — requisito de integridad de la
     // firma electrónica).
-    let hashDocumento = null;
-    try {
-      const contenidoParaHash = doc.tipoDocumento === "pdf" ? doc.archivoPdfBase64 || "" : doc.contenido || "";
-      const bytes = new TextEncoder().encode(contenidoParaHash);
-      const digest = await crypto.subtle.digest("SHA-256", bytes);
-      hashDocumento = Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, "0")).join("");
-    } catch (e) {
-      // Si el navegador no soporta Web Crypto (muy raro), se firma igual,
-      // simplemente sin el hash adicional.
-    }
+    const hashDocumento = await sha256Hex(doc.tipoDocumento === "pdf" ? doc.archivoPdfBase64 || "" : doc.contenido || "");
 
     const nuevaFirma = {
       nombre: nombre.trim(),
@@ -1986,7 +1993,20 @@ function VistaFirma() {
     };
     const firmantesActualizados = [...(doc.firmantes || []), nuevaFirma];
     const updated = { ...doc, firmantes: firmantesActualizados };
-    await storageSet(`documento:${doc.id}`, JSON.stringify(updated), true);
+    try {
+      // Pasa por el servidor (no directo a Supabase) para que quede
+      // registrada la IP real de quien firmó — el navegador no puede
+      // falsificarla como sí podría falsificar cualquier otro dato del
+      // formulario.
+      const resultado = await firmarDocumentoPublico(doc.id, updated);
+      if (resultado?.ip) {
+        firmantesActualizados[firmantesActualizados.length - 1] = { ...nuevaFirma, ip: resultado.ip };
+        updated.firmantes = firmantesActualizados;
+      }
+    } catch (e) {
+      setError("No pudimos guardar tu firma en este momento. Intenta de nuevo en un momento.");
+      return;
+    }
     setDoc(updated);
     setColocando(false);
     setPreview(null);
@@ -1999,6 +2019,48 @@ function VistaFirma() {
     setNumeroId("");
     setTextoFirma("");
     setConfirmado(false);
+  };
+
+  const descargarCertificado = () => {
+    const firma = (doc.firmantes || [])[doc.firmantes.length - 1];
+    if (!firma) return;
+    const texto = `CERTIFICADO DE FIRMA ELECTRÓNICA
+Emitido por Nomos — válido como comprobante bajo la Ley 527 de 1999 (Colombia)
+
+Documento firmado: ${doc.titulo}
+Cliente/asunto: ${doc.cliente || "—"}
+
+Datos del firmante
+------------------
+Nombre: ${firma.nombre}
+Tipo de identificación: ${firma.tipoId}
+Número de identificación: ${firma.numeroId}
+Rol: ${firma.rol === "abogado" ? "Abogado del despacho" : "Firmante / cliente"}
+
+Evidencia técnica
+------------------
+Fecha y hora de la firma: ${new Date(firma.firmadoEn).toLocaleString("es-CO", { dateStyle: "full", timeStyle: "medium" })}
+Autorización de tratamiento de datos y firma electrónica aceptada: ${firma.aceptaConsentimiento ? "Sí" : "No registrada"}
+Dirección IP de origen: ${firma.ip || "No disponible"}
+Navegador/dispositivo (user-agent): ${firma.userAgent || "No disponible"}
+Hash de integridad del documento (SHA-256): ${firma.hashDocumento || "No disponible"}
+
+Este hash permite verificar que el documento no fue alterado después de
+esta firma: si el contenido cambia, un nuevo cálculo del hash ya no
+coincidirá con el valor de arriba.
+
+Código del documento: ${doc.id}
+Certificado generado: ${new Date().toLocaleString("es-CO", { dateStyle: "full", timeStyle: "medium" })}
+`;
+    const blob = new Blob([texto], { type: "text/plain;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `certificado-firma-${doc.id}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   };
 
   return (
@@ -2077,6 +2139,9 @@ function VistaFirma() {
                 Tu firma quedó registrada en el documento.
               </p>
               <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
+                <button className="drx-btn-ghost" style={buttonGhost} onClick={descargarCertificado}>
+                  📄 Descargar certificado de firma
+                </button>
                 <button className="drx-btn-ghost" style={buttonGhost} onClick={agregarOtraPersona}>
                   Agregar la firma de otra persona
                 </button>
@@ -4803,6 +4868,7 @@ function DocumentosTab() {
   const [editandoDocId, setEditandoDocId] = useState(null);
   const [formEdicionDoc, setFormEdicionDoc] = useState({});
   const [filtro, setFiltro] = useState("");
+  const [integridad, setIntegridad] = useState({});
 
   const cargar = useCallback(async () => {
     const entries = {};
@@ -4816,6 +4882,23 @@ function DocumentosTab() {
   useEffect(() => {
     cargar();
   }, [cargar]);
+
+  // Verifica, para cada documento con al menos una firma, que el hash
+  // guardado al firmar todavía coincida con el contenido actual — si no
+  // coincide, alguien lo modificó después de firmado.
+  useEffect(() => {
+    (async () => {
+      const resultados = {};
+      for (const [id, d] of Object.entries(docs)) {
+        const firmaConHash = (d.firmantes || []).find((f) => f.hashDocumento);
+        if (!firmaConHash) continue;
+        const contenidoActual = d.tipoDocumento === "pdf" ? d.archivoPdfBase64 || "" : d.contenido || "";
+        const hashActual = await sha256Hex(contenidoActual);
+        resultados[id] = hashActual && hashActual === firmaConHash.hashDocumento ? "ok" : "alterado";
+      }
+      setIntegridad(resultados);
+    })();
+  }, [docs]);
 
   const manejarArchivo = async (e) => {
     const file = e.target.files?.[0];
@@ -5124,7 +5207,19 @@ function DocumentosTab() {
                     Cliente: {d.cliente || "—"}
                   </p>
                 </div>
-                <EstadoBadge estado={estado} />
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6 }}>
+                  <EstadoBadge estado={estado} />
+                  {integridad[id] === "ok" && (
+                    <span style={{ fontFamily: "Inter, sans-serif", fontSize: 10.5, fontWeight: 700, color: "#166534" }} title="El contenido no ha cambiado desde que se firmó">
+                      ✓ Integridad verificada
+                    </span>
+                  )}
+                  {integridad[id] === "alterado" && (
+                    <span style={{ fontFamily: "Inter, sans-serif", fontSize: 10.5, fontWeight: 700, color: "#B42318" }} title="El contenido cambió después de la firma">
+                      ⚠ Modificado después de firmar
+                    </span>
+                  )}
+                </div>
               </div>
 
               {firmantes.length > 0 && (
