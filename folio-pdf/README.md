@@ -43,17 +43,23 @@ entorno (solo no se guardan registros ni funciona `/panel` — ver siguiente sec
 
 1. En el SQL Editor del **mismo proyecto de Supabase** que usa la app interna del despacho,
    ejecuta `folio-pdf/supabase/schema.sql`.
-2. En el proyecto **folio-pdf** de Vercel (Settings → Environment Variables), agrega
-   `VITE_SUPABASE_URL` y `VITE_SUPABASE_ANON_KEY` con los mismos valores que ya tiene la app
-   interna (Project Settings → API en Supabase).
+2. En el proyecto **folio-pdf** de Vercel (Settings → Environment Variables), agrega:
+   - `VITE_SUPABASE_URL` y `VITE_SUPABASE_ANON_KEY` — mismos valores que ya tiene la app
+     interna (Project Settings → API en Supabase). Tipo **Config** (se pueden volver a ver).
+   - `SUPABASE_SERVICE_ROLE_KEY` — la llave **service_role** de ese mismo proyecto de
+     Supabase (Project Settings → API Keys → "secret" / service_role). Tipo **Secret**, y
+     **sin** el prefijo `VITE_` (para que nunca llegue al navegador).
+   - `PANEL_PASSWORD` — la contraseña para entrar a `/panel`. Tipo **Secret**, sin prefijo
+     `VITE_`.
 3. Vuelve a desplegar. Ya cada registro (nombre + celular) queda guardado, y cada documento
    procesado queda contado por herramienta.
-4. Entra a `/panel` (ej. `https://folio-pdf-omega.vercel.app/panel`) con la contraseña
-   configurada en `src/Panel.jsx` (`PANEL_PASSWORD`) para ver los números.
+4. Entra a `/panel` (ej. `https://folio-pdf-omega.vercel.app/panel`) con la contraseña que
+   pusiste en `PANEL_PASSWORD`.
 
-Por seguridad, el panel público solo muestra **conteos** (nunca nombres ni celulares) — esos
-datos personales solo se pueden ver en el Table Editor de Supabase (tabla `folio_leads`),
-porque la llave `anon` que usa el navegador no tiene permiso de lectura sobre esa tabla.
+La lista de personas registradas (nombre y celular) se muestra directo en `/panel`, pero se
+lee desde una función serverless (`api/panel-leads.js`) que usa la llave `service_role` de
+Supabase — esa llave nunca llega al navegador, solo vive en el servidor de Vercel, y la
+función exige la contraseña antes de devolver cualquier dato.
 
 ## Firma electrónica
 

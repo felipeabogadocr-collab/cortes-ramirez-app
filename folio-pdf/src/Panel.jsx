@@ -1,26 +1,41 @@
 import { useEffect, useState } from "react";
 import Logo from "./components/Logo.jsx";
 import Footer from "./components/Footer.jsx";
-import { supabase } from "./lib/supabaseClient.js";
 
-const PANEL_PASSWORD = "Foliocrabogaods";
-const SESSION_KEY = "folio_panel_ok";
+const SESSION_KEY = "folio_panel_clave";
+
+async function pedirDatos(password) {
+  const resp = await fetch("/api/panel-leads", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ password }),
+  });
+  const json = await resp.json();
+  if (!resp.ok) throw new Error(json.error || "No se pudo entrar al panel.");
+  return json;
+}
 
 function PasswordGate({ onUnlock }) {
   const [clave, setClave] = useState("");
   const [mostrar, setMostrar] = useState(false);
+  const [cargando, setCargando] = useState(false);
   const [error, setError] = useState("");
 
-  function entrar() {
-    if (clave.trim().toLowerCase() === PANEL_PASSWORD.toLowerCase()) {
+  async function entrar() {
+    setCargando(true);
+    setError("");
+    try {
+      const datos = await pedirDatos(clave);
       try {
-        sessionStorage.setItem(SESSION_KEY, "1");
+        sessionStorage.setItem(SESSION_KEY, clave);
       } catch {
         // si el navegador bloquea sessionStorage, igual dejamos entrar
       }
-      onUnlock();
-    } else {
-      setError("Contraseña incorrecta.");
+      onUnlock(datos);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setCargando(false);
     }
   }
 
@@ -83,8 +98,8 @@ function PasswordGate({ onUnlock }) {
           </button>
         </div>
         {error && <p style={{ color: "var(--danger)", fontSize: 12, marginTop: 8 }}>{error}</p>}
-        <button className="btn-primary" style={{ width: "100%", marginTop: 14 }} onClick={entrar}>
-          Entrar
+        <button className="btn-primary" style={{ width: "100%", marginTop: 14 }} onClick={entrar} disabled={cargando}>
+          {cargando ? "Entrando…" : "Entrar"}
         </button>
       </div>
     </div>
@@ -100,40 +115,8 @@ function Stat({ label, value }) {
   );
 }
 
-function Dashboard() {
-  const [resumen, setResumen] = useState(null);
-  const [porHerramienta, setPorHerramienta] = useState([]);
-  const [error, setError] = useState("");
-  const [cargando, setCargando] = useState(true);
-
-  useEffect(() => {
-    async function cargar() {
-      if (!supabase) {
-        setError(
-          "Faltan las variables VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY en este proyecto de Vercel."
-        );
-        setCargando(false);
-        return;
-      }
-      try {
-        const [r1, r2] = await Promise.all([
-          supabase.from("folio_stats_resumen").select("*").single(),
-          supabase.from("folio_stats_por_herramienta").select("*"),
-        ]);
-        if (r1.error) throw r1.error;
-        if (r2.error) throw r2.error;
-        setResumen(r1.data);
-        setPorHerramienta(r2.data || []);
-      } catch (e) {
-        setError(
-          "No se pudieron cargar las estadísticas. Verifica que ejecutaste el script folio-pdf/supabase/schema.sql en Supabase."
-        );
-      } finally {
-        setCargando(false);
-      }
-    }
-    cargar();
-  }, []);
+function Dashboard({ datos }) {
+  const { totalRegistros, totalDocumentos, porHerramienta, leads } = datos;
 
   return (
     <div style={{ minHeight: "100dvh", display: "flex", flexDirection: "column", background: "var(--bg)" }}>
@@ -144,32 +127,26 @@ function Dashboard() {
             <div className="uppercase" style={{ fontWeight: 800, fontSize: 17, letterSpacing: 1 }}>
               Panel de Folio
             </div>
-            <div style={{ fontSize: 11, color: "var(--muted)" }}>Solo números — sin datos personales</div>
+            <div style={{ fontSize: 11, color: "var(--muted)" }}>Solo tú puedes ver esta página</div>
           </div>
         </div>
       </header>
 
       <main style={{ flex: 1, maxWidth: 900, margin: "0 auto", width: "100%", padding: "24px 20px 60px" }}>
-        {cargando && <p style={{ color: "var(--muted)" }}>Cargando estadísticas…</p>}
-        {error && <p style={{ color: "var(--danger)", fontSize: 13.5 }}>{error}</p>}
+        <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginBottom: 24 }}>
+          <Stat label="Personas registradas" value={totalRegistros} />
+          <Stat label="Documentos procesados" value={totalDocumentos} />
+        </div>
 
-        {resumen && (
+        {porHerramienta.length > 0 && (
           <>
-            <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginBottom: 24 }}>
-              <Stat label="Personas registradas" value={resumen.total_registros ?? 0} />
-              <Stat label="Documentos procesados" value={resumen.total_documentos ?? 0} />
-            </div>
-
             <h2 className="uppercase" style={{ fontSize: 15, letterSpacing: 0.6, marginBottom: 10 }}>
               Documentos por herramienta
             </h2>
-            {porHerramienta.length === 0 && (
-              <p style={{ color: "var(--muted)", fontSize: 13 }}>Todavía no hay documentos procesados.</p>
-            )}
-            <div className="card" style={{ overflow: "hidden" }}>
+            <div className="card" style={{ overflow: "hidden", marginBottom: 28 }}>
               {porHerramienta.map((row, i) => (
                 <div
-                  key={row.herramienta || i}
+                  key={row.herramienta}
                   style={{
                     display: "flex",
                     justifyContent: "space-between",
@@ -178,18 +155,42 @@ function Dashboard() {
                     fontSize: 14,
                   }}
                 >
-                  <span>{row.herramienta || "Sin especificar"}</span>
+                  <span>{row.herramienta}</span>
                   <strong>{row.total}</strong>
                 </div>
               ))}
             </div>
-
-            <p style={{ fontSize: 12, color: "var(--muted)", marginTop: 24 }}>
-              Para ver la lista de nombres y celulares registrados, entra directo a tu proyecto de
-              Supabase → Table Editor → tabla <code>folio_leads</code>. Por seguridad, esos datos
-              nunca se muestran en esta página pública.
-            </p>
           </>
+        )}
+
+        <h2 className="uppercase" style={{ fontSize: 15, letterSpacing: 0.6, marginBottom: 10 }}>
+          Personas registradas ({leads.length})
+        </h2>
+        {leads.length === 0 ? (
+          <p style={{ color: "var(--muted)", fontSize: 13 }}>Todavía nadie se ha registrado.</p>
+        ) : (
+          <div className="card" style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13.5 }}>
+              <thead>
+                <tr style={{ textAlign: "left", borderBottom: "1px solid var(--border)" }}>
+                  <th style={{ padding: "10px 14px" }}>Nombre</th>
+                  <th style={{ padding: "10px 14px" }}>Celular</th>
+                  <th style={{ padding: "10px 14px" }}>Fecha</th>
+                </tr>
+              </thead>
+              <tbody>
+                {leads.map((l, i) => (
+                  <tr key={i} style={{ borderTop: i === 0 ? "none" : "1px solid var(--border)" }}>
+                    <td style={{ padding: "10px 14px" }}>{l.nombre}</td>
+                    <td style={{ padding: "10px 14px" }}>{l.telefono}</td>
+                    <td style={{ padding: "10px 14px", color: "var(--muted)" }}>
+                      {new Date(l.created_at).toLocaleString("es-CR")}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </main>
 
@@ -199,14 +200,33 @@ function Dashboard() {
 }
 
 export default function Panel() {
-  const [desbloqueado, setDesbloqueado] = useState(() => {
-    try {
-      return sessionStorage.getItem(SESSION_KEY) === "1";
-    } catch {
-      return false;
-    }
-  });
+  const [datos, setDatos] = useState(null);
+  const [revisandoSesion, setRevisandoSesion] = useState(true);
 
-  if (!desbloqueado) return <PasswordGate onUnlock={() => setDesbloqueado(true)} />;
-  return <Dashboard />;
+  useEffect(() => {
+    let claveGuardada = null;
+    try {
+      claveGuardada = sessionStorage.getItem(SESSION_KEY);
+    } catch {
+      // nada que hacer si el navegador bloquea sessionStorage
+    }
+    if (!claveGuardada) {
+      setRevisandoSesion(false);
+      return;
+    }
+    pedirDatos(claveGuardada)
+      .then(setDatos)
+      .catch(() => {
+        try {
+          sessionStorage.removeItem(SESSION_KEY);
+        } catch {
+          // nada que hacer
+        }
+      })
+      .finally(() => setRevisandoSesion(false));
+  }, []);
+
+  if (revisandoSesion) return null;
+  if (!datos) return <PasswordGate onUnlock={setDatos} />;
+  return <Dashboard datos={datos} />;
 }

@@ -1,17 +1,18 @@
 -- Esquema de Folio (analítica de registros y uso). Ejecutar en el SQL Editor
 -- del MISMO proyecto de Supabase que ya usa la app interna del despacho.
 --
--- Diseño de seguridad: la app de Folio es pública y sin backend, así que la
--- llave "anon" que usa viaja dentro del código del navegador y cualquiera
--- podría copiarla. Por eso:
+-- Diseño de seguridad: la llave "anon" que usa el navegador de Folio viaja
+-- dentro del código público, así que:
 --   - folio_leads y folio_eventos: la llave anon solo puede INSERTAR, nunca
---     leer. Los nombres y celulares de quienes se registran NUNCA quedan
---     expuestos al público, solo tú los puedes ver en el Table Editor de
---     Supabase (con tu login).
---   - folio_stats_resumen y folio_stats_por_herramienta: son vistas que
---     solo devuelven CONTEOS (números), nunca datos personales, así que sí
---     es seguro dejarlas de lectura pública — es lo que alimenta el panel
---     de Folio.
+--     leer. Los nombres y celulares NUNCA se pueden leer con esa llave.
+--   - La lista completa de personas registradas SÍ se muestra en
+--     /panel (protegida con contraseña), pero se lee desde una función
+--     serverless (folio-pdf/api/panel-leads.js) que usa la llave
+--     "service role" de Supabase — esa llave nunca viaja al navegador, solo
+--     vive como variable de entorno en el servidor de Vercel.
+--   - folio_stats_resumen y folio_stats_por_herramienta quedan de lectura
+--     pública (solo conteos, sin datos personales) por si se necesitan en
+--     el futuro, aunque el panel actual ya no depende de ellas.
 
 create extension if not exists "pgcrypto";
 
