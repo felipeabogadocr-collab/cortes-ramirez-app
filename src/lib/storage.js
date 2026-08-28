@@ -19,10 +19,11 @@ const INDEX_TABLES = {
   "indice-casos": "casos",
 };
 
-const LIST_TABLES = {
-  "usuarios-despacho": "usuarios",
-  "metricas-redes": "metricas_redes",
-};
+// Ya no queda nada mapeado aquí: los usuarios viven en Supabase Auth +
+// la tabla "perfiles" (ver useUsuariosDespacho en App.jsx), y las métricas
+// de redes se eliminaron. Se deja el objeto vacío por si en el futuro se
+// necesita otra lista completa (leer/reemplazar todo el arreglo).
+const LIST_TABLES = {};
 
 function parseRecordKey(key) {
   const idx = key.indexOf(":");
