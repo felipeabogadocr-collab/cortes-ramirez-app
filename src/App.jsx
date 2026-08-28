@@ -7762,7 +7762,7 @@ function LoginGate({ onIngresar, onCancelar, pantallaInicial }) {
       <div
         aria-hidden="true"
         style={{
-          position: "absolute",
+          position: "fixed",
           top: "12%",
           left: "12%",
           width: 300,
@@ -7777,7 +7777,7 @@ function LoginGate({ onIngresar, onCancelar, pantallaInicial }) {
       <div
         aria-hidden="true"
         style={{
-          position: "absolute",
+          position: "fixed",
           bottom: "8%",
           right: "10%",
           width: 260,
@@ -8625,6 +8625,27 @@ function EstablecerContrasenaNueva({ onListo }) {
   );
 }
 
+// Saludo por voz al iniciar sesión, usando la síntesis de voz que trae el
+// navegador (Web Speech API) — sin ningún servicio ni costo externo, nunca
+// sale de tu propio computador. Si el navegador no la soporta, simplemente
+// no dice nada, sin romper el inicio de sesión.
+function saludarPorVoz(nombre) {
+  try {
+    if (typeof window === "undefined" || !window.speechSynthesis) return;
+    const primerNombre = (nombre || "").trim().split(/\s+/)[0] || "";
+    const texto = primerNombre ? `Hola ${primerNombre}, bienvenido a Nomos.` : "Hola, bienvenido a Nomos.";
+    const utter = new SpeechSynthesisUtterance(texto);
+    const voces = window.speechSynthesis.getVoices();
+    const vozEspanol = voces.find((v) => v.lang?.toLowerCase().startsWith("es"));
+    if (vozEspanol) utter.voice = vozEspanol;
+    utter.lang = vozEspanol?.lang || "es-ES";
+    utter.rate = 1;
+    window.speechSynthesis.speak(utter);
+  } catch {
+    // Ver arriba: si algo falla, simplemente no saluda.
+  }
+}
+
 export default function App() {
   useEffect(() => {
     ensureFonts();
@@ -8675,6 +8696,7 @@ export default function App() {
     setUsuarioActual(usuario);
     if (registrarLogin && usuario) {
       registrarAuditoria(usuario, "inicio_sesion", "sesion", null, {});
+      saludarPorVoz(usuario.nombre);
     }
   }, []);
 
@@ -8817,6 +8839,39 @@ export default function App() {
   return (
     <div className={oscuro ? "drx-tema-oscuro" : "drx-tema-claro"} style={{ background: COLORS.bg, minHeight: "100%", display: "flex" }}>
       <GlobalStyle />
+
+      <div
+        aria-hidden="true"
+        style={{
+          position: "fixed",
+          top: "8%",
+          left: "45%",
+          width: 340,
+          height: 340,
+          borderRadius: "50%",
+          background: `radial-gradient(circle, rgba(30,95,180,${oscuro ? 0.16 : 0.08}) 0%, rgba(30,95,180,0) 70%)`,
+          animation: "drx-mesh 14s ease-in-out infinite",
+          pointerEvents: "none",
+          zIndex: 0,
+          transition: "background 0.3s ease",
+        }}
+      />
+      <div
+        aria-hidden="true"
+        style={{
+          position: "fixed",
+          bottom: "5%",
+          right: "8%",
+          width: 300,
+          height: 300,
+          borderRadius: "50%",
+          background: `radial-gradient(circle, rgba(20,184,166,${oscuro ? 0.14 : 0.07}) 0%, rgba(20,184,166,0) 70%)`,
+          animation: "drx-mesh 18s ease-in-out infinite reverse",
+          pointerEvents: "none",
+          zIndex: 0,
+          transition: "background 0.3s ease",
+        }}
+      />
 
       <div
         style={{
