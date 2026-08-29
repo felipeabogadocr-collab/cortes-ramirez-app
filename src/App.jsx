@@ -1677,7 +1677,7 @@ function AsistenteIA({ nombre, usuarioId, onAccionCompletada }) {
           body: JSON.stringify({ model: "claude-sonnet-4-6", max_tokens: 700, system: systemPrompt, tools: TOOLS_ASISTENTE, messages: mensajesAPI }),
         });
         const data = await response.json();
-        if (!response.ok) throw new Error(data.error || "No se pudo contactar al asistente de IA");
+        if (!response.ok || data.error) throw new Error(data.error || "No se pudo contactar al asistente de IA");
         const bloques = data.content || [];
         const textoBloque = bloques.filter((b) => b.type === "text").map((b) => b.text).join("\n");
         const toolUses = bloques.filter((b) => b.type === "tool_use");
@@ -2969,7 +2969,7 @@ async function organizarPagoConIA(descripcion) {
     }),
   });
   const data = await response.json();
-  if (!response.ok) throw new Error(data.error || "No se pudo contactar al asistente de IA");
+  if (!response.ok || data.error) throw new Error(data.error || "No se pudo contactar al asistente de IA");
   const texto = (data.content || []).map((b) => b.text || "").join("");
   const limpio = texto.replace(/```json|```/g, "").trim();
   return JSON.parse(limpio);
@@ -3957,7 +3957,7 @@ async function explicarActuacion(actuacion, anotacion) {
     }),
   });
   const data = await response.json();
-  if (!response.ok) throw new Error(data.error || "No se pudo contactar al asistente de IA");
+  if (!response.ok || data.error) throw new Error(data.error || "No se pudo contactar al asistente de IA");
   return (data.content || []).map((b) => b.text || "").join("").trim();
 }
 
@@ -4978,7 +4978,7 @@ async function generarIdeasCalendario(tema, estrategia) {
     }),
   });
   const data = await response.json();
-  if (!response.ok) throw new Error(data.error || "No se pudo contactar al asistente de IA");
+  if (!response.ok || data.error) throw new Error(data.error || "No se pudo contactar al asistente de IA");
   const texto = (data.content || []).map((b) => b.text || "").join("");
   return texto
     .split("\n")
@@ -5223,7 +5223,7 @@ function CommunityManagerIA({ estrategia, onGuardarIdeas }) {
         body: JSON.stringify({ model: "claude-sonnet-4-6", max_tokens: 900, system: systemPrompt, messages: mensajesAPI }),
       });
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "No se pudo contactar al asistente de IA");
+      if (!response.ok || data.error) throw new Error(data.error || "No se pudo contactar al asistente de IA");
       const respuesta =
         (data.content || [])
           .filter((b) => b.type === "text")

@@ -63,7 +63,23 @@ function toGeminiContents(messages) {
   return contents;
 }
 
+// Motivos por los que Gemini puede responder "OK" (200) pero sin texto
+// utilizable: contenido bloqueado por seguridad, se acabaron los tokens antes
+// de generar nada, etc. Sin esto, el frontend recibía un content vacío y
+// mostraba un mensaje genérico de "no pude responder" sin decir por qué.
+const RAZONES_SIN_RESPUESTA = {
+  SAFETY: "Gemini bloqueó la respuesta por sus filtros de seguridad.",
+  RECITATION: "Gemini bloqueó la respuesta por posible contenido citado/protegido.",
+  MAX_TOKENS: "La respuesta se cortó porque llegó al límite de tokens antes de generar texto.",
+  PROHIBITED_CONTENT: "Gemini bloqueó la respuesta por contenido no permitido.",
+  OTHER: "Gemini no pudo generar una respuesta por un motivo desconocido.",
+};
+
 function fromGeminiResponse(geminiData) {
+  const bloqueoPrevio = geminiData?.promptFeedback?.blockReason;
+  if (bloqueoPrevio) {
+    return { content: [], error: `Gemini bloqueó la solicitud (${bloqueoPrevio}). Prueba reformular el mensaje o quitar el archivo adjunto.` };
+  }
   const candidate = geminiData?.candidates?.[0];
   const parts = candidate?.content?.parts || [];
   const content = parts.map((part, idx) => {
@@ -77,6 +93,10 @@ function fromGeminiResponse(geminiData) {
     }
     return { type: "text", text: part.text || "" };
   });
+  if (content.length === 0 && candidate?.finishReason && candidate.finishReason !== "STOP") {
+    const razon = RAZONES_SIN_RESPUESTA[candidate.finishReason] || `Gemini terminó sin generar texto (${candidate.finishReason}).`;
+    return { content: [], error: razon };
+  }
   return { content };
 }
 
