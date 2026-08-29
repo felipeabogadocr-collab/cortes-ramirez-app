@@ -539,6 +539,8 @@ const GlobalStyle = () => (
     .drx-tab-transition { animation: drx-tab-in 0.32s cubic-bezier(0.16, 1, 0.3, 1); }
     @keyframes drx-barra-progreso { 0% { width: 0%; opacity: 1; } 70% { width: 85%; opacity: 1; } 100% { width: 100%; opacity: 0; } }
     .drx-barra-progreso { animation: drx-barra-progreso 0.5s ease-out forwards; }
+    @keyframes drx-campana { 0%, 100% { transform: rotate(0deg); } 20% { transform: rotate(-14deg); } 40% { transform: rotate(11deg); } 60% { transform: rotate(-7deg); } 80% { transform: rotate(4deg); } }
+    .drx-campana-sonando svg { animation: drx-campana 0.6s ease-in-out; transform-origin: top center; }
     @keyframes drx-spin { to { transform: rotate(360deg); } }
     .drx-card:hover { transform: translateY(-2px); }
     @keyframes drx-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
@@ -6338,42 +6340,45 @@ function ModalNotificaciones({
   onIrAContenido,
   onIrAVigilancia,
 }) {
+  const panelRef = useRef(null);
+
   useEffect(() => {
     const alPresionarTecla = (e) => {
       if (e.key === "Escape") onCerrar();
     };
+    // Como ya no hay una capa oscura de fondo cubriendo toda la pantalla
+    // (el panel sale directo de la campanita, no como ventana aparte), hay
+    // que detectar el clic afuera nosotros mismos para poder cerrarlo.
+    const alHacerClicAfuera = (e) => {
+      if (panelRef.current && !panelRef.current.contains(e.target)) onCerrar();
+    };
     window.addEventListener("keydown", alPresionarTecla);
-    return () => window.removeEventListener("keydown", alPresionarTecla);
+    document.addEventListener("mousedown", alHacerClicAfuera);
+    return () => {
+      window.removeEventListener("keydown", alPresionarTecla);
+      document.removeEventListener("mousedown", alHacerClicAfuera);
+    };
   }, [onCerrar]);
 
   return (
     <div
-      onClick={onCerrar}
+      ref={panelRef}
+      className="drx-fade-in"
       style={{
-        position: "fixed",
-        inset: 0,
-        background: "rgba(10,18,32,0.55)",
-        backdropFilter: "blur(4px)",
-        WebkitBackdropFilter: "blur(4px)",
-        display: "flex",
-        alignItems: "flex-start",
-        justifyContent: "center",
-        padding: "60px 20px",
+        position: "absolute",
+        top: "calc(100% + 10px)",
+        right: 0,
+        background: COLORS.panel,
+        borderRadius: 14,
+        border: `1px solid ${COLORS.border}`,
+        width: 400,
+        maxWidth: "calc(100vw - 40px)",
+        maxHeight: "70vh",
+        overflowY: "auto",
+        boxShadow: "0 20px 50px rgba(10,35,66,0.22)",
         zIndex: 1000,
       }}
     >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          background: COLORS.panel,
-          borderRadius: 14,
-          width: "100%",
-          maxWidth: 460,
-          maxHeight: "75vh",
-          overflowY: "auto",
-          boxShadow: "0 20px 50px rgba(0,0,0,0.3)",
-        }}
-      >
         <div style={{ padding: "18px 20px", borderBottom: `1px solid ${COLORS.border}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <h2 style={{ fontFamily: "Inter, sans-serif", fontSize: 19, fontWeight: 700, margin: 0, color: COLORS.ink }}>Notificaciones</h2>
           <button onClick={onCerrar} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: COLORS.muted }}>
@@ -6525,7 +6530,6 @@ function ModalNotificaciones({
           )}
         </div>
       </div>
-    </div>
   );
 }
 
@@ -9577,9 +9581,10 @@ export default function App() {
           />
           <BuscadorGlobal onIr={setTab} />
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
+            <div style={{ position: "relative" }}>
             <button
-              className="drx-btn-ghost"
-              onClick={() => setMostrarNotificaciones(true)}
+              className={`drx-btn-ghost${mostrarNotificaciones ? " drx-campana-sonando" : ""}`}
+              onClick={() => setMostrarNotificaciones((v) => !v)}
               title="Notificaciones"
               style={{
                 position: "relative",
@@ -9616,6 +9621,24 @@ export default function App() {
                 </span>
               )}
             </button>
+            {mostrarNotificaciones && (
+              <ModalNotificaciones
+                firmasNuevas={firmasNuevas}
+                clientesInactivos={clientesInactivos}
+                pagosPendientes={pagosPendientes}
+                contenidoPendiente={contenidoPendiente}
+                contenidoVencido={contenidoVencido}
+                novedadesJudiciales={novedadesJudiciales}
+                clientesSinRadicado={clientesSinRadicado}
+                onCerrar={() => setMostrarNotificaciones(false)}
+                onMarcarVistas={marcarFirmasVistas}
+                onIrADocumentos={irADocumentos}
+                onIrAClientes={irAClientes}
+                onIrAContenido={irAContenido}
+                onIrAVigilancia={irAVigilancia}
+              />
+            )}
+            </div>
             <button className="drx-btn-ghost" style={buttonGhost} onClick={() => setModoPublico(true)}>
               Ver vista del cliente ↗
             </button>
@@ -9683,24 +9706,6 @@ export default function App() {
           </div>
         </div>
       </div>
-
-      {mostrarNotificaciones && (
-        <ModalNotificaciones
-          firmasNuevas={firmasNuevas}
-          clientesInactivos={clientesInactivos}
-          pagosPendientes={pagosPendientes}
-          contenidoPendiente={contenidoPendiente}
-          contenidoVencido={contenidoVencido}
-          novedadesJudiciales={novedadesJudiciales}
-          clientesSinRadicado={clientesSinRadicado}
-          onCerrar={() => setMostrarNotificaciones(false)}
-          onMarcarVistas={marcarFirmasVistas}
-          onIrADocumentos={irADocumentos}
-          onIrAClientes={irAClientes}
-          onIrAContenido={irAContenido}
-          onIrAVigilancia={irAVigilancia}
-        />
-      )}
 
       {avisoInactividad && (
         <div

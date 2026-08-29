@@ -13,4 +13,17 @@ body,
 body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+/* Los botones, campos de texto y selects NO heredan la fuente de la página
+   por defecto — el navegador les pone su propia fuente del sistema, que se
+   ve distinta (y más barata) que el resto de la app. Sin esto, cualquier
+   botón o campo al que se le olvide poner fontFamily a mano se ve con una
+   letra distinta al resto. */
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
 }
