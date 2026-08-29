@@ -10,6 +10,13 @@
   --accent: #16a34a;
   --danger: #d92d20;
   --shadow: 0 1px 2px rgba(20, 24, 31, 0.04), 0 6px 16px rgba(20, 24, 31, 0.05);
+
+  /* El pie de página siempre es azul oscuro, sin importar el tema activo. */
+  --footer-bg: #0a2342;
+  --footer-bg-2: #071a33;
+  --footer-text: #f2f5fb;
+  --footer-muted: #9fb0cc;
+  --footer-border: rgba(255, 255, 255, 0.12);
 }
 
 [data-theme="dark"] {
@@ -40,7 +47,7 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
-  font-family: "Manrope", system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+  font-family: "Plus Jakarta Sans", system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
   transition: background 0.2s ease, color 0.2s ease;
   position: relative;
 }
@@ -217,7 +224,7 @@ select {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 26px;
+  color: var(--brand-2);
   background: linear-gradient(135deg, var(--panel-2), var(--border));
 }
 
@@ -314,6 +321,9 @@ select {
 }
 
 .sign-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   background: var(--panel-2);
   color: var(--muted);
   border: 1px solid var(--border);
@@ -376,4 +386,74 @@ select {
   .card {
     border-radius: 12px;
   }
+}
+
+/* Pie de página estilo Nomos: siempre azul oscuro, columnas + franja final. */
+.footer-grid {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 1fr 1fr;
+  gap: 32px;
+}
+
+@media (max-width: 780px) {
+  .footer-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 28px;
+  }
+}
+
+@media (max-width: 480px) {
+  .footer-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.footer-link {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--footer-muted);
+  font-size: 13px;
+  font-weight: 500;
+  text-align: left;
+  text-decoration: none;
+  transition: color 0.15s ease;
+}
+
+.footer-link:hover {
+  color: var(--footer-text);
+}
+
+.footer-heading {
+  font-size: 11.5px;
+  font-weight: 800;
+  letter-spacing: 1.2px;
+  color: var(--footer-text);
+  margin: 0 0 14px;
+}
+
+.footer-bottom-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.footer-top-btn {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--footer-border);
+  color: var(--footer-text);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s ease;
+}
+
+.footer-top-btn:hover {
+  background: rgba(255, 255, 255, 0.16);
 }

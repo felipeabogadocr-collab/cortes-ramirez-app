@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import JSZip from "jszip";
 import { fileToBytes, getPageCount, splitPdf, downloadBytes } from "../../lib/pdfUtils.js";
+import { IconUpload } from "../Icons.jsx";
 
 export default function SplitTool() {
   const [bytes, setBytes] = useState(null);
@@ -75,7 +76,13 @@ export default function SplitTool() {
           onChange={(e) => cargar(e.target.files[0])}
         />
         <button className="btn-upload" onClick={() => inputRef.current.click()} disabled={busy}>
-          {busy ? "Cargando…" : "📤 Subir PDF"}
+          {busy ? (
+            "Cargando…"
+          ) : (
+            <>
+              <IconUpload /> Subir PDF
+            </>
+          )}
         </button>
         {error && <p style={{ color: "var(--danger)", fontSize: 13, marginTop: 10 }}>{error}</p>}
       </div>

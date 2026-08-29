@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { fileToBytes, renderThumbnails, signPdf, downloadBytes } from "../../lib/pdfUtils.js";
+import { IconEdit, IconImage, IconType, IconUpload } from "../Icons.jsx";
 
 const STAMP_W = 640;
 const STAMP_H = 240;
@@ -344,7 +345,13 @@ export default function SignTool() {
           onChange={(e) => cargar(e.target.files[0])}
         />
         <button className="btn-upload" onClick={() => inputRef.current.click()} disabled={busy}>
-          {busy ? "Cargando…" : "📤 Subir PDF"}
+          {busy ? (
+            "Cargando…"
+          ) : (
+            <>
+              <IconUpload /> Subir PDF
+            </>
+          )}
         </button>
         {error && <p style={{ color: "var(--danger)", fontSize: 13, marginTop: 10 }}>{error}</p>}
       </div>
@@ -429,13 +436,13 @@ export default function SignTool() {
 
         <div className="sign-tabs">
           <button className={`sign-tab ${metodo === "dibujar" ? "active" : ""}`} onClick={() => setMetodo("dibujar")}>
-            ✍️ Dibujar
+            <IconEdit size={14} /> Dibujar
           </button>
           <button className={`sign-tab ${metodo === "imagen" ? "active" : ""}`} onClick={() => setMetodo("imagen")}>
-            🖼️ Subir imagen
+            <IconImage size={14} /> Subir imagen
           </button>
           <button className={`sign-tab ${metodo === "texto" ? "active" : ""}`} onClick={() => setMetodo("texto")}>
-            🖋️ Escribir nombre
+            <IconType size={14} /> Escribir nombre
           </button>
         </div>
 
@@ -451,7 +458,7 @@ export default function SignTool() {
               onChange={(e) => cargarImagenFirma(e.target.files[0])}
             />
             <button className="btn-upload" onClick={() => imagenInputRef.current.click()}>
-              📤 Subir imagen de mi firma
+<IconUpload /> Subir imagen de mi firma
             </button>
             {firmaImagen && (
               <img
@@ -469,7 +476,7 @@ export default function SignTool() {
         {metodo === "texto" && (
           <div>
             <p style={{ fontSize: 14, color: "var(--text)", marginBottom: 10, lineHeight: 1.5 }}>
-              ✨ Tu nombre se convierte <strong>automáticamente en una firma</strong>, junto con el
+              Tu nombre se convierte <strong>automáticamente en una firma</strong>, junto con el
               sello de fecha y hora.
             </p>
             <label style={{ fontSize: 12.5, fontWeight: 700, display: "block", marginBottom: 6 }}>

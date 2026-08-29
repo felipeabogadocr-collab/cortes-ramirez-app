@@ -11,14 +11,25 @@ import SplitTool from "./components/tools/SplitTool.jsx";
 import SignTool from "./components/tools/SignTool.jsx";
 import ImagesToPdfTool from "./components/tools/ImagesToPdfTool.jsx";
 import CompressTool from "./components/tools/CompressTool.jsx";
+import {
+  IconPaperclip,
+  IconFolder,
+  IconScissors,
+  IconPen,
+  IconImage,
+  IconCompress,
+  IconLock,
+  IconGlobe,
+  IconCheck,
+} from "./components/Icons.jsx";
 
 const TOOLS = [
-  { id: "unir", label: "Unir PDF", icon: "📎", Component: MergeTool },
-  { id: "organizar", label: "Organizar páginas", icon: "🗂️", Component: OrganizeTool },
-  { id: "dividir", label: "Dividir PDF", icon: "✂️", Component: SplitTool },
-  { id: "firmar", label: "Firmar PDF", icon: "✍️", Component: SignTool },
-  { id: "imagenes", label: "Imágenes a PDF", icon: "🖼️", Component: ImagesToPdfTool },
-  { id: "comprimir", label: "Comprimir PDF", icon: "🗜️", Component: CompressTool },
+  { id: "unir", label: "Unir PDF", Icon: IconPaperclip, Component: MergeTool },
+  { id: "organizar", label: "Organizar páginas", Icon: IconFolder, Component: OrganizeTool },
+  { id: "dividir", label: "Dividir PDF", Icon: IconScissors, Component: SplitTool },
+  { id: "firmar", label: "Firmar PDF", Icon: IconPen, Component: SignTool },
+  { id: "imagenes", label: "Imágenes a PDF", Icon: IconImage, Component: ImagesToPdfTool },
+  { id: "comprimir", label: "Comprimir PDF", Icon: IconCompress, Component: CompressTool },
 ];
 
 export default function App() {
@@ -56,28 +67,36 @@ export default function App() {
 
         {!Active && (
           <>
-            <h1
-              className="uppercase"
-              style={{
-                fontSize: 28,
-                fontWeight: 800,
-                margin: "0 0 6px",
-                letterSpacing: 1,
-                backgroundImage: "linear-gradient(135deg, var(--brand), var(--brand-2))",
-                WebkitBackgroundClip: "text",
-                backgroundClip: "text",
-                color: "transparent",
-              }}
-            >
-              Herramientas PDF gratis
-            </h1>
-            <p style={{ color: "var(--muted)", fontSize: 14, margin: "0 0 14px" }}>
-              Para estudiantes y abogados. Rápidas, sencillas y sin costo.
-            </p>
-            <div className="trust-badges" style={{ marginBottom: 22 }}>
-              <span className="trust-badge">🔒 Sin almacenamiento</span>
-              <span className="trust-badge">🌐 100% en tu navegador</span>
-              <span className="trust-badge">✅ Gratis para siempre</span>
+            <div style={{ textAlign: "center", marginBottom: 22 }}>
+              <h1
+                className="uppercase"
+                style={{
+                  fontSize: 28,
+                  fontWeight: 800,
+                  margin: "0 0 6px",
+                  letterSpacing: 1,
+                  backgroundImage: "linear-gradient(135deg, var(--brand), var(--brand-2))",
+                  WebkitBackgroundClip: "text",
+                  backgroundClip: "text",
+                  color: "transparent",
+                }}
+              >
+                Herramientas PDF gratis
+              </h1>
+              <p style={{ color: "var(--muted)", fontSize: 14, margin: "0 0 14px" }}>
+                Para estudiantes y abogados. Rápidas, sencillas y sin costo.
+              </p>
+              <div className="trust-badges" style={{ justifyContent: "center" }}>
+                <span className="trust-badge">
+                  <IconLock /> Sin almacenamiento
+                </span>
+                <span className="trust-badge">
+                  <IconGlobe /> 100% en tu navegador
+                </span>
+                <span className="trust-badge">
+                  <IconCheck /> Gratis para siempre
+                </span>
+              </div>
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(170px, 1fr))", gap: 14 }}>
               {TOOLS.map((t) => (
@@ -95,7 +114,9 @@ export default function App() {
                     color: "var(--text)",
                   }}
                 >
-                  <span className="tool-icon-badge">{t.icon}</span>
+                  <span className="tool-icon-badge">
+                    <t.Icon size={26} />
+                  </span>
                   <span className="uppercase" style={{ fontWeight: 700, fontSize: 13.5, letterSpacing: 0.4 }}>
                     {t.label}
                   </span>
@@ -110,15 +131,25 @@ export default function App() {
             <button className="btn-ghost" style={{ marginBottom: 16 }} onClick={() => setActiveTool(null)}>
               ← Volver a herramientas
             </button>
-            <h2 className="uppercase" style={{ fontSize: 19, margin: "0 0 14px", letterSpacing: 0.8 }}>
-              {Active.icon} {Active.label}
+            <h2
+              className="uppercase"
+              style={{
+                fontSize: 19,
+                margin: "0 0 14px",
+                letterSpacing: 0.8,
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+              }}
+            >
+              <Active.Icon size={20} /> {Active.label}
             </h2>
             <Active.Component />
           </div>
         )}
       </main>
 
-      <Footer />
+      <Footer onSelectTool={setActiveTool} onExplore={() => setActiveTool(null)} />
       <WhatsAppFloat />
       <Toast />
     </div>

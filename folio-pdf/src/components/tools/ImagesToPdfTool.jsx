@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import { imagesToPdf, downloadBytes } from "../../lib/pdfUtils.js";
+import { IconUpload } from "../Icons.jsx";
 
 export default function ImagesToPdfTool() {
   const [files, setFiles] = useState([]);
@@ -58,7 +59,7 @@ export default function ImagesToPdfTool() {
         onChange={(e) => addFiles(e.target.files)}
       />
       <button className="btn-upload" onClick={() => inputRef.current.click()}>
-        📤 Agregar imágenes
+<IconUpload /> Agregar imágenes
       </button>
 
       <div style={{ marginTop: 14, display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(110px, 1fr))", gap: 10 }}>

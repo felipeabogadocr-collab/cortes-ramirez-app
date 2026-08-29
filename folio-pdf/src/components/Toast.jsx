@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { IconCheck } from "./Icons.jsx";
 
 export default function Toast() {
   const [message, setMessage] = useState(null);
@@ -21,7 +22,9 @@ export default function Toast() {
 
   return (
     <div className="toast" role="status">
-      <span>✅</span>
+      <span style={{ display: "flex" }}>
+        <IconCheck size={16} />
+      </span>
       <span>{message}</span>
     </div>
   );

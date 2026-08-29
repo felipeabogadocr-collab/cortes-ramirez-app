@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import { fileToBytes, compressPdf, downloadBytes } from "../../lib/pdfUtils.js";
+import { IconUpload, IconFile } from "../Icons.jsx";
 
 export default function CompressTool() {
   const [file, setFile] = useState(null);
@@ -46,7 +47,15 @@ export default function CompressTool() {
         }}
       />
       <button className="btn-upload" onClick={() => inputRef.current.click()}>
-        {file ? `📄 ${file.name}` : "📤 Subir PDF"}
+        {file ? (
+          <>
+            <IconFile /> {file.name}
+          </>
+        ) : (
+          <>
+            <IconUpload /> Subir PDF
+          </>
+        )}
       </button>
 
       {error && <p style={{ color: "var(--danger)", fontSize: 13, marginTop: 10 }}>{error}</p>}

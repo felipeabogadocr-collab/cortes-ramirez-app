@@ -1,4 +1,5 @@
 import Logo from "./Logo.jsx";
+import { IconLock, IconSun, IconMoon } from "./Icons.jsx";
 
 export default function Header({ theme, onToggleTheme, onGoHome }) {
   return (
@@ -50,7 +51,7 @@ export default function Header({ theme, onToggleTheme, onGoHome }) {
           }}
         >
           <div className="trust-badge header-trust-badge" style={{ justifySelf: "start" }}>
-            🔒 Sitio seguro
+            <IconLock /> Sitio seguro
           </div>
           <button
             onClick={onGoHome}
@@ -86,7 +87,7 @@ export default function Header({ theme, onToggleTheme, onGoHome }) {
               title={theme === "dark" ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
               aria-label="Cambiar tema"
             >
-              {theme === "dark" ? "☀️" : "🌙"}
+              {theme === "dark" ? <IconSun /> : <IconMoon />}
             </button>
           </div>
         </div>

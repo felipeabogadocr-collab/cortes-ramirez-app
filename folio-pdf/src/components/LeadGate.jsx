@@ -1,6 +1,7 @@
 import { useState } from "react";
 import Logo from "./Logo.jsx";
 import { registrarLead } from "../lib/analytics.js";
+import { IconLock, IconShield } from "./Icons.jsx";
 
 const WHATSAPP_NUMBER = "573192875428";
 const STORAGE_KEY = "folio_lead_ok";
@@ -163,8 +164,12 @@ export default function LeadGate({ onDone }) {
           almacenan.
         </p>
         <div className="trust-badges" style={{ justifyContent: "center", marginTop: 12 }}>
-          <span className="trust-badge">🔒 Conexión cifrada</span>
-          <span className="trust-badge">🛡️ Datos protegidos</span>
+          <span className="trust-badge">
+            <IconLock /> Conexión cifrada
+          </span>
+          <span className="trust-badge">
+            <IconShield /> Datos protegidos
+          </span>
         </div>
       </div>
     </div>
