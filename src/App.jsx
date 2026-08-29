@@ -759,7 +759,7 @@ function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-const APP_VERSION = "1.2.0";
+const APP_VERSION = "1.3.0";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -1469,6 +1469,25 @@ const TOOLS_ASISTENTE = [
     },
   },
   {
+    name: "crear_evento_agenda",
+    description: "Agrega un evento nuevo a la agenda del despacho (audiencia, reunión, cita, vencimiento de término, etc.).",
+    input_schema: {
+      type: "object",
+      properties: {
+        titulo: { type: "string" },
+        fecha: { type: "string", description: "Fecha del evento en formato YYYY-MM-DD" },
+        hora: { type: "string", description: "Hora en formato HH:MM (24 horas), opcional" },
+        notas: { type: "string" },
+      },
+      required: ["titulo", "fecha"],
+    },
+  },
+  {
+    name: "listar_agenda_proxima",
+    description: "Lista los próximos eventos pendientes en la agenda del despacho.",
+    input_schema: { type: "object", properties: {}, required: [] },
+  },
+  {
     name: "programar_cobro",
     description: "Programa el próximo cobro de un cliente existente: la fecha del próximo pago y el valor esperado.",
     input_schema: {
@@ -1725,6 +1744,35 @@ async function ejecutarHerramienta(nombreHerramienta, input) {
     return { mensaje: `Documento "${input.titulo}" creado y listo para enviar a firma desde la pestaña Firmar documentos.` };
   }
 
+  if (nombreHerramienta === "crear_evento_agenda") {
+    const id = uid();
+    await storageSet(`evento:${id}`, JSON.stringify({ titulo: input.titulo, fecha: input.fecha, hora: input.hora || "", notas: input.notas || "", creadoEn: new Date().toISOString() }), true);
+    const idsAgendaRaw = await storageGet("indice-agenda", true);
+    const idsAgenda = idsAgendaRaw ? JSON.parse(idsAgendaRaw) : [];
+    await storageSet("indice-agenda", JSON.stringify([id, ...idsAgenda]), true);
+    return { mensaje: `Evento "${input.titulo}" agendado para el ${input.fecha}${input.hora ? ` a las ${input.hora}` : ""}.` };
+  }
+
+  if (nombreHerramienta === "listar_agenda_proxima") {
+    const idsAgendaRaw = await storageGet("indice-agenda", true);
+    const idsAgenda = idsAgendaRaw ? JSON.parse(idsAgendaRaw) : [];
+    const hoyISO = new Date().toISOString().slice(0, 10);
+    const eventos = [];
+    for (const id of idsAgenda) {
+      const raw = await storageGet(`evento:${id}`, true);
+      if (!raw) continue;
+      const e = JSON.parse(raw);
+      if (e.fecha >= hoyISO) eventos.push(e);
+    }
+    eventos.sort((a, b) => `${a.fecha}T${a.hora || "00:00"}`.localeCompare(`${b.fecha}T${b.hora || "00:00"}`));
+    if (eventos.length === 0) return { mensaje: "No hay eventos próximos en la agenda." };
+    const texto = eventos
+      .slice(0, 10)
+      .map((e) => `- ${e.titulo} — ${e.fecha}${e.hora ? ` ${e.hora}` : ""}${e.notas ? ` (${e.notas})` : ""}`)
+      .join("\n");
+    return { mensaje: texto };
+  }
+
   if (nombreHerramienta === "programar_cobro") {
     const encontrado = await buscarClientePorNombre(input.nombre_cliente);
     if (!encontrado) return { mensaje: `No encontré ningún cliente llamado "${input.nombre_cliente}". Verifica el nombre exacto.` };
@@ -1796,21 +1844,55 @@ const SUGERENCIAS_ASISTENTE = [
 ];
 
 function AsistenteIA({ nombre, usuarioId, onAccionCompletada }) {
+  const claveHistorial = `chat-asistente:${usuarioId || "general"}`;
   const [mensajes, setMensajes] = useState([]);
   const [texto, setTexto] = useState("");
   const [adjunto, setAdjunto] = useState(null);
   const [cargando, setCargando] = useState(false);
+  const [historialCargado, setHistorialCargado] = useState(false);
   const contenedorRef = useRef(null);
   const fileInputRef = useRef(null);
   const inputRef = useRef(null);
 
-  // El historial vive solo mientras la pestaña está abierta — se pidió que
-  // cada recarga empiece en limpio, en vez de arrastrar conversaciones viejas.
+  useEffect(() => {
+    (async () => {
+      const raw = await storageGet(claveHistorial, true);
+      if (raw) {
+        try {
+          setMensajes(JSON.parse(raw));
+        } catch (e) {
+          setMensajes([]);
+        }
+      }
+      setHistorialCargado(true);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [claveHistorial]);
+
+  useEffect(() => {
+    if (!historialCargado) return;
+    // Al guardar, quitamos el contenido pesado de los adjuntos (base64/texto extraído)
+    // y los enlaces de archivos generados (dejan de servir tras recargar la página).
+    const paraGuardar = mensajes.map((m) => {
+      const limpio = { ...m };
+      if (limpio.adjunto) {
+        const { base64, texto: textoAdjunto, ...restoAdjunto } = limpio.adjunto;
+        limpio.adjunto = restoAdjunto;
+      }
+      delete limpio.archivoGenerado;
+      return limpio;
+    });
+    storageSet(claveHistorial, JSON.stringify(paraGuardar), true);
+  }, [mensajes, historialCargado, claveHistorial]);
+
   useEffect(() => {
     if (contenedorRef.current) contenedorRef.current.scrollTo({ top: contenedorRef.current.scrollHeight, behavior: "smooth" });
   }, [mensajes, cargando]);
 
-  const borrarHistorial = () => setMensajes([]);
+  const borrarHistorial = () => {
+    setMensajes([]);
+    storageSet(claveHistorial, JSON.stringify([]), true);
+  };
 
   const copiarMensaje = (texto) => {
     navigator.clipboard?.writeText(texto).catch(() => {});
@@ -1859,7 +1941,7 @@ function AsistenteIA({ nombre, usuarioId, onAccionCompletada }) {
       const systemPrompt =
         `Eres el asistente virtual de ${getNombreDespacho()}, dentro de su panel de gestión (la plataforma Nomos). Le hablas a ${nombre}, el abogado dueño del despacho, como lo haría un empresario visionario: con confianza, ambición sana, y viendo siempre oportunidades de crecer el negocio. Incluyes de forma natural y respetuosa una referencia a Dios en tus respuestas cuando encaje (por ejemplo, dar gracias por el progreso, pedir sabiduría, o reconocer que el esfuerzo y la fe van de la mano), sin exagerar ni forzarlo en cada frase. ` +
         `Actúas como un verdadero experto en contabilidad de despachos legales, en redes sociales y marketing para abogados, y en gestión de operaciones legales — da consejos con ese nivel de criterio, no genéricos. ` +
-        `Eres el cerebro de la operación del despacho: puedes crear y editar clientes, buscar la información completa de un cliente existente, crear casos, registrar pagos y generarles su recibo automáticamente, programar el próximo cobro de un cliente, agregar actuaciones a la línea de tiempo de un cliente, actualizar el estado de vigilancia judicial, crear documentos de texto listos para firma electrónica, crear usuarios nuevos con acceso al panel, registrar métricas de redes sociales, generar un informe en PDF con el diagnóstico del despacho, generar un reporte en Excel con todos los pagos, leer imágenes, PDF y documentos de Word que te envíen, y dar ideas prácticas de gestión, negocio y contenido. Cuando te pregunten qué puedes hacer, cuéntalo con entusiasmo y de forma concreta. ` +
+        `Eres el cerebro de la operación del despacho: puedes crear y editar clientes, buscar la información completa de un cliente existente, crear casos, registrar pagos y generarles su recibo automáticamente, programar el próximo cobro de un cliente, agregar actuaciones a la línea de tiempo de un cliente, actualizar el estado de vigilancia judicial, crear documentos de texto listos para firma electrónica, agendar eventos (audiencias, reuniones, vencimientos) y consultar los próximos eventos de la agenda, crear usuarios nuevos con acceso al panel, registrar métricas de redes sociales, generar un informe en PDF con el diagnóstico del despacho, generar un reporte en Excel con todos los pagos, leer imágenes, PDF y documentos de Word que te envíen, y dar ideas prácticas de gestión, negocio y contenido. Cuando te pregunten qué puedes hacer, cuéntalo con entusiasmo y de forma concreta. ` +
         `Usa las herramientas disponibles para actuar de verdad cuando te lo pidan (no solo describir qué harías), y confirma siempre al final qué hiciste. Este es el estado actual del despacho:\n\n${contexto}\n\nResponde en español, de forma cercana, breve y con visión de negocio.`;
 
       let mensajesAPI = nuevos.map((m, idx) => {
@@ -1949,7 +2031,7 @@ function AsistenteIA({ nombre, usuarioId, onAccionCompletada }) {
         {mensajes.length === 0 && (
           <div>
             <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.muted, marginBottom: 10 }}>
-              Pregúntame qué priorizar hoy, pídeme ideas de negocio o de contenido, mándame una foto, un PDF o un Word, o dime cosas como "crea un cliente llamado...", "registra un pago de..." o "actualiza el estado de vigilancia de...". Recuerdo lo que hablemos mientras la página siga abierta.
+              Pregúntame qué priorizar hoy, pídeme ideas de negocio o de contenido, mándame una foto, un PDF o un Word, o dime cosas como "crea un cliente llamado...", "registra un pago de..." o "actualiza el estado de vigilancia de...". Recuerdo todo lo que hablemos aquí, incluso si recargas la página.
             </p>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
               {SUGERENCIAS_ASISTENTE.map((s) => (
@@ -2100,6 +2182,251 @@ function AsistenteIA({ nombre, usuarioId, onAccionCompletada }) {
         />
         <button className="drx-btn-primary" style={{ ...buttonPrimary, display: "flex", alignItems: "center", gap: 6 }} onClick={enviar} disabled={cargando || (!texto.trim() && !adjunto)}>
           Enviar <Icono tipo="cursorArriba" size={14} style={{ transform: "rotate(90deg)" }} />
+        </button>
+      </div>
+    </Card>
+  );
+}
+
+function useEventosAgenda() {
+  const { ids, addId, removeId } = useIndex("indice-agenda", true);
+  const [eventos, setEventos] = useState({});
+  const [cargado, setCargado] = useState(false);
+
+  const cargar = useCallback(async () => {
+    const mapa = {};
+    for (const id of ids) {
+      const raw = await storageGet(`evento:${id}`, true);
+      if (raw) mapa[id] = JSON.parse(raw);
+    }
+    setEventos(mapa);
+    setCargado(true);
+  }, [ids]);
+
+  useEffect(() => {
+    cargar();
+  }, [cargar]);
+
+  const crear = async (datos) => {
+    const id = uid();
+    await storageSet(`evento:${id}`, JSON.stringify({ ...datos, creadoEn: new Date().toISOString() }), true);
+    await addId(id);
+    await cargar();
+  };
+
+  const eliminar = async (id) => {
+    await removeId(id);
+    setEventos((prev) => {
+      const { [id]: _quitado, ...resto } = prev;
+      return resto;
+    });
+  };
+
+  return { ids, eventos, cargado, crear, eliminar, reload: cargar };
+}
+
+// Revisa cada 30s si algún evento de la agenda ya se cumplió y todavía no se
+// avisó — cuando pasa, suena una vez y muestra una notificación del sistema
+// (si el navegador tiene permiso). Se guarda qué ids ya sonaron en
+// localStorage para no repetir el aviso si la pestaña sigue abierta.
+function useAgendaRecordatorios() {
+  useEffect(() => {
+    const LLAVE = "agenda-eventos-notificados";
+    let yaNotificados;
+    try {
+      yaNotificados = new Set(JSON.parse(localStorage.getItem(LLAVE) || "[]"));
+    } catch (e) {
+      yaNotificados = new Set();
+    }
+    const guardar = () => localStorage.setItem(LLAVE, JSON.stringify([...yaNotificados]));
+
+    const sonar = () => {
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.type = "sine";
+        osc.frequency.value = 880;
+        gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.22, ctx.currentTime + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.6);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.65);
+      } catch (e) {
+        /* algunos navegadores bloquean audio sin interacción previa — no pasa nada si falla */
+      }
+    };
+
+    let cancelado = false;
+    const revisar = async () => {
+      if (cancelado) return;
+      const idsRaw = await storageGet("indice-agenda", true);
+      const ids = idsRaw ? JSON.parse(idsRaw) : [];
+      const ahora = Date.now();
+      for (const id of ids) {
+        if (yaNotificados.has(id)) continue;
+        const raw = await storageGet(`evento:${id}`, true);
+        if (!raw) continue;
+        const evento = JSON.parse(raw);
+        const momento = new Date(`${evento.fecha}T${evento.hora || "08:00"}:00`).getTime();
+        if (Number.isNaN(momento)) continue;
+        // Solo avisa eventos vencidos en las últimas 24h — evita una lluvia de
+        // avisos viejos si el despacho estuvo varios días sin abrir la app.
+        if (momento <= ahora && ahora - momento < 24 * 60 * 60 * 1000) {
+          yaNotificados.add(id);
+          guardar();
+          sonar();
+          if (typeof Notification !== "undefined" && Notification.permission === "granted") {
+            new Notification(evento.titulo, { body: evento.notas || "Tienes un evento en tu agenda.", icon: "/icon-192.png" });
+          }
+        }
+      }
+    };
+
+    revisar();
+    const intervalo = setInterval(revisar, 30000);
+    return () => {
+      cancelado = true;
+      clearInterval(intervalo);
+    };
+  }, []);
+}
+
+function AgendaTab() {
+  const { ids, eventos, cargado, crear, eliminar } = useEventosAgenda();
+  const [mostrarForm, setMostrarForm] = useState(false);
+  const [form, setForm] = useState({ titulo: "", fecha: "", hora: "", notas: "" });
+  const [permisoNotif, setPermisoNotif] = useState(typeof Notification !== "undefined" ? Notification.permission : "unsupported");
+  const { confirmar, ConfirmarDialogo } = useConfirmarDialogo();
+
+  const pedirPermiso = async () => {
+    if (typeof Notification === "undefined") return;
+    const resultado = await Notification.requestPermission();
+    setPermisoNotif(resultado);
+  };
+
+  const guardar = async () => {
+    if (!form.titulo.trim() || !form.fecha) return;
+    await crear({ titulo: form.titulo.trim(), fecha: form.fecha, hora: form.hora, notas: form.notas.trim() });
+    setForm({ titulo: "", fecha: "", hora: "", notas: "" });
+    setMostrarForm(false);
+  };
+
+  const eliminarClick = async (id, titulo) => {
+    if (!(await confirmar(`¿Eliminar el evento "${titulo}" de la agenda?`))) return;
+    await eliminar(id);
+  };
+
+  const lista = ids
+    .map((id) => ({ id, ...eventos[id] }))
+    .filter((e) => e.titulo)
+    .sort((a, b) => `${a.fecha}T${a.hora || "00:00"}`.localeCompare(`${b.fecha}T${b.hora || "00:00"}`));
+
+  const hoyISO = new Date().toISOString().slice(0, 10);
+  const proximos = lista.filter((e) => e.fecha >= hoyISO);
+  const pasados = lista.filter((e) => e.fecha < hoyISO);
+
+  return (
+    <div>
+      <EncabezadoSeccion titulo="Agenda" color="#8B5CF6" />
+
+      {permisoNotif !== "granted" && permisoNotif !== "unsupported" && (
+        <Card style={{ marginBottom: 20, background: COLORS.accentSoft, border: "1px solid #C7D6EA" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
+            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.navy, margin: 0, display: "flex", alignItems: "center", gap: 6 }}>
+              <IconoCampana size={15} /> Activa las notificaciones para avisarte cuando llegue un evento.
+            </p>
+            <button className="drx-btn-primary" style={buttonPrimary} onClick={pedirPermiso}>
+              Activar notificaciones
+            </button>
+          </div>
+        </Card>
+      )}
+
+      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 16 }}>
+        <button className="drx-btn-primary" style={buttonPrimary} onClick={() => setMostrarForm((v) => !v)}>
+          {mostrarForm ? "Cancelar" : "+ Nuevo evento"}
+        </button>
+      </div>
+
+      {mostrarForm && (
+        <Card style={{ marginBottom: 20 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            <Field label="Título">
+              <input className="drx-input" style={inputStyle} value={form.titulo} onChange={(e) => setForm({ ...form, titulo: e.target.value })} placeholder="Ej: Audiencia con Juan Pérez" />
+            </Field>
+            <div className="drx-grid-form" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              <Field label="Fecha">
+                <input className="drx-input" style={inputStyle} type="date" value={form.fecha} onChange={(e) => setForm({ ...form, fecha: e.target.value })} />
+              </Field>
+              <Field label="Hora (opcional)">
+                <input className="drx-input" style={inputStyle} type="time" value={form.hora} onChange={(e) => setForm({ ...form, hora: e.target.value })} />
+              </Field>
+            </div>
+            <Field label="Notas (opcional)">
+              <textarea
+                className="drx-input"
+                style={{ ...inputStyle, resize: "vertical", minHeight: 60, fontFamily: "Inter, sans-serif" }}
+                value={form.notas}
+                onChange={(e) => setForm({ ...form, notas: e.target.value })}
+                placeholder="Detalles del evento..."
+              />
+            </Field>
+            <button className="drx-btn-primary" style={buttonPrimary} onClick={guardar} disabled={!form.titulo.trim() || !form.fecha}>
+              Guardar evento
+            </button>
+          </div>
+        </Card>
+      )}
+
+      {cargado && lista.length === 0 && <EstadoVacio icono={<Icono tipo="calendario" size={26} />} texto="No tienes eventos en tu agenda todavía." />}
+
+      {proximos.length > 0 && (
+        <div style={{ marginBottom: 24 }}>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, fontWeight: 700, color: COLORS.muted, textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 10 }}>Próximos</p>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {proximos.map((e) => (
+              <EventoAgendaCard key={e.id} evento={e} onEliminar={() => eliminarClick(e.id, e.titulo)} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {pasados.length > 0 && (
+        <div>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, fontWeight: 700, color: COLORS.muted, textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 10 }}>Pasados</p>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {pasados
+              .slice()
+              .reverse()
+              .map((e) => (
+                <EventoAgendaCard key={e.id} evento={e} onEliminar={() => eliminarClick(e.id, e.titulo)} pasado />
+              ))}
+          </div>
+        </div>
+      )}
+      {ConfirmarDialogo}
+    </div>
+  );
+}
+
+function EventoAgendaCard({ evento, onEliminar, pasado }) {
+  const fechaTexto = new Date(`${evento.fecha}T${evento.hora || "00:00"}:00`).toLocaleDateString("es-CO", { weekday: "long", day: "numeric", month: "long" });
+  return (
+    <Card style={{ padding: 14, opacity: pasado ? 0.6 : 1 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10, flexWrap: "wrap" }}>
+        <div style={{ flex: 1, minWidth: 180 }}>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 14, fontWeight: 700, color: COLORS.ink, margin: 0, textTransform: "capitalize" }}>{evento.titulo}</p>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, margin: "4px 0 0", textTransform: "capitalize" }}>
+            {fechaTexto}
+            {evento.hora ? ` · ${evento.hora}` : ""}
+          </p>
+          {evento.notas && <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.inkSoft, margin: "6px 0 0" }}>{evento.notas}</p>}
+        </div>
+        <button onClick={onEliminar} style={{ background: "none", border: "none", cursor: "pointer", color: COLORS.muted, display: "flex", flexShrink: 0 }} title="Eliminar evento">
+          <Icono tipo="papelera" size={15} />
         </button>
       </div>
     </Card>
@@ -2833,6 +3160,7 @@ const ICONOS_TAB = {
   contenido: "M4 4.5h12v12H4v-12Zm0 3.3h12M7 3v3M13 3v3M6.5 11h2M11.5 11h2M6.5 14h2M11.5 14h2",
   documentos: "M6 3.5h6l3 3v10h-9v-13Zm6 0v3h3M8 10.5l4-1-1 4-4 1 1-4Z",
   reportes: "M4 16.5v-6M9 16.5v-10M14 16.5v-3.5M2.5 16.5h15",
+  agenda: "M3.5 5h13v11h-13v-11ZM3.5 8.5h13M7 3v3M13 3v3M6.5 11.5h2M11.5 11.5h2",
   usuarios: "M10 12.7a2.7 2.7 0 1 0 0-5.4 2.7 2.7 0 0 0 0 5.4Zm7-2.7a7 7 0 0 1-.1 1.2l1.6 1.2-1.5 2.6-1.9-.7c-.4.3-.9.6-1.4.8l-.3 2H8.6l-.3-2c-.5-.2-1-.5-1.4-.8l-1.9.7-1.5-2.6 1.6-1.2A7 7 0 0 1 5 10c0-.4 0-.8.1-1.2L3.5 7.6l1.5-2.6 1.9.7c.4-.3.9-.6 1.4-.8l.3-2h2.8l.3 2c.5.2 1 .5 1.4.8l1.9-.7 1.5 2.6-1.6 1.2c.1.4.1.8.1 1.2Z",
 };
 
@@ -6940,6 +7268,7 @@ function ModalNotificaciones({
 
 const SECCIONES_PERMISOS = [
   { id: "resumen", nombre: "Resumen" },
+  { id: "agenda", nombre: "Agenda" },
   { id: "clientes", nombre: "Clientes" },
   { id: "vigilancia", nombre: "Vigilancia judicial" },
   { id: "contabilidad", nombre: "Contabilidad" },
@@ -6951,7 +7280,7 @@ const SECCIONES_PERMISOS = [
 function permisosPorDefecto(rol) {
   const todos = Object.fromEntries(SECCIONES_PERMISOS.map((s) => [s.id, true]));
   if (rol === "Administrador" || rol === "Abogado") return todos;
-  return { resumen: true, clientes: true, casos: true, vigilancia: false, contabilidad: false, contenido: false, documentos: true, reportes: false };
+  return { resumen: true, agenda: true, clientes: true, casos: true, vigilancia: false, contabilidad: false, contenido: false, documentos: true, reportes: false };
 }
 
 const NOTIF_CATEGORIAS = [
@@ -9708,6 +10037,7 @@ export default function App() {
   const [tab, setTab] = useState("resumen");
   const [mostrarNotificaciones, setMostrarNotificaciones] = useState(false);
   const [sidebarMovilAbierta, setSidebarMovilAbierta] = useState(false);
+  useAgendaRecordatorios();
 
   // La app scrollea con la página completa (no hay un contenedor interno
   // aparte por sección) — sin esto, si venías scrolleado hacia abajo en una
@@ -10001,6 +10331,11 @@ export default function App() {
               Resumen
             </SidebarButton>
           )}
+          {puedeVer("agenda") && (
+            <SidebarButton active={tab === "agenda"} onClick={() => setTab("agenda")} color="#8B5CF6" icono="agenda">
+              Agenda
+            </SidebarButton>
+          )}
           {puedeVer("clientes") && (
             <SidebarButton active={tab === "clientes"} onClick={() => setTab("clientes")} color="#14B8A6" icono="clientes">
               Clientes
@@ -10202,6 +10537,7 @@ export default function App() {
           )}
           <div key={tab} className="drx-tab-transition" style={{ maxWidth: 760, margin: "0 auto" }}>
             {tab === "resumen" && puedeVer("resumen") && <ResumenTab nombre={usuarioActual.nombre} usuarioId={usuarioActual.id} onIr={setTab} />}
+            {tab === "agenda" && puedeVer("agenda") && <AgendaTab />}
             {tab === "clientes" && puedeVer("clientes") && <ClientesTab usuarioActual={usuarioActual} />}
             {tab === "vigilancia" && puedeVer("vigilancia") && <VigilanciaTab />}
             {tab === "contabilidad" && puedeVer("contabilidad") && <ContabilidadTab usuarioActual={usuarioActual} />}
