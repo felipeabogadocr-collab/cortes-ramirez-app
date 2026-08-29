@@ -10,6 +10,7 @@ export default function SplitTool() {
   const [rangos, setRangos] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [resultado, setResultado] = useState(null);
   const inputRef = useRef(null);
 
   async function cargar(file) {
@@ -47,16 +48,17 @@ export default function SplitTool() {
   async function dividir() {
     setBusy(true);
     setError("");
+    setResultado(null);
     try {
       const ranges = parseRangos(rangos, total);
       const partes = await splitPdf(bytes, ranges);
       if (partes.length === 1) {
-        downloadBytes(partes[0], `parte-1.pdf`, "application/pdf", "Dividir PDF");
+        setResultado({ bytes: partes[0], filename: "parte-1.pdf", mime: "application/pdf" });
       } else {
         const zip = new JSZip();
         partes.forEach((p, i) => zip.file(`parte-${i + 1}.pdf`, p));
         const zipBytes = await zip.generateAsync({ type: "uint8array" });
-        downloadBytes(zipBytes, "pdf-dividido-folio.zip", "application/zip", "Dividir PDF");
+        setResultado({ bytes: zipBytes, filename: "pdf-dividido-folio.zip", mime: "application/zip" });
       }
     } catch (e) {
       setError(e.message || "No se pudo dividir el PDF.");
@@ -95,7 +97,7 @@ export default function SplitTool() {
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
         <p style={{ color: "var(--muted)", fontSize: 13, margin: 0 }}>El PDF tiene {total} páginas.</p>
-        <button className="btn-ghost" onClick={() => setBytes(null)}>
+        <button className="btn-ghost" onClick={() => { setBytes(null); setResultado(null); }}>
           Cambiar archivo
         </button>
       </div>
@@ -105,7 +107,10 @@ export default function SplitTool() {
       </label>
       <input
         value={rangos}
-        onChange={(e) => setRangos(e.target.value)}
+        onChange={(e) => {
+          setRangos(e.target.value);
+          setResultado(null);
+        }}
         placeholder="Ej: 1-3, 4-6, 7"
         style={{
           width: "100%",
@@ -124,8 +129,22 @@ export default function SplitTool() {
       {error && <p style={{ color: "var(--danger)", fontSize: 13, marginTop: 10 }}>{error}</p>}
 
       <button className="btn-primary" style={{ marginTop: 12 }} onClick={dividir} disabled={busy}>
-        {busy ? "Dividiendo…" : "Dividir y descargar"}
+        {busy ? "Dividiendo…" : "Dividir PDF"}
       </button>
+
+      {resultado && (
+        <div className="card" style={{ marginTop: 16, padding: 14 }}>
+          <p style={{ margin: "0 0 10px", fontSize: 13, color: "var(--muted)" }}>
+            Tu archivo está listo. Toca el botón para descargarlo.
+          </p>
+          <button
+            className="btn-primary"
+            onClick={() => downloadBytes(resultado.bytes, resultado.filename, resultado.mime, "Dividir PDF")}
+          >
+            Descargar {resultado.filename.endsWith(".zip") ? "ZIP" : "PDF"}
+          </button>
+        </div>
+      )}
     </div>
   );
 }

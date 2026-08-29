@@ -32,13 +32,13 @@ export default function Footer({ onSelectTool, onExplore }) {
   }, []);
 
   function abrirHerramienta(id) {
+    // El scroll al inicio lo hace App.jsx cuando cambia la herramienta activa,
+    // así no compite con el cambio de tamaño del contenido.
     if (onSelectTool) onSelectTool(id);
-    scrollToTop();
   }
 
   function explorar() {
     if (onExplore) onExplore();
-    scrollToTop();
   }
 
   return (

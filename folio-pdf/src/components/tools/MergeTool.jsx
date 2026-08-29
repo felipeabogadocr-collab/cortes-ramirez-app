@@ -7,12 +7,14 @@ export default function MergeTool() {
   const [files, setFiles] = useState([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [resultado, setResultado] = useState(null);
   const inputRef = useRef(null);
 
   function addFiles(fileList) {
     const nuevos = Array.from(fileList).filter((f) => f.type === "application/pdf" || f.name.toLowerCase().endsWith(".pdf"));
     setFiles((prev) => [...prev, ...nuevos]);
     setError("");
+    setResultado(null);
   }
 
   function mover(i, dir) {
@@ -36,9 +38,10 @@ export default function MergeTool() {
     }
     setBusy(true);
     setError("");
+    setResultado(null);
     try {
       const bytes = await mergePdfs(files);
-      downloadBytes(bytes, "unido-folio.pdf", "application/pdf", "Unir PDF");
+      setResultado(bytes);
     } catch (e) {
       setError("No se pudo unir el PDF. Verifica que los archivos no estén dañados o protegidos con contraseña.");
     } finally {
@@ -90,8 +93,22 @@ export default function MergeTool() {
       {error && <p style={{ color: "var(--danger)", fontSize: 13, marginTop: 10 }}>{error}</p>}
 
       <button className="btn-primary" style={{ marginTop: 16 }} onClick={unir} disabled={busy || files.length < 2}>
-        {busy ? "Uniendo…" : "Unir y descargar PDF"}
+        {busy ? "Uniendo…" : "Unir PDF"}
       </button>
+
+      {resultado && (
+        <div className="card" style={{ marginTop: 16, padding: 14 }}>
+          <p style={{ margin: "0 0 10px", fontSize: 13, color: "var(--muted)" }}>
+            Tu PDF está listo. Toca el botón para descargarlo.
+          </p>
+          <button
+            className="btn-primary"
+            onClick={() => downloadBytes(resultado, "unido-folio.pdf", "application/pdf", "Unir PDF")}
+          >
+            Descargar PDF unido
+          </button>
+        </div>
+      )}
     </div>
   );
 }

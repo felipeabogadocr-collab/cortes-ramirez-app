@@ -7,12 +7,14 @@ export default function ImagesToPdfTool() {
   const [files, setFiles] = useState([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [resultado, setResultado] = useState(null);
   const inputRef = useRef(null);
 
   function addFiles(fileList) {
     const nuevos = Array.from(fileList).filter((f) => f.type === "image/png" || f.type === "image/jpeg");
     setFiles((prev) => [...prev, ...nuevos]);
     setError("");
+    setResultado(null);
   }
 
   function mover(i, dir) {
@@ -36,9 +38,10 @@ export default function ImagesToPdfTool() {
     }
     setBusy(true);
     setError("");
+    setResultado(null);
     try {
       const bytes = await imagesToPdf(files);
-      downloadBytes(bytes, "imagenes-folio.pdf", "application/pdf", "Imágenes a PDF");
+      setResultado(bytes);
     } catch {
       setError("No se pudo generar el PDF. Verifica que las imágenes sean JPG o PNG.");
     } finally {
@@ -80,8 +83,22 @@ export default function ImagesToPdfTool() {
       {error && <p style={{ color: "var(--danger)", fontSize: 13, marginTop: 10 }}>{error}</p>}
 
       <button className="btn-primary" style={{ marginTop: 16 }} onClick={convertir} disabled={busy || !files.length}>
-        {busy ? "Generando…" : "Convertir a PDF y descargar"}
+        {busy ? "Generando…" : "Convertir a PDF"}
       </button>
+
+      {resultado && (
+        <div className="card" style={{ marginTop: 16, padding: 14 }}>
+          <p style={{ margin: "0 0 10px", fontSize: 13, color: "var(--muted)" }}>
+            Tu PDF está listo. Toca el botón para descargarlo.
+          </p>
+          <button
+            className="btn-primary"
+            onClick={() => downloadBytes(resultado, "imagenes-folio.pdf", "application/pdf", "Imágenes a PDF")}
+          >
+            Descargar PDF
+          </button>
+        </div>
+      )}
     </div>
   );
 }

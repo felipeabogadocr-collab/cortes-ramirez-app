@@ -8,6 +8,7 @@ export default function OrganizeTool() {
   const [pages, setPages] = useState([]); // { index, rotation, deleted, thumb }
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [resultado, setResultado] = useState(null);
   const inputRef = useRef(null);
 
   async function cargar(file) {
@@ -27,6 +28,7 @@ export default function OrganizeTool() {
   }
 
   function mover(i, dir) {
+    setResultado(null);
     setPages((prev) => {
       const arr = [...prev];
       const j = i + dir;
@@ -37,10 +39,12 @@ export default function OrganizeTool() {
   }
 
   function rotar(i) {
+    setResultado(null);
     setPages((prev) => prev.map((p, idx) => (idx === i ? { ...p, rotation: (p.rotation + 90) % 360 } : p)));
   }
 
   function alternarEliminar(i) {
+    setResultado(null);
     setPages((prev) => prev.map((p, idx) => (idx === i ? { ...p, deleted: !p.deleted } : p)));
   }
 
@@ -60,9 +64,10 @@ export default function OrganizeTool() {
     }
     setBusy(true);
     setError("");
+    setResultado(null);
     try {
       const out = await organizePdf(bytes, pages);
-      downloadBytes(out, "organizado-folio.pdf", "application/pdf", "Organizar páginas");
+      setResultado(out);
     } catch {
       setError("No se pudo guardar el PDF organizado.");
     } finally {
@@ -102,7 +107,7 @@ export default function OrganizeTool() {
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
         <p style={{ color: "var(--muted)", fontSize: 13, margin: 0 }}>{pages.length} páginas — reordena, rota o elimina.</p>
-        <button className="btn-ghost" onClick={() => { setBytes(null); setPages([]); }}>
+        <button className="btn-ghost" onClick={() => { setBytes(null); setPages([]); setResultado(null); }}>
           Cambiar archivo
         </button>
       </div>
@@ -138,8 +143,22 @@ export default function OrganizeTool() {
       {error && <p style={{ color: "var(--danger)", fontSize: 13, marginTop: 10 }}>{error}</p>}
 
       <button className="btn-primary" style={{ marginTop: 16 }} onClick={guardar} disabled={busy}>
-        {busy ? "Guardando…" : "Guardar y descargar PDF"}
+        {busy ? "Guardando…" : "Guardar cambios"}
       </button>
+
+      {resultado && (
+        <div className="card" style={{ marginTop: 16, padding: 14 }}>
+          <p style={{ margin: "0 0 10px", fontSize: 13, color: "var(--muted)" }}>
+            Tu PDF está listo. Toca el botón para descargarlo.
+          </p>
+          <button
+            className="btn-primary"
+            onClick={() => downloadBytes(resultado, "organizado-folio.pdf", "application/pdf", "Organizar páginas")}
+          >
+            Descargar PDF
+          </button>
+        </div>
+      )}
     </div>
   );
 }

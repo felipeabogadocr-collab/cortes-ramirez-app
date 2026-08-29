@@ -238,6 +238,7 @@ export default function SignTool() {
   const [box, setBox] = useState({ x: 0.3, y: 0.78, width: 0.4, height: 0.15 });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [resultado, setResultado] = useState(null);
   const inputRef = useRef(null);
   const imagenInputRef = useRef(null);
   const containerRef = useRef(null);
@@ -314,6 +315,7 @@ export default function SignTool() {
     }
     setBusy(true);
     setError("");
+    setResultado(null);
     try {
       let grafica = firmaDibujada;
       if (metodo === "imagen") grafica = firmaImagen;
@@ -323,7 +325,7 @@ export default function SignTool() {
       }
       const compuesta = await composeStamp({ signatureDataUrl: grafica, nombre: nombre.trim() });
       const out = await signPdf(bytes, compuesta, pageIndex, box);
-      downloadBytes(out, "firmado-folio.pdf", "application/pdf", "Firmar PDF");
+      setResultado(out);
     } catch {
       setError("No se pudo firmar el PDF.");
     } finally {
@@ -545,7 +547,7 @@ export default function SignTool() {
         {error && <p style={{ color: "var(--danger)", fontSize: 13, marginTop: 10 }}>{error}</p>}
 
         <button className="btn-primary" style={{ marginTop: 14 }} onClick={aplicar} disabled={busy}>
-          {busy ? "Firmando…" : "Firmar y descargar PDF"}
+          {busy ? "Firmando…" : "Firmar PDF"}
         </button>
         <button
           className="btn-ghost"
@@ -556,10 +558,25 @@ export default function SignTool() {
             setFirmaImagen(null);
             setNombre("");
             setStampUrl(null);
+            setResultado(null);
           }}
         >
           Cambiar archivo
         </button>
+
+        {resultado && (
+          <div className="card" style={{ marginTop: 16, padding: 14 }}>
+            <p style={{ margin: "0 0 10px", fontSize: 13, color: "var(--muted)" }}>
+              Tu PDF firmado está listo. Toca el botón para descargarlo.
+            </p>
+            <button
+              className="btn-primary"
+              onClick={() => downloadBytes(resultado, "firmado-folio.pdf", "application/pdf", "Firmar PDF")}
+            >
+              Descargar PDF firmado
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

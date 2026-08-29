@@ -43,6 +43,15 @@ export default function App() {
     localStorage.setItem("folio_theme", theme);
   }, [theme]);
 
+  // Sube al inicio de la página cada vez que cambia la herramienta activa,
+  // ya se haya elegido desde la cuadrícula, el pie de página o "volver".
+  // Se hace aquí (tras el renderizado) para que no compita con el cambio
+  // de tamaño del contenido y termine dejando el scroll abajo, como pasaba
+  // al elegir una herramienta desde el pie de página en el celular.
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, [activeTool]);
+
   if (!accepted) {
     return (
       <>

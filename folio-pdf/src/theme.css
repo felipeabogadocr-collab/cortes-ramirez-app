@@ -522,7 +522,8 @@ select {
 .footer-link {
   background: none;
   border: none;
-  padding: 0;
+  padding: 6px 0;
+  margin: -6px 0;
   color: var(--footer-muted);
   font-size: 13px;
   font-weight: 500;
