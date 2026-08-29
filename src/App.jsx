@@ -759,7 +759,7 @@ function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-const APP_VERSION = "1.3.0";
+const APP_VERSION = "1.4.0";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -1846,7 +1846,13 @@ const SUGERENCIAS_ASISTENTE = [
 ];
 
 function AsistenteIA({ nombre, usuarioId, onAccionCompletada }) {
-  const claveHistorial = `chat-asistente:${usuarioId || "general"}`;
+  const claveIndice = `chat-asistente-indice:${usuarioId || "general"}`;
+  const claveMensajes = (idConv) => `chat-asistente-conv:${usuarioId || "general"}:${idConv}`;
+
+  const [conversaciones, setConversaciones] = useState([]);
+  const [convActivaId, setConvActivaId] = useState(null);
+  const [indiceCargado, setIndiceCargado] = useState(false);
+  const [mostrarLista, setMostrarLista] = useState(false);
   const [mensajes, setMensajes] = useState([]);
   const [texto, setTexto] = useState("");
   const [adjunto, setAdjunto] = useState(null);
@@ -1855,24 +1861,34 @@ function AsistenteIA({ nombre, usuarioId, onAccionCompletada }) {
   const contenedorRef = useRef(null);
   const fileInputRef = useRef(null);
   const inputRef = useRef(null);
+  const { confirmar, ConfirmarDialogo } = useConfirmarDialogo();
+
+  const abrirConversacion = async (idConv) => {
+    setConvActivaId(idConv);
+    setHistorialCargado(false);
+    const raw = await storageGet(claveMensajes(idConv), true);
+    setMensajes(raw ? JSON.parse(raw) : []);
+    setHistorialCargado(true);
+    setMostrarLista(false);
+  };
 
   useEffect(() => {
     (async () => {
-      const raw = await storageGet(claveHistorial, true);
-      if (raw) {
-        try {
-          setMensajes(JSON.parse(raw));
-        } catch (e) {
-          setMensajes([]);
-        }
+      const raw = await storageGet(claveIndice, true);
+      const lista = raw ? JSON.parse(raw) : [];
+      setConversaciones(lista);
+      if (lista.length > 0) {
+        await abrirConversacion(lista[0].id);
+      } else {
+        setHistorialCargado(true);
       }
-      setHistorialCargado(true);
+      setIndiceCargado(true);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [claveHistorial]);
+  }, [claveIndice]);
 
   useEffect(() => {
-    if (!historialCargado) return;
+    if (!historialCargado || !convActivaId) return;
     // Al guardar, quitamos el contenido pesado de los adjuntos (base64/texto extraído)
     // y los enlaces de archivos generados (dejan de servir tras recargar la página).
     const paraGuardar = mensajes.map((m) => {
@@ -1884,16 +1900,31 @@ function AsistenteIA({ nombre, usuarioId, onAccionCompletada }) {
       delete limpio.archivoGenerado;
       return limpio;
     });
-    storageSet(claveHistorial, JSON.stringify(paraGuardar), true);
-  }, [mensajes, historialCargado, claveHistorial]);
+    storageSet(claveMensajes(convActivaId), JSON.stringify(paraGuardar), true);
+  }, [mensajes, historialCargado, convActivaId]);
 
   useEffect(() => {
     if (contenedorRef.current) contenedorRef.current.scrollTo({ top: contenedorRef.current.scrollHeight, behavior: "smooth" });
   }, [mensajes, cargando]);
 
-  const borrarHistorial = () => {
+  const nuevaConversacion = () => {
+    setConvActivaId(null);
     setMensajes([]);
-    storageSet(claveHistorial, JSON.stringify([]), true);
+    setMostrarLista(false);
+    inputRef.current?.focus();
+  };
+
+  const eliminarConversacion = async (idConv, e) => {
+    e.stopPropagation();
+    if (!(await confirmar("¿Eliminar esta conversación? No se puede deshacer."))) return;
+    const restantes = conversaciones.filter((c) => c.id !== idConv);
+    setConversaciones(restantes);
+    await storageSet(claveIndice, JSON.stringify(restantes), true);
+    await storageSet(claveMensajes(idConv), JSON.stringify([]), true);
+    if (idConv === convActivaId) {
+      if (restantes.length > 0) await abrirConversacion(restantes[0].id);
+      else nuevaConversacion();
+    }
   };
 
   const copiarMensaje = (texto) => {
@@ -1934,6 +1965,27 @@ function AsistenteIA({ nombre, usuarioId, onAccionCompletada }) {
     setTexto("");
     setAdjunto(null);
     if (inputRef.current) inputRef.current.style.height = "auto";
+
+    // Si no hay una conversación activa (recién abierta o "Nueva conversación"),
+    // se crea aquí, con el primer mensaje como título — así cada tema queda
+    // organizado en su propio historial, en vez de todo mezclado en un chat sin fin.
+    let idConv = convActivaId;
+    if (!idConv) {
+      idConv = uid();
+      const titulo = pregunta.slice(0, 46) || "Nueva conversación";
+      const nuevaLista = [{ id: idConv, titulo, actualizadoEn: new Date().toISOString() }, ...conversaciones];
+      setConvActivaId(idConv);
+      setConversaciones(nuevaLista);
+      await storageSet(claveIndice, JSON.stringify(nuevaLista), true);
+    } else {
+      const actual = conversaciones.find((c) => c.id === idConv);
+      if (actual) {
+        const reordenado = [{ ...actual, actualizadoEn: new Date().toISOString() }, ...conversaciones.filter((c) => c.id !== idConv)];
+        setConversaciones(reordenado);
+        storageSet(claveIndice, JSON.stringify(reordenado), true);
+      }
+    }
+
     const nuevos = [...mensajes, { rol: "usuario", texto: pregunta, adjunto: adjuntoActual }];
     setMensajes(nuevos);
     setCargando(true);
@@ -2012,41 +2064,111 @@ function AsistenteIA({ nombre, usuarioId, onAccionCompletada }) {
     inputRef.current?.focus();
   };
 
+  const conversacionActual = conversaciones.find((c) => c.id === convActivaId);
+
   return (
     <Card style={{ marginBottom: 24, padding: 24 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 14, fontWeight: 700, color: COLORS.headingText, margin: 0 }}>Asistente del despacho</p>
-        {mensajes.length > 0 && (
-          <button onClick={borrarHistorial} style={{ background: "none", border: "none", cursor: "pointer", color: COLORS.muted, fontSize: 11.5, fontFamily: "Inter, sans-serif", textDecoration: "underline" }}>
-            Borrar historial
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14, gap: 10 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+          <div style={{ width: 30, height: 30, borderRadius: 9, background: `linear-gradient(135deg, ${COLORS.navy}, ${COLORS.accentBright})`, display: "flex", alignItems: "center", justifyContent: "center", color: "#FFFFFF", flexShrink: 0 }}>
+            <IconoNomos size={15} />
+          </div>
+          <div style={{ minWidth: 0 }}>
+            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 14.5, fontWeight: 800, color: COLORS.headingText, margin: 0, letterSpacing: 0.2 }}>Asistente Nomos</p>
+            {conversacionActual && (
+              <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11, color: COLORS.muted, margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 220 }}>
+                {conversacionActual.titulo}
+              </p>
+            )}
+          </div>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+          <button onClick={nuevaConversacion} title="Nueva conversación" className="drx-btn-ghost" style={{ ...buttonGhost, padding: "7px 10px", display: "flex", alignItems: "center", gap: 5, fontSize: 12 }}>
+            <Icono tipo="chispa" size={13} /> Nueva
           </button>
-        )}
+          <div style={{ position: "relative" }}>
+            <button
+              onClick={() => setMostrarLista((v) => !v)}
+              title="Ver conversaciones"
+              className="drx-btn-ghost"
+              style={{ ...buttonGhost, padding: "7px 9px", display: "flex", alignItems: "center" }}
+            >
+              <Icono tipo="portapapeles" size={14} />
+            </button>
+            {mostrarLista && (
+              <div
+                className="drx-fade-in"
+                style={{
+                  position: "absolute",
+                  top: "calc(100% + 8px)",
+                  right: 0,
+                  width: 240,
+                  maxHeight: 300,
+                  overflowY: "auto",
+                  background: COLORS.panel,
+                  border: `1px solid ${COLORS.border}`,
+                  borderRadius: 12,
+                  boxShadow: "0 12px 30px rgba(10,35,66,0.18)",
+                  zIndex: 30,
+                  padding: 6,
+                }}
+              >
+                {conversaciones.length === 0 && (
+                  <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, padding: 10, margin: 0 }}>Aún no tienes conversaciones.</p>
+                )}
+                {conversaciones.map((c) => (
+                  <div
+                    key={c.id}
+                    onClick={() => abrirConversacion(c.id)}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      gap: 6,
+                      padding: "8px 9px",
+                      borderRadius: 8,
+                      cursor: "pointer",
+                      background: c.id === convActivaId ? COLORS.accentSoft : "transparent",
+                    }}
+                  >
+                    <div style={{ minWidth: 0 }}>
+                      <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.ink, margin: 0, fontWeight: c.id === convActivaId ? 700 : 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {c.titulo}
+                      </p>
+                      <p style={{ fontFamily: "Inter, sans-serif", fontSize: 10.5, color: COLORS.muted, margin: 0 }}>
+                        {new Date(c.actualizadoEn).toLocaleDateString("es-CO", { day: "2-digit", month: "short" })}
+                      </p>
+                    </div>
+                    <button onClick={(e) => eliminarConversacion(c.id, e)} style={{ background: "none", border: "none", cursor: "pointer", color: COLORS.muted, display: "flex", flexShrink: 0, padding: 2 }} title="Eliminar">
+                      <Icono tipo="papelera" size={13} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
       </div>
       <div style={{ position: "relative", height: 340, marginBottom: 12 }}>
         <div
           aria-hidden="true"
-          style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", opacity: 0.05, pointerEvents: "none", color: COLORS.navy }}
+          style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", opacity: 0.09, pointerEvents: "none", color: COLORS.accentBright }}
         >
           <IconoNomos size={150} />
         </div>
         <div ref={contenedorRef} style={{ position: "relative", height: "100%", overflowY: "auto", overscrollBehavior: "contain", display: "flex", flexDirection: "column", gap: 12, paddingRight: 4 }}>
         {mensajes.length === 0 && (
-          <div>
-            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.muted, marginBottom: 10 }}>
-              Pregúntame qué priorizar hoy, pídeme ideas de negocio o de contenido, mándame una foto, un PDF o un Word, o dime cosas como "crea un cliente llamado...", "registra un pago de..." o "actualiza el estado de vigilancia de...". Recuerdo todo lo que hablemos aquí, incluso si recargas la página.
-            </p>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-              {SUGERENCIAS_ASISTENTE.map((s) => (
-                <button
-                  key={s}
-                  className="drx-btn-ghost"
-                  onClick={() => setTexto(s)}
-                  style={{ background: COLORS.surfaceSoft, border: `1px solid ${COLORS.border}`, borderRadius: 20, padding: "6px 12px", fontSize: 11.5, fontFamily: "Inter, sans-serif", color: COLORS.inkSoft, cursor: "pointer" }}
-                >
-                  {s}
-                </button>
-              ))}
-            </div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
+            {SUGERENCIAS_ASISTENTE.map((s) => (
+              <button
+                key={s}
+                className="drx-btn-ghost"
+                onClick={() => setTexto(s)}
+                style={{ background: COLORS.surfaceSoft, border: `1px solid ${COLORS.border}`, borderRadius: 20, padding: "6px 12px", fontSize: 11.5, fontFamily: "Inter, sans-serif", color: COLORS.inkSoft, cursor: "pointer" }}
+              >
+                {s}
+              </button>
+            ))}
           </div>
         )}
         {mensajes.map((m, i) => (
@@ -2186,6 +2308,7 @@ function AsistenteIA({ nombre, usuarioId, onAccionCompletada }) {
           Enviar <Icono tipo="cursorArriba" size={14} style={{ transform: "rotate(90deg)" }} />
         </button>
       </div>
+      {ConfirmarDialogo}
     </Card>
   );
 }
