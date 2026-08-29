@@ -8053,6 +8053,7 @@ function LoginGate({ onIngresar, onCancelar, pantallaInicial }) {
           animation: "drx-mesh 12s ease-in-out infinite",
           transition: "background 0.3s ease",
           pointerEvents: "none",
+          zIndex: -1,
         }}
       />
       <div
@@ -8068,12 +8069,13 @@ function LoginGate({ onIngresar, onCancelar, pantallaInicial }) {
           animation: "drx-mesh 15s ease-in-out infinite reverse",
           transition: "background 0.3s ease",
           pointerEvents: "none",
+          zIndex: -1,
         }}
       />
-      <div style={{ position: "absolute", top: 20, right: 20 }}>
+      <div style={{ position: "absolute", top: 20, right: 20, zIndex: 1 }}>
         <BotonTema oscuro={oscuro} onClick={alternar} />
       </div>
-      <div className="drx-fade-in" style={{ maxWidth: 420, width: "100%", position: "relative" }}>
+      <div className="drx-fade-in" style={{ maxWidth: 420, width: "100%", position: "relative", zIndex: 1 }}>
       <Card style={{ width: "100%", textAlign: "center", position: "relative", borderTop: `3px solid ${COLORS.accentBright}`, boxShadow: "0 20px 50px rgba(10,35,66,0.14)" }}>
         {onCancelar && (
           <button
@@ -9378,7 +9380,7 @@ export default function App() {
           background: `radial-gradient(circle, rgba(30,95,180,${oscuro ? 0.16 : 0.08}) 0%, rgba(30,95,180,0) 70%)`,
           animation: "drx-mesh 14s ease-in-out infinite",
           pointerEvents: "none",
-          zIndex: 0,
+          zIndex: -1,
           transition: "background 0.3s ease",
         }}
       />
@@ -9394,7 +9396,7 @@ export default function App() {
           background: `radial-gradient(circle, rgba(20,184,166,${oscuro ? 0.14 : 0.07}) 0%, rgba(20,184,166,0) 70%)`,
           animation: "drx-mesh 18s ease-in-out infinite reverse",
           pointerEvents: "none",
-          zIndex: 0,
+          zIndex: -1,
           transition: "background 0.3s ease",
         }}
       />
@@ -9412,6 +9414,7 @@ export default function App() {
           top: 0,
           height: "100vh",
           overflowY: "auto",
+          zIndex: 1,
         }}
       >
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "4px 6px 20px", marginBottom: 20, borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
@@ -9499,7 +9502,7 @@ export default function App() {
         </div>
       </div>
 
-      <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
+      <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", position: "relative", zIndex: 1 }}>
         <div
           style={{
             background: COLORS.panel,
