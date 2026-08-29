@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, Fragment } from "react";
 import { supabase } from "./lib/supabaseClient";
 
 const uid = () => Math.random().toString(36).slice(2, 10).toUpperCase();
@@ -707,7 +707,7 @@ function EstadoVacio({ icono, texto }) {
         background: COLORS.surfaceSoft,
       }}
     >
-      <div style={{ fontSize: 30, marginBottom: 10, opacity: 0.7 }}>{icono}</div>
+      <div style={{ display: "flex", justifyContent: "center", marginBottom: 10, opacity: 0.55, color: COLORS.muted }}>{icono}</div>
       <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted, margin: 0 }}>{texto}</p>
     </div>
   );
@@ -939,6 +939,81 @@ function IconoCampana({ size = 17 }) {
       <path d="M9.5 20.5a2.5 2.5 0 0 0 5 0" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
     </svg>
   );
+}
+
+// Ícono de línea genérico para reemplazar los emojis sueltos por toda la
+// app — mismo lenguaje visual (trazo fino, sin relleno) que IconoCampana e
+// IconoSeguridad, para que se vea consistente y no "barato".
+function Icono({ tipo, size = 15, style }) {
+  const p = { width: size, height: size, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 1.8, strokeLinecap: "round", strokeLinejoin: "round", style: { flexShrink: 0, ...style } };
+  switch (tipo) {
+    case "clip":
+      return <svg {...p}><path d="M8 12.5V7a3 3 0 0 1 6 0v8a5 5 0 0 1-10 0V8" /></svg>;
+    case "documento":
+      return <svg {...p}><path d="M7 3h7l4 4v14H7Z" /><path d="M14 3v4h4" /><path d="M9.5 12.5h5M9.5 15.5h5" /></svg>;
+    case "balanza":
+      return <svg {...p}><path d="M12 3v18M6 8h12M6 8 3.5 13a2.5 2.5 0 0 0 5 0L6 8Zm12 0-2.5 5a2.5 2.5 0 0 0 5 0L18 8Z" /><path d="M8.5 21h7" /></svg>;
+    case "mano":
+      return <svg {...p}><path d="M8 13V6.5a1.5 1.5 0 0 1 3 0V12M11 12V5a1.5 1.5 0 0 1 3 0v7M14 12.5V6.5a1.5 1.5 0 0 1 3 0v8" /><path d="M8 12.5v3a5.5 5.5 0 0 0 11 0V13" /></svg>;
+    case "telefono":
+      return <svg {...p}><path d="M6 3h3l1.5 4.5L8.5 9a11 11 0 0 0 6.5 6.5l1.5-2 4.5 1.5v3a2 2 0 0 1-2.2 2A18 18 0 0 1 4 5.2 2 2 0 0 1 6 3Z" /></svg>;
+    case "chat":
+      return <svg {...p}><path d="M4 4.5h16v12H9l-4 3.5v-3.5H4Z" /></svg>;
+    case "refrescar":
+      return <svg {...p}><path d="M20 11a8 8 0 0 0-14.6-4.5M4 4v5h5" /><path d="M4 13a8 8 0 0 0 14.6 4.5M20 20v-5h-5" /></svg>;
+    case "foco":
+      return <svg {...p}><path d="M9 18h6M10 21h4" /><path d="M12 3a6 6 0 0 0-3.5 10.9c.6.4 1 1.1 1 1.9V16h5v-.2c0-.8.4-1.5 1-1.9A6 6 0 0 0 12 3Z" /></svg>;
+    case "portapapeles":
+      return <svg {...p}><rect x="6" y="4.5" width="12" height="16" rx="2" /><path d="M9.5 3.5h5v2.5h-5Z" /></svg>;
+    case "check":
+      return <svg {...p}><path d="M5 12.5 10 17 19 7" /></svg>;
+    case "ojo":
+      return <svg {...p}><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z" /><circle cx="12" cy="12" r="2.6" /></svg>;
+    case "ojoTachado":
+      return <svg {...p}><path d="M3 3l18 18" /><path d="M10.6 5.7A9.9 9.9 0 0 1 12 5.5c6 0 9.5 6.5 9.5 6.5a15.6 15.6 0 0 1-3.3 4.1M6.6 6.9C4.1 8.6 2.5 12 2.5 12S6 18.5 12 18.5c1.2 0 2.3-.2 3.3-.6" /><path d="M9.9 10a2.6 2.6 0 0 0 3.6 3.6" /></svg>;
+    case "reloj":
+      return <svg {...p}><circle cx="12" cy="12" r="8.5" /><path d="M12 7.5V12l3 2" /></svg>;
+    case "cronometro":
+      return <svg {...p}><circle cx="12" cy="13" r="8" /><path d="M12 9v4l2.5 2M9.5 2.5h5M12 2.5V5" /></svg>;
+    case "objetivo":
+      return <svg {...p}><circle cx="12" cy="12" r="8.5" /><circle cx="12" cy="12" r="4.5" /><circle cx="12" cy="12" r="0.8" fill="currentColor" /></svg>;
+    case "apreton":
+      return <svg {...p}><path d="M2.5 13 7 9l4 2 3-2.5 4.5 3.5-3 3.5-2-1.5-3 2Z" /><path d="M9 13l2.5 2.5M13.5 12l2.5 2.8" /></svg>;
+    case "calendario":
+      return <svg {...p}><rect x="3.5" y="5" width="17" height="15.5" rx="2" /><path d="M3.5 9.5h17M8 3v4M16 3v4" /></svg>;
+    case "chispa":
+      return <svg {...p}><path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M18.4 5.6l-2.8 2.8M8.4 15.6l-2.8 2.8" /></svg>;
+    case "lapiz":
+      return <svg {...p}><path d="M4 17.5 14.5 7l2.5 2.5L6.5 20H4v-2.5Z" /><path d="M13 8.5l2.5 2.5" /></svg>;
+    case "tarjeta":
+      return <svg {...p}><rect x="2.5" y="5.5" width="19" height="13" rx="2" /><path d="M2.5 10h19M6 14.5h4" /></svg>;
+    case "alerta":
+      return <svg {...p}><path d="M12 3 22 20H2Z" /><path d="M12 9.5v4.5M12 17v.3" /></svg>;
+    case "escudo":
+      return <svg {...p}><path d="M12 3 19 6v5.5c0 5-3 8.4-7 9.5-4-1.1-7-4.5-7-9.5V6l7-3Z" /><path d="M8.7 12l2.3 2.3 4.3-4.6" /></svg>;
+    case "sobre":
+      return <svg {...p}><rect x="3" y="5.5" width="18" height="13" rx="2" /><path d="m3.5 6.5 8.5 7 8.5-7" /></svg>;
+    case "bandeja":
+      return <svg {...p}><path d="M3 12h5l2 3h4l2-3h5" /><path d="M5.5 6h13l2.5 6v7a1 1 0 0 1-1 1h-16a1 1 0 0 1-1-1v-7Z" /></svg>;
+    case "llave":
+      return <svg {...p}><circle cx="7.5" cy="14.5" r="4" /><path d="M10.5 11.5 20 2M16.5 5.5l3 3M14 8l2.5 2.5" /></svg>;
+    case "edificio":
+      return <svg {...p}><path d="M4 21h16M6 21V9l6-4 6 4v12" /><path d="M10 21v-5h4v5M9 12h1M14 12h1M9 15.5h1M14 15.5h1" /></svg>;
+    case "persona":
+      return <svg {...p}><circle cx="12" cy="8" r="3.5" /><path d="M4.5 20.5a7.5 7.5 0 0 1 15 0" /></svg>;
+    case "imagen":
+      return <svg {...p}><rect x="3" y="4.5" width="18" height="15" rx="2" /><circle cx="8.5" cy="10" r="1.7" /><path d="m4 18 5.5-5.5 3 3L18 10l3 4.5" /></svg>;
+    case "papelera":
+      return <svg {...p}><path d="M4.5 7h15M9 7V4.5h6V7" /><path d="M6.5 7 7.5 20a1 1 0 0 0 1 1h7a1 1 0 0 0 1-1L17.5 7" /><path d="M10 11v6M14 11v6" /></svg>;
+    case "cursorArriba":
+      return <svg {...p}><path d="M12 19V6M6.5 11.5 12 6l5.5 5.5" /></svg>;
+    case "lupa":
+      return <svg {...p}><circle cx="10.5" cy="10.5" r="6.5" /><path d="m20 20-4.5-4.5" /></svg>;
+    case "grafico":
+      return <svg {...p}><path d="M4 20V10M11 20V4M18 20v-7" /><path d="M2.5 20h19" /></svg>;
+    default:
+      return null;
+  }
 }
 
 function BotonTema({ oscuro, onClick }) {
@@ -1546,54 +1621,83 @@ async function ejecutarHerramienta(nombreHerramienta, input) {
   return { mensaje: "No reconozco esa acción." };
 }
 
+// El asistente de IA a veces responde con markdown (**negrilla**, listas con
+// "- "). Sin esto se veían los asteriscos sueltos en el chat en vez de texto
+// con formato real.
+function lineaConNegrillas(linea, keyPrefix) {
+  const partes = linea.split(/(\*\*[^*]+\*\*)/g).filter((p) => p !== "");
+  return partes.map((parte, i) =>
+    parte.startsWith("**") && parte.endsWith("**") ? (
+      <strong key={`${keyPrefix}-${i}`}>{parte.slice(2, -2)}</strong>
+    ) : (
+      <Fragment key={`${keyPrefix}-${i}`}>{parte}</Fragment>
+    )
+  );
+}
+
+function TextoAsistente({ texto }) {
+  const lineas = (texto || "").split("\n");
+  return (
+    <>
+      {lineas.map((linea, i) => {
+        const esViñeta = /^\s*[-*]\s+/.test(linea);
+        const contenido = esViñeta ? linea.replace(/^\s*[-*]\s+/, "") : linea;
+        return (
+          <div key={i} style={{ display: "flex", gap: esViñeta ? 6 : 0, marginTop: i > 0 ? (linea.trim() === "" ? 8 : 2) : 0 }}>
+            {esViñeta && <span style={{ opacity: 0.6 }}>•</span>}
+            <span>{lineaConNegrillas(contenido, i)}</span>
+          </div>
+        );
+      })}
+    </>
+  );
+}
+
+function PuntosEscribiendo() {
+  return (
+    <span style={{ display: "inline-flex", gap: 3, alignItems: "center" }}>
+      {[0, 1, 2].map((i) => (
+        <span
+          key={i}
+          style={{
+            width: 5,
+            height: 5,
+            borderRadius: "50%",
+            background: COLORS.muted,
+            animation: `drx-pulse 1s ease-in-out ${i * 0.15}s infinite`,
+          }}
+        />
+      ))}
+    </span>
+  );
+}
+
+const SUGERENCIAS_ASISTENTE = [
+  "¿Qué debería priorizar hoy?",
+  "Registra un pago de 500.000 de Juan Pérez por Nequi",
+  "Dame 3 ideas de contenido para redes",
+  "¿Cómo va el despacho este mes?",
+];
+
 function AsistenteIA({ nombre, usuarioId, onAccionCompletada }) {
-  const claveHistorial = `chat-asistente:${usuarioId || "general"}`;
   const [mensajes, setMensajes] = useState([]);
   const [texto, setTexto] = useState("");
   const [adjunto, setAdjunto] = useState(null);
   const [cargando, setCargando] = useState(false);
-  const [historialCargado, setHistorialCargado] = useState(false);
   const contenedorRef = useRef(null);
   const fileInputRef = useRef(null);
+  const inputRef = useRef(null);
 
+  // El historial vive solo mientras la pestaña está abierta — se pidió que
+  // cada recarga empiece en limpio, en vez de arrastrar conversaciones viejas.
   useEffect(() => {
-    (async () => {
-      const raw = await storageGet(claveHistorial, true);
-      if (raw) {
-        try {
-          setMensajes(JSON.parse(raw));
-        } catch (e) {
-          setMensajes([]);
-        }
-      }
-      setHistorialCargado(true);
-    })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [claveHistorial]);
-
-  useEffect(() => {
-    if (!historialCargado) return;
-    // Al guardar, quitamos el contenido pesado de los adjuntos (base64/texto extraído)
-    // y los enlaces de archivos generados (dejan de servir tras recargar la página).
-    const paraGuardar = mensajes.map((m) => {
-      const limpio = { ...m };
-      if (limpio.adjunto) {
-        const { base64, texto: textoAdjunto, ...restoAdjunto } = limpio.adjunto;
-        limpio.adjunto = restoAdjunto;
-      }
-      delete limpio.archivoGenerado;
-      return limpio;
-    });
-    storageSet(claveHistorial, JSON.stringify(paraGuardar), true);
-  }, [mensajes, historialCargado, claveHistorial]);
-
-  useEffect(() => {
-    if (contenedorRef.current) contenedorRef.current.scrollTop = contenedorRef.current.scrollHeight;
+    if (contenedorRef.current) contenedorRef.current.scrollTo({ top: contenedorRef.current.scrollHeight, behavior: "smooth" });
   }, [mensajes, cargando]);
 
-  const borrarHistorial = async () => {
-    setMensajes([]);
-    await storageSet(claveHistorial, JSON.stringify([]), true);
+  const borrarHistorial = () => setMensajes([]);
+
+  const copiarMensaje = (texto) => {
+    navigator.clipboard?.writeText(texto).catch(() => {});
   };
 
   const adjuntarArchivo = async (e) => {
@@ -1704,6 +1808,7 @@ function AsistenteIA({ nombre, usuarioId, onAccionCompletada }) {
       setMensajes((prev) => [...prev, { rol: "asistente", texto: `Tuve un problema para responder: ${e.message || "intenta de nuevo en un momento."}` }]);
     }
     setCargando(false);
+    inputRef.current?.focus();
   };
 
   return (
@@ -1716,62 +1821,116 @@ function AsistenteIA({ nombre, usuarioId, onAccionCompletada }) {
           </button>
         )}
       </div>
-      <div ref={contenedorRef} style={{ minHeight: 260, maxHeight: 520, overflowY: "auto", display: "flex", flexDirection: "column", gap: 10, marginBottom: 12, paddingRight: 4 }}>
+      <div ref={contenedorRef} style={{ height: 340, overflowY: "auto", display: "flex", flexDirection: "column", gap: 12, marginBottom: 12, paddingRight: 4 }}>
         {mensajes.length === 0 && (
-          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.muted }}>
-            Pregúntame qué priorizar hoy, pídeme ideas de negocio o de contenido, mándame una foto, un PDF o un Word, o dime cosas como "crea un cliente llamado...", "registra un pago de...", "crea un caso para..." o "actualiza el estado de vigilancia de...". Recuerdo todo lo que hablemos aquí.
-          </p>
+          <div>
+            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.muted, marginBottom: 10 }}>
+              Pregúntame qué priorizar hoy, pídeme ideas de negocio o de contenido, mándame una foto, un PDF o un Word, o dime cosas como "crea un cliente llamado...", "registra un pago de..." o "actualiza el estado de vigilancia de...". Recuerdo lo que hablemos mientras la página siga abierta.
+            </p>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+              {SUGERENCIAS_ASISTENTE.map((s) => (
+                <button
+                  key={s}
+                  className="drx-btn-ghost"
+                  onClick={() => setTexto(s)}
+                  style={{ background: COLORS.surfaceSoft, border: `1px solid ${COLORS.border}`, borderRadius: 20, padding: "6px 12px", fontSize: 11.5, fontFamily: "Inter, sans-serif", color: COLORS.inkSoft, cursor: "pointer" }}
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+          </div>
         )}
         {mensajes.map((m, i) => (
-          <div
-            key={i}
-            style={{
-              alignSelf: m.rol === "usuario" ? "flex-end" : "flex-start",
-              background: m.rol === "usuario" ? COLORS.navy : COLORS.accentSoft,
-              color: m.rol === "usuario" ? "#FFFFFF" : COLORS.navy,
-              borderRadius: 10,
-              padding: "9px 13px",
-              maxWidth: "85%",
-              fontSize: 13,
-              fontFamily: "Inter, sans-serif",
-              whiteSpace: "pre-wrap",
-              lineHeight: 1.5,
-            }}
-          >
-            {m.adjunto?.tipoBloque === "image" && m.adjunto.base64 && (
-              <img src={`data:${m.adjunto.mediaType};base64,${m.adjunto.base64}`} alt="Adjunta" style={{ maxWidth: "100%", borderRadius: 8, marginBottom: m.texto ? 6 : 0, display: "block" }} />
-            )}
-            {m.adjunto?.tipoBloque === "image" && !m.adjunto.base64 && <p style={{ margin: "0 0 6px", fontSize: 12, opacity: 0.85 }}>🖼️ {m.adjunto.nombre}</p>}
-            {(m.adjunto?.tipoBloque === "document" || m.adjunto?.tipoBloque === "texto_extraido") && (
-              <p style={{ margin: "0 0 6px", fontSize: 12, opacity: 0.85 }}>📄 {m.adjunto.nombre}</p>
-            )}
-            {m.texto}
-            {m.archivoGenerado && (
-              <div style={{ marginTop: 8 }}>
-                <a
-                  href={m.archivoGenerado.url}
-                  download={m.archivoGenerado.nombre}
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: 6,
-                    background: "#FFFFFF",
-                    color: COLORS.navy,
-                    border: `1px solid ${COLORS.navy}`,
-                    borderRadius: 6,
-                    padding: "5px 12px",
-                    fontSize: 12,
-                    fontWeight: 600,
-                    textDecoration: "none",
-                  }}
+          <div key={i} style={{ display: "flex", flexDirection: m.rol === "usuario" ? "row-reverse" : "row", gap: 8, alignItems: "flex-end" }}>
+            <div
+              style={{
+                width: 26,
+                height: 26,
+                borderRadius: "50%",
+                flexShrink: 0,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                background: m.rol === "usuario" ? COLORS.accentSoft : COLORS.navy,
+                color: m.rol === "usuario" ? COLORS.navy : "#FFFFFF",
+              }}
+            >
+              {m.rol === "usuario" ? <Icono tipo="persona" size={13} /> : <IconoNomos size={13} />}
+            </div>
+            <div
+              className="drx-fade-in"
+              style={{
+                position: "relative",
+                background: m.rol === "usuario" ? COLORS.navy : COLORS.accentSoft,
+                color: m.rol === "usuario" ? "#FFFFFF" : COLORS.navy,
+                borderRadius: 12,
+                padding: "9px 13px",
+                maxWidth: "80%",
+                fontSize: 13,
+                fontFamily: "Inter, sans-serif",
+                lineHeight: 1.55,
+              }}
+            >
+              {m.adjunto?.tipoBloque === "image" && m.adjunto.base64 && (
+                <img src={`data:${m.adjunto.mediaType};base64,${m.adjunto.base64}`} alt="Adjunta" style={{ maxWidth: "100%", borderRadius: 8, marginBottom: m.texto ? 6 : 0, display: "block" }} />
+              )}
+              {m.adjunto?.tipoBloque === "image" && !m.adjunto.base64 && (
+                <p style={{ margin: "0 0 6px", fontSize: 12, opacity: 0.85, display: "flex", alignItems: "center", gap: 5 }}>
+                  <Icono tipo="imagen" size={13} /> {m.adjunto.nombre}
+                </p>
+              )}
+              {(m.adjunto?.tipoBloque === "document" || m.adjunto?.tipoBloque === "texto_extraido") && (
+                <p style={{ margin: "0 0 6px", fontSize: 12, opacity: 0.85, display: "flex", alignItems: "center", gap: 5 }}>
+                  <Icono tipo="documento" size={13} /> {m.adjunto.nombre}
+                </p>
+              )}
+              <TextoAsistente texto={m.texto} />
+              {m.archivoGenerado && (
+                <div style={{ marginTop: 8 }}>
+                  <a
+                    href={m.archivoGenerado.url}
+                    download={m.archivoGenerado.nombre}
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 6,
+                      background: "#FFFFFF",
+                      color: COLORS.navy,
+                      border: `1px solid ${COLORS.navy}`,
+                      borderRadius: 6,
+                      padding: "5px 12px",
+                      fontSize: 12,
+                      fontWeight: 600,
+                      textDecoration: "none",
+                    }}
+                  >
+                    <Icono tipo="cursorArriba" size={13} style={{ transform: "rotate(180deg)" }} /> Descargar {m.archivoGenerado.nombre}
+                  </a>
+                </div>
+              )}
+              {m.rol === "asistente" && (
+                <button
+                  onClick={() => copiarMensaje(m.texto)}
+                  title="Copiar respuesta"
+                  style={{ position: "absolute", top: 6, right: -26, background: "none", border: "none", cursor: "pointer", color: COLORS.muted, opacity: 0.6, padding: 2 }}
                 >
-                  ⬇️ Descargar {m.archivoGenerado.nombre}
-                </a>
-              </div>
-            )}
+                  <Icono tipo="portapapeles" size={13} />
+                </button>
+              )}
+            </div>
           </div>
         ))}
-        {cargando && <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted }}>Pensando...</p>}
+        {cargando && (
+          <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
+            <div style={{ width: 26, height: 26, borderRadius: "50%", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", background: COLORS.navy, color: "#FFFFFF" }}>
+              <IconoNomos size={13} />
+            </div>
+            <div style={{ background: COLORS.accentSoft, borderRadius: 12, padding: "10px 14px" }}>
+              <PuntosEscribiendo />
+            </div>
+          </div>
+        )}
       </div>
 
       {adjunto && (
@@ -1779,23 +1938,24 @@ function AsistenteIA({ nombre, usuarioId, onAccionCompletada }) {
           {adjunto.tipoBloque === "image" ? (
             <img src={`data:${adjunto.mediaType};base64,${adjunto.base64}`} alt="Adjunta" style={{ width: 32, height: 32, borderRadius: 4, objectFit: "cover" }} />
           ) : (
-            <span style={{ fontSize: 18 }}>📄</span>
+            <Icono tipo="documento" size={18} style={{ color: COLORS.muted }} />
           )}
           <span style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, color: adjunto.tipoBloque === "error" ? "#B42318" : COLORS.inkSoft, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
             {adjunto.tipoBloque === "error" ? `Formato no soportado: ${adjunto.nombre}` : adjunto.nombre}
           </span>
-          <button onClick={() => setAdjunto(null)} style={{ background: "none", border: "none", cursor: "pointer", color: COLORS.muted, fontSize: 14 }}>
-            ✕
+          <button onClick={() => setAdjunto(null)} style={{ background: "none", border: "none", cursor: "pointer", color: COLORS.muted, display: "flex" }}>
+            <Icono tipo="check" size={14} style={{ transform: "rotate(45deg)" }} />
           </button>
         </div>
       )}
 
       <div style={{ display: "flex", gap: 8 }}>
         <input type="file" accept="image/*,.pdf,.docx" ref={fileInputRef} onChange={adjuntarArchivo} style={{ display: "none" }} />
-        <button className="drx-btn-ghost" style={{ ...buttonGhost, padding: "10px 12px" }} onClick={() => fileInputRef.current?.click()} title="Adjuntar foto, PDF o Word">
-          📎
+        <button className="drx-btn-ghost" style={{ ...buttonGhost, padding: "10px 12px", display: "flex", alignItems: "center" }} onClick={() => fileInputRef.current?.click()} title="Adjuntar foto, PDF o Word">
+          <Icono tipo="clip" size={16} />
         </button>
         <input
+          ref={inputRef}
           className="drx-input"
           style={{ ...inputStyle, flex: 1 }}
           value={texto}
@@ -1803,8 +1963,8 @@ function AsistenteIA({ nombre, usuarioId, onAccionCompletada }) {
           placeholder="Ej: registra un pago de 500.000 de Juan Pérez por Nequi"
           onKeyDown={(e) => e.key === "Enter" && enviar()}
         />
-        <button className="drx-btn-primary" style={buttonPrimary} onClick={enviar} disabled={cargando || (!texto.trim() && !adjunto)}>
-          Enviar
+        <button className="drx-btn-primary" style={{ ...buttonPrimary, display: "flex", alignItems: "center", gap: 6 }} onClick={enviar} disabled={cargando || (!texto.trim() && !adjunto)}>
+          Enviar <Icono tipo="cursorArriba" size={14} style={{ transform: "rotate(90deg)" }} />
         </button>
       </div>
     </Card>
@@ -1820,7 +1980,7 @@ function ResumenTab({ nombre, usuarioId, onIr }) {
     <div>
       <div className="drx-glow" style={{ textAlign: "center", padding: "30px 16px 34px" }}>
         <div style={{ marginBottom: 18 }}>
-          <Pill>⚖️ {getNombreDespacho()} — Panel de gestión</Pill>
+          <Pill><Icono tipo="balanza" size={13} style={{ marginRight: 2, verticalAlign: -2 }} /> {getNombreDespacho()} — Panel de gestión</Pill>
         </div>
         <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted, marginBottom: 10 }}>Hola, {nombre}</p>
         <h1 style={{ fontFamily: "Inter, sans-serif", fontSize: 34, fontWeight: 800, letterSpacing: 0.5, textTransform: "uppercase", margin: 0, lineHeight: 1.2 }}>
@@ -1927,7 +2087,7 @@ function ResumenTab({ nombre, usuarioId, onIr }) {
         <div className="drx-fade-in" style={{ marginBottom: 20 }}>
           <Card style={{ borderLeft: "4px solid #F5A524" }}>
             <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, fontWeight: 700, color: COLORS.headingText, marginBottom: 10 }}>
-              📋 Pendientes de hoy ({tareasPendientes})
+              <Icono tipo="portapapeles" size={14} style={{ marginRight: 4, verticalAlign: -2 }} /> Pendientes de hoy ({tareasPendientes})
             </p>
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               {r.procesosConNovedad > 0 && (
@@ -1985,7 +2145,7 @@ function ResumenTab({ nombre, usuarioId, onIr }) {
         </SeccionEstadisticas>
       </div>
 
-      {tareasPendientes === 0 && <EstadoVacio icono="✅" texto="Todo al día — no hay pendientes urgentes por ahora." />}
+      {tareasPendientes === 0 && <EstadoVacio icono={<Icono tipo="check" size={26} />} texto="Todo al día — no hay pendientes urgentes por ahora." />}
     </div>
   );
 }
@@ -2122,7 +2282,7 @@ function DocumentoTextoConFirmas({ contenido, firmantes, previewFirmante, onMove
             marginBottom: 10,
           }}
         >
-          <span style={{ fontSize: 16 }}>👆</span>
+          <Icono tipo="mano" size={17} style={{ color: COLORS.navy }} />
           <span style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.navy, fontWeight: 600 }}>
             Puedes desplazarte libremente por el documento. Mantén presionado el recuadro que parpadea y arrástralo hasta donde quieras dejar tu firma.
           </span>
@@ -2414,7 +2574,7 @@ Certificado generado: ${new Date().toLocaleString("es-CO", { dateStyle: "full", 
               </p>
               <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
                 <button className="drx-btn-ghost" style={buttonGhost} onClick={descargarCertificado}>
-                  📄 Descargar certificado de firma
+                  <Icono tipo="documento" size={14} style={{ marginRight: 4, verticalAlign: -2 }} /> Descargar certificado de firma
                 </button>
                 <button className="drx-btn-ghost" style={buttonGhost} onClick={agregarOtraPersona}>
                   Agregar la firma de otra persona
@@ -2436,7 +2596,7 @@ Certificado generado: ${new Date().toLocaleString("es-CO", { dateStyle: "full", 
                     gap: 6,
                   }}
                 >
-                  💬 ¿Tienes dudas? Escríbenos
+                  <Icono tipo="chat" size={14} style={{ marginRight: 4, verticalAlign: -2 }} /> ¿Tienes dudas? Escríbenos
                 </a>
               </div>
             </div>
@@ -2864,7 +3024,7 @@ function BuscadorGlobal({ onIr }) {
         ref={inputRef}
         className="drx-input"
         style={{ ...inputStyle, width: "100%" }}
-        placeholder="🔍 Buscar cliente o documento... (Ctrl+K)"
+        placeholder="Buscar cliente o documento... (Ctrl+K)"
         value={q}
         onChange={(e) => {
           setQ(e.target.value);
@@ -3465,7 +3625,7 @@ function ClientesTab({ usuarioActual }) {
                     )}
                     {c.telefono && (
                       <a href={`tel:${c.telefono.replace(/[^0-9+]/g, "")}`} title="Llamar" style={{ color: COLORS.accentBright, textDecoration: "none", fontWeight: 600 }}>
-                        📞 Llamar
+                        <Icono tipo="telefono" size={13} style={{ marginRight: 4, verticalAlign: -2 }} /> Llamar
                       </a>
                     )}
                     {c.telefono && c.email && "·"}
@@ -3558,7 +3718,7 @@ function ClientesTab({ usuarioActual }) {
             </Card>
           );
         })}
-        {ids.length === 0 && !showForm && <EstadoVacio icono="👥" texto="Aún no has registrado clientes." />}
+        {ids.length === 0 && !showForm && <EstadoVacio icono={<Icono tipo="persona" size={26} />} texto="Aún no has registrado clientes." />}
         {ids.length > 0 && idsFiltrados.length === 0 && (
           <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted, textAlign: "center" }}>Ningún cliente coincide con "{filtro}".</p>
         )}
@@ -4138,7 +4298,7 @@ function VigilanciaTab() {
           lineHeight: 1.6,
         }}
       >
-        <strong>⚖️ Sobre esta sección:</strong> aquí centralizas los procesos que tienen número de radicado. La consulta{" "}
+        <strong><Icono tipo="balanza" size={13} style={{ marginRight: 4, verticalAlign: -2 }} /> Sobre esta sección:</strong> aquí centralizas los procesos que tienen número de radicado. La consulta{" "}
         <strong>"Consultar Rama Judicial"</strong> trae el estado real desde la Consulta de Procesos Nacional Unificada
         (el mismo buscador público de la Rama Judicial, por número de radicado — no existe una API oficial del Estado
         para esto, así que si algún día cambian su página puede dejar de funcionar y hay que ajustarlo).
@@ -4158,7 +4318,7 @@ function VigilanciaTab() {
             lineHeight: 1.6,
           }}
         >
-          <strong>⚠️ {sinRadicado.length} cliente{sinRadicado.length !== 1 ? "s" : ""} sin número de radicado:</strong>{" "}
+          <strong><Icono tipo="alerta" size={13} style={{ marginRight: 4, verticalAlign: -2 }} /> {sinRadicado.length} cliente{sinRadicado.length !== 1 ? "s" : ""} sin número de radicado:</strong>{" "}
           {sinRadicado.map((id) => clientes[id]?.nombre).filter(Boolean).join(", ")}. La revisión automática diaria y la
           consulta a la Rama Judicial solo funcionan si el cliente tiene el radicado registrado — agrégalo desde{" "}
           <strong>Clientes → Editar</strong> para que estos también queden vigilados.
@@ -4171,7 +4331,13 @@ function VigilanciaTab() {
         </p>
         {conRadicado.length > 0 && (
           <button className="drx-btn-primary" style={buttonPrimary} onClick={consultarTodos} disabled={consultandoTodos}>
-            {consultandoTodos ? "Consultando todos…" : "🔄 Consultar Rama Judicial (todos)"}
+            {consultandoTodos ? (
+              "Consultando todos…"
+            ) : (
+              <>
+                <Icono tipo="refrescar" size={13} style={{ marginRight: 4, verticalAlign: -2 }} /> Consultar Rama Judicial (todos)
+              </>
+            )}
           </button>
         )}
       </div>
@@ -4265,7 +4431,13 @@ function VigilanciaTab() {
                 onClick={() => consultarUno(id)}
                 disabled={consultando === id}
               >
-                {consultando === id ? "Consultando…" : "🔄 Consultar Rama Judicial"}
+                {consultando === id ? (
+                  "Consultando…"
+                ) : (
+                  <>
+                    <Icono tipo="refrescar" size={13} style={{ marginRight: 4, verticalAlign: -2 }} /> Consultar Rama Judicial
+                  </>
+                )}
               </button>
 
               {errorConsulta && (
@@ -4302,7 +4474,13 @@ function VigilanciaTab() {
                       onClick={() => pedirExplicacion(id)}
                       disabled={explicando === id}
                     >
-                      {explicando === id ? "Analizando…" : "💡 Explicar y sugerir con IA"}
+                      {explicando === id ? (
+                        "Analizando…"
+                      ) : (
+                        <>
+                          <Icono tipo="foco" size={13} style={{ marginRight: 4, verticalAlign: -2 }} /> Explicar y sugerir con IA
+                        </>
+                      )}
                     </button>
                   </div>
                   {explicaciones[id] && (
@@ -4315,7 +4493,13 @@ function VigilanciaTab() {
                         style={{ ...buttonGhost, fontSize: 11, padding: "4px 10px", marginTop: 8 }}
                         onClick={() => copiarExplicacion(explicaciones[id], id)}
                       >
-                        {explicacionCopiada === id ? "✓ Copiado" : "📋 Copiar"}
+                        {explicacionCopiada === id ? (
+                          "✓ Copiado"
+                        ) : (
+                          <>
+                            <Icono tipo="portapapeles" size={13} style={{ marginRight: 4, verticalAlign: -2 }} /> Copiar
+                          </>
+                        )}
                       </button>
                     </div>
                   )}
@@ -4327,10 +4511,10 @@ function VigilanciaTab() {
           );
         })}
         {conRadicado.length === 0 && (
-          <EstadoVacio icono="⚖️" texto="Ningún cliente tiene número de radicado registrado todavía. Agrégalo desde la pestaña Clientes." />
+          <EstadoVacio icono={<Icono tipo="balanza" size={26} />} texto="Ningún cliente tiene número de radicado registrado todavía. Agrégalo desde la pestaña Clientes." />
         )}
         {conRadicado.length > 0 && conRadicadoFiltrados.length === 0 && (
-          <EstadoVacio icono="🔍" texto={`Ningún proceso en estado "${filtroEstado}".`} />
+          <EstadoVacio icono={<Icono tipo="lupa" size={26} />} texto={`Ningún proceso en estado "${filtroEstado}".`} />
         )}
       </div>
     </div>
@@ -4488,7 +4672,13 @@ function ReciboCard({ cliente, pago }) {
                 setTimeout(() => setCopiado(false), 1200);
               }}
             >
-              {copiado ? "Descargando..." : "⬇️ Descargar recibo"}
+              {copiado ? (
+                "Descargando..."
+              ) : (
+                <>
+                  <Icono tipo="cursorArriba" size={13} style={{ marginRight: 4, verticalAlign: -2, transform: "rotate(180deg)" }} /> Descargar recibo
+                </>
+              )}
             </a>
           )}
           {numero && (
@@ -4663,7 +4853,7 @@ function ReportesTab() {
           <BarraReporte key={estado} etiqueta={estado} valor={conteoEstados[estado]} maximo={maxEstado} color={COLOR_ESTADO[estado]} />
         ))}
         {sinRevisar > 0 && <BarraReporte etiqueta="Sin revisar todavía" valor={sinRevisar} maximo={maxEstado} color="#94A3B8" />}
-        {listaClientes.length === 0 && <EstadoVacio icono="📊" texto="Aún no hay clientes registrados." />}
+        {listaClientes.length === 0 && <EstadoVacio icono={<Icono tipo="grafico" size={26} />} texto="Aún no hay clientes registrados." />}
       </Card>
 
       <Card>
@@ -4671,7 +4861,7 @@ function ReportesTab() {
         <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, marginBottom: 14 }}>
           Cuántos clientes tiene asignados cada uno. Se asigna desde "Clientes" al crear o editar un cliente.
         </p>
-        {filasCarga.length === 0 && <EstadoVacio icono="📊" texto="Aún no hay clientes registrados." />}
+        {filasCarga.length === 0 && <EstadoVacio icono={<Icono tipo="grafico" size={26} />} texto="Aún no hay clientes registrados." />}
         {filasCarga.map(([nombre, n]) => (
           <BarraReporte key={nombre} etiqueta={nombre} valor={n} maximo={maxCarga} color="#7C3AED" />
         ))}
@@ -4779,7 +4969,7 @@ function ContabilidadTab({ usuarioActual }) {
       {clientesSinPagos.length > 0 && (
         <div style={{ marginBottom: 20 }}>
           <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, fontWeight: 700, color: "#8B5CF6", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 10 }}>
-            👀 Sin ningún pago registrado todavía
+            <Icono tipo="ojo" size={14} style={{ marginRight: 4, verticalAlign: -2 }} /> Sin ningún pago registrado todavía
           </p>
           <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.inkSoft, margin: "0 0 8px" }}>
             {clientesSinPagos.map((c) => c.nombre).join(", ")}
@@ -5106,7 +5296,7 @@ function EstrategiaContenidoCard({ estrategia, cargado, onGuardar }) {
   return (
     <Card style={{ marginBottom: 20 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, flexWrap: "wrap", gap: 8 }}>
-        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, fontWeight: 700, color: COLORS.ink, margin: 0 }}>🎯 Estrategia y nicho</p>
+        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, fontWeight: 700, color: COLORS.ink, margin: 0, display: "flex", alignItems: "center", gap: 6 }}><Icono tipo="objetivo" size={15} /> Estrategia y nicho</p>
         <button className="drx-btn-ghost" style={{ ...buttonGhost, fontSize: 11.5, padding: "5px 10px" }} onClick={() => setEditando((e) => !e)}>
           {editando ? "Cancelar" : tieneEstrategia ? "Editar" : "Definir"}
         </button>
@@ -5252,7 +5442,7 @@ function CommunityManagerIA({ estrategia, onGuardarIdeas }) {
   return (
     <Card style={{ marginBottom: 20, padding: 24 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, fontWeight: 700, color: COLORS.ink, margin: 0 }}>🤝 Community Manager IA</p>
+        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, fontWeight: 700, color: COLORS.ink, margin: 0, display: "flex", alignItems: "center", gap: 6 }}><Icono tipo="apreton" size={15} /> Community Manager IA</p>
         {mensajes.length > 0 && (
           <button
             onClick={borrarHistorial}
@@ -5411,7 +5601,7 @@ function ContenidoTab() {
           lineHeight: 1.6,
         }}
       >
-        <strong>🗓️ Planeador de contenido:</strong> organiza qué se sube, en qué red (Instagram, Facebook, TikTok) y cuándo. No publica nada
+        <strong><Icono tipo="calendario" size={13} style={{ marginRight: 4, verticalAlign: -2 }} /> Planeador de contenido:</strong> organiza qué se sube, en qué red (Instagram, Facebook, TikTok) y cuándo. No publica nada
         automáticamente — es la agenda para no perder el hilo. Lo pendiente para hoy o vencido aparece en la campana de notificaciones.
       </div>
 
@@ -5420,7 +5610,7 @@ function ContenidoTab() {
       <CommunityManagerIA estrategia={estrategia} onGuardarIdeas={agregarVarias} />
 
       <Card style={{ marginBottom: 20 }}>
-        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, fontWeight: 700, color: COLORS.ink, marginBottom: 4 }}>💡 Banco de ideas rápidas</p>
+        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, fontWeight: 700, color: COLORS.ink, marginBottom: 4, display: "flex", alignItems: "center", gap: 6 }}><Icono tipo="foco" size={15} /> Banco de ideas rápidas</p>
         <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.muted, marginBottom: 12 }}>
           Pide ideas a la IA (con o sin tema) y guárdalas aquí. Cuando quieras usar una, la conviertes en una entrada del calendario con un clic.
         </p>
@@ -5433,7 +5623,13 @@ function ContenidoTab() {
             onChange={(e) => setTemaIdeas(e.target.value)}
           />
           <button className="drx-btn-primary" style={buttonPrimary} onClick={pedirIdeas} disabled={generandoIdeas}>
-            {generandoIdeas ? "Generando..." : "✨ Generar 5 ideas"}
+            {generandoIdeas ? (
+              "Generando..."
+            ) : (
+              <>
+                <Icono tipo="chispa" size={13} style={{ marginRight: 4, verticalAlign: -2 }} /> Generar 5 ideas
+              </>
+            )}
           </button>
         </div>
         {ideas.length > 0 ? (
@@ -5464,7 +5660,13 @@ function ContenidoTab() {
                       setTimeout(() => setIdeaCopiada(""), 1500);
                     }}
                   >
-                    {ideaCopiada === idea.id ? "✓ Copiado" : "📋 Copiar"}
+                    {ideaCopiada === idea.id ? (
+                      "✓ Copiado"
+                    ) : (
+                      <>
+                        <Icono tipo="portapapeles" size={13} style={{ marginRight: 4, verticalAlign: -2 }} /> Copiar
+                      </>
+                    )}
                   </button>
                   <button className="drx-btn-ghost" style={{ ...buttonGhost, fontSize: 11.5, padding: "5px 10px" }} onClick={() => usarIdea(idea)}>
                     + Al calendario
@@ -6128,7 +6330,15 @@ function DocumentosTab() {
                       if (diasRestantes > 5) return null;
                       return (
                         <span style={{ fontFamily: "Inter, sans-serif", fontSize: 10.5, fontWeight: 700, color: diasRestantes <= 0 ? "#B42318" : "#B45309" }}>
-                          {diasRestantes <= 0 ? "⚠ Enlace vencido" : `⏱ Vence en ${diasRestantes} día${diasRestantes !== 1 ? "s" : ""}`}
+                          {diasRestantes <= 0 ? (
+                            <>
+                              <Icono tipo="alerta" size={12} style={{ marginRight: 3, verticalAlign: -2 }} /> Enlace vencido
+                            </>
+                          ) : (
+                            <>
+                              <Icono tipo="cronometro" size={12} style={{ marginRight: 3, verticalAlign: -2 }} /> Vence en {diasRestantes} día{diasRestantes !== 1 ? "s" : ""}
+                            </>
+                          )}
                         </span>
                       );
                     })()}
@@ -6139,7 +6349,7 @@ function DocumentosTab() {
                   )}
                   {integridad[id] === "alterado" && (
                     <span style={{ fontFamily: "Inter, sans-serif", fontSize: 10.5, fontWeight: 700, color: "#B42318" }} title="El contenido cambió después de la firma">
-                      ⚠ Modificado después de firmar
+                      <Icono tipo="alerta" size={12} style={{ marginRight: 3, verticalAlign: -2 }} /> Modificado después de firmar
                     </span>
                   )}
                 </div>
@@ -6206,7 +6416,13 @@ function DocumentosTab() {
                     style={{ ...buttonGhost, padding: "6px 12px", fontSize: 12.5, fontWeight: 600 }}
                     onClick={() => copiarCodigo(id)}
                   >
-                    {copiedId === id ? "¡Copiado! ✓" : "📋 Copiar código"}
+                    {copiedId === id ? (
+                      "¡Copiado! ✓"
+                    ) : (
+                      <>
+                        <Icono tipo="portapapeles" size={13} style={{ marginRight: 4, verticalAlign: -2 }} /> Copiar código
+                      </>
+                    )}
                   </button>
                 </div>
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -6227,7 +6443,7 @@ function DocumentosTab() {
                   {estado === "listo" && (
                     <>
                       <button className="drx-btn-ghost" style={{ ...buttonGhost, padding: "6px 14px", fontSize: 12.5 }} onClick={() => descargarPdfFirmado(d)}>
-                        📄 Ver / descargar PDF firmado ↗
+                        <Icono tipo="documento" size={13} style={{ marginRight: 4, verticalAlign: -2 }} /> Ver / descargar PDF firmado ↗
                       </button>
                       {d.whatsappNumero && (
                         <button
@@ -6261,7 +6477,7 @@ function DocumentosTab() {
             </Card>
           );
         })}
-        {ids.length === 0 && !showForm && <EstadoVacio icono="✍️" texto="Aún no has creado documentos para firma." />}
+        {ids.length === 0 && !showForm && <EstadoVacio icono={<Icono tipo="lapiz" size={26} />} texto="Aún no has creado documentos para firma." />}
         {ids.length > 0 && idsFiltrados.length === 0 && (
           <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted, textAlign: "center" }}>Ningún documento coincide con "{filtro}".</p>
         )}
@@ -6442,7 +6658,7 @@ function ModalNotificaciones({
 
         <div style={{ padding: "16px 20px" }}>
           <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, fontWeight: 700, color: COLORS.headingText, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 10 }}>
-            ✍️ Firmas nuevas
+            <Icono tipo="lapiz" size={14} style={{ marginRight: 4, verticalAlign: -2 }} /> Firmas nuevas
           </p>
           {firmasNuevas.length > 0 ? (
             <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 18 }}>
@@ -6489,7 +6705,7 @@ function ModalNotificaciones({
           )}
 
           <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, fontWeight: 700, color: "#0A2342", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 10 }}>
-            💳 Pagos pendientes
+            <Icono tipo="tarjeta" size={14} style={{ marginRight: 4, verticalAlign: -2 }} /> Pagos pendientes
           </p>
           {pagosPendientes.length > 0 ? (
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -6513,7 +6729,7 @@ function ModalNotificaciones({
           )}
 
           <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, fontWeight: 700, color: "#7C3AED", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 10 }}>
-            🗓️ Contenido pendiente
+            <Icono tipo="calendario" size={14} style={{ marginRight: 4, verticalAlign: -2 }} /> Contenido pendiente
           </p>
           {contenidoVencido.length > 0 || contenidoPendiente.length > 0 ? (
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -6542,7 +6758,7 @@ function ModalNotificaciones({
           )}
 
           <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, fontWeight: 700, color: "#B45309", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 10 }}>
-            ⚖️ Novedades judiciales
+            <Icono tipo="balanza" size={14} style={{ marginRight: 4, verticalAlign: -2 }} /> Novedades judiciales
           </p>
           {novedadesJudiciales.length > 0 ? (
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -6563,7 +6779,7 @@ function ModalNotificaciones({
           )}
 
           <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, fontWeight: 700, color: "#B45309", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 10 }}>
-            📋 Clientes sin radicado
+            <Icono tipo="portapapeles" size={14} style={{ marginRight: 4, verticalAlign: -2 }} /> Clientes sin radicado
           </p>
           {clientesSinRadicado.length > 0 ? (
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -6738,7 +6954,7 @@ function CampoContrasena({ valor, onChange, onEnter, autoFocus }) {
         title={visible ? "Ocultar contraseña" : "Mostrar contraseña"}
         style={{ position: "absolute", right: 6, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", fontSize: 16, color: COLORS.muted, padding: 6 }}
       >
-        {visible ? "🙈" : "👁️"}
+        <Icono tipo={visible ? "ojoTachado" : "ojo"} size={15} />
       </button>
     </div>
   );
@@ -7608,7 +7824,7 @@ function LandingPage({ onRegistrar, onIniciarSesion }) {
                   marginTop: 6,
                 }}
               >
-                {p.destacado ? "🏛️" : "👤"}
+                <Icono tipo={p.destacado ? "edificio" : "persona"} size={16} />
               </div>
               <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, fontWeight: 700, color: COLORS.headingText, margin: "0 0 4px" }}>{p.nombre}</p>
               <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, marginBottom: 14, minHeight: 32, lineHeight: 1.5 }}>{p.descripcion}</p>
@@ -7805,7 +8021,7 @@ function LandingPage({ onRegistrar, onIniciarSesion }) {
               rel="noreferrer"
               style={{ ...footerLinkStyle, display: "inline-flex", alignItems: "center", gap: 6 }}
             >
-              💬 Escríbenos por WhatsApp
+              <Icono tipo="chat" size={14} style={{ marginRight: 5, verticalAlign: -2 }} /> Escríbenos por WhatsApp
             </a>
           </div>
         </div>
@@ -7940,7 +8156,7 @@ function PantallaPendienteActivacion({ usuarioActual, onCerrarSesion }) {
             boxSizing: "border-box",
           }}
         >
-          💬 Escribir por WhatsApp para activar
+          <Icono tipo="chat" size={14} style={{ marginRight: 5, verticalAlign: -2 }} /> Escribir por WhatsApp para activar
         </a>
         <button
           onClick={onCerrarSesion}
@@ -8249,8 +8465,11 @@ function LoginGate({ onIngresar, onCancelar, pantallaInicial }) {
           </button>
         )}
         <InsigniaPlataforma grande />
-        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 22, margin: "0 0 4px" }}>
-          {pantalla === "registro" ? "🏛️" : pantalla === "recuperar" || pantalla === "recuperacion-enviada" ? "✉️" : pantalla === "registro-enviado" ? "📬" : "🔑"}
+        <p style={{ margin: "0 0 4px", display: "flex", justifyContent: "center", color: COLORS.headingText }}>
+          <Icono
+            tipo={pantalla === "registro" ? "edificio" : pantalla === "recuperar" || pantalla === "recuperacion-enviada" ? "sobre" : pantalla === "registro-enviado" ? "bandeja" : "llave"}
+            size={26}
+          />
         </p>
         <h1 style={{ fontFamily: "Inter, sans-serif", fontSize: 22, fontWeight: 800, textTransform: "uppercase", letterSpacing: 0.5, color: COLORS.headingText, margin: "0 0 4px" }}>
           {pantalla === "registro"
@@ -8872,7 +9091,7 @@ function UsuariosPermisosTab({ usuarioActual, onDespachoRenombrado }) {
       </Card>
 
       <Card style={{ marginBottom: 20, borderLeft: "4px solid #10B981" }}>
-        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, fontWeight: 600, color: COLORS.headingText, marginBottom: 4 }}>🛡️ Respaldo de tus datos</p>
+        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, fontWeight: 600, color: COLORS.headingText, marginBottom: 4, display: "flex", alignItems: "center", gap: 5 }}><Icono tipo="escudo" size={14} /> Respaldo de tus datos</p>
         <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, marginBottom: 12 }}>
           Descarga ahora mismo un archivo con TODA la información de tu despacho (clientes, documentos, casos y contenido) tal
           como está en este momento. Guárdalo en tu computador o en la nube (Google Drive, etc.). Recomendado: descárgalo
@@ -8886,7 +9105,13 @@ function UsuariosPermisosTab({ usuarioActual, onDespachoRenombrado }) {
               onClick={() => setPidiendoContrasenaRespaldo(true)}
               disabled={respaldando || segundosEsperaRespaldo > 0}
             >
-              {segundosEsperaRespaldo > 0 ? `Vuelve a intentar en ${segundosEsperaRespaldo}s` : "⬇️ Descargar respaldo completo"}
+              {segundosEsperaRespaldo > 0 ? (
+                `Vuelve a intentar en ${segundosEsperaRespaldo}s`
+              ) : (
+                <>
+                  <Icono tipo="cursorArriba" size={13} style={{ marginRight: 4, verticalAlign: -2, transform: "rotate(180deg)" }} /> Descargar respaldo completo
+                </>
+              )}
             </button>
             {errorRespaldo && <p style={{ color: "#B42318", fontSize: 12, marginTop: 8, fontFamily: "Inter, sans-serif" }}>{errorRespaldo}</p>}
           </>
@@ -9013,7 +9238,7 @@ function UsuariosPermisosTab({ usuarioActual, onDespachoRenombrado }) {
 
               <div style={{ borderTop: `1px solid ${COLORS.border}`, marginTop: 12, paddingTop: 10 }}>
                 <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, fontWeight: 600, color: COLORS.muted, marginBottom: 8 }}>
-                  🔔 Qué notificaciones recibe (campana)
+                  <IconoCampana size={14} /> Qué notificaciones recibe (campana)
                 </p>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
                   {NOTIF_CATEGORIAS.map((n) => {
@@ -9081,7 +9306,7 @@ function PapeleraPanel() {
         style={{ background: "none", border: "none", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%", padding: 0 }}
       >
         <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, fontWeight: 700, color: COLORS.ink, margin: 0 }}>
-          🗑️ Papelera {cargado ? `(${totalItems})` : ""}
+          <Icono tipo="papelera" size={14} style={{ marginRight: 4, verticalAlign: -2 }} /> Papelera {cargado ? `(${totalItems})` : ""}
         </p>
         <span style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.muted }}>{abierto ? "Ocultar ▲" : "Ver ▼"}</span>
       </button>
@@ -9179,7 +9404,7 @@ function PanelAuditoria() {
         onClick={() => setAbierto((a) => !a)}
         style={{ background: "none", border: "none", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%", padding: 0 }}
       >
-        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, fontWeight: 700, color: COLORS.ink, margin: 0 }}>📋 Auditoría (últimos 50 registros)</p>
+        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, fontWeight: 700, color: COLORS.ink, margin: 0, display: "flex", alignItems: "center", gap: 6 }}><Icono tipo="portapapeles" size={15} /> Auditoría (últimos 50 registros)</p>
         <span style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.muted }}>{abierto ? "Ocultar ▲" : "Ver ▼"}</span>
       </button>
 
@@ -9828,7 +10053,7 @@ export default function App() {
               }}
             >
               <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.navy, margin: 0 }}>
-                🛡️ Tu última sesión fue el{" "}
+                <Icono tipo="escudo" size={13} style={{ marginRight: 4, verticalAlign: -2 }} /> Tu última sesión fue el{" "}
                 {new Date(ultimaSesionAnterior).toLocaleString("es-CO", { dateStyle: "medium", timeStyle: "short" })}. Si no fuiste tú, cambia tu
                 contraseña ya mismo.
               </p>
