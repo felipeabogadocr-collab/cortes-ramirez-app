@@ -759,7 +759,7 @@ function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-const APP_VERSION = "1.4.0";
+const APP_VERSION = "1.5.0";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -1855,7 +1855,7 @@ function AsistenteIA({ nombre, usuarioId, onAccionCompletada }) {
   const [mostrarLista, setMostrarLista] = useState(false);
   const [mensajes, setMensajes] = useState([]);
   const [texto, setTexto] = useState("");
-  const [adjunto, setAdjunto] = useState(null);
+  const [adjuntos, setAdjuntos] = useState([]);
   const [cargando, setCargando] = useState(false);
   const [historialCargado, setHistorialCargado] = useState(false);
   const contenedorRef = useRef(null);
@@ -1893,9 +1893,8 @@ function AsistenteIA({ nombre, usuarioId, onAccionCompletada }) {
     // y los enlaces de archivos generados (dejan de servir tras recargar la página).
     const paraGuardar = mensajes.map((m) => {
       const limpio = { ...m };
-      if (limpio.adjunto) {
-        const { base64, texto: textoAdjunto, ...restoAdjunto } = limpio.adjunto;
-        limpio.adjunto = restoAdjunto;
+      if (limpio.adjuntos) {
+        limpio.adjuntos = limpio.adjuntos.map(({ base64, texto: textoAdjunto, ...resto }) => resto);
       }
       delete limpio.archivoGenerado;
       return limpio;
@@ -1931,39 +1930,44 @@ function AsistenteIA({ nombre, usuarioId, onAccionCompletada }) {
     navigator.clipboard?.writeText(texto).catch(() => {});
   };
 
+  const MAX_ADJUNTOS = 5;
+
   const adjuntarArchivo = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = Array.from(e.target.files || []);
     e.target.value = "";
-    const nombreArchivo = file.name.toLowerCase();
+    if (files.length === 0) return;
 
-    if (archivoDemasiadoGrande(file)) {
-      setAdjunto({ tipoBloque: "error", nombre: `${file.name} (pesa más de ${TAMANO_MAX_ARCHIVO_MB} MB)` });
-      return;
-    }
-
-    if (file.type.startsWith("image/")) {
-      const base64 = await fileToBase64(file);
-      setAdjunto({ tipoBloque: "image", base64, mediaType: file.type, nombre: file.name });
-    } else if (nombreArchivo.endsWith(".pdf")) {
-      const base64 = await fileToBase64(file);
-      setAdjunto({ tipoBloque: "document", base64, mediaType: "application/pdf", nombre: file.name });
-    } else if (nombreArchivo.endsWith(".docx")) {
-      await ensureMammoth();
-      const arrayBuffer = await file.arrayBuffer();
-      const resultado = await window.mammoth.extractRawText({ arrayBuffer });
-      setAdjunto({ tipoBloque: "texto_extraido", texto: resultado.value, nombre: file.name });
-    } else {
-      setAdjunto({ tipoBloque: "error", nombre: file.name });
+    for (const file of files.slice(0, MAX_ADJUNTOS - adjuntos.length)) {
+      const nombreArchivo = file.name.toLowerCase();
+      let nuevo;
+      if (archivoDemasiadoGrande(file)) {
+        nuevo = { id: uid(), tipoBloque: "error", nombre: `${file.name} (pesa más de ${TAMANO_MAX_ARCHIVO_MB} MB)` };
+      } else if (file.type.startsWith("image/")) {
+        const base64 = await fileToBase64(file);
+        nuevo = { id: uid(), tipoBloque: "image", base64, mediaType: file.type, nombre: file.name };
+      } else if (nombreArchivo.endsWith(".pdf")) {
+        const base64 = await fileToBase64(file);
+        nuevo = { id: uid(), tipoBloque: "document", base64, mediaType: "application/pdf", nombre: file.name };
+      } else if (nombreArchivo.endsWith(".docx")) {
+        await ensureMammoth();
+        const arrayBuffer = await file.arrayBuffer();
+        const resultado = await window.mammoth.extractRawText({ arrayBuffer });
+        nuevo = { id: uid(), tipoBloque: "texto_extraido", texto: resultado.value, nombre: file.name };
+      } else {
+        nuevo = { id: uid(), tipoBloque: "error", nombre: file.name };
+      }
+      setAdjuntos((prev) => [...prev, nuevo]);
     }
   };
 
+  const quitarAdjunto = (id) => setAdjuntos((prev) => prev.filter((a) => a.id !== id));
+
   const enviar = async () => {
-    if ((!texto.trim() && !adjunto) || cargando) return;
+    if ((!texto.trim() && adjuntos.length === 0) || cargando) return;
     const pregunta = texto.trim();
-    const adjuntoActual = adjunto;
+    const adjuntosActuales = adjuntos;
     setTexto("");
-    setAdjunto(null);
+    setAdjuntos([]);
     if (inputRef.current) inputRef.current.style.height = "auto";
 
     // Si no hay una conversación activa (recién abierta o "Nueva conversación"),
@@ -1986,7 +1990,7 @@ function AsistenteIA({ nombre, usuarioId, onAccionCompletada }) {
       }
     }
 
-    const nuevos = [...mensajes, { rol: "usuario", texto: pregunta, adjunto: adjuntoActual }];
+    const nuevos = [...mensajes, { rol: "usuario", texto: pregunta, adjuntos: adjuntosActuales }];
     setMensajes(nuevos);
     setCargando(true);
 
@@ -2000,27 +2004,22 @@ function AsistenteIA({ nombre, usuarioId, onAccionCompletada }) {
 
       let mensajesAPI = nuevos.map((m, idx) => {
         const esUltimo = idx === nuevos.length - 1;
-        if (esUltimo && m.adjunto?.tipoBloque === "image") {
-          return {
-            role: "user",
-            content: [
-              { type: "image", source: { type: "base64", media_type: m.adjunto.mediaType, data: m.adjunto.base64 } },
-              { type: "text", text: m.texto || "Analiza esta imagen." },
-            ],
-          };
-        }
-        if (esUltimo && m.adjunto?.tipoBloque === "document") {
-          return {
-            role: "user",
-            content: [
-              { type: "document", source: { type: "base64", media_type: "application/pdf", data: m.adjunto.base64 } },
-              { type: "text", text: m.texto || "Analiza este documento." },
-            ],
-          };
-        }
-        if (esUltimo && m.adjunto?.tipoBloque === "texto_extraido") {
-          const textoCompleto = `${m.texto || "Analiza este documento."}\n\nContenido del documento adjunto (${m.adjunto.nombre}):\n${m.adjunto.texto}`;
-          return { role: "user", content: textoCompleto };
+        const adjuntosValidos = esUltimo ? (m.adjuntos || []).filter((a) => a.tipoBloque !== "error") : [];
+        if (adjuntosValidos.length > 0) {
+          const textoExtraido = adjuntosValidos
+            .filter((a) => a.tipoBloque === "texto_extraido")
+            .map((a) => `\n\nContenido del documento adjunto (${a.nombre}):\n${a.texto}`)
+            .join("");
+          const bloques = adjuntosValidos
+            .filter((a) => a.tipoBloque === "image")
+            .map((a) => ({ type: "image", source: { type: "base64", media_type: a.mediaType, data: a.base64 } }))
+            .concat(
+              adjuntosValidos
+                .filter((a) => a.tipoBloque === "document")
+                .map((a) => ({ type: "document", source: { type: "base64", media_type: "application/pdf", data: a.base64 } }))
+            );
+          bloques.push({ type: "text", text: (m.texto || "Analiza el/los archivo(s) adjunto(s).") + textoExtraido });
+          return { role: "user", content: bloques };
         }
         return { role: m.rol === "usuario" ? "user" : "assistant", content: m.texto };
       });
@@ -2202,18 +2201,20 @@ function AsistenteIA({ nombre, usuarioId, onAccionCompletada }) {
                 lineHeight: 1.55,
               }}
             >
-              {m.adjunto?.tipoBloque === "image" && m.adjunto.base64 && (
-                <img src={`data:${m.adjunto.mediaType};base64,${m.adjunto.base64}`} alt="Adjunta" style={{ maxWidth: "100%", borderRadius: 8, marginBottom: m.texto ? 6 : 0, display: "block" }} />
-              )}
-              {m.adjunto?.tipoBloque === "image" && !m.adjunto.base64 && (
-                <p style={{ margin: "0 0 6px", fontSize: 12, opacity: 0.85, display: "flex", alignItems: "center", gap: 5 }}>
-                  <Icono tipo="imagen" size={13} /> {m.adjunto.nombre}
-                </p>
-              )}
-              {(m.adjunto?.tipoBloque === "document" || m.adjunto?.tipoBloque === "texto_extraido") && (
-                <p style={{ margin: "0 0 6px", fontSize: 12, opacity: 0.85, display: "flex", alignItems: "center", gap: 5 }}>
-                  <Icono tipo="documento" size={13} /> {m.adjunto.nombre}
-                </p>
+              {(m.adjuntos || []).map((a) =>
+                a.tipoBloque === "image" ? (
+                  a.base64 ? (
+                    <img key={a.id} src={`data:${a.mediaType};base64,${a.base64}`} alt="Adjunta" style={{ maxWidth: "100%", borderRadius: 8, marginBottom: 6, display: "block" }} />
+                  ) : (
+                    <p key={a.id} style={{ margin: "0 0 6px", fontSize: 12, opacity: 0.85, display: "flex", alignItems: "center", gap: 5 }}>
+                      <Icono tipo="imagen" size={13} /> {a.nombre}
+                    </p>
+                  )
+                ) : (
+                  <p key={a.id} style={{ margin: "0 0 6px", fontSize: 12, opacity: 0.85, display: "flex", alignItems: "center", gap: 5 }}>
+                    <Icono tipo="documento" size={13} /> {a.nombre}
+                  </p>
+                )
               )}
               <TextoAsistente texto={m.texto} />
               {m.archivoGenerado && (
@@ -2264,25 +2265,35 @@ function AsistenteIA({ nombre, usuarioId, onAccionCompletada }) {
         </div>
       </div>
 
-      {adjunto && (
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, background: COLORS.surfaceSoft, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "6px 10px" }}>
-          {adjunto.tipoBloque === "image" ? (
-            <img src={`data:${adjunto.mediaType};base64,${adjunto.base64}`} alt="Adjunta" style={{ width: 32, height: 32, borderRadius: 4, objectFit: "cover" }} />
-          ) : (
-            <Icono tipo="documento" size={18} style={{ color: COLORS.muted }} />
-          )}
-          <span style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, color: adjunto.tipoBloque === "error" ? "#B42318" : COLORS.inkSoft, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-            {adjunto.tipoBloque === "error" ? `Formato no soportado: ${adjunto.nombre}` : adjunto.nombre}
-          </span>
-          <button onClick={() => setAdjunto(null)} style={{ background: "none", border: "none", cursor: "pointer", color: COLORS.muted, display: "flex" }}>
-            <Icono tipo="check" size={14} style={{ transform: "rotate(45deg)" }} />
-          </button>
+      {adjuntos.length > 0 && (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 8 }}>
+          {adjuntos.map((a) => (
+            <div key={a.id} style={{ display: "flex", alignItems: "center", gap: 6, background: COLORS.surfaceSoft, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "5px 8px", maxWidth: 200 }}>
+              {a.tipoBloque === "image" ? (
+                <img src={`data:${a.mediaType};base64,${a.base64}`} alt="Adjunta" style={{ width: 24, height: 24, borderRadius: 4, objectFit: "cover", flexShrink: 0 }} />
+              ) : (
+                <Icono tipo="documento" size={15} style={{ color: COLORS.muted, flexShrink: 0 }} />
+              )}
+              <span style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, color: a.tipoBloque === "error" ? "#B42318" : COLORS.inkSoft, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {a.tipoBloque === "error" ? `Formato no soportado: ${a.nombre}` : a.nombre}
+              </span>
+              <button onClick={() => quitarAdjunto(a.id)} style={{ background: "none", border: "none", cursor: "pointer", color: COLORS.muted, display: "flex", flexShrink: 0 }}>
+                <Icono tipo="check" size={12} style={{ transform: "rotate(45deg)" }} />
+              </button>
+            </div>
+          ))}
         </div>
       )}
 
       <div style={{ display: "flex", gap: 8 }}>
-        <input type="file" accept="image/*,.pdf,.docx" ref={fileInputRef} onChange={adjuntarArchivo} style={{ display: "none" }} />
-        <button className="drx-btn-ghost" style={{ ...buttonGhost, padding: "10px 12px", display: "flex", alignItems: "center" }} onClick={() => fileInputRef.current?.click()} title="Adjuntar foto, PDF o Word">
+        <input type="file" accept="image/*,.pdf,.docx" multiple ref={fileInputRef} onChange={adjuntarArchivo} style={{ display: "none" }} />
+        <button
+          className="drx-btn-ghost"
+          style={{ ...buttonGhost, padding: "10px 12px", display: "flex", alignItems: "center" }}
+          onClick={() => fileInputRef.current?.click()}
+          title="Adjuntar hasta 5 fotos, PDF o Word"
+          disabled={adjuntos.length >= MAX_ADJUNTOS}
+        >
           <Icono tipo="clip" size={16} />
         </button>
         <textarea
@@ -2304,7 +2315,7 @@ function AsistenteIA({ nombre, usuarioId, onAccionCompletada }) {
             }
           }}
         />
-        <button className="drx-btn-primary" style={{ ...buttonPrimary, display: "flex", alignItems: "center", gap: 6 }} onClick={enviar} disabled={cargando || (!texto.trim() && !adjunto)}>
+        <button className="drx-btn-primary" style={{ ...buttonPrimary, display: "flex", alignItems: "center", gap: 6 }} onClick={enviar} disabled={cargando || (!texto.trim() && adjuntos.length === 0)}>
           Enviar <Icono tipo="cursorArriba" size={14} style={{ transform: "rotate(90deg)" }} />
         </button>
       </div>

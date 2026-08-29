@@ -150,8 +150,18 @@ export default async function handler(req, res) {
   try {
     let resultado = await llamarGemini(body);
 
-    // Si aun así falla con "invalid argument" por otra razón, se reintenta
-    // una vez sin herramientas y sin adjuntos (solo el texto), para que la
+    // Si Google respondió que se acabó la cuota gratuita (429), no tiene
+    // sentido gastar otra solicitud reintentando — eso solo empeora el
+    // problema. Se avisa directo con un mensaje claro, sin el texto técnico
+    // de Google (enlaces, nombres de métricas, etc.).
+    const esLimiteDeCuota = !resultado.ok && (resultado.status === 429 || resultado.data?.error?.status === "RESOURCE_EXHAUSTED");
+    if (esLimiteDeCuota) {
+      console.error("Límite de cuota de Gemini:", JSON.stringify(resultado.data));
+      return res.status(429).json({ error: "El asistente alcanzó el límite de uso gratuito por un momento. Espera unos segundos y vuelve a intentar." });
+    }
+
+    // Si falla con "invalid argument" por otra razón, se reintenta una vez
+    // sin herramientas y sin adjuntos (solo el texto), para que la
     // conversación no se quede muerta — pero se avisa que el archivo no se
     // pudo procesar, en vez de responder como si lo hubiera leído.
     const esInvalidoDeNuevo = !resultado.ok && /invalid argument/i.test(resultado.data?.error?.message || "");
@@ -164,6 +174,10 @@ export default async function handler(req, res) {
 
     if (!resultado.ok) {
       console.error("Error de Gemini:", JSON.stringify(resultado.data));
+      const errStatus = resultado.data?.error?.status;
+      if (errStatus === "RESOURCE_EXHAUSTED" || resultado.status === 429) {
+        return res.status(429).json({ error: "El asistente alcanzó el límite de uso gratuito por un momento. Espera unos segundos y vuelve a intentar." });
+      }
       return res.status(resultado.status).json({ error: resultado.data?.error?.message || "Error del asistente de IA" });
     }
 
