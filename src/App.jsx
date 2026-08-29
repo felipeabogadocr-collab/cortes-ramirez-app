@@ -756,6 +756,33 @@ function TexturaGrano() {
   );
 }
 
+// Número de versión que se sube a mano cada vez que se publica un cambio
+// importante — junto con la fecha del build, deja ver de un vistazo si el
+// navegador ya tiene la versión más nueva.
+const APP_VERSION = "1.2.0";
+
+function SelloVersion({ oscuro }) {
+  return (
+    <div
+      title="Si esta fecha no cambia después de que Claude publique algo nuevo, tu navegador todavía tiene la versión vieja guardada — haz Ctrl+Shift+R."
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 7,
+        border: `1px solid ${oscuro ? "rgba(255,255,255,0.16)" : COLORS.border}`,
+        borderRadius: 20,
+        padding: "5px 12px",
+        fontFamily: "Inter, sans-serif",
+        fontSize: 11,
+        color: oscuro ? "#B8C5DA" : COLORS.muted,
+      }}
+    >
+      <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#22C55E", flexShrink: 0 }} />
+      Actualizado {new Date(__BUILD_TIME__).toLocaleDateString("es-CO", { day: "2-digit", month: "short", year: "numeric" })} · v{APP_VERSION}
+    </div>
+  );
+}
+
 function EncabezadoSeccion({ titulo, color }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 26 }}>
@@ -1918,7 +1945,7 @@ function AsistenteIA({ nombre, usuarioId, onAccionCompletada }) {
         >
           <IconoNomos size={150} />
         </div>
-        <div ref={contenedorRef} style={{ position: "relative", height: "100%", overflowY: "auto", display: "flex", flexDirection: "column", gap: 12, paddingRight: 4 }}>
+        <div ref={contenedorRef} style={{ position: "relative", height: "100%", overflowY: "auto", overscrollBehavior: "contain", display: "flex", flexDirection: "column", gap: 12, paddingRight: 4 }}>
         {mensajes.length === 0 && (
           <div>
             <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.muted, marginBottom: 10 }}>
@@ -5560,7 +5587,7 @@ function CommunityManagerIA({ estrategia, onGuardarIdeas }) {
           </button>
         )}
       </div>
-      <div ref={contenedorRef} style={{ minHeight: 200, maxHeight: 420, overflowY: "auto", display: "flex", flexDirection: "column", gap: 10, marginBottom: 12, paddingRight: 4 }}>
+      <div ref={contenedorRef} style={{ minHeight: 200, maxHeight: 420, overflowY: "auto", overscrollBehavior: "contain", display: "flex", flexDirection: "column", gap: 10, marginBottom: 12, paddingRight: 4 }}>
         {mensajes.length === 0 && (
           <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.muted }}>
             Pídele ideas de video, guiones, captions, hashtags o estrategia para crecer seguidores que se conviertan en clientes. Ejemplo: "dame 5 ideas de
@@ -8777,9 +8804,9 @@ function LoginGate({ onIngresar, onCancelar, pantallaInicial }) {
           Inicio de sesión real con Supabase Auth: tu contraseña nunca se guarda en texto plano, viaja cifrada y la
           verifica el servidor.
         </p>
-        <p style={{ textAlign: "center", fontFamily: "monospace", fontSize: 9.5, color: COLORS.border, marginTop: 10 }}>
-          versión: {new Date(__BUILD_TIME__).toLocaleString("es-CO", { dateStyle: "short", timeStyle: "medium" })}
-        </p>
+        <div style={{ display: "flex", justifyContent: "center", marginTop: 12 }}>
+          <SelloVersion oscuro={oscuro} />
+        </div>
       </Card>
       </div>
     </div>
@@ -10200,9 +10227,9 @@ export default function App() {
             <p style={{ textAlign: "center", fontFamily: "Inter, sans-serif", fontSize: 11, color: COLORS.muted, margin: 0 }}>
               Nomos — creado por <strong style={{ color: COLORS.headingText }}>Felipe Cortés Ramírez</strong>, abogado y CEO de Cortés Ramírez Abogados. Todos los derechos reservados.
             </p>
-            <p title="Si esta hora no cambia después de que Claude publique algo nuevo, tu navegador todavía tiene la versión vieja guardada — haz Ctrl+Shift+R." style={{ textAlign: "center", fontFamily: "monospace", fontSize: 9.5, color: COLORS.border, margin: "4px 0 0" }}>
-              versión: {new Date(__BUILD_TIME__).toLocaleString("es-CO", { dateStyle: "short", timeStyle: "medium" })}
-            </p>
+            <div style={{ display: "flex", justifyContent: "center", marginTop: 4 }}>
+              <SelloVersion oscuro={oscuro} />
+            </div>
           </div>
         </div>
       </div>
