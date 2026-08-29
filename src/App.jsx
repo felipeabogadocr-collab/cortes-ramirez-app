@@ -778,7 +778,9 @@ function SelloVersion({ oscuro }) {
       }}
     >
       <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#22C55E", flexShrink: 0 }} />
-      Actualizado {new Date(__BUILD_TIME__).toLocaleDateString("es-CO", { day: "2-digit", month: "short", year: "numeric" })} · v{APP_VERSION}
+      Actualizado {new Date(__BUILD_TIME__).toLocaleDateString("es-CO", { day: "2-digit", month: "short", year: "numeric" })}
+      {" "}
+      {new Date(__BUILD_TIME__).toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" })} · v{APP_VERSION}
     </div>
   );
 }
