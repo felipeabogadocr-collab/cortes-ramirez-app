@@ -1,4 +1,5 @@
 {
+  "$comment": "empuje de prueba para revisar por que Vercel dejo de desplegar commits nuevos",
   "crons": [
     { "path": "/api/cron/vigilancia-judicial", "schedule": "0 13 * * *" }
   ],
