@@ -504,10 +504,11 @@ const GlobalStyle = () => (
       --drx-surface-soft: #232C39;
     }
     .drx-tema-claro, .drx-tema-oscuro { transition: background-color .2s ease, color .2s ease, border-color .2s ease; }
-    .drx-btn-primary { transition: transform .15s ease, filter .15s ease; }
+    .drx-btn-primary { transition: transform .15s ease, filter .15s ease, box-shadow .15s ease; }
     .drx-btn-primary:hover { filter: brightness(1.15); transform: translateY(-1px); }
-    .drx-btn-primary:active { transform: translateY(0); }
-    .drx-btn-ghost { transition: background .15s ease, border-color .15s ease; }
+    .drx-btn-primary:active { transform: scale(0.97) translateY(0); filter: brightness(0.95); }
+    .drx-btn-ghost { transition: background .15s ease, border-color .15s ease, transform .15s ease; }
+    .drx-btn-ghost:active { transform: scale(0.97); }
     .drx-tema-claro .drx-btn-ghost:hover { background: #EEF2F7; border-color: #B9C2CF; }
     .drx-tema-oscuro .drx-btn-ghost:hover { background: #232C39; border-color: #3A4657; }
     .drx-card { transition: box-shadow .18s ease, border-color .18s ease, transform .18s ease; }
@@ -534,6 +535,10 @@ const GlobalStyle = () => (
     @keyframes drx-pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(30,95,180,0.35); } 50% { box-shadow: 0 0 0 6px rgba(30,95,180,0); } }
     @keyframes drx-fade-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
     .drx-fade-in { animation: drx-fade-in 0.22s ease; }
+    @keyframes drx-tab-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    .drx-tab-transition { animation: drx-tab-in 0.32s cubic-bezier(0.16, 1, 0.3, 1); }
+    @keyframes drx-barra-progreso { 0% { width: 0%; opacity: 1; } 70% { width: 85%; opacity: 1; } 100% { width: 100%; opacity: 0; } }
+    .drx-barra-progreso { animation: drx-barra-progreso 0.5s ease-out forwards; }
     @keyframes drx-spin { to { transform: rotate(360deg); } }
     .drx-card:hover { transform: translateY(-2px); }
     @keyframes drx-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
@@ -572,19 +577,20 @@ const buttonPrimary = {
   background: COLORS.navy,
   color: "#FFFFFF",
   border: "none",
-  borderRadius: 8,
+  borderRadius: 10,
   padding: "11px 20px",
   fontSize: 14,
   fontWeight: 600,
   cursor: "pointer",
   fontFamily: "Inter, sans-serif",
+  boxShadow: "0 2px 8px rgba(10,35,66,0.18)",
 };
 
 const buttonGhost = {
   background: COLORS.panel,
   color: COLORS.ink,
   border: `1px solid ${COLORS.border}`,
-  borderRadius: 8,
+  borderRadius: 10,
   padding: "10px 18px",
   fontSize: 14,
   fontWeight: 500,
@@ -6347,6 +6353,8 @@ function ModalNotificaciones({
         position: "fixed",
         inset: 0,
         background: "rgba(10,18,32,0.55)",
+        backdropFilter: "blur(4px)",
+        WebkitBackdropFilter: "blur(4px)",
         display: "flex",
         alignItems: "flex-start",
         justifyContent: "center",
@@ -9553,6 +9561,12 @@ export default function App() {
             zIndex: 20,
           }}
         >
+          <div
+            key={tab}
+            className="drx-barra-progreso"
+            aria-hidden="true"
+            style={{ position: "absolute", bottom: -1, left: 0, height: 2, background: COLORS.accentBright }}
+          />
           <BuscadorGlobal onIr={setTab} />
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
             <button
@@ -9631,7 +9645,7 @@ export default function App() {
               </button>
             </div>
           )}
-          <div key={tab} className="drx-fade-in" style={{ maxWidth: 760, margin: "0 auto" }}>
+          <div key={tab} className="drx-tab-transition" style={{ maxWidth: 760, margin: "0 auto" }}>
             {tab === "resumen" && puedeVer("resumen") && <ResumenTab nombre={usuarioActual.nombre} usuarioId={usuarioActual.id} onIr={setTab} />}
             {tab === "clientes" && puedeVer("clientes") && <ClientesTab usuarioActual={usuarioActual} />}
             {tab === "vigilancia" && puedeVer("vigilancia") && <VigilanciaTab />}
