@@ -1769,8 +1769,18 @@ function ResumenTab({ nombre, usuarioId, onIr }) {
           <Pill>⚖️ {getNombreDespacho()} — Panel de gestión</Pill>
         </div>
         <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted, marginBottom: 10 }}>Hola, {nombre}</p>
-        <h1 style={{ fontFamily: "Inter, sans-serif", fontSize: 34, fontWeight: 800, letterSpacing: 0.5, textTransform: "uppercase", color: COLORS.headingText, margin: 0, lineHeight: 1.2 }}>
-          Jefe, ¿qué hacemos hoy?
+        <h1 style={{ fontFamily: "Inter, sans-serif", fontSize: 34, fontWeight: 800, letterSpacing: 0.5, textTransform: "uppercase", margin: 0, lineHeight: 1.2 }}>
+          <span style={{ color: COLORS.headingText }}>Jefe, </span>
+          <span
+            style={{
+              background: `linear-gradient(100deg, ${COLORS.navy}, ${COLORS.accentBright} 55%, #14B8A6)`,
+              WebkitBackgroundClip: "text",
+              backgroundClip: "text",
+              color: "transparent",
+            }}
+          >
+            ¿qué hacemos hoy?
+          </span>
         </h1>
         <p
           style={{
@@ -9397,12 +9407,12 @@ export default function App() {
         aria-hidden="true"
         style={{
           position: "fixed",
-          top: "8%",
-          left: "45%",
-          width: 340,
-          height: 340,
+          top: "-60px",
+          left: "calc(250px + 15%)",
+          width: 460,
+          height: 460,
           borderRadius: "50%",
-          background: `radial-gradient(circle, rgba(30,95,180,${oscuro ? 0.16 : 0.08}) 0%, rgba(30,95,180,0) 70%)`,
+          background: `radial-gradient(circle, rgba(30,95,180,${oscuro ? 0.28 : 0.16}) 0%, rgba(30,95,180,0) 70%)`,
           animation: "drx-mesh 14s ease-in-out infinite",
           pointerEvents: "none",
           zIndex: 0,
@@ -9413,12 +9423,12 @@ export default function App() {
         aria-hidden="true"
         style={{
           position: "fixed",
-          bottom: "5%",
-          right: "8%",
-          width: 300,
-          height: 300,
+          top: "6%",
+          right: "10%",
+          width: 320,
+          height: 320,
           borderRadius: "50%",
-          background: `radial-gradient(circle, rgba(20,184,166,${oscuro ? 0.14 : 0.07}) 0%, rgba(20,184,166,0) 70%)`,
+          background: `radial-gradient(circle, rgba(20,184,166,${oscuro ? 0.24 : 0.14}) 0%, rgba(20,184,166,0) 70%)`,
           animation: "drx-mesh 18s ease-in-out infinite reverse",
           pointerEvents: "none",
           zIndex: 0,
