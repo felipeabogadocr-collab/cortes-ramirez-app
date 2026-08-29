@@ -9213,6 +9213,14 @@ export default function App() {
   const [cambiandoUsuario, setCambiandoUsuario] = useState(false);
   const [tab, setTab] = useState("resumen");
   const [mostrarNotificaciones, setMostrarNotificaciones] = useState(false);
+
+  // La app scrollea con la página completa (no hay un contenedor interno
+  // aparte por sección) — sin esto, si venías scrolleado hacia abajo en una
+  // pestaña y cambiabas a otra, te quedabas en la misma posición en vez de
+  // empezar arriba, lo que se sentía como que la pantalla "saltaba" sola.
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [tab]);
   const {
     count: notificaciones,
     firmasNuevas,
