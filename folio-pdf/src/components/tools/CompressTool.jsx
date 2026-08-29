@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { fileToBytes, compressPdf, downloadBytes } from "../../lib/pdfUtils.js";
 import { IconUpload, IconFile } from "../Icons.jsx";
+import UploadNote from "../UploadNote.jsx";
 
 export default function CompressTool() {
   const [file, setFile] = useState(null);
@@ -57,6 +58,7 @@ export default function CompressTool() {
           </>
         )}
       </button>
+      <UploadNote />
 
       {error && <p style={{ color: "var(--danger)", fontSize: 13, marginTop: 10 }}>{error}</p>}
 

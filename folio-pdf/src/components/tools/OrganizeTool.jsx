@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { fileToBytes, renderThumbnails, organizePdf, extractPage, downloadBytes } from "../../lib/pdfUtils.js";
 import { IconUpload } from "../Icons.jsx";
+import UploadNote from "../UploadNote.jsx";
 
 export default function OrganizeTool() {
   const [bytes, setBytes] = useState(null);
@@ -91,6 +92,7 @@ export default function OrganizeTool() {
             </>
           )}
         </button>
+        <UploadNote />
         {error && <p style={{ color: "var(--danger)", fontSize: 13, marginTop: 10 }}>{error}</p>}
       </div>
     );

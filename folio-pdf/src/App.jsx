@@ -66,7 +66,7 @@ export default function App() {
         <PrivacyNotice style={{ marginBottom: 20 }} />
 
         {!Active && (
-          <>
+          <div className="fade-in">
             <div style={{ textAlign: "center", marginBottom: 22 }}>
               <h1
                 className="uppercase"
@@ -98,7 +98,7 @@ export default function App() {
                 </span>
               </div>
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(170px, 1fr))", gap: 14 }}>
+            <div className="tools-grid">
               {TOOLS.map((t) => (
                 <button
                   key={t.id}
@@ -123,26 +123,29 @@ export default function App() {
                 </button>
               ))}
             </div>
-          </>
+          </div>
         )}
 
         {Active && (
-          <div>
+          <div className="fade-in" key={Active.id}>
             <button className="btn-ghost" style={{ marginBottom: 16 }} onClick={() => setActiveTool(null)}>
               ← Volver a herramientas
             </button>
             <h2
               className="uppercase"
               style={{
-                fontSize: 19,
-                margin: "0 0 14px",
+                fontSize: 18,
+                margin: "0 0 16px",
                 letterSpacing: 0.8,
                 display: "flex",
                 alignItems: "center",
-                gap: 8,
+                gap: 12,
               }}
             >
-              <Active.Icon size={20} /> {Active.label}
+              <span className="tool-icon-badge" style={{ width: 38, height: 38, borderRadius: 11 }}>
+                <Active.Icon size={18} />
+              </span>
+              {Active.label}
             </h2>
             <Active.Component />
           </div>

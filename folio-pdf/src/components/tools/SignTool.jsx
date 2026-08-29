@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { fileToBytes, renderThumbnails, signPdf, downloadBytes } from "../../lib/pdfUtils.js";
-import { IconEdit, IconImage, IconType, IconUpload } from "../Icons.jsx";
+import { IconEdit, IconImage, IconType, IconUpload, IconShield } from "../Icons.jsx";
+import UploadNote from "../UploadNote.jsx";
 
 const STAMP_W = 640;
 const STAMP_H = 240;
@@ -353,6 +354,7 @@ export default function SignTool() {
             </>
           )}
         </button>
+        <UploadNote />
         {error && <p style={{ color: "var(--danger)", fontSize: 13, marginTop: 10 }}>{error}</p>}
       </div>
     );
@@ -432,6 +434,13 @@ export default function SignTool() {
         >
           Mínimo {MIN_LARGO_NOMBRE} letras. Sin este dato no se puede firmar — queda registrado en el
           sello del documento.
+        </p>
+
+        <p style={{ fontSize: 10.5, color: "var(--muted)", margin: "0 0 12px", display: "flex", alignItems: "flex-start", gap: 5 }}>
+          <span style={{ flexShrink: 0, marginTop: 1 }}>
+            <IconShield size={12} />
+          </span>
+          Tu firma no se almacena ni se comparte: se aplica directamente en tu navegador.
         </p>
 
         <div className="sign-tabs">

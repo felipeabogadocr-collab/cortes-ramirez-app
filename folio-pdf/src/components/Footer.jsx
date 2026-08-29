@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Logo from "./Logo.jsx";
 import { IconChat, IconChevronUp, IconLock } from "./Icons.jsx";
+import { APP_VERSION, LAST_UPDATED } from "../version.js";
 
 const WHATSAPP_NUMBER = "573192875428";
 
@@ -19,6 +20,16 @@ function scrollToTop() {
 
 export default function Footer({ onSelectTool, onExplore }) {
   const [panel, setPanel] = useState(null); // "privacidad" | "terminos" | null
+  const privacidadRef = useRef(null);
+
+  useEffect(() => {
+    function onOpenPrivacy() {
+      setPanel("privacidad");
+      setTimeout(() => privacidadRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }), 50);
+    }
+    window.addEventListener("folio:open-privacy", onOpenPrivacy);
+    return () => window.removeEventListener("folio:open-privacy", onOpenPrivacy);
+  }, []);
 
   function abrirHerramienta(id) {
     if (onSelectTool) onSelectTool(id);
@@ -41,9 +52,27 @@ export default function Footer({ onSelectTool, onExplore }) {
                 Folio
               </span>
             </div>
-            <p style={{ fontSize: 13, color: "var(--footer-muted)", lineHeight: 1.6, maxWidth: 260, margin: 0 }}>
+            <p style={{ fontSize: 13, color: "var(--footer-muted)", lineHeight: 1.6, maxWidth: 260, margin: "0 0 14px" }}>
               Herramientas PDF gratuitas para estudiantes y abogados en Colombia.
             </p>
+            <span
+              title={`Versión ${APP_VERSION}, actualizada el ${LAST_UPDATED}`}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                fontSize: 10.5,
+                fontWeight: 600,
+                color: "var(--footer-muted)",
+                background: "rgba(255,255,255,0.06)",
+                border: "1px solid var(--footer-border)",
+                borderRadius: 999,
+                padding: "4px 10px",
+              }}
+            >
+              <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--accent)" }} />
+              Actualizado {LAST_UPDATED} · v{APP_VERSION}
+            </span>
           </div>
 
           <div>
@@ -93,6 +122,7 @@ export default function Footer({ onSelectTool, onExplore }) {
 
         {panel && (
           <div
+            ref={privacidadRef}
             className="card"
             style={{
               marginTop: 28,
@@ -143,25 +173,29 @@ export default function Footer({ onSelectTool, onExplore }) {
         </div>
       </div>
 
-      <div style={{ borderTop: "1px solid var(--footer-border)", padding: "16px 24px" }}>
-        <p style={{ textAlign: "center", fontSize: 11, color: "var(--footer-muted)", margin: "0 0 4px" }}>
+      <div style={{ borderTop: "1px solid var(--footer-border)", padding: "14px 24px" }}>
+        <p style={{ textAlign: "center", fontSize: 10.5, color: "var(--footer-muted)", margin: "0 0 3px" }}>
           Diseñado por <strong style={{ color: "var(--footer-text)" }}>LITIA.ai</strong> · Desarrollado por{" "}
-          <strong style={{ color: "var(--footer-text)" }}>Felipe</strong> y{" "}
-          <strong style={{ color: "var(--footer-text)" }}>CR Abogados</strong>. Todos los derechos reservados.
+          <strong style={{ color: "var(--footer-text)" }}>Felipe Cortés Ramírez</strong>, CEO{" "}
+          <strong style={{ color: "var(--footer-text)" }}>Cortés Ramírez Abogados</strong>
+        </p>
+        <p style={{ textAlign: "center", fontSize: 10.5, color: "var(--footer-muted)", margin: "0 0 6px" }}>
+          Todos los derechos reservados.
         </p>
         <p
           style={{
             textAlign: "center",
-            fontSize: 10.5,
+            fontSize: 10,
             color: "var(--footer-muted)",
             margin: 0,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
             gap: 5,
+            flexWrap: "wrap",
           }}
         >
-          <IconLock size={11} /> Sitio con cifrado SSL · Tus archivos nunca se almacenan ni se comparten con terceros
+          <IconLock size={11} /> Cifrado SSL · Sin cookies de rastreo · Tus archivos nunca se almacenan
         </p>
       </div>
     </footer>

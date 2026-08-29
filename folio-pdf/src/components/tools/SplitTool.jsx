@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import JSZip from "jszip";
 import { fileToBytes, getPageCount, splitPdf, downloadBytes } from "../../lib/pdfUtils.js";
 import { IconUpload } from "../Icons.jsx";
+import UploadNote from "../UploadNote.jsx";
 
 export default function SplitTool() {
   const [bytes, setBytes] = useState(null);
@@ -84,6 +85,7 @@ export default function SplitTool() {
             </>
           )}
         </button>
+        <UploadNote />
         {error && <p style={{ color: "var(--danger)", fontSize: 13, marginTop: 10 }}>{error}</p>}
       </div>
     );

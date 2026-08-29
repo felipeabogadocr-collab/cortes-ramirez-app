@@ -207,6 +207,24 @@ select {
   letter-spacing: 0.5px;
 }
 
+.tools-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+}
+
+@media (max-width: 780px) {
+  .tools-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 480px) {
+  .tools-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .tool-card {
   transition: transform 0.12s ease, border-color 0.12s ease, box-shadow 0.12s ease;
 }
@@ -215,6 +233,12 @@ select {
   transform: translateY(-2px);
   border-color: var(--brand-2);
   box-shadow: 0 10px 24px rgba(47, 111, 237, 0.18);
+}
+
+.tool-card:hover .tool-icon-badge {
+  transform: scale(1.08);
+  color: #fff;
+  background: linear-gradient(135deg, var(--brand-2), var(--brand));
 }
 
 .tool-icon-badge {
@@ -226,6 +250,23 @@ select {
   justify-content: center;
   color: var(--brand-2);
   background: linear-gradient(135deg, var(--panel-2), var(--border));
+  transition: transform 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+
+/* Aparición suave del contenido al cargar o cambiar de herramienta. */
+.fade-in {
+  animation: fade-in-up 0.25s ease;
+}
+
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* Insignias de confianza (seguridad) mostradas en el inicio y la puerta de entrada. */
@@ -250,6 +291,42 @@ select {
 
 .header-hero {
   background: linear-gradient(180deg, var(--panel) 0%, var(--panel-2) 100%);
+}
+
+/* Línea de acento en la parte superior de la página, un detalle de marca premium. */
+.top-accent-bar {
+  height: 3px;
+  background: linear-gradient(90deg, var(--brand-2), var(--accent), var(--brand-2));
+  background-size: 200% 100%;
+  animation: accent-shift 6s ease infinite;
+}
+
+@keyframes accent-shift {
+  0% {
+    background-position: 0% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.btn-icon,
+.footer-top-btn {
+  transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+}
+
+.btn-icon:hover:not(:disabled),
+.footer-top-btn:hover {
+  transform: translateY(-2px) scale(1.05);
+}
+
+.whatsapp-float {
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.whatsapp-float:hover {
+  transform: scale(1.08);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.32);
 }
 
 @media (max-width: 640px) {

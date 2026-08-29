@@ -2,6 +2,10 @@ import Logo from "./Logo.jsx";
 import { IconLock, IconSun, IconMoon } from "./Icons.jsx";
 
 export default function Header({ theme, onToggleTheme, onGoHome }) {
+  function abrirPrivacidad() {
+    window.dispatchEvent(new CustomEvent("folio:open-privacy"));
+  }
+
   return (
     <header
       style={{
@@ -11,25 +15,27 @@ export default function Header({ theme, onToggleTheme, onGoHome }) {
         boxShadow: "0 1px 8px rgba(0,0,0,0.06)",
       }}
     >
+      <div className="top-accent-bar" aria-hidden="true" />
+
       <div
         style={{
           background: "var(--brand)",
           color: "#fff",
-          padding: "5px 16px",
+          padding: "3px 16px",
           textAlign: "center",
         }}
       >
         <p
           style={{
             margin: 0,
-            fontSize: 10.5,
-            letterSpacing: 0.3,
+            fontSize: 9.5,
+            letterSpacing: 0.2,
             opacity: 0.92,
             lineHeight: 1.4,
           }}
         >
-          Todos los derechos reservados · Desarrollado por <strong>Felipe</strong> · Una
-          herramienta de <strong>LITIA.ai</strong> y <strong>CR Abogados</strong>
+          Diseñado por <strong>Felipe Cortés Ramírez</strong>, CEO de{" "}
+          <strong>Cortés Ramírez Abogados</strong> · Todos los derechos reservados
         </p>
       </div>
 
@@ -37,7 +43,7 @@ export default function Header({ theme, onToggleTheme, onGoHome }) {
         className="header-hero"
         style={{
           borderBottom: "1px solid var(--border)",
-          padding: "16px 20px",
+          padding: "10px 20px",
         }}
       >
         <div
@@ -50,9 +56,15 @@ export default function Header({ theme, onToggleTheme, onGoHome }) {
             gap: 10,
           }}
         >
-          <div className="trust-badge header-trust-badge" style={{ justifySelf: "start" }}>
+          <button
+            type="button"
+            className="trust-badge header-trust-badge"
+            onClick={abrirPrivacidad}
+            title="Ver nuestra política de privacidad"
+            style={{ justifySelf: "start", border: "1px solid var(--border)", cursor: "pointer" }}
+          >
             <IconLock /> Sitio seguro
-          </div>
+          </button>
           <button
             onClick={onGoHome}
             title="Ir al menú principal"
@@ -60,22 +72,22 @@ export default function Header({ theme, onToggleTheme, onGoHome }) {
             style={{
               display: "flex",
               alignItems: "center",
-              gap: 12,
+              gap: 10,
               justifySelf: "center",
               background: "transparent",
               border: "none",
               padding: 0,
             }}
           >
-            <Logo size={38} />
+            <Logo size={32} />
             <div style={{ textAlign: "center" }}>
               <div
                 className="uppercase"
-                style={{ fontWeight: 800, fontSize: 20, letterSpacing: 2 }}
+                style={{ fontWeight: 800, fontSize: 17, letterSpacing: 1.6 }}
               >
                 Folio
               </div>
-              <div style={{ fontSize: 11, color: "var(--muted)", marginTop: -2 }}>
+              <div style={{ fontSize: 10, color: "var(--muted)", marginTop: -2 }}>
                 Herramientas PDF gratis
               </div>
             </div>

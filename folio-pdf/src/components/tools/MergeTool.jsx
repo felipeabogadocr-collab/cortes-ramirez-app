@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { mergePdfs, downloadBytes } from "../../lib/pdfUtils.js";
 import { IconUpload } from "../Icons.jsx";
+import UploadNote from "../UploadNote.jsx";
 
 export default function MergeTool() {
   const [files, setFiles] = useState([]);
@@ -61,6 +62,7 @@ export default function MergeTool() {
       <button className="btn-upload" onClick={() => inputRef.current.click()}>
         <IconUpload /> Agregar PDF
       </button>
+      <UploadNote />
 
       <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 8 }}>
         {files.map((f, i) => (

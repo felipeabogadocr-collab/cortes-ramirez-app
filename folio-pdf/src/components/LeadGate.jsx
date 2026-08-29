@@ -130,6 +130,13 @@ export default function LeadGate({ onDone }) {
         <p style={{ fontSize: 10.5, color: "var(--muted)", margin: "4px 0 0" }}>
           Debe tener {paisInfo.digits} dígitos (sin el {indicativo}).
         </p>
+        <p style={{ fontSize: 10.5, color: "var(--muted)", margin: "6px 0 0", display: "flex", alignItems: "flex-start", gap: 5 }}>
+          <span style={{ flexShrink: 0, marginTop: 1 }}>
+            <IconShield size={12} />
+          </span>
+          Tu número solo se usa para contactarte por WhatsApp; nunca se comparte ni se vende a
+          terceros.
+        </p>
 
         <label
           style={{
