@@ -510,9 +510,9 @@ const GlobalStyle = () => (
     .drx-btn-ghost { transition: background .15s ease, border-color .15s ease; }
     .drx-tema-claro .drx-btn-ghost:hover { background: #EEF2F7; border-color: #B9C2CF; }
     .drx-tema-oscuro .drx-btn-ghost:hover { background: #232C39; border-color: #3A4657; }
-    .drx-card { transition: box-shadow .15s ease, border-color .15s ease, transform .15s ease; }
-    .drx-tema-claro .drx-card:hover { box-shadow: 0 2px 10px rgba(10,35,66,0.06); }
-    .drx-tema-oscuro .drx-card:hover { box-shadow: 0 4px 18px rgba(0,0,0,0.4); }
+    .drx-card { transition: box-shadow .18s ease, border-color .18s ease, transform .18s ease; }
+    .drx-tema-claro .drx-card:hover { box-shadow: 0 10px 26px rgba(10,35,66,0.1); border-color: #C7D6EA; }
+    .drx-tema-oscuro .drx-card:hover { box-shadow: 0 10px 30px rgba(0,0,0,0.5); border-color: #3A4A63; }
     .drx-tab { transition: background .15s ease, color .15s ease; }
     .drx-input:focus { border-color: ${COLORS.accentBright} !important; box-shadow: 0 0 0 3px ${COLORS.accentSoft}; }
     .drx-btn-primary:hover { box-shadow: 0 6px 20px rgba(30,95,180,0.35); }
@@ -535,7 +535,7 @@ const GlobalStyle = () => (
     @keyframes drx-fade-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
     .drx-fade-in { animation: drx-fade-in 0.22s ease; }
     @keyframes drx-spin { to { transform: rotate(360deg); } }
-    .drx-card:hover { transform: translateY(-1px); }
+    .drx-card:hover { transform: translateY(-2px); }
     @keyframes drx-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
     @keyframes drx-mesh { 0%, 100% { transform: translate(0, 0) scale(1); } 50% { transform: translate(3%, -4%) scale(1.08); } }
     .drx-cta-shine { position: relative; overflow: hidden; }
@@ -682,23 +682,55 @@ function Pill({ children }) {
   );
 }
 
+// Textura de grano casi imperceptible (mismo recurso que ya usaba la
+// landing) — reutilizada también dentro de la app ya logueada, para que se
+// sienta parte de la misma marca en vez de una pantalla "de trabajo" aparte.
+function TexturaGrano() {
+  return (
+    <div
+      aria-hidden="true"
+      style={{
+        position: "fixed",
+        inset: 0,
+        pointerEvents: "none",
+        zIndex: 1,
+        opacity: 0.035,
+        mixBlendMode: "overlay",
+        backgroundImage:
+          "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\")",
+      }}
+    />
+  );
+}
+
 function EncabezadoSeccion({ titulo, color }) {
   return (
-    <div style={{ marginBottom: 22 }}>
-      <div style={{ width: 42, height: 4, borderRadius: 2, background: color, marginBottom: 12 }} />
-      <h2
+    <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 26 }}>
+      <div
         style={{
-          fontFamily: "Inter, sans-serif",
-          fontSize: 12.5,
-          fontWeight: 700,
-          letterSpacing: 1,
-          textTransform: "uppercase",
-          color,
-          margin: "0 0 4px",
+          width: 38,
+          height: 38,
+          borderRadius: 11,
+          flexShrink: 0,
+          background: `linear-gradient(135deg, ${color}, ${color}CC)`,
+          boxShadow: `0 6px 16px ${color}40`,
         }}
-      >
-        {titulo}
-      </h2>
+      />
+      <div>
+        <div style={{ width: 30, height: 3, borderRadius: 2, background: `linear-gradient(90deg, ${color}, transparent)`, marginBottom: 6 }} />
+        <h2
+          style={{
+            fontFamily: "Inter, sans-serif",
+            fontSize: 20,
+            fontWeight: 800,
+            letterSpacing: -0.3,
+            color: COLORS.headingText,
+            margin: 0,
+          }}
+        >
+          {titulo}
+        </h2>
+      </div>
     </div>
   );
 }
@@ -1800,6 +1832,7 @@ function ResumenTab({ nombre, usuarioId, onIr }) {
                   fontSize: 15,
                   color: d.color,
                   flexShrink: 0,
+                  animation: "drx-pulse 2.4s ease-in-out infinite",
                 }}
               >
                 {d.puntaje}
@@ -2666,7 +2699,7 @@ function AvatarIniciales({ nombre, size = 34 }) {
         width: size,
         height: size,
         borderRadius: "50%",
-        background: color,
+        background: `linear-gradient(135deg, ${color}, ${color}CC)`,
         color: "#FFFFFF",
         display: "flex",
         alignItems: "center",
@@ -2675,6 +2708,8 @@ function AvatarIniciales({ nombre, size = 34 }) {
         fontWeight: 700,
         fontSize: size * 0.4,
         flexShrink: 0,
+        boxShadow: `0 3px 8px ${color}55`,
+        border: "2px solid rgba(255,255,255,0.6)",
       }}
     >
       {iniciales || "?"}
@@ -3188,7 +3223,7 @@ function ClientesTab({ usuarioActual }) {
           >
             Exportar CSV
           </button>
-          <button className="drx-btn-primary" style={buttonPrimary} onClick={() => setShowForm((s) => !s)}>
+          <button className="drx-btn-primary drx-cta-shine" style={buttonPrimary} onClick={() => setShowForm((s) => !s)}>
             {showForm ? "Cancelar" : "+ Nuevo cliente"}
           </button>
         </div>
@@ -3515,7 +3550,7 @@ function CasosTab() {
         <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted, margin: 0 }}>
           {ids.length} caso{ids.length !== 1 ? "s" : ""} en seguimiento
         </p>
-        <button className="drx-btn-primary" style={buttonPrimary} onClick={() => setShowForm((s) => !s)}>
+        <button className="drx-btn-primary drx-cta-shine" style={buttonPrimary} onClick={() => setShowForm((s) => !s)}>
           {showForm ? "Cancelar" : "+ Nuevo caso"}
         </button>
       </div>
@@ -4315,7 +4350,7 @@ function FormularioPago({ cliente, onRegistrar }) {
           <input className="drx-input" style={inputStyle} type="number" value={valorProximoPago} onChange={(e) => setValorProximoPago(e.target.value)} placeholder="Ej: 500000" />
         </Field>
       </div>
-      <button className="drx-btn-primary" style={{ ...buttonPrimary, marginTop: 14 }} onClick={registrar} disabled={generando}>
+      <button className="drx-btn-primary drx-cta-shine" style={{ ...buttonPrimary, marginTop: 14 }} onClick={registrar} disabled={generando}>
         {generando ? "Generando recibo..." : "Registrar pago y generar recibo"}
       </button>
     </div>
@@ -5822,7 +5857,7 @@ function DocumentosTab() {
           {idsFiltrados.length} documento{idsFiltrados.length !== 1 ? "s" : ""}
           {filtro.trim() ? ` de ${ids.length}` : ""} · comparte el código con tus clientes para que firmen
         </p>
-        <button className="drx-btn-primary" style={buttonPrimary} onClick={() => setShowForm((s) => !s)}>
+        <button className="drx-btn-primary drx-cta-shine" style={buttonPrimary} onClick={() => setShowForm((s) => !s)}>
           {showForm ? "Cancelar" : "+ Nuevo documento"}
         </button>
       </div>
@@ -5923,7 +5958,7 @@ function DocumentosTab() {
             </Field>
           </div>
 
-          <button className="drx-btn-primary" style={{ ...buttonPrimary, marginTop: 14 }} onClick={guardar} disabled={!listoParaGuardar}>
+          <button className="drx-btn-primary drx-cta-shine" style={{ ...buttonPrimary, marginTop: 14 }} onClick={guardar} disabled={!listoParaGuardar}>
             Crear y generar código de firma
           </button>
         </Card>
@@ -7011,19 +7046,7 @@ function LandingPage({ onRegistrar, onIniciarSesion }) {
         .drx-hero-item { opacity: 0; animation: drx-subir 0.7s ease forwards; }
       `}</style>
 
-      <div
-        aria-hidden="true"
-        style={{
-          position: "fixed",
-          inset: 0,
-          pointerEvents: "none",
-          zIndex: 1,
-          opacity: 0.035,
-          mixBlendMode: "overlay",
-          backgroundImage:
-            "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\")",
-        }}
-      />
+      <TexturaGrano />
 
       <div
         style={{
@@ -8040,6 +8063,7 @@ function LoginGate({ onIngresar, onCancelar, pantallaInicial }) {
       style={{ minHeight: "100%", background: COLORS.bg, display: "flex", alignItems: "center", justifyContent: "center", padding: 24, position: "relative", overflow: "hidden" }}
     >
       <GlobalStyle />
+      <TexturaGrano />
       <div
         aria-hidden="true"
         style={{
@@ -9367,6 +9391,7 @@ export default function App() {
   return (
     <div className={oscuro ? "drx-tema-oscuro" : "drx-tema-claro"} style={{ background: COLORS.bg, minHeight: "100%", display: "flex" }}>
       <GlobalStyle />
+      <TexturaGrano />
 
       <div
         aria-hidden="true"
@@ -9405,7 +9430,7 @@ export default function App() {
         style={{
           width: 250,
           flexShrink: 0,
-          background: COLORS.navy,
+          background: `linear-gradient(180deg, ${COLORS.navy} 0%, #071a33 100%)`,
           borderRight: `3px solid ${COLORS.accentBright}`,
           display: "flex",
           flexDirection: "column",
@@ -9507,6 +9532,7 @@ export default function App() {
           style={{
             background: COLORS.panel,
             borderBottom: `1px solid ${COLORS.border}`,
+            boxShadow: "0 2px 10px rgba(10,35,66,0.04)",
             padding: "16px 28px",
             display: "flex",
             justifyContent: "space-between",
@@ -9520,6 +9546,7 @@ export default function App() {
           <BuscadorGlobal onIr={setTab} />
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
             <button
+              className="drx-btn-ghost"
               onClick={() => setMostrarNotificaciones(true)}
               title="Notificaciones"
               style={{
