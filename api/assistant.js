@@ -157,7 +157,13 @@ export default async function handler(req, res) {
     const esLimiteDeCuota = !resultado.ok && (resultado.status === 429 || resultado.data?.error?.status === "RESOURCE_EXHAUSTED");
     if (esLimiteDeCuota) {
       console.error("Límite de cuota de Gemini:", JSON.stringify(resultado.data));
-      return res.status(429).json({ error: "El asistente alcanzó el límite de uso gratuito por un momento. Espera unos segundos y vuelve a intentar." });
+      // Google manda cuánto esperar en un campo "RetryInfo" (retryDelay, ej. "17s")
+      // dentro de error.details — lo leemos para poder bloquear el botón de
+      // enviar ese tiempo exacto, en vez de dejar que reintenten de inmediato
+      // y sigan gastando cuota sin darle chance a que se libere.
+      const detalleReintento = (resultado.data?.error?.details || []).find((d) => d["@type"]?.includes("RetryInfo"));
+      const segundos = detalleReintento?.retryDelay ? Math.ceil(parseFloat(detalleReintento.retryDelay)) : 20;
+      return res.status(429).json({ error: "El asistente alcanzó el límite de uso gratuito por un momento. Espera unos segundos y vuelve a intentar.", retryAfterSegundos: segundos });
     }
 
     // Si falla con "invalid argument" por otra razón, se reintenta una vez
@@ -176,7 +182,9 @@ export default async function handler(req, res) {
       console.error("Error de Gemini:", JSON.stringify(resultado.data));
       const errStatus = resultado.data?.error?.status;
       if (errStatus === "RESOURCE_EXHAUSTED" || resultado.status === 429) {
-        return res.status(429).json({ error: "El asistente alcanzó el límite de uso gratuito por un momento. Espera unos segundos y vuelve a intentar." });
+        const detalleReintento = (resultado.data?.error?.details || []).find((d) => d["@type"]?.includes("RetryInfo"));
+        const segundos = detalleReintento?.retryDelay ? Math.ceil(parseFloat(detalleReintento.retryDelay)) : 20;
+        return res.status(429).json({ error: "El asistente alcanzó el límite de uso gratuito por un momento. Espera unos segundos y vuelve a intentar.", retryAfterSegundos: segundos });
       }
       return res.status(resultado.status).json({ error: resultado.data?.error?.message || "Error del asistente de IA" });
     }

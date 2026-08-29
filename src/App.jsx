@@ -759,7 +759,7 @@ function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-const APP_VERSION = "1.5.0";
+const APP_VERSION = "1.6.0";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -1858,10 +1858,27 @@ function AsistenteIA({ nombre, usuarioId, onAccionCompletada }) {
   const [adjuntos, setAdjuntos] = useState([]);
   const [cargando, setCargando] = useState(false);
   const [historialCargado, setHistorialCargado] = useState(false);
+  const [esperandoCuotaHasta, setEsperandoCuotaHasta] = useState(0);
+  const [segundosRestantes, setSegundosRestantes] = useState(0);
   const contenedorRef = useRef(null);
   const fileInputRef = useRef(null);
   const inputRef = useRef(null);
   const { confirmar, ConfirmarDialogo } = useConfirmarDialogo();
+
+  // Cuando Gemini avisa que hay que esperar X segundos por el límite gratuito,
+  // se bloquea el envío ese tiempo exacto — sin esto, reintentar de inmediato
+  // solo mantenía el límite activo en vez de dejarlo liberarse.
+  useEffect(() => {
+    if (!esperandoCuotaHasta) return;
+    const actualizar = () => {
+      const restante = Math.max(0, Math.ceil((esperandoCuotaHasta - Date.now()) / 1000));
+      setSegundosRestantes(restante);
+      if (restante === 0) setEsperandoCuotaHasta(0);
+    };
+    actualizar();
+    const intervalo = setInterval(actualizar, 1000);
+    return () => clearInterval(intervalo);
+  }, [esperandoCuotaHasta]);
 
   const abrirConversacion = async (idConv) => {
     setConvActivaId(idConv);
@@ -1963,7 +1980,7 @@ function AsistenteIA({ nombre, usuarioId, onAccionCompletada }) {
   const quitarAdjunto = (id) => setAdjuntos((prev) => prev.filter((a) => a.id !== id));
 
   const enviar = async () => {
-    if ((!texto.trim() && adjuntos.length === 0) || cargando) return;
+    if ((!texto.trim() && adjuntos.length === 0) || cargando || segundosRestantes > 0) return;
     const pregunta = texto.trim();
     const adjuntosActuales = adjuntos;
     setTexto("");
@@ -2033,7 +2050,11 @@ function AsistenteIA({ nombre, usuarioId, onAccionCompletada }) {
           body: JSON.stringify({ model: "claude-sonnet-4-6", max_tokens: 700, system: systemPrompt, tools: TOOLS_ASISTENTE, messages: mensajesAPI }),
         });
         const data = await response.json();
-        if (!response.ok || data.error) throw new Error(data.error || "No se pudo contactar al asistente de IA");
+        if (!response.ok || data.error) {
+          const err = new Error(data.error || "No se pudo contactar al asistente de IA");
+          if (data.retryAfterSegundos) err.retryAfterSegundos = data.retryAfterSegundos;
+          throw err;
+        }
         const bloques = data.content || [];
         const textoBloque = bloques.filter((b) => b.type === "text").map((b) => b.text).join("\n");
         const toolUses = bloques.filter((b) => b.type === "tool_use");
@@ -2058,6 +2079,7 @@ function AsistenteIA({ nombre, usuarioId, onAccionCompletada }) {
       setMensajes((prev) => [...prev, { rol: "asistente", texto: respuestaFinal || "No pude generar una respuesta, intenta de nuevo.", archivoGenerado }]);
     } catch (e) {
       setMensajes((prev) => [...prev, { rol: "asistente", texto: `Tuve un problema para responder: ${e.message || "intenta de nuevo en un momento."}` }]);
+      if (e.retryAfterSegundos) setEsperandoCuotaHasta(Date.now() + e.retryAfterSegundos * 1000);
     }
     setCargando(false);
     inputRef.current?.focus();
@@ -2315,8 +2337,20 @@ function AsistenteIA({ nombre, usuarioId, onAccionCompletada }) {
             }
           }}
         />
-        <button className="drx-btn-primary" style={{ ...buttonPrimary, display: "flex", alignItems: "center", gap: 6 }} onClick={enviar} disabled={cargando || (!texto.trim() && adjuntos.length === 0)}>
-          Enviar <Icono tipo="cursorArriba" size={14} style={{ transform: "rotate(90deg)" }} />
+        <button
+          className="drx-btn-primary"
+          style={{ ...buttonPrimary, display: "flex", alignItems: "center", gap: 6, opacity: segundosRestantes > 0 ? 0.6 : 1 }}
+          onClick={enviar}
+          disabled={cargando || segundosRestantes > 0 || (!texto.trim() && adjuntos.length === 0)}
+          title={segundosRestantes > 0 ? "Esperando a que se libere el límite gratuito" : undefined}
+        >
+          {segundosRestantes > 0 ? (
+            `Espera ${segundosRestantes}s`
+          ) : (
+            <>
+              Enviar <Icono tipo="cursorArriba" size={14} style={{ transform: "rotate(90deg)" }} />
+            </>
+          )}
         </button>
       </div>
       {ConfirmarDialogo}
