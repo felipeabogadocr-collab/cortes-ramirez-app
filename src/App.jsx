@@ -1419,6 +1419,41 @@ const TOOLS_ASISTENTE = [
     description: "Genera un archivo Excel descargable con el listado completo de clientes y todos sus pagos registrados.",
     input_schema: { type: "object", properties: {}, required: [] },
   },
+  {
+    name: "buscar_cliente",
+    description: "Busca un cliente que ya existe y devuelve su información completa: contacto, radicado, tipo y área del proceso, estado de vigilancia judicial, total pagado, saldo pendiente y notas.",
+    input_schema: {
+      type: "object",
+      properties: { nombre_cliente: { type: "string" } },
+      required: ["nombre_cliente"],
+    },
+  },
+  {
+    name: "crear_documento_firma",
+    description: "Crea un nuevo documento de texto (contrato, poder, autorización, etc.) listo para enviar a firma electrónica, opcionalmente asociado a un cliente.",
+    input_schema: {
+      type: "object",
+      properties: {
+        titulo: { type: "string" },
+        contenido: { type: "string", description: "Texto completo del documento" },
+        nombre_cliente: { type: "string", description: "Nombre del cliente al que pertenece, opcional" },
+      },
+      required: ["titulo", "contenido"],
+    },
+  },
+  {
+    name: "programar_cobro",
+    description: "Programa el próximo cobro de un cliente existente: la fecha del próximo pago y el valor esperado.",
+    input_schema: {
+      type: "object",
+      properties: {
+        nombre_cliente: { type: "string" },
+        valor_esperado: { type: "number", description: "Valor esperado en pesos colombianos" },
+        fecha: { type: "string", description: "Fecha del próximo cobro en formato YYYY-MM-DD" },
+      },
+      required: ["nombre_cliente", "valor_esperado", "fecha"],
+    },
+  },
 ];
 
 async function buscarClientePorNombre(nombreBuscado) {
@@ -1618,6 +1653,60 @@ async function ejecutarHerramienta(nombreHerramienta, input) {
     return { mensaje: "Reporte en Excel generado con todos los clientes y sus pagos.", archivo: { url, nombre: "reporte_pagos.xlsx" } };
   }
 
+  if (nombreHerramienta === "buscar_cliente") {
+    const encontrado = await buscarClientePorNombre(input.nombre_cliente);
+    if (!encontrado) return { mensaje: `No encontré ningún cliente llamado "${input.nombre_cliente}". Verifica el nombre exacto.` };
+    const { cliente } = encontrado;
+    const totalPagado = (cliente.pagos || []).reduce((s, p) => s + (Number(p.valor) || 0), 0);
+    const saldo = cliente.valorTotal ? Number(cliente.valorTotal) - totalPagado : null;
+    const partes = [
+      `Cliente: ${cliente.nombre}`,
+      cliente.telefono ? `Teléfono: ${cliente.telefono}` : null,
+      cliente.email ? `Email: ${cliente.email}` : null,
+      cliente.radicado ? `Radicado: ${cliente.radicado}` : "Sin radicado registrado",
+      `Proceso: ${cliente.tipoProceso || "—"} / ${cliente.areaProceso || "—"}`,
+      cliente.estadoVigilancia ? `Estado de vigilancia: ${cliente.estadoVigilancia}` : null,
+      `Total pagado: ${formatoCOP(totalPagado)}`,
+      saldo !== null ? `Saldo pendiente: ${formatoCOP(saldo)}` : null,
+      cliente.proximoPago?.fecha ? `Próximo cobro: ${formatoCOP(cliente.proximoPago.valorEsperado || 0)} el ${cliente.proximoPago.fecha}` : null,
+      cliente.notas ? `Notas: ${cliente.notas}` : null,
+    ].filter(Boolean);
+    return { mensaje: partes.join("\n") };
+  }
+
+  if (nombreHerramienta === "crear_documento_firma") {
+    const id = uid();
+    await storageSet(
+      `documento:${id}`,
+      JSON.stringify({
+        titulo: input.titulo,
+        cliente: input.nombre_cliente || "",
+        whatsappIndicativo: "57",
+        whatsappNumero: "",
+        contenido: input.contenido,
+        nombreArchivo: "",
+        tipoDocumento: "texto",
+        archivoPdfBase64: "",
+        firmantes: [],
+        creadoEn: new Date().toISOString(),
+      }),
+      true
+    );
+    const idsDocsRaw = await storageGet("indice-documentos", true);
+    const idsDocs = idsDocsRaw ? JSON.parse(idsDocsRaw) : [];
+    await storageSet("indice-documentos", JSON.stringify([id, ...idsDocs]), true);
+    return { mensaje: `Documento "${input.titulo}" creado y listo para enviar a firma desde la pestaña Firmar documentos.` };
+  }
+
+  if (nombreHerramienta === "programar_cobro") {
+    const encontrado = await buscarClientePorNombre(input.nombre_cliente);
+    if (!encontrado) return { mensaje: `No encontré ningún cliente llamado "${input.nombre_cliente}". Verifica el nombre exacto.` };
+    const { id, cliente } = encontrado;
+    const actualizado = { ...cliente, proximoPago: { fecha: input.fecha, valorEsperado: Number(input.valor_esperado) } };
+    await storageSet(`cliente:${id}`, JSON.stringify(actualizado), false);
+    return { mensaje: `Próximo cobro de ${cliente.nombre} programado: ${formatoCOP(input.valor_esperado)} para el ${input.fecha}.` };
+  }
+
   return { mensaje: "No reconozco esa acción." };
 }
 
@@ -1733,6 +1822,7 @@ function AsistenteIA({ nombre, usuarioId, onAccionCompletada }) {
     const adjuntoActual = adjunto;
     setTexto("");
     setAdjunto(null);
+    if (inputRef.current) inputRef.current.style.height = "auto";
     const nuevos = [...mensajes, { rol: "usuario", texto: pregunta, adjunto: adjuntoActual }];
     setMensajes(nuevos);
     setCargando(true);
@@ -1742,7 +1832,7 @@ function AsistenteIA({ nombre, usuarioId, onAccionCompletada }) {
       const systemPrompt =
         `Eres el asistente virtual de ${getNombreDespacho()}, dentro de su panel de gestión (la plataforma Nomos). Le hablas a ${nombre}, el abogado dueño del despacho, como lo haría un empresario visionario: con confianza, ambición sana, y viendo siempre oportunidades de crecer el negocio. Incluyes de forma natural y respetuosa una referencia a Dios en tus respuestas cuando encaje (por ejemplo, dar gracias por el progreso, pedir sabiduría, o reconocer que el esfuerzo y la fe van de la mano), sin exagerar ni forzarlo en cada frase. ` +
         `Actúas como un verdadero experto en contabilidad de despachos legales, en redes sociales y marketing para abogados, y en gestión de operaciones legales — da consejos con ese nivel de criterio, no genéricos. ` +
-        `Eres el cerebro de la operación del despacho: puedes crear y editar clientes, crear casos, registrar pagos y generarles su recibo automáticamente, agregar actuaciones a la línea de tiempo de un cliente, actualizar el estado de vigilancia judicial, crear usuarios nuevos con acceso al panel, registrar métricas de redes sociales, generar un informe en PDF con el diagnóstico del despacho, generar un reporte en Excel con todos los pagos, leer imágenes, PDF y documentos de Word que te envíen, y dar ideas prácticas de gestión, negocio y contenido. Cuando te pregunten qué puedes hacer, cuéntalo con entusiasmo y de forma concreta. ` +
+        `Eres el cerebro de la operación del despacho: puedes crear y editar clientes, buscar la información completa de un cliente existente, crear casos, registrar pagos y generarles su recibo automáticamente, programar el próximo cobro de un cliente, agregar actuaciones a la línea de tiempo de un cliente, actualizar el estado de vigilancia judicial, crear documentos de texto listos para firma electrónica, crear usuarios nuevos con acceso al panel, registrar métricas de redes sociales, generar un informe en PDF con el diagnóstico del despacho, generar un reporte en Excel con todos los pagos, leer imágenes, PDF y documentos de Word que te envíen, y dar ideas prácticas de gestión, negocio y contenido. Cuando te pregunten qué puedes hacer, cuéntalo con entusiasmo y de forma concreta. ` +
         `Usa las herramientas disponibles para actuar de verdad cuando te lo pidan (no solo describir qué harías), y confirma siempre al final qué hiciste. Este es el estado actual del despacho:\n\n${contexto}\n\nResponde en español, de forma cercana, breve y con visión de negocio.`;
 
       let mensajesAPI = nuevos.map((m, idx) => {
@@ -1821,7 +1911,14 @@ function AsistenteIA({ nombre, usuarioId, onAccionCompletada }) {
           </button>
         )}
       </div>
-      <div ref={contenedorRef} style={{ height: 340, overflowY: "auto", display: "flex", flexDirection: "column", gap: 12, marginBottom: 12, paddingRight: 4 }}>
+      <div style={{ position: "relative", height: 340, marginBottom: 12 }}>
+        <div
+          aria-hidden="true"
+          style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", opacity: 0.05, pointerEvents: "none", color: COLORS.navy }}
+        >
+          <IconoNomos size={150} />
+        </div>
+        <div ref={contenedorRef} style={{ position: "relative", height: "100%", overflowY: "auto", display: "flex", flexDirection: "column", gap: 12, paddingRight: 4 }}>
         {mensajes.length === 0 && (
           <div>
             <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.muted, marginBottom: 10 }}>
@@ -1931,6 +2028,7 @@ function AsistenteIA({ nombre, usuarioId, onAccionCompletada }) {
             </div>
           </div>
         )}
+        </div>
       </div>
 
       {adjunto && (
@@ -1954,14 +2052,24 @@ function AsistenteIA({ nombre, usuarioId, onAccionCompletada }) {
         <button className="drx-btn-ghost" style={{ ...buttonGhost, padding: "10px 12px", display: "flex", alignItems: "center" }} onClick={() => fileInputRef.current?.click()} title="Adjuntar foto, PDF o Word">
           <Icono tipo="clip" size={16} />
         </button>
-        <input
+        <textarea
           ref={inputRef}
           className="drx-input"
-          style={{ ...inputStyle, flex: 1 }}
+          rows={1}
+          style={{ ...inputStyle, flex: 1, resize: "none", maxHeight: 66, lineHeight: 1.4, fontFamily: "Inter, sans-serif" }}
           value={texto}
-          onChange={(e) => setTexto(e.target.value)}
-          placeholder="Ej: registra un pago de 500.000 de Juan Pérez por Nequi"
-          onKeyDown={(e) => e.key === "Enter" && enviar()}
+          onChange={(e) => {
+            setTexto(e.target.value);
+            e.target.style.height = "auto";
+            e.target.style.height = `${Math.min(e.target.scrollHeight, 66)}px`;
+          }}
+          placeholder="Ej: registra un pago de 500.000 de Juan Pérez por Nequi (Shift+Enter para salto de línea)"
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              enviar();
+            }
+          }}
         />
         <button className="drx-btn-primary" style={{ ...buttonPrimary, display: "flex", alignItems: "center", gap: 6 }} onClick={enviar} disabled={cargando || (!texto.trim() && !adjunto)}>
           Enviar <Icono tipo="cursorArriba" size={14} style={{ transform: "rotate(90deg)" }} />
