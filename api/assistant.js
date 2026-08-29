@@ -130,23 +130,35 @@ export default async function handler(req, res) {
   const geminiTools = toGeminiTools(tools);
   if (geminiTools) body.tools = geminiTools;
 
-  try {
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      }
-    );
-
+  const llamarGemini = async (cuerpo) => {
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(cuerpo),
+    });
     const data = await response.json();
-    if (!response.ok) {
-      console.error("Error de Gemini:", data);
-      return res.status(response.status).json({ error: data?.error?.message || "Error del asistente de IA" });
+    return { ok: response.ok, status: response.status, data };
+  };
+
+  try {
+    let resultado = await llamarGemini(body);
+
+    // Gemini a veces rechaza con "invalid argument" la combinación de
+    // herramientas + un archivo adjunto (imagen/PDF) en el mismo turno. Si
+    // pasa eso, reintentamos una vez sin las herramientas para que al menos
+    // pueda leer y responder sobre el archivo, en vez de fallar del todo.
+    const esInvalidoConHerramientas = !resultado.ok && body.tools && /invalid argument/i.test(resultado.data?.error?.message || "");
+    if (esInvalidoConHerramientas) {
+      const { tools: _tools, ...cuerpoSinHerramientas } = body;
+      resultado = await llamarGemini(cuerpoSinHerramientas);
     }
 
-    return res.status(200).json(fromGeminiResponse(data));
+    if (!resultado.ok) {
+      console.error("Error de Gemini:", resultado.data);
+      return res.status(resultado.status).json({ error: resultado.data?.error?.message || "Error del asistente de IA" });
+    }
+
+    return res.status(200).json(fromGeminiResponse(resultado.data));
   } catch (err) {
     console.error("Error llamando a Gemini:", err);
     return res.status(502).json({ error: "No se pudo contactar al asistente de IA" });
