@@ -96,6 +96,7 @@ export default function LeadGate({ onDone }) {
           onChange={(e) => setNombre(e.target.value)}
           placeholder="Tu nombre completo"
           required
+          autoComplete="off"
           style={inputStyle}
         />
 
@@ -124,6 +125,7 @@ export default function LeadGate({ onDone }) {
             inputMode="numeric"
             maxLength={paisInfo.digits + 2}
             required
+            autoComplete="off"
             style={{ ...inputStyle, flex: 1 }}
           />
         </div>

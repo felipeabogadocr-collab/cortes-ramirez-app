@@ -1,7 +1,25 @@
+import { useEffect, useState } from "react";
 import Logo from "./Logo.jsx";
 import { IconLock, IconSun, IconMoon } from "./Icons.jsx";
 
+// Solo afirmamos "sitio seguro" cuando la conexión realmente es HTTPS
+// (o estamos en desarrollo local), en vez de mostrarlo como texto fijo.
+function conexionEsSegura() {
+  if (typeof window === "undefined") return true;
+  return window.location.protocol === "https:" || window.location.hostname === "localhost";
+}
+
 export default function Header({ theme, onToggleTheme, onGoHome }) {
+  const [conScroll, setConScroll] = useState(false);
+
+  useEffect(() => {
+    function onScroll() {
+      setConScroll(window.scrollY > 4);
+    }
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
   function abrirPrivacidad() {
     window.dispatchEvent(new CustomEvent("folio:open-privacy"));
   }
@@ -12,7 +30,8 @@ export default function Header({ theme, onToggleTheme, onGoHome }) {
         position: "sticky",
         top: 0,
         zIndex: 20,
-        boxShadow: "0 1px 8px rgba(0,0,0,0.06)",
+        boxShadow: conScroll ? "0 4px 16px rgba(0,0,0,0.1)" : "0 1px 8px rgba(0,0,0,0.06)",
+        transition: "box-shadow 0.2s ease",
       }}
     >
       <div className="top-accent-bar" aria-hidden="true" />
@@ -56,15 +75,19 @@ export default function Header({ theme, onToggleTheme, onGoHome }) {
             gap: 10,
           }}
         >
-          <button
-            type="button"
-            className="trust-badge header-trust-badge"
-            onClick={abrirPrivacidad}
-            title="Ver nuestra política de privacidad"
-            style={{ justifySelf: "start", border: "1px solid var(--border)", cursor: "pointer" }}
-          >
-            <IconLock /> Sitio seguro
-          </button>
+          {conexionEsSegura() ? (
+            <button
+              type="button"
+              className="trust-badge header-trust-badge"
+              onClick={abrirPrivacidad}
+              title="Ver nuestra política de privacidad"
+              style={{ justifySelf: "start", border: "1px solid var(--border)", cursor: "pointer" }}
+            >
+              <IconLock /> Sitio seguro
+            </button>
+          ) : (
+            <span />
+          )}
           <button
             onClick={onGoHome}
             title="Ir al menú principal"

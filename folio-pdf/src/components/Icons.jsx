@@ -106,6 +106,10 @@ export function IconCompress({ size = 26 }) {
   );
 }
 
+export function IconArrowRight({ size = 13 }) {
+  return base(<path d="M4 12h15M13 6l6 6-6 6" />, size, 2.2);
+}
+
 export function IconChevronUp({ size = 20 }) {
   return base(<path d="M6 15l6-6 6 6" />, size, 2.2);
 }

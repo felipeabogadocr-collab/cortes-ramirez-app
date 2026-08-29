@@ -21,6 +21,7 @@ import {
   IconLock,
   IconGlobe,
   IconCheck,
+  IconArrowRight,
 } from "./components/Icons.jsx";
 
 const TOOLS = [
@@ -68,6 +69,7 @@ export default function App() {
         {!Active && (
           <div className="fade-in">
             <div style={{ textAlign: "center", marginBottom: 22 }}>
+              <span className="eyebrow uppercase">Plataforma 100% gratuita</span>
               <h1
                 className="uppercase"
                 style={{
@@ -119,6 +121,9 @@ export default function App() {
                   </span>
                   <span className="uppercase" style={{ fontWeight: 700, fontSize: 13.5, letterSpacing: 0.4 }}>
                     {t.label}
+                  </span>
+                  <span className="tool-card-arrow">
+                    Abrir <IconArrowRight />
                   </span>
                 </button>
               ))}

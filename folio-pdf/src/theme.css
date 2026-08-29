@@ -241,6 +241,40 @@ select {
   background: linear-gradient(135deg, var(--brand-2), var(--brand));
 }
 
+/* Etiqueta pequeña ("eyebrow") arriba del título principal. */
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 1.2px;
+  color: var(--brand-2);
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 5px 14px;
+  margin-bottom: 12px;
+}
+
+/* Flecha "Abrir" que aparece en las tarjetas de herramientas al pasar el mouse. */
+.tool-card-arrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--brand-2);
+  opacity: 0;
+  transform: translateY(-4px);
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.tool-card:hover .tool-card-arrow {
+  opacity: 1;
+  transform: translateY(0);
+}
+
 .tool-icon-badge {
   width: 56px;
   height: 56px;
