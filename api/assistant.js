@@ -122,13 +122,20 @@ export default async function handler(req, res) {
     return res.status(429).json({ error: "Demasiadas solicitudes al asistente. Espera un momento e inténtalo de nuevo." });
   }
 
+  const contenidos = toGeminiContents(messages);
   const body = {
-    contents: toGeminiContents(messages),
+    contents: contenidos,
     generationConfig: { maxOutputTokens: Math.min(Number(max_tokens) || 700, MAX_TOKENS_CAP) },
   };
   if (system) body.systemInstruction = { parts: [{ text: system }] };
+
+  // Gemini rechaza con "invalid argument" la combinación de herramientas +
+  // un archivo adjunto (imagen/PDF) en el mismo turno — así que si hay algún
+  // adjunto en la conversación, de una vez se manda sin herramientas (no
+  // reactivamente, para no depender de adivinar el texto exacto del error).
+  const tieneAdjunto = contenidos.some((c) => (c.parts || []).some((p) => p.inlineData));
   const geminiTools = toGeminiTools(tools);
-  if (geminiTools) body.tools = geminiTools;
+  if (geminiTools && !tieneAdjunto) body.tools = geminiTools;
 
   const llamarGemini = async (cuerpo) => {
     const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`, {
@@ -143,22 +150,28 @@ export default async function handler(req, res) {
   try {
     let resultado = await llamarGemini(body);
 
-    // Gemini a veces rechaza con "invalid argument" la combinación de
-    // herramientas + un archivo adjunto (imagen/PDF) en el mismo turno. Si
-    // pasa eso, reintentamos una vez sin las herramientas para que al menos
-    // pueda leer y responder sobre el archivo, en vez de fallar del todo.
-    const esInvalidoConHerramientas = !resultado.ok && body.tools && /invalid argument/i.test(resultado.data?.error?.message || "");
-    if (esInvalidoConHerramientas) {
-      const { tools: _tools, ...cuerpoSinHerramientas } = body;
-      resultado = await llamarGemini(cuerpoSinHerramientas);
+    // Si aun así falla con "invalid argument" por otra razón, se reintenta
+    // una vez sin herramientas y sin adjuntos (solo el texto), para que la
+    // conversación no se quede muerta — pero se avisa que el archivo no se
+    // pudo procesar, en vez de responder como si lo hubiera leído.
+    const esInvalidoDeNuevo = !resultado.ok && /invalid argument/i.test(resultado.data?.error?.message || "");
+    let seOmitioAdjunto = false;
+    if (esInvalidoDeNuevo) {
+      const contenidosSoloTexto = contenidos.map((c) => ({ ...c, parts: c.parts.filter((p) => !p.inlineData) })).filter((c) => c.parts.length > 0);
+      resultado = await llamarGemini({ ...body, contents: contenidosSoloTexto, tools: undefined });
+      seOmitioAdjunto = resultado.ok;
     }
 
     if (!resultado.ok) {
-      console.error("Error de Gemini:", resultado.data);
+      console.error("Error de Gemini:", JSON.stringify(resultado.data));
       return res.status(resultado.status).json({ error: resultado.data?.error?.message || "Error del asistente de IA" });
     }
 
-    return res.status(200).json(fromGeminiResponse(resultado.data));
+    const respuesta = fromGeminiResponse(resultado.data);
+    if (seOmitioAdjunto && respuesta.content) {
+      respuesta.content.unshift({ type: "text", text: "No pude leer el archivo adjunto, así que respondo solo con base en tu mensaje:\n\n" });
+    }
+    return res.status(200).json(respuesta);
   } catch (err) {
     console.error("Error llamando a Gemini:", err);
     return res.status(502).json({ error: "No se pudo contactar al asistente de IA" });
