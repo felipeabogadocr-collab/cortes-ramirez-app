@@ -172,7 +172,10 @@ export default async function handler(req, res) {
     // pudo procesar, en vez de responder como si lo hubiera leído.
     const esInvalidoDeNuevo = !resultado.ok && /invalid argument/i.test(resultado.data?.error?.message || "");
     let seOmitioAdjunto = false;
+    let errorOriginalAdjunto = "";
     if (esInvalidoDeNuevo) {
+      errorOriginalAdjunto = resultado.data?.error?.message || "";
+      console.error("Gemini rechazo el adjunto, detalle completo:", JSON.stringify(resultado.data));
       const contenidosSoloTexto = contenidos.map((c) => ({ ...c, parts: c.parts.filter((p) => !p.inlineData) })).filter((c) => c.parts.length > 0);
       resultado = await llamarGemini({ ...body, contents: contenidosSoloTexto, tools: undefined });
       seOmitioAdjunto = resultado.ok;
@@ -191,7 +194,7 @@ export default async function handler(req, res) {
 
     const respuesta = fromGeminiResponse(resultado.data);
     if (seOmitioAdjunto && respuesta.content) {
-      respuesta.content.unshift({ type: "text", text: "No pude leer el archivo adjunto, así que respondo solo con base en tu mensaje:\n\n" });
+      respuesta.content.unshift({ type: "text", text: `No pude leer el archivo adjunto (motivo real de Gemini: "${errorOriginalAdjunto}"), así que respondo solo con base en tu mensaje:\n\n` });
     }
     return res.status(200).json(respuesta);
   } catch (err) {
