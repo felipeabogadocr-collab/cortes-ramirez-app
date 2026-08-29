@@ -44,6 +44,7 @@ export default function App() {
 
   return (
     <div style={{ minHeight: "100dvh", display: "flex", flexDirection: "column" }}>
+      <div className="bg-blobs" aria-hidden="true" />
       <Header
         theme={theme}
         onToggleTheme={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
@@ -55,12 +56,29 @@ export default function App() {
 
         {!Active && (
           <>
-            <h1 className="uppercase" style={{ fontSize: 22, margin: "0 0 4px", letterSpacing: 1 }}>
+            <h1
+              className="uppercase"
+              style={{
+                fontSize: 28,
+                fontWeight: 800,
+                margin: "0 0 6px",
+                letterSpacing: 1,
+                backgroundImage: "linear-gradient(135deg, var(--brand), var(--brand-2))",
+                WebkitBackgroundClip: "text",
+                backgroundClip: "text",
+                color: "transparent",
+              }}
+            >
               Herramientas PDF gratis
             </h1>
-            <p style={{ color: "var(--muted)", fontSize: 14, margin: "0 0 20px" }}>
+            <p style={{ color: "var(--muted)", fontSize: 14, margin: "0 0 14px" }}>
               Para estudiantes y abogados. Rápidas, sencillas y sin costo.
             </p>
+            <div className="trust-badges" style={{ marginBottom: 22 }}>
+              <span className="trust-badge">🔒 Sin almacenamiento</span>
+              <span className="trust-badge">🌐 100% en tu navegador</span>
+              <span className="trust-badge">✅ Gratis para siempre</span>
+            </div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(170px, 1fr))", gap: 14 }}>
               {TOOLS.map((t) => (
                 <button
@@ -77,7 +95,7 @@ export default function App() {
                     color: "var(--text)",
                   }}
                 >
-                  <span style={{ fontSize: 30 }}>{t.icon}</span>
+                  <span className="tool-icon-badge">{t.icon}</span>
                   <span className="uppercase" style={{ fontWeight: 700, fontSize: 13.5, letterSpacing: 0.4 }}>
                     {t.label}
                   </span>

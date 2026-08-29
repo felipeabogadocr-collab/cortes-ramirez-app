@@ -33,9 +33,9 @@ export default function Header({ theme, onToggleTheme, onGoHome }) {
       </div>
 
       <div
+        className="header-hero"
         style={{
           borderBottom: "1px solid var(--border)",
-          background: "var(--panel)",
           padding: "16px 20px",
         }}
       >
@@ -49,7 +49,9 @@ export default function Header({ theme, onToggleTheme, onGoHome }) {
             gap: 10,
           }}
         >
-          <div />
+          <div className="trust-badge header-trust-badge" style={{ justifySelf: "start" }}>
+            🔒 Sitio seguro
+          </div>
           <button
             onClick={onGoHome}
             title="Ir al menú principal"

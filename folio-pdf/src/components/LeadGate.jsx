@@ -75,9 +75,11 @@ export default function LeadGate({ onDone }) {
         justifyContent: "center",
         padding: 20,
         background: "var(--bg)",
+        position: "relative",
       }}
     >
-      <div className="card" style={{ maxWidth: 420, width: "100%", padding: "28px 26px" }}>
+      <div className="bg-blobs" aria-hidden="true" />
+      <div className="card" style={{ maxWidth: 420, width: "100%", padding: "28px 26px", position: "relative" }}>
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, marginBottom: 18 }}>
           <Logo size={44} />
           <h1 style={{ fontSize: 20, margin: 0, textAlign: "center" }}>Bienvenido a Folio</h1>
@@ -160,6 +162,10 @@ export default function LeadGate({ onDone }) {
           actualizaciones y noticias de LITIA.ai, y acceder a descuentos. Tus documentos nunca se
           almacenan.
         </p>
+        <div className="trust-badges" style={{ justifyContent: "center", marginTop: 12 }}>
+          <span className="trust-badge">🔒 Conexión cifrada</span>
+          <span className="trust-badge">🛡️ Datos protegidos</span>
+        </div>
       </div>
     </div>
   );

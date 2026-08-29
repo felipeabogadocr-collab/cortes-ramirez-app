@@ -16,8 +16,8 @@ export default function PrivacyNotice({ style }) {
     >
       <span style={{ fontSize: 16 }}>🔒</span>
       <span>
-        <strong style={{ color: "var(--text)" }}>Tus archivos no se almacenan.</strong> Todo el
-        procesamiento ocurre en tu propio navegador; los archivos se eliminan de la memoria
+        <strong style={{ color: "var(--text)" }}>✅ 100% privado: tus archivos no se almacenan.</strong> Todo
+        el procesamiento ocurre en tu propio navegador; los archivos se eliminan de la memoria
         inmediatamente al cerrar o cambiar de herramienta. Nunca se suben a ningún servidor.
       </span>
     </div>
