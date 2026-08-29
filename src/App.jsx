@@ -3081,6 +3081,7 @@ function ClientesTab({ usuarioActual }) {
   useAvisoAntesDeSalir(showForm && !!form.nombre.trim());
   const [soloSinRadicado, setSoloSinRadicado] = useState(false);
   const [soloInactivos, setSoloInactivos] = useState(false);
+  const { confirmar, ConfirmarDialogo } = useConfirmarDialogo();
 
   useEffect(() => {
     (async () => {
@@ -3496,8 +3497,8 @@ function ClientesTab({ usuarioActual }) {
                   <button
                     className="drx-btn-ghost"
                     style={buttonGhost}
-                    onClick={() => {
-                      if (!window.confirm(`¿Eliminar a ${c.nombre}? Puedes recuperarlo después desde la Papelera.`)) return;
+                    onClick={async () => {
+                      if (!(await confirmar(`¿Eliminar a ${c.nombre}? Puedes recuperarlo después desde la Papelera.`))) return;
                       removeId(id);
                       registrarAuditoria(usuarioActual, "eliminar_cliente", "cliente", id, { nombre: c.nombre });
                     }}
@@ -3515,6 +3516,7 @@ function ClientesTab({ usuarioActual }) {
           <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted, textAlign: "center" }}>Ningún cliente coincide con "{filtro}".</p>
         )}
       </div>
+      {ConfirmarDialogo}
     </div>
   );
 }
@@ -5650,6 +5652,7 @@ function DocumentosTab() {
   const [filtro, setFiltro] = useState("");
   const [integridad, setIntegridad] = useState({});
   const [filtroEstadoDoc, setFiltroEstadoDoc] = useState("Todos");
+  const { confirmar, ConfirmarDialogo } = useConfirmarDialogo();
 
   const cargar = useCallback(async () => {
     const entries = {};
@@ -6196,8 +6199,8 @@ function DocumentosTab() {
                   <button
                     className="drx-btn-ghost"
                     style={{ ...buttonGhost, padding: "4px 10px", fontSize: 12 }}
-                    onClick={() => {
-                      if (!window.confirm(`¿Eliminar "${d.titulo}"? Puedes recuperarlo después desde la Papelera.`)) return;
+                    onClick={async () => {
+                      if (!(await confirmar(`¿Eliminar "${d.titulo}"? Puedes recuperarlo después desde la Papelera.`))) return;
                       removeId(id);
                     }}
                   >
@@ -6213,6 +6216,7 @@ function DocumentosTab() {
           <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted, textAlign: "center" }}>Ningún documento coincide con "{filtro}".</p>
         )}
       </div>
+      {ConfirmarDialogo}
     </div>
   );
 }
@@ -7926,6 +7930,68 @@ function guardarJSONLocal(llave, valor) {
   }
 }
 
+// Reemplaza window.confirm() (esa ventana gris del sistema operativo que no
+// combina con nada del diseño) por un diálogo propio, con el mismo estilo
+// del resto de la app. Se usa como: const ok = await confirmar("¿Seguro?");
+// y se debe renderizar {ConfirmarDialogo} en algún lugar del componente.
+function useConfirmarDialogo() {
+  const [pregunta, setPregunta] = useState(null);
+
+  const confirmar = (mensaje) =>
+    new Promise((resolve) => {
+      setPregunta({ mensaje, resolver: resolve });
+    });
+
+  const responder = (valor) => {
+    pregunta?.resolver(valor);
+    setPregunta(null);
+  };
+
+  const ConfirmarDialogo = pregunta ? (
+    <div
+      onClick={() => responder(false)}
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(10,18,32,0.55)",
+        backdropFilter: "blur(4px)",
+        WebkitBackdropFilter: "blur(4px)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 20,
+        zIndex: 2000,
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="drx-fade-in"
+        style={{
+          background: COLORS.panel,
+          borderRadius: 14,
+          padding: 24,
+          maxWidth: 380,
+          width: "100%",
+          boxShadow: "0 20px 50px rgba(0,0,0,0.3)",
+          borderTop: "3px solid #B42318",
+        }}
+      >
+        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 14, color: COLORS.ink, lineHeight: 1.6, margin: "0 0 20px" }}>{pregunta.mensaje}</p>
+        <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+          <button className="drx-btn-ghost" style={buttonGhost} onClick={() => responder(false)}>
+            Cancelar
+          </button>
+          <button className="drx-btn-primary" style={{ ...buttonPrimary, background: "#B42318" }} onClick={() => responder(true)}>
+            Confirmar
+          </button>
+        </div>
+      </div>
+    </div>
+  ) : null;
+
+  return { confirmar, ConfirmarDialogo };
+}
+
 function useCuentaRegresiva(hastaCuando) {
   const [segundos, setSegundos] = useState(0);
   useEffect(() => {
@@ -8345,6 +8411,7 @@ function PlataformaTab() {
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState("");
   const [cambiando, setCambiando] = useState(null);
+  const { confirmar, ConfirmarDialogo } = useConfirmarDialogo();
 
   const cargar = useCallback(async () => {
     setCargando(true);
@@ -8385,7 +8452,7 @@ function PlataformaTab() {
   };
 
   const eliminarDespacho = async (despacho) => {
-    if (!window.confirm(`¿Eliminar por completo "${despacho.nombre}"? Esto borra su registro y la cuenta de quien se registró. No se puede deshacer.`)) {
+    if (!(await confirmar(`¿Eliminar por completo "${despacho.nombre}"? Esto borra su registro y la cuenta de quien se registró. No se puede deshacer.`))) {
       return;
     }
     setCambiando(despacho.id);
@@ -8516,6 +8583,7 @@ function PlataformaTab() {
           </div>
         </>
       )}
+      {ConfirmarDialogo}
     </div>
   );
 }
@@ -8561,6 +8629,7 @@ function UsuariosPermisosTab({ usuarioActual, onDespachoRenombrado }) {
   const [eliminandoId, setEliminandoId] = useState(null);
   const [enviandoResetId, setEnviandoResetId] = useState(null);
   const [resetEnviadoId, setResetEnviadoId] = useState(null);
+  const { confirmar, ConfirmarDialogo } = useConfirmarDialogo();
 
   const enviarResetContrasena = async (u) => {
     setEnviandoResetId(u.id);
@@ -8579,7 +8648,7 @@ function UsuariosPermisosTab({ usuarioActual, onDespachoRenombrado }) {
   };
 
   const eliminarUsuarioClick = async (u) => {
-    if (!window.confirm(`¿Eliminar el acceso de ${u.nombre}? Ya no podrá iniciar sesión. No se puede deshacer.`)) return;
+    if (!(await confirmar(`¿Eliminar el acceso de ${u.nombre}? Ya no podrá iniciar sesión. No se puede deshacer.`))) return;
     setEliminandoId(u.id);
     setError("");
     try {
@@ -8689,7 +8758,7 @@ function UsuariosPermisosTab({ usuarioActual, onDespachoRenombrado }) {
       URL.revokeObjectURL(url);
       registrarAuditoria(usuarioActual, "descargar_respaldo", "despacho", despachoId, {});
     } catch (e) {
-      window.alert("No se pudo generar el respaldo. Intenta de nuevo en un momento.");
+      setErrorRespaldo("No se pudo generar el respaldo. Intenta de nuevo en un momento.");
     }
     setRespaldando(false);
   };
@@ -8757,14 +8826,17 @@ function UsuariosPermisosTab({ usuarioActual, onDespachoRenombrado }) {
           cada semana o antes de cualquier cambio grande.
         </p>
         {!pidiendoContrasenaRespaldo ? (
-          <button
-            className="drx-btn-primary"
-            style={{ ...buttonPrimary, background: "#10B981" }}
-            onClick={() => setPidiendoContrasenaRespaldo(true)}
-            disabled={respaldando || segundosEsperaRespaldo > 0}
-          >
-            {segundosEsperaRespaldo > 0 ? `Vuelve a intentar en ${segundosEsperaRespaldo}s` : "⬇️ Descargar respaldo completo"}
-          </button>
+          <>
+            <button
+              className="drx-btn-primary"
+              style={{ ...buttonPrimary, background: "#10B981" }}
+              onClick={() => setPidiendoContrasenaRespaldo(true)}
+              disabled={respaldando || segundosEsperaRespaldo > 0}
+            >
+              {segundosEsperaRespaldo > 0 ? `Vuelve a intentar en ${segundosEsperaRespaldo}s` : "⬇️ Descargar respaldo completo"}
+            </button>
+            {errorRespaldo && <p style={{ color: "#B42318", fontSize: 12, marginTop: 8, fontFamily: "Inter, sans-serif" }}>{errorRespaldo}</p>}
+          </>
         ) : (
           <div style={{ maxWidth: 320 }}>
             <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.inkSoft, marginBottom: 8 }}>
@@ -8909,6 +8981,7 @@ function UsuariosPermisosTab({ usuarioActual, onDespachoRenombrado }) {
 
       <PapeleraPanel />
       <PanelAuditoria />
+      {ConfirmarDialogo}
     </div>
   );
 }
@@ -8922,6 +8995,7 @@ function PapeleraPanel() {
   const [abierto, setAbierto] = useState(false);
   const [cargado, setCargado] = useState(false);
   const [items, setItems] = useState({ clientes: [], documentos: [] });
+  const { confirmar, ConfirmarDialogo } = useConfirmarDialogo();
 
   const cargar = useCallback(async () => {
     const [clientes, documentos] = await Promise.all([obtenerPapelera("clientes"), obtenerPapelera("documentos")]);
@@ -8939,7 +9013,7 @@ function PapeleraPanel() {
   };
 
   const borrarDefinitivo = async (tipo, id) => {
-    if (!window.confirm("Esto borra el registro para siempre, sin poder recuperarlo. ¿Seguro?")) return;
+    if (!(await confirmar("Esto borra el registro para siempre, sin poder recuperarlo. ¿Seguro?"))) return;
     await eliminarDefinitivo(tipo, id);
     cargar();
   };
@@ -8947,6 +9021,7 @@ function PapeleraPanel() {
   const totalItems = items.clientes.length + items.documentos.length;
 
   return (
+    <>
     <Card style={{ marginTop: 20 }}>
       <button
         onClick={() => setAbierto((a) => !a)}
@@ -9016,6 +9091,8 @@ function PapeleraPanel() {
         </div>
       )}
     </Card>
+    {ConfirmarDialogo}
+    </>
   );
 }
 
