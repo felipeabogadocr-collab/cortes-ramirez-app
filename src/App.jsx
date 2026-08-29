@@ -552,6 +552,51 @@ const GlobalStyle = () => (
       transform: skewX(-20deg); transition: left 0.55s ease;
     }
     .drx-cta-shine:hover::after { left: 130%; }
+
+    /* --- Móvil: la barra lateral pasa de columna fija a cajón deslizable,
+       y varias cuadrículas de formulario de 2-3 columnas se apilan en 1 --- */
+    .drx-btn-hamburguesa { display: none; }
+    .drx-sidebar-overlay { display: none; }
+    @media (max-width: 860px) {
+      .drx-app-shell { display: block !important; }
+      .drx-sidebar {
+        position: fixed !important;
+        left: 0;
+        top: 0;
+        height: 100vh !important;
+        width: 250px !important;
+        max-width: 82vw;
+        transform: translateX(-105%);
+        transition: transform 0.25s ease;
+        z-index: 200 !important;
+        box-shadow: 10px 0 32px rgba(0,0,0,0.35);
+      }
+      .drx-sidebar.drx-sidebar-abierta { transform: translateX(0); }
+      .drx-sidebar-overlay.drx-sidebar-abierta {
+        display: block;
+        position: fixed;
+        inset: 0;
+        background: rgba(6,14,28,0.5);
+        z-index: 150;
+      }
+      .drx-btn-hamburguesa {
+        display: flex !important;
+        align-items: center;
+        justify-content: center;
+        width: 38px;
+        height: 38px;
+        flex-shrink: 0;
+        background: transparent;
+        border: 1px solid var(--drx-border);
+        border-radius: 8px;
+        cursor: pointer;
+        color: var(--drx-heading);
+      }
+      .drx-topbar { padding: 12px 14px !important; flex-wrap: wrap; }
+      .drx-content-area { padding: 14px 14px 28px !important; }
+      .drx-grid-form { grid-template-columns: 1fr !important; }
+      .drx-tabla-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    }
   `}</style>
 );
 
@@ -2400,7 +2445,7 @@ Certificado generado: ${new Date().toLocaleString("es-CO", { dateStyle: "full", 
                 <Field label="Nombre completo">
                   <input className="drx-input" style={inputStyle} value={nombre} onChange={(e) => setNombre(e.target.value)} />
                 </Field>
-                <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr", gap: 12 }}>
+                <div className="drx-grid-form" style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr", gap: 12 }}>
                   <Field label="Tipo de identificación">
                     <select className="drx-input" style={inputStyle} value={tipoId} onChange={(e) => setTipoId(e.target.value)}>
                       {TIPOS_ID.map((t) => (
@@ -2606,7 +2651,7 @@ function VistaPreviaAnimada() {
                 <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11, color: "#9FB6D6", margin: "0 0 12px", textTransform: "uppercase", letterSpacing: 0.5 }}>
                   Resumen de hoy
                 </p>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, marginBottom: 16 }}>
+                <div className="drx-grid-form" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, marginBottom: 16 }}>
                   {[
                     { etiqueta: "Recaudado hoy", valor: "$2.4M", color: "#14B8A6" },
                     { etiqueta: "Clientes activos", valor: "38", color: "#8B5CF6" },
@@ -3250,7 +3295,7 @@ function ClientesTab({ usuarioActual }) {
 
       {showForm && (
         <Card style={{ marginBottom: 16 }}>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <div className="drx-grid-form" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <Field label="Nombre completo">
               <input className="drx-input" style={inputStyle} value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} />
             </Field>
@@ -3322,7 +3367,7 @@ function ClientesTab({ usuarioActual }) {
           if (editandoId === id) {
             return (
               <Card key={id}>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <div className="drx-grid-form" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                   <Field label="Nombre completo">
                     <input className="drx-input" style={inputStyle} value={formEdicion.nombre || ""} onChange={(e) => setFormEdicion({ ...formEdicion, nombre: e.target.value })} />
                   </Field>
@@ -3577,7 +3622,7 @@ function CasosTab() {
 
       {showForm && (
         <Card style={{ marginBottom: 16 }}>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <div className="drx-grid-form" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <Field label="Título del proceso">
               <input className="drx-input" style={inputStyle} value={form.titulo} onChange={(e) => setForm({ ...form, titulo: e.target.value })} />
             </Field>
@@ -3616,7 +3661,7 @@ function CasosTab() {
           if (editandoId === id) {
             return (
               <Card key={id}>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <div className="drx-grid-form" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                   <Field label="Título del proceso">
                     <input className="drx-input" style={inputStyle} value={formEdicion.titulo || ""} onChange={(e) => setFormEdicion({ ...formEdicion, titulo: e.target.value })} />
                   </Field>
@@ -4340,7 +4385,7 @@ function FormularioPago({ cliente, onRegistrar }) {
 
   return (
     <div style={{ marginTop: 12, borderTop: `1px solid ${COLORS.border}`, paddingTop: 14 }}>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+      <div className="drx-grid-form" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
         <Field label="Medio de pago">
           <select className="drx-input" style={inputStyle} value={medioPago} onChange={(e) => setMedioPago(e.target.value)}>
             {MEDIOS_PAGO.map((m) => (
@@ -4354,7 +4399,7 @@ function FormularioPago({ cliente, onRegistrar }) {
           <input className="drx-input" style={inputStyle} type="number" value={valor} onChange={(e) => setValor(e.target.value)} placeholder="Ej: 500000" />
         </Field>
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+      <div className="drx-grid-form" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
         <Field label="Fecha en que se hizo el pago">
           <input type="date" className="drx-input" style={inputStyle} value={fechaPago} onChange={(e) => setFechaPago(e.target.value)} />
         </Field>
@@ -4362,7 +4407,7 @@ function FormularioPago({ cliente, onRegistrar }) {
           <input className="drx-input" style={inputStyle} value={concepto} onChange={(e) => setConcepto(e.target.value)} placeholder="Ej: Cuota inicial, honorarios..." />
         </Field>
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 12 }}>
+      <div className="drx-grid-form" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 12 }}>
         <Field label="Fecha del próximo pago (opcional, si no la calcula el plan de pago)">
           <input type="date" className="drx-input" style={inputStyle} value={fechaProximoPago} onChange={(e) => setFechaProximoPago(e.target.value)} />
         </Field>
@@ -5560,7 +5605,7 @@ function ContenidoTab() {
           <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, fontWeight: 700, color: COLORS.ink, marginBottom: 12 }}>
             {editandoId ? "Editar entrada" : "Nueva entrada"}
           </p>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <div className="drx-grid-form" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <Field label="Título / qué se sube">
               <input
                 className="drx-input"
@@ -5918,7 +5963,7 @@ function DocumentosTab() {
 
       {showForm && (
         <Card style={{ marginBottom: 16 }}>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+          <div className="drx-grid-form" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
             <Field label="Título del documento">
               <input className="drx-input" style={inputStyle} value={form.titulo} onChange={(e) => setForm({ ...form, titulo: e.target.value })} />
             </Field>
@@ -6002,7 +6047,7 @@ function DocumentosTab() {
                     Este documento ya tiene {firmantes.length} firma{firmantes.length !== 1 ? "s" : ""}. Las firmas ya puestas no se borran, pero si cambias el contenido, revísalo con quien ya firmó.
                   </p>
                 )}
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+                <div className="drx-grid-form" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
                   <Field label="Título del documento">
                     <input className="drx-input" style={inputStyle} value={formEdicionDoc.titulo || ""} onChange={(e) => setFormEdicionDoc({ ...formEdicionDoc, titulo: e.target.value })} />
                   </Field>
@@ -6114,7 +6159,7 @@ function DocumentosTab() {
                     previewFirmante={previewAbogado ? { ...previewAbogado, textoFirma: nombreAbogado || "Tu firma" } : null}
                     onMovePreview={(pos) => setPreviewAbogado((p) => ({ ...p, ...pos }))}
                   />
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+                  <div className="drx-grid-form" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
                     <Field label="Tu nombre completo">
                       <input className="drx-input" style={inputStyle} value={nombreAbogado} onChange={(e) => setNombreAbogado(e.target.value)} />
                     </Field>
@@ -8875,7 +8920,7 @@ function UsuariosPermisosTab({ usuarioActual, onDespachoRenombrado }) {
 
       {mostrarForm && (
         <Card style={{ marginBottom: 16 }}>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <div className="drx-grid-form" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <Field label="Nombre">
               <input className="drx-input" style={inputStyle} value={nombre} onChange={(e) => setNombre(e.target.value)} />
             </Field>
@@ -9297,6 +9342,7 @@ export default function App() {
   const [cambiandoUsuario, setCambiandoUsuario] = useState(false);
   const [tab, setTab] = useState("resumen");
   const [mostrarNotificaciones, setMostrarNotificaciones] = useState(false);
+  const [sidebarMovilAbierta, setSidebarMovilAbierta] = useState(false);
 
   // La app scrollea con la página completa (no hay un contenedor interno
   // aparte por sección) — sin esto, si venías scrolleado hacia abajo en una
@@ -9304,6 +9350,7 @@ export default function App() {
   // empezar arriba, lo que se sentía como que la pantalla "saltaba" sola.
   useEffect(() => {
     window.scrollTo(0, 0);
+    setSidebarMovilAbierta(false);
   }, [tab]);
   const {
     count: notificaciones,
@@ -9499,9 +9546,13 @@ export default function App() {
   };
 
   return (
-    <div className={oscuro ? "drx-tema-oscuro" : "drx-tema-claro"} style={{ background: COLORS.bg, minHeight: "100%", display: "flex" }}>
+    <div className={`drx-app-shell ${oscuro ? "drx-tema-oscuro" : "drx-tema-claro"}`} style={{ background: COLORS.bg, minHeight: "100%", display: "flex" }}>
       <GlobalStyle />
       <TexturaGrano />
+      <div
+        className={`drx-sidebar-overlay${sidebarMovilAbierta ? " drx-sidebar-abierta" : ""}`}
+        onClick={() => setSidebarMovilAbierta(false)}
+      />
 
       <div
         aria-hidden="true"
@@ -9537,6 +9588,7 @@ export default function App() {
       />
 
       <div
+        className={`drx-sidebar${sidebarMovilAbierta ? " drx-sidebar-abierta" : ""}`}
         style={{
           width: 250,
           flexShrink: 0,
@@ -9639,6 +9691,7 @@ export default function App() {
 
       <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", position: "relative", zIndex: 1 }}>
         <div
+          className="drx-topbar"
           style={{
             background: COLORS.panel,
             borderBottom: `1px solid ${COLORS.border}`,
@@ -9659,6 +9712,18 @@ export default function App() {
             aria-hidden="true"
             style={{ position: "absolute", bottom: -1, left: 0, height: 2, background: COLORS.accentBright }}
           />
+          <button
+            className="drx-btn-hamburguesa"
+            onClick={() => setSidebarMovilAbierta((v) => !v)}
+            title="Menú"
+            aria-label="Abrir menú"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+              <line x1="3" y1="6" x2="21" y2="6" />
+              <line x1="3" y1="12" x2="21" y2="12" />
+              <line x1="3" y1="18" x2="21" y2="18" />
+            </svg>
+          </button>
           <BuscadorGlobal onIr={setTab} />
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
             <div style={{ position: "relative" }}>
@@ -9726,7 +9791,7 @@ export default function App() {
           </div>
         </div>
 
-        <div style={{ padding: "28px 28px 40px", flex: 1 }}>
+        <div className="drx-content-area" style={{ padding: "28px 28px 40px", flex: 1 }}>
           {ultimaSesionAnterior && (
             <div
               style={{
