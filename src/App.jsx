@@ -571,7 +571,7 @@ const GlobalStyle = () => (
         z-index: 200 !important;
         box-shadow: 10px 0 32px rgba(0,0,0,0.35);
       }
-      .drx-sidebar.drx-sidebar-abierta { transform: translateX(0); }
+      .drx-sidebar.drx-sidebar-abierta { transform: translateX(0); overscroll-behavior: contain; }
       .drx-sidebar-overlay.drx-sidebar-abierta {
         display: block;
         position: fixed;
@@ -9357,6 +9357,20 @@ export default function App() {
     window.scrollTo(0, 0);
     setSidebarMovilAbierta(false);
   }, [tab]);
+
+  // En móvil el menú lateral es un cajón fijo encima de la página. Sin esto,
+  // al hacer scroll con el dedo dentro del cajón, el gesto "se pasaba" y
+  // también movía la página de fondo (todo el panel parecía temblar/moverse
+  // en vez de quedarse fijo mientras solo el contenido de la derecha scrollea).
+  useEffect(() => {
+    if (sidebarMovilAbierta) {
+      const previo = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+      return () => {
+        document.body.style.overflow = previo;
+      };
+    }
+  }, [sidebarMovilAbierta]);
   const {
     count: notificaciones,
     firmasNuevas,
