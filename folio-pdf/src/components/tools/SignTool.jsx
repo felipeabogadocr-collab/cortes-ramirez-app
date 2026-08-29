@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { fileToBytes, renderThumbnails, signPdf, downloadBytes } from "../../lib/pdfUtils.js";
+import { fileToBytes, renderThumbnails, signPdf } from "../../lib/pdfUtils.js";
+import DownloadCard from "../DownloadCard.jsx";
 import { IconEdit, IconImage, IconType, IconUpload, IconShield } from "../Icons.jsx";
 import UploadNote from "../UploadNote.jsx";
 
@@ -565,17 +566,7 @@ export default function SignTool() {
         </button>
 
         {resultado && (
-          <div className="card" style={{ marginTop: 16, padding: 14 }}>
-            <p style={{ margin: "0 0 10px", fontSize: 13, color: "var(--muted)" }}>
-              Tu PDF firmado está listo. Toca el botón para descargarlo.
-            </p>
-            <button
-              className="btn-primary"
-              onClick={() => downloadBytes(resultado, "firmado-folio.pdf", "application/pdf", "Firmar PDF")}
-            >
-              Descargar PDF firmado
-            </button>
-          </div>
+          <DownloadCard bytes={resultado} defaultName="firmado-folio.pdf" herramienta="Firmar PDF" />
         )}
       </div>
     </div>

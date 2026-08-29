@@ -1,8 +1,9 @@
 import { useRef, useState } from "react";
 import JSZip from "jszip";
-import { fileToBytes, getPageCount, splitPdf, downloadBytes } from "../../lib/pdfUtils.js";
+import { fileToBytes, getPageCount, splitPdf } from "../../lib/pdfUtils.js";
 import { IconUpload } from "../Icons.jsx";
 import UploadNote from "../UploadNote.jsx";
+import DownloadCard from "../DownloadCard.jsx";
 
 export default function SplitTool() {
   const [bytes, setBytes] = useState(null);
@@ -133,17 +134,12 @@ export default function SplitTool() {
       </button>
 
       {resultado && (
-        <div className="card" style={{ marginTop: 16, padding: 14 }}>
-          <p style={{ margin: "0 0 10px", fontSize: 13, color: "var(--muted)" }}>
-            Tu archivo está listo. Toca el botón para descargarlo.
-          </p>
-          <button
-            className="btn-primary"
-            onClick={() => downloadBytes(resultado.bytes, resultado.filename, resultado.mime, "Dividir PDF")}
-          >
-            Descargar {resultado.filename.endsWith(".zip") ? "ZIP" : "PDF"}
-          </button>
-        </div>
+        <DownloadCard
+          bytes={resultado.bytes}
+          defaultName={resultado.filename}
+          mime={resultado.mime}
+          herramienta="Dividir PDF"
+        />
       )}
     </div>
   );

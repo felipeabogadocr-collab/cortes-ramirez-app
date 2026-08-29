@@ -1,7 +1,8 @@
 import { useRef, useState } from "react";
-import { imagesToPdf, downloadBytes } from "../../lib/pdfUtils.js";
+import { imagesToPdf } from "../../lib/pdfUtils.js";
 import { IconUpload } from "../Icons.jsx";
 import UploadNote from "../UploadNote.jsx";
+import DownloadCard from "../DownloadCard.jsx";
 
 export default function ImagesToPdfTool() {
   const [files, setFiles] = useState([]);
@@ -87,17 +88,7 @@ export default function ImagesToPdfTool() {
       </button>
 
       {resultado && (
-        <div className="card" style={{ marginTop: 16, padding: 14 }}>
-          <p style={{ margin: "0 0 10px", fontSize: 13, color: "var(--muted)" }}>
-            Tu PDF está listo. Toca el botón para descargarlo.
-          </p>
-          <button
-            className="btn-primary"
-            onClick={() => downloadBytes(resultado, "imagenes-folio.pdf", "application/pdf", "Imágenes a PDF")}
-          >
-            Descargar PDF
-          </button>
-        </div>
+        <DownloadCard bytes={resultado} defaultName="imagenes-folio.pdf" herramienta="Imágenes a PDF" />
       )}
     </div>
   );

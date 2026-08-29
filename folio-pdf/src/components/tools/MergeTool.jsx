@@ -1,7 +1,8 @@
 import { useRef, useState } from "react";
-import { mergePdfs, downloadBytes } from "../../lib/pdfUtils.js";
+import { mergePdfs } from "../../lib/pdfUtils.js";
 import { IconUpload } from "../Icons.jsx";
 import UploadNote from "../UploadNote.jsx";
+import DownloadCard from "../DownloadCard.jsx";
 
 export default function MergeTool() {
   const [files, setFiles] = useState([]);
@@ -97,17 +98,7 @@ export default function MergeTool() {
       </button>
 
       {resultado && (
-        <div className="card" style={{ marginTop: 16, padding: 14 }}>
-          <p style={{ margin: "0 0 10px", fontSize: 13, color: "var(--muted)" }}>
-            Tu PDF está listo. Toca el botón para descargarlo.
-          </p>
-          <button
-            className="btn-primary"
-            onClick={() => downloadBytes(resultado, "unido-folio.pdf", "application/pdf", "Unir PDF")}
-          >
-            Descargar PDF unido
-          </button>
-        </div>
+        <DownloadCard bytes={resultado} defaultName="unido-folio.pdf" herramienta="Unir PDF" />
       )}
     </div>
   );

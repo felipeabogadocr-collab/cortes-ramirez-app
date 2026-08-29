@@ -1,7 +1,8 @@
 import { useRef, useState } from "react";
-import { fileToBytes, compressPdf, downloadBytes } from "../../lib/pdfUtils.js";
+import { fileToBytes, compressPdf } from "../../lib/pdfUtils.js";
 import { IconUpload, IconFile } from "../Icons.jsx";
 import UploadNote from "../UploadNote.jsx";
+import DownloadCard from "../DownloadCard.jsx";
 
 export default function CompressTool() {
   const [file, setFile] = useState(null);
@@ -67,17 +68,12 @@ export default function CompressTool() {
       </button>
 
       {result && (
-        <div className="card" style={{ marginTop: 16, padding: 14, fontSize: 13 }}>
-          <p style={{ margin: "0 0 6px" }}>
+        <>
+          <p style={{ margin: "16px 0 0", fontSize: 13 }}>
             Original: <strong>{kb(result.original)}</strong> → Comprimido: <strong>{kb(result.nuevo)}</strong>
           </p>
-          <button
-            className="btn-primary"
-            onClick={() => downloadBytes(result.bytes, "comprimido-folio.pdf", "application/pdf", "Comprimir PDF")}
-          >
-            Descargar PDF comprimido
-          </button>
-        </div>
+          <DownloadCard bytes={result.bytes} defaultName="comprimido-folio.pdf" herramienta="Comprimir PDF" />
+        </>
       )}
     </div>
   );

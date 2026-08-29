@@ -1,7 +1,8 @@
 import { useRef, useState } from "react";
-import { fileToBytes, renderThumbnails, organizePdf, extractPage, downloadBytes } from "../../lib/pdfUtils.js";
+import { fileToBytes, renderThumbnails, organizePdf, extractPage } from "../../lib/pdfUtils.js";
 import { IconUpload } from "../Icons.jsx";
 import UploadNote from "../UploadNote.jsx";
+import DownloadCard from "../DownloadCard.jsx";
 
 export default function OrganizeTool() {
   const [bytes, setBytes] = useState(null);
@@ -9,6 +10,7 @@ export default function OrganizeTool() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [resultado, setResultado] = useState(null);
+  const [paginaExtraida, setPaginaExtraida] = useState(null);
   const inputRef = useRef(null);
 
   async function cargar(file) {
@@ -51,7 +53,7 @@ export default function OrganizeTool() {
   async function extraer(i) {
     try {
       const out = await extractPage(bytes, pages[i].index);
-      downloadBytes(out, `pagina-${pages[i].index + 1}.pdf`, "application/pdf", "Organizar páginas");
+      setPaginaExtraida({ bytes: out, filename: `pagina-${pages[i].index + 1}.pdf` });
     } catch {
       setError("No se pudo extraer esa página.");
     }
@@ -107,7 +109,15 @@ export default function OrganizeTool() {
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
         <p style={{ color: "var(--muted)", fontSize: 13, margin: 0 }}>{pages.length} páginas — reordena, rota o elimina.</p>
-        <button className="btn-ghost" onClick={() => { setBytes(null); setPages([]); setResultado(null); }}>
+        <button
+          className="btn-ghost"
+          onClick={() => {
+            setBytes(null);
+            setPages([]);
+            setResultado(null);
+            setPaginaExtraida(null);
+          }}
+        >
           Cambiar archivo
         </button>
       </div>
@@ -146,18 +156,16 @@ export default function OrganizeTool() {
         {busy ? "Guardando…" : "Guardar cambios"}
       </button>
 
+      {paginaExtraida && (
+        <DownloadCard
+          bytes={paginaExtraida.bytes}
+          defaultName={paginaExtraida.filename}
+          herramienta="Organizar páginas"
+        />
+      )}
+
       {resultado && (
-        <div className="card" style={{ marginTop: 16, padding: 14 }}>
-          <p style={{ margin: "0 0 10px", fontSize: 13, color: "var(--muted)" }}>
-            Tu PDF está listo. Toca el botón para descargarlo.
-          </p>
-          <button
-            className="btn-primary"
-            onClick={() => downloadBytes(resultado, "organizado-folio.pdf", "application/pdf", "Organizar páginas")}
-          >
-            Descargar PDF
-          </button>
-        </div>
+        <DownloadCard bytes={resultado} defaultName="organizado-folio.pdf" herramienta="Organizar páginas" />
       )}
     </div>
   );
