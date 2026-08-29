@@ -8400,6 +8400,9 @@ function LoginGate({ onIngresar, onCancelar, pantallaInicial }) {
           Inicio de sesión real con Supabase Auth: tu contraseña nunca se guarda en texto plano, viaja cifrada y la
           verifica el servidor.
         </p>
+        <p style={{ textAlign: "center", fontFamily: "monospace", fontSize: 9.5, color: COLORS.border, marginTop: 10 }}>
+          versión: {new Date(__BUILD_TIME__).toLocaleString("es-CO", { dateStyle: "short", timeStyle: "medium" })}
+        </p>
       </Card>
       </div>
     </div>
@@ -9779,6 +9782,9 @@ export default function App() {
             </p>
             <p style={{ textAlign: "center", fontFamily: "Inter, sans-serif", fontSize: 11, color: COLORS.muted, margin: 0 }}>
               Nomos — creado por <strong style={{ color: COLORS.headingText }}>Felipe Cortés Ramírez</strong>, abogado y CEO de Cortés Ramírez Abogados. Todos los derechos reservados.
+            </p>
+            <p title="Si esta hora no cambia después de que Claude publique algo nuevo, tu navegador todavía tiene la versión vieja guardada — haz Ctrl+Shift+R." style={{ textAlign: "center", fontFamily: "monospace", fontSize: 9.5, color: COLORS.border, margin: "4px 0 0" }}>
+              versión: {new Date(__BUILD_TIME__).toLocaleString("es-CO", { dateStyle: "short", timeStyle: "medium" })}
             </p>
           </div>
         </div>

@@ -3,6 +3,12 @@ import react from "@vitejs/plugin-react";
 import { VitePWA } from "vite-plugin-pwa";
 
 export default defineConfig({
+  // Sello con la hora exacta de este build — se muestra chiquito en la app
+  // para poder comprobar, sin adivinar, si el navegador ya está sirviendo
+  // la versión nueva o todavía tiene una vieja guardada en caché.
+  define: {
+    __BUILD_TIME__: JSON.stringify(new Date().toISOString()),
+  },
   plugins: [
     react(),
     VitePWA({
