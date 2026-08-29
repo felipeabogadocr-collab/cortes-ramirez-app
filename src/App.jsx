@@ -8053,7 +8053,7 @@ function LoginGate({ onIngresar, onCancelar, pantallaInicial }) {
           animation: "drx-mesh 12s ease-in-out infinite",
           transition: "background 0.3s ease",
           pointerEvents: "none",
-          zIndex: -1,
+          zIndex: 0,
         }}
       />
       <div
@@ -8069,7 +8069,7 @@ function LoginGate({ onIngresar, onCancelar, pantallaInicial }) {
           animation: "drx-mesh 15s ease-in-out infinite reverse",
           transition: "background 0.3s ease",
           pointerEvents: "none",
-          zIndex: -1,
+          zIndex: 0,
         }}
       />
       <div style={{ position: "absolute", top: 20, right: 20, zIndex: 1 }}>
@@ -9380,7 +9380,7 @@ export default function App() {
           background: `radial-gradient(circle, rgba(30,95,180,${oscuro ? 0.16 : 0.08}) 0%, rgba(30,95,180,0) 70%)`,
           animation: "drx-mesh 14s ease-in-out infinite",
           pointerEvents: "none",
-          zIndex: -1,
+          zIndex: 0,
           transition: "background 0.3s ease",
         }}
       />
@@ -9396,7 +9396,7 @@ export default function App() {
           background: `radial-gradient(circle, rgba(20,184,166,${oscuro ? 0.14 : 0.07}) 0%, rgba(20,184,166,0) 70%)`,
           animation: "drx-mesh 18s ease-in-out infinite reverse",
           pointerEvents: "none",
-          zIndex: -1,
+          zIndex: 0,
           transition: "background 0.3s ease",
         }}
       />
