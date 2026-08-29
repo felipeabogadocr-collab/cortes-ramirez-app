@@ -11,7 +11,7 @@
 import { supabaseAdmin } from "./_lib/supabaseAdmin.js";
 import { dentroDelLimite } from "./_lib/rateLimit.js";
 
-const GEMINI_MODEL = "gemini-2.0-flash";
+const GEMINI_MODEL = "gemini-3.6-flash";
 const MAX_TOKENS_CAP = 2000;
 
 function toGeminiTools(tools) {
