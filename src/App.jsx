@@ -759,7 +759,7 @@ function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-const APP_VERSION = "1.9.3";
+const APP_VERSION = "1.9.4";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -10191,12 +10191,25 @@ function UsuariosPermisosTab({ usuarioActual, onDespachoRenombrado }) {
             <Card key={u.id}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12, flexWrap: "wrap", gap: 8 }}>
                 <div>
-                  <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, fontWeight: 700, color: COLORS.ink, margin: 0 }}>
+                  <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, fontWeight: 700, color: COLORS.ink, margin: 0, display: "flex", alignItems: "center", gap: 8 }}>
                     {u.nombre} {u.id === usuarioActualId && <span style={{ color: COLORS.muted, fontWeight: 400, fontSize: 12 }}>(tú)</span>}
+                    <span
+                      style={{
+                        fontFamily: "Inter, sans-serif",
+                        fontSize: 10.5,
+                        fontWeight: 700,
+                        padding: "2px 8px",
+                        borderRadius: 20,
+                        textTransform: "uppercase",
+                        letterSpacing: 0.3,
+                        background: u.rol === "Administrador" ? "#FEF3E2" : u.rol === "Abogado" ? COLORS.accentSoft : "#F0F0F0",
+                        color: u.rol === "Administrador" ? "#B45309" : u.rol === "Abogado" ? COLORS.navy : COLORS.muted,
+                      }}
+                    >
+                      {u.rol}
+                    </span>
                   </p>
-                  <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, margin: "2px 0 0" }}>
-                    {u.email} · {u.rol}
-                  </p>
+                  <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, margin: "2px 0 0" }}>{u.email}</p>
                   <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11, color: COLORS.muted, margin: "2px 0 0" }}>
                     <UltimaSesionUsuario usuarioId={u.id} />
                   </p>
@@ -10222,6 +10235,22 @@ function UsuariosPermisosTab({ usuarioActual, onDespachoRenombrado }) {
                   )}
                 </div>
               </div>
+              {u.rol !== "Administrador" && (
+                <div style={{ display: "flex", gap: 12, marginBottom: 8 }}>
+                  <button
+                    onClick={() => SECCIONES_PERMISOS.forEach((s) => cambiarPermiso(u, s.id, true))}
+                    style={{ background: "none", border: "none", cursor: "pointer", color: COLORS.accentBright, fontSize: 11.5, fontFamily: "Inter, sans-serif", textDecoration: "underline", padding: 0 }}
+                  >
+                    Marcar todo
+                  </button>
+                  <button
+                    onClick={() => SECCIONES_PERMISOS.forEach((s) => cambiarPermiso(u, s.id, false))}
+                    style={{ background: "none", border: "none", cursor: "pointer", color: COLORS.muted, fontSize: 11.5, fontFamily: "Inter, sans-serif", textDecoration: "underline", padding: 0 }}
+                  >
+                    Ninguno
+                  </button>
+                </div>
+              )}
               <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
                 {SECCIONES_PERMISOS.map((s) => (
                   <label key={s.id} style={{ display: "flex", alignItems: "center", gap: 6, fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.inkSoft, cursor: "pointer" }}>
