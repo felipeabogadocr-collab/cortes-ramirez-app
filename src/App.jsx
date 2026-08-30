@@ -759,7 +759,7 @@ function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-const APP_VERSION = "1.8.0";
+const APP_VERSION = "1.8.1";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -3972,6 +3972,7 @@ function ClientesTab({ usuarioActual }) {
   useAvisoAntesDeSalir(showForm && !!form.nombre.trim());
   const [soloSinRadicado, setSoloSinRadicado] = useState(false);
   const [soloInactivos, setSoloInactivos] = useState(false);
+  const [toastGuardado, setToastGuardado] = useState("");
   const { confirmar, ConfirmarDialogo } = useConfirmarDialogo();
 
   useEffect(() => {
@@ -3998,6 +3999,8 @@ function ClientesTab({ usuarioActual }) {
     await storageSet(`cliente:${id}`, JSON.stringify({ ...form, timeline: [], ultimaActuacion: new Date().toISOString(), proximoPago }), false);
     await addId(id);
     registrarAuditoria(usuarioActual, "crear_cliente", "cliente", id, { nombre: form.nombre });
+    setToastGuardado(`"${form.nombre}" se guardó correctamente`);
+    setTimeout(() => setToastGuardado(""), 2800);
     setForm(FORM_CLIENTE_INICIAL);
     setShowForm(false);
   };
@@ -4414,6 +4417,30 @@ function ClientesTab({ usuarioActual }) {
           <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted, textAlign: "center" }}>Ningún cliente coincide con "{filtro}".</p>
         )}
       </div>
+      {toastGuardado && (
+        <div
+          className="drx-fade-in"
+          style={{
+            position: "fixed",
+            bottom: 24,
+            right: 24,
+            zIndex: 200,
+            background: "#0B3D2E",
+            color: "#FFFFFF",
+            padding: "12px 18px",
+            borderRadius: 10,
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            fontFamily: "Inter, sans-serif",
+            fontSize: 13,
+            fontWeight: 600,
+            boxShadow: "0 10px 30px rgba(11,61,46,0.35)",
+          }}
+        >
+          <Icono tipo="check" size={15} /> {toastGuardado}
+        </div>
+      )}
       {ConfirmarDialogo}
     </div>
   );
@@ -7629,15 +7656,26 @@ function InsigniaPlataforma({ grande }) {
 
 function CampoContrasena({ valor, onChange, onEnter, autoFocus }) {
   const [visible, setVisible] = useState(false);
+  // Bloq Mayús activado es la causa más común de "contraseña incorrecta" cuando
+  // en realidad el usuario la escribió bien — avisarlo evita intentos fallidos
+  // (y el bloqueo temporal por demasiados intentos) por algo tan tonto como eso.
+  const [bloqMayus, setBloqMayus] = useState(false);
+  const detectarBloqMayus = (e) => setBloqMayus(e.getModifierState && e.getModifierState("CapsLock"));
+
   return (
     <div style={{ position: "relative" }}>
       <input
         type={visible ? "text" : "password"}
         className="drx-input"
-        style={{ ...inputStyle, paddingRight: 44, width: "100%", boxSizing: "border-box" }}
+        style={{ ...inputStyle, paddingRight: 44, width: "100%", boxSizing: "border-box", borderColor: bloqMayus ? "#D97706" : undefined }}
         value={valor}
         onChange={(e) => onChange(e.target.value)}
-        onKeyDown={(e) => e.key === "Enter" && onEnter && onEnter()}
+        onKeyDown={(e) => {
+          detectarBloqMayus(e);
+          if (e.key === "Enter" && onEnter) onEnter();
+        }}
+        onKeyUp={detectarBloqMayus}
+        onBlur={() => setBloqMayus(false)}
         autoFocus={autoFocus}
       />
       <button
@@ -7648,6 +7686,11 @@ function CampoContrasena({ valor, onChange, onEnter, autoFocus }) {
       >
         <Icono tipo={visible ? "ojoTachado" : "ojo"} size={15} />
       </button>
+      {bloqMayus && (
+        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, color: "#D97706", margin: "5px 0 0", display: "flex", alignItems: "center", gap: 4 }}>
+          <Icono tipo="alerta" size={12} /> Bloq Mayús está activado
+        </p>
+      )}
     </div>
   );
 }
