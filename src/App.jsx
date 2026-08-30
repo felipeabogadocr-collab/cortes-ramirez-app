@@ -759,7 +759,7 @@ function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-const APP_VERSION = "1.9.2";
+const APP_VERSION = "1.9.3";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -5646,6 +5646,20 @@ function ReportesTab() {
   const filasCarga = Object.entries(cargaPorAbogado).sort((a, b) => b[1] - a[1]);
   const maxCarga = Math.max(1, ...filasCarga.map(([, n]) => n));
 
+  // Distribución por área del derecho — para ver de un vistazo en qué se
+  // concentra el despacho (útil para decidir en qué especializarse o en qué
+  // invertir en marketing).
+  const cargaPorArea = {};
+  listaClientes.forEach((c) => {
+    const area = c.areaProceso?.trim() || "Sin definir";
+    cargaPorArea[area] = (cargaPorArea[area] || 0) + 1;
+  });
+  const filasArea = Object.entries(cargaPorArea).sort((a, b) => b[1] - a[1]);
+  const maxArea = Math.max(1, ...filasArea.map(([, n]) => n));
+
+  const clientesConPago = listaClientes.filter((c) => (c.pagos || []).length > 0).length;
+  const ticketPromedio = clientesConPago > 0 ? ingresoTotalHistorico / clientesConPago : 0;
+
   if (cargando) {
     return (
       <div>
@@ -5736,6 +5750,20 @@ function ReportesTab() {
         {usuarios.length > 0 && filasCarga.length > 0 && (
           <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, color: COLORS.muted, marginTop: 10 }}>
             {usuarios.length} usuario{usuarios.length !== 1 ? "s" : ""} en el despacho.
+          </p>
+        )}
+      </Card>
+
+      <Card>
+        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, fontWeight: 700, color: COLORS.ink, marginBottom: 4 }}>Distribución por área del derecho</p>
+        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, marginBottom: 14 }}>En qué se concentra el despacho — útil para decidir dónde especializarse.</p>
+        {filasArea.length === 0 && <EstadoVacio icono={<Icono tipo="balanza" size={26} />} texto="Aún no hay clientes registrados." />}
+        {filasArea.map(([area, n]) => (
+          <BarraReporte key={area} etiqueta={area} valor={n} maximo={maxArea} color={COLOR_AREA_PROCESO[area] || "#6B7480"} />
+        ))}
+        {clientesConPago > 0 && (
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, color: COLORS.muted, marginTop: 10 }}>
+            Ticket promedio por cliente que ha pagado: <strong style={{ color: COLORS.headingText }}>{formatoCOP(ticketPromedio)}</strong>
           </p>
         )}
       </Card>
