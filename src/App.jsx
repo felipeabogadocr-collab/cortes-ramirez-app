@@ -37,17 +37,17 @@ const LOGO_SRC = `data:image/png;base64,${LOGO_BASE64}`;
 const COLORS = {
   bg: "var(--drx-bg)",
   panel: "var(--drx-panel)",
-  navy: "#0A2342",
-  navyDeep: "#061529",
+  navy: "#0B3D2E",
+  navyDeep: "#042E22",
   ink: "var(--drx-ink)",
   inkSoft: "var(--drx-ink-soft)",
   muted: "var(--drx-muted)",
   border: "var(--drx-border)",
   headingText: "var(--drx-heading)",
   surfaceSoft: "var(--drx-surface-soft)",
-  accent: "#0A2342",
-  accentBright: "#1E5FB4",
-  accentSoft: "#E8EEF7",
+  accent: "#0B3D2E",
+  accentBright: "#16A34A",
+  accentSoft: "#E3F5EA",
   black: "#0B0B0C",
 };
 
@@ -150,7 +150,7 @@ function generarReciboImagen(clienteId, cliente, pago) {
     ctx.fillStyle = "#FFFFFF";
     ctx.fillRect(0, 0, width, height);
 
-    ctx.fillStyle = "#0A2342";
+    ctx.fillStyle = "#0B3D2E";
     ctx.fillRect(0, 0, width, 160);
 
     const dibujarResto = () => {
@@ -161,10 +161,10 @@ function generarReciboImagen(clienteId, cliente, pago) {
       ctx.fillStyle = "#B9CBE5";
       ctx.fillText("Recibo de pago", 165, 104);
 
-      ctx.fillStyle = "#0A2342";
+      ctx.fillStyle = "#0B3D2E";
       ctx.font = "700 25px Georgia";
       ctx.fillText("RECIBO DE PAGO", 44, 218);
-      ctx.strokeStyle = "#0A2342";
+      ctx.strokeStyle = "#0B3D2E";
       ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.moveTo(44, 234);
@@ -188,7 +188,7 @@ function generarReciboImagen(clienteId, cliente, pago) {
       if (pago.concepto) fila("Concepto:", pago.concepto);
 
       y += 20;
-      ctx.fillStyle = "#E8EEF7";
+      ctx.fillStyle = "#E3F5EA";
       ctx.fillRect(44, y, width - 88, 118);
       ctx.strokeStyle = "#C7D6EA";
       ctx.lineWidth = 1.5;
@@ -196,7 +196,7 @@ function generarReciboImagen(clienteId, cliente, pago) {
       ctx.fillStyle = "#6B7480";
       ctx.font = "700 13px Arial";
       ctx.fillText("VALOR PAGADO", 66, y + 34);
-      ctx.fillStyle = "#0A2342";
+      ctx.fillStyle = "#0B3D2E";
       ctx.font = "700 42px Georgia";
       ctx.fillText(formatoCOP(pago.valor), 66, y + 88);
 
@@ -395,7 +395,7 @@ async function descargarPdfFirmado(doc) {
   pdf.setFontSize(16);
   pdf.text(doc.titulo || "Documento", marginX, y);
   y += 8;
-  pdf.setDrawColor(10, 35, 66);
+  pdf.setDrawColor(11, 61, 46);
   pdf.setLineWidth(1.2);
   pdf.line(marginX, y, pageWidth - marginX, y);
   y += 26;
@@ -428,10 +428,10 @@ async function descargarPdfFirmado(doc) {
       y = 60;
     }
     const alto = 58;
-    pdf.setDrawColor(10, 35, 66);
+    pdf.setDrawColor(11, 61, 46);
     pdf.setLineWidth(1);
     if (f.rol === "abogado") {
-      pdf.setFillColor(10, 35, 66);
+      pdf.setFillColor(11, 61, 46);
       pdf.roundedRect(marginX, y, pageWidth - marginX * 2, alto, 4, 4, "FD");
       pdf.setTextColor(255, 255, 255);
     } else {
@@ -490,7 +490,7 @@ const GlobalStyle = () => (
       --drx-ink-soft: #3B4657;
       --drx-muted: #6B7480;
       --drx-border: #DFE3EA;
-      --drx-heading: #0A2342;
+      --drx-heading: #0B3D2E;
       --drx-surface-soft: #FAFAF8;
     }
     .drx-tema-oscuro {
@@ -500,7 +500,7 @@ const GlobalStyle = () => (
       --drx-ink-soft: #C7CDD6;
       --drx-muted: #8B95A3;
       --drx-border: #2B3542;
-      --drx-heading: #8FB4E8;
+      --drx-heading: #7FCBA4;
       --drx-surface-soft: #232C39;
     }
     .drx-tema-claro, .drx-tema-oscuro { transition: background-color .2s ease, color .2s ease, border-color .2s ease; }
@@ -512,11 +512,11 @@ const GlobalStyle = () => (
     .drx-tema-claro .drx-btn-ghost:hover { background: #EEF2F7; border-color: #B9C2CF; }
     .drx-tema-oscuro .drx-btn-ghost:hover { background: #232C39; border-color: #3A4657; }
     .drx-card { transition: box-shadow .18s ease, border-color .18s ease, transform .18s ease; }
-    .drx-tema-claro .drx-card:hover { box-shadow: 0 10px 26px rgba(10,35,66,0.1); border-color: #C7D6EA; }
+    .drx-tema-claro .drx-card:hover { box-shadow: 0 10px 26px rgba(11,61,46,0.1); border-color: #C7D6EA; }
     .drx-tema-oscuro .drx-card:hover { box-shadow: 0 10px 30px rgba(0,0,0,0.5); border-color: #3A4A63; }
     .drx-tab { transition: background .15s ease, color .15s ease; }
     .drx-input:focus { border-color: ${COLORS.accentBright} !important; box-shadow: 0 0 0 3px ${COLORS.accentSoft}; }
-    .drx-btn-primary:hover { box-shadow: 0 6px 20px rgba(30,95,180,0.35); }
+    .drx-btn-primary:hover { box-shadow: 0 6px 20px rgba(22,163,74,0.35); }
     .drx-glow { position: relative; }
     .drx-glow > * { position: relative; z-index: 1; }
     .drx-tema-oscuro .drx-glow::before {
@@ -527,12 +527,12 @@ const GlobalStyle = () => (
       transform: translateX(-50%);
       width: 640px;
       height: 320px;
-      background: radial-gradient(circle, rgba(30,95,180,0.28), transparent 70%);
+      background: radial-gradient(circle, rgba(22,163,74,0.28), transparent 70%);
       filter: blur(50px);
       pointer-events: none;
       z-index: 0;
     }
-    @keyframes drx-pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(30,95,180,0.35); } 50% { box-shadow: 0 0 0 6px rgba(30,95,180,0); } }
+    @keyframes drx-pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(22,163,74,0.35); } 50% { box-shadow: 0 0 0 6px rgba(22,163,74,0); } }
     @keyframes drx-fade-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
     .drx-fade-in { animation: drx-fade-in 0.22s ease; }
     @keyframes drx-tab-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
@@ -630,7 +630,7 @@ const buttonPrimary = {
   fontWeight: 600,
   cursor: "pointer",
   fontFamily: "Inter, sans-serif",
-  boxShadow: "0 2px 8px rgba(10,35,66,0.18)",
+  boxShadow: "0 2px 8px rgba(11,61,46,0.18)",
 };
 
 const buttonGhost = {
@@ -759,7 +759,7 @@ function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-const APP_VERSION = "1.6.0";
+const APP_VERSION = "1.7.0";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -1609,7 +1609,7 @@ async function ejecutarHerramienta(nombreHerramienta, input) {
     const marginX = 48;
     let y = 64;
 
-    pdf.setFillColor(10, 35, 66);
+    pdf.setFillColor(11, 61, 46);
     pdf.rect(0, 0, pageWidth, 90, "F");
     pdf.setTextColor(255, 255, 255);
     pdf.setFont("helvetica", "bold");
@@ -2129,7 +2129,7 @@ function AsistenteIA({ nombre, usuarioId, onAccionCompletada }) {
                   background: COLORS.panel,
                   border: `1px solid ${COLORS.border}`,
                   borderRadius: 12,
-                  boxShadow: "0 12px 30px rgba(10,35,66,0.18)",
+                  boxShadow: "0 12px 30px rgba(11,61,46,0.18)",
                   zIndex: 30,
                   padding: 6,
                 }}
@@ -2822,7 +2822,7 @@ function SelloFirma({ nombre, tipoId, numeroId, fecha, compact, rol }) {
         border: `1.5px solid ${COLORS.navy}`,
         borderRadius: 6,
         padding: compact ? "4px 8px" : "8px 12px",
-        boxShadow: "0 1px 3px rgba(10,35,66,0.18)",
+        boxShadow: "0 1px 3px rgba(11,61,46,0.18)",
       }}
     >
       <span style={{ fontFamily: "Inter, sans-serif", fontWeight: 700, fontSize: compact ? 14 : 16, color: esAbogado ? "#FFFFFF" : COLORS.navy, lineHeight: 1.2 }}>
@@ -3404,7 +3404,7 @@ function VistaPreviaAnimada() {
           background: COLORS.navy,
           borderRadius: 16,
           overflow: "hidden",
-          boxShadow: "0 30px 70px rgba(10,35,66,0.4)",
+          boxShadow: "0 30px 70px rgba(11,61,46,0.4)",
           border: "1px solid #143c72",
           textAlign: "left",
         }}
@@ -7278,7 +7278,7 @@ function ModalNotificaciones({
         maxWidth: "calc(100vw - 40px)",
         maxHeight: "70vh",
         overflowY: "auto",
-        boxShadow: "0 20px 50px rgba(10,35,66,0.22)",
+        boxShadow: "0 20px 50px rgba(11,61,46,0.22)",
         zIndex: 1000,
       }}
     >
@@ -7337,7 +7337,7 @@ function ModalNotificaciones({
             <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.muted, marginBottom: 18 }}>Todos los clientes tienen actuaciones recientes.</p>
           )}
 
-          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, fontWeight: 700, color: "#0A2342", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 10 }}>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, fontWeight: 700, color: "#0B3D2E", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 10 }}>
             <Icono tipo="tarjeta" size={14} style={{ marginRight: 4, verticalAlign: -2 }} /> Pagos pendientes
           </p>
           {pagosPendientes.length > 0 ? (
@@ -7984,7 +7984,7 @@ function LandingPage({ onRegistrar, onIniciarSesion }) {
           WebkitBackdropFilter: scrolleado ? "blur(8px)" : "none",
           borderBottom: `1px solid ${COLORS.border}`,
           borderTop: `3px solid ${COLORS.accentBright}`,
-          boxShadow: scrolleado ? "0 4px 18px rgba(10,35,66,0.12)" : "0 2px 12px rgba(10,35,66,0.08)",
+          boxShadow: scrolleado ? "0 4px 18px rgba(11,61,46,0.12)" : "0 2px 12px rgba(11,61,46,0.08)",
           transition: "box-shadow 0.2s ease, background 0.2s ease",
         }}
       >
@@ -8024,7 +8024,7 @@ function LandingPage({ onRegistrar, onIniciarSesion }) {
             width: 320,
             height: 320,
             borderRadius: "50%",
-            background: "radial-gradient(circle, rgba(30,95,180,0.22) 0%, rgba(30,95,180,0) 70%)",
+            background: "radial-gradient(circle, rgba(22,163,74,0.22) 0%, rgba(22,163,74,0) 70%)",
             animation: "drx-mesh 10s ease-in-out infinite",
             pointerEvents: "none",
           }}
@@ -8168,7 +8168,7 @@ function LandingPage({ onRegistrar, onIniciarSesion }) {
                     fontWeight: 800,
                     fontSize: 17,
                     margin: "0 auto 14px",
-                    boxShadow: "0 8px 20px rgba(10,35,66,0.25)",
+                    boxShadow: "0 8px 20px rgba(11,61,46,0.25)",
                   }}
                 >
                   {paso.n}
@@ -8305,7 +8305,7 @@ function LandingPage({ onRegistrar, onIniciarSesion }) {
                   <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.inkSoft, lineHeight: 1.65, margin: 0 }}>{f.texto}</p>
                 </div>
                 <div style={{ flex: "1 1 320px" }}>
-                  <div style={{ background: COLORS.navy, borderRadius: 14, padding: 18, boxShadow: "0 18px 40px rgba(10,35,66,0.22)" }}>{f.contenido}</div>
+                  <div style={{ background: COLORS.navy, borderRadius: 14, padding: 18, boxShadow: "0 18px 40px rgba(11,61,46,0.22)" }}>{f.contenido}</div>
                 </div>
               </div>
             </AlEntrar>
@@ -8342,7 +8342,7 @@ function LandingPage({ onRegistrar, onIniciarSesion }) {
             </div>
           </AlEntrar>
           <AlEntrar retraso={100}>
-            <div style={{ background: COLORS.navy, borderRadius: 14, padding: 22, boxShadow: "0 16px 40px rgba(10,35,66,0.25)" }}>
+            <div style={{ background: COLORS.navy, borderRadius: 14, padding: 22, boxShadow: "0 16px 40px rgba(11,61,46,0.25)" }}>
               <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, fontWeight: 700, color: "#9FB6D6", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 14 }}>
                 Con Nomos
               </p>
@@ -8420,7 +8420,7 @@ function LandingPage({ onRegistrar, onIniciarSesion }) {
               style={{
                 border: p.destacado ? `2px solid ${COLORS.accentBright}` : `1px solid ${COLORS.border}`,
                 borderTop: `4px solid ${p.destacado ? COLORS.accentBright : COLORS.navy}`,
-                boxShadow: p.destacado ? "0 10px 30px rgba(30,95,180,0.18)" : "none",
+                boxShadow: p.destacado ? "0 10px 30px rgba(22,163,74,0.18)" : "none",
                 position: "relative",
               }}
             >
@@ -8711,7 +8711,7 @@ function LandingPage({ onRegistrar, onIniciarSesion }) {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          boxShadow: "0 8px 20px rgba(10,35,66,0.3)",
+          boxShadow: "0 8px 20px rgba(11,61,46,0.3)",
           zIndex: 40,
           cursor: "pointer",
           opacity: mostrarSubir ? 1 : 0,
@@ -8734,7 +8734,7 @@ function LandingPage({ onRegistrar, onIniciarSesion }) {
           zIndex: 39,
           background: COLORS.panel,
           borderTop: `1px solid ${COLORS.border}`,
-          boxShadow: "0 -6px 20px rgba(10,35,66,0.12)",
+          boxShadow: "0 -6px 20px rgba(11,61,46,0.12)",
           padding: "12px 20px",
           transform: mostrarCtaFlotante ? "translateY(0)" : "translateY(100%)",
           transition: "transform 0.3s ease",
@@ -9061,7 +9061,7 @@ function LoginGate({ onIngresar, onCancelar, pantallaInicial }) {
           width: 300,
           height: 300,
           borderRadius: "50%",
-          background: `radial-gradient(circle, rgba(30,95,180,${oscuro ? 0.32 : 0.16}) 0%, rgba(30,95,180,0) 70%)`,
+          background: `radial-gradient(circle, rgba(22,163,74,${oscuro ? 0.32 : 0.16}) 0%, rgba(22,163,74,0) 70%)`,
           animation: "drx-mesh 12s ease-in-out infinite",
           transition: "background 0.3s ease",
           pointerEvents: "none",
@@ -9088,7 +9088,7 @@ function LoginGate({ onIngresar, onCancelar, pantallaInicial }) {
         <BotonTema oscuro={oscuro} onClick={alternar} />
       </div>
       <div className="drx-fade-in" style={{ maxWidth: 420, width: "100%", position: "relative", zIndex: 1 }}>
-      <Card style={{ width: "100%", textAlign: "center", position: "relative", borderTop: `3px solid ${COLORS.accentBright}`, boxShadow: "0 20px 50px rgba(10,35,66,0.14)" }}>
+      <Card style={{ width: "100%", textAlign: "center", position: "relative", borderTop: `3px solid ${COLORS.accentBright}`, boxShadow: "0 20px 50px rgba(11,61,46,0.14)" }}>
         {onCancelar && (
           <button
             onClick={onCancelar}
@@ -9891,10 +9891,38 @@ function UsuariosPermisosTab({ usuarioActual, onDespachoRenombrado }) {
         })}
       </div>
 
+      <PanelSeguridadSesion confirmar={confirmar} />
       <PapeleraPanel />
       <PanelAuditoria />
       {ConfirmarDialogo}
     </div>
+  );
+}
+
+function PanelSeguridadSesion({ confirmar }) {
+  const [cerrando, setCerrando] = useState(false);
+  const [hecho, setHecho] = useState(false);
+
+  const cerrarTodasLasSesiones = async () => {
+    if (!(await confirmar("¿Cerrar tu sesión en todos los dispositivos donde hayas iniciado sesión? Tendrás que volver a ingresar tu contraseña en todos ellos, incluido este."))) return;
+    setCerrando(true);
+    await supabase.auth.signOut({ scope: "global" });
+    setHecho(true);
+    setTimeout(() => window.location.reload(), 1200);
+  };
+
+  return (
+    <Card style={{ marginBottom: 20 }}>
+      <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, fontWeight: 600, color: COLORS.headingText, marginBottom: 4, display: "flex", alignItems: "center", gap: 5 }}>
+        <Icono tipo="escudo" size={14} /> Seguridad de tu sesión
+      </p>
+      <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, marginBottom: 12 }}>
+        Si crees que alguien más pudo haber entrado a tu cuenta, o dejaste una sesión abierta en un computador que no es tuyo, ciérralas todas de un clic.
+      </p>
+      <button className="drx-btn-ghost" style={{ ...buttonGhost, borderColor: "#B42318", color: "#B42318" }} onClick={cerrarTodasLasSesiones} disabled={cerrando}>
+        {hecho ? "Listo, cerrando sesión..." : cerrando ? "Cerrando todas las sesiones..." : "Cerrar sesión en todos los dispositivos"}
+      </button>
+    </Card>
   );
 }
 
@@ -10442,7 +10470,7 @@ export default function App() {
           width: 460,
           height: 460,
           borderRadius: "50%",
-          background: `radial-gradient(circle, rgba(30,95,180,${oscuro ? 0.28 : 0.16}) 0%, rgba(30,95,180,0) 70%)`,
+          background: `radial-gradient(circle, rgba(22,163,74,${oscuro ? 0.28 : 0.16}) 0%, rgba(22,163,74,0) 70%)`,
           animation: "drx-mesh 14s ease-in-out infinite",
           pointerEvents: "none",
           zIndex: 0,
@@ -10471,7 +10499,7 @@ export default function App() {
         style={{
           width: 250,
           flexShrink: 0,
-          background: `linear-gradient(180deg, ${COLORS.navy} 0%, #071a33 100%)`,
+          background: `linear-gradient(180deg, ${COLORS.navy} 0%, #052a20 100%)`,
           borderRight: `3px solid ${COLORS.accentBright}`,
           display: "flex",
           flexDirection: "column",
@@ -10579,7 +10607,7 @@ export default function App() {
           style={{
             background: COLORS.panel,
             borderBottom: `1px solid ${COLORS.border}`,
-            boxShadow: "0 2px 10px rgba(10,35,66,0.04)",
+            boxShadow: "0 2px 10px rgba(11,61,46,0.04)",
             padding: "16px 28px",
             display: "flex",
             justifyContent: "space-between",
