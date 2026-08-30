@@ -759,7 +759,7 @@ function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-const APP_VERSION = "1.7.0";
+const APP_VERSION = "1.7.1";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -3416,7 +3416,7 @@ function VistaPreviaAnimada() {
           <span style={{ marginLeft: 10, fontFamily: "Inter, sans-serif", fontSize: 11, color: "#7C93B8" }}>nomos — panel del despacho</span>
         </div>
         <div style={{ display: "flex", minHeight: 260 }}>
-          <div style={{ width: 46, background: "#0d2c54", padding: "16px 0", display: "flex", flexDirection: "column", alignItems: "center", gap: 16, flexShrink: 0 }}>
+          <div style={{ width: 46, background: "#0d3524", padding: "16px 0", display: "flex", flexDirection: "column", alignItems: "center", gap: 16, flexShrink: 0 }}>
             <div style={{ width: 28, height: 28, borderRadius: 8, background: "#FFFFFF", display: "flex", alignItems: "center", justifyContent: "center", color: COLORS.navy }}>
               <IconoNomos size={16} />
             </div>
@@ -3451,13 +3451,13 @@ function VistaPreviaAnimada() {
                     { etiqueta: "Clientes activos", valor: "38", color: "#8B5CF6" },
                     { etiqueta: "Con novedad", valor: "3", color: "#F5A524" },
                   ].map((s) => (
-                    <div key={s.etiqueta} style={{ background: "#0d2c54", borderRadius: 10, padding: "10px 12px" }}>
+                    <div key={s.etiqueta} style={{ background: "#0d3524", borderRadius: 10, padding: "10px 12px" }}>
                       <p style={{ fontFamily: "Inter, sans-serif", fontSize: 9.5, color: "#9FB6D6", margin: 0 }}>{s.etiqueta}</p>
                       <p style={{ fontFamily: "Inter, sans-serif", fontSize: 17, fontWeight: 800, color: s.color, margin: "3px 0 0" }}>{s.valor}</p>
                     </div>
                   ))}
                 </div>
-                <div style={{ background: "#0d2c54", borderRadius: 10, padding: "12px 14px", display: "flex", alignItems: "flex-end", gap: 8, height: 78 }}>
+                <div style={{ background: "#0d3524", borderRadius: 10, padding: "12px 14px", display: "flex", alignItems: "flex-end", gap: 8, height: 78 }}>
                   {[38, 55, 44, 70, 60, 82, 68].map((h, i) => (
                     <div key={i} style={{ flex: 1, height: `${h}%`, borderRadius: 3, background: i === 5 ? COLORS.accentBright : "#1e5fb4" }} />
                   ))}
@@ -3473,7 +3473,7 @@ function VistaPreviaAnimada() {
                     { nombre: "Proceso 2024-00187", estado: "Con novedad", color: "#F5A524" },
                     { nombre: "Proceso 2023-00542", estado: "En trámite", color: "#2F80ED" },
                   ].map((p) => (
-                    <div key={p.nombre} style={{ background: "#0d2c54", borderRadius: 8, padding: "8px 12px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <div key={p.nombre} style={{ background: "#0d3524", borderRadius: 8, padding: "8px 12px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                       <span style={{ fontFamily: "monospace", fontSize: 11, color: "#D7E2F1" }}>{p.nombre}</span>
                       <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontFamily: "Inter, sans-serif", fontSize: 9.5, fontWeight: 700, color: p.color }}>
                         <span style={{ width: 6, height: 6, borderRadius: "50%", background: p.color }} />
@@ -3482,7 +3482,7 @@ function VistaPreviaAnimada() {
                     </div>
                   ))}
                 </div>
-                <div style={{ background: "#0d2c54", borderRadius: 10, padding: "12px 14px", display: "flex", alignItems: "center", gap: 12 }}>
+                <div style={{ background: "#0d3524", borderRadius: 10, padding: "12px 14px", display: "flex", alignItems: "center", gap: 12 }}>
                   <div style={{ width: 30, height: 30, borderRadius: "50%", background: "#10B981", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                     <span style={{ color: "#FFFFFF", fontWeight: 800, fontSize: 14 }}>✓</span>
                   </div>
@@ -8234,7 +8234,7 @@ function LandingPage({ onRegistrar, onIniciarSesion }) {
                     { nombre: "Proceso 2023-00542", estado: "En trámite", color: "#2F80ED" },
                     { nombre: "Proceso 2022-00931", estado: "Finalizado", color: "#10B981" },
                   ].map((p) => (
-                    <div key={p.nombre} style={{ background: "#0d2c54", borderRadius: 8, padding: "9px 12px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <div key={p.nombre} style={{ background: "#0d3524", borderRadius: 8, padding: "9px 12px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                       <span style={{ fontFamily: "monospace", fontSize: 11, color: "#D7E2F1" }}>{p.nombre}</span>
                       <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontFamily: "Inter, sans-serif", fontSize: 9.5, fontWeight: 700, color: p.color }}>
                         <span style={{ width: 6, height: 6, borderRadius: "50%", background: p.color }} />
@@ -8252,7 +8252,7 @@ function LandingPage({ onRegistrar, onIniciarSesion }) {
               color: "#10B981",
               contenido: (
                 <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                  <div style={{ background: "#0d2c54", borderRadius: 10, padding: "12px 14px", display: "flex", alignItems: "center", gap: 12 }}>
+                  <div style={{ background: "#0d3524", borderRadius: 10, padding: "12px 14px", display: "flex", alignItems: "center", gap: 12 }}>
                     <div style={{ width: 30, height: 30, borderRadius: "50%", background: "#10B981", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                       <span style={{ color: "#FFFFFF", fontWeight: 800, fontSize: 14 }}>✓</span>
                     </div>
@@ -8261,7 +8261,7 @@ function LandingPage({ onRegistrar, onIniciarSesion }) {
                       <p style={{ fontFamily: "Inter, sans-serif", fontSize: 9.5, color: "#9FB6D6", margin: "2px 0 0" }}>Firmado por cliente y abogado</p>
                     </div>
                   </div>
-                  <div style={{ background: "#0d2c54", borderRadius: 8, padding: "8px 12px", fontFamily: "monospace", fontSize: 9.5, color: "#7C93B8", wordBreak: "break-all" }}>
+                  <div style={{ background: "#0d3524", borderRadius: 8, padding: "8px 12px", fontFamily: "monospace", fontSize: 9.5, color: "#7C93B8", wordBreak: "break-all" }}>
                     hash: 8f3a2c…e91d — íntegro ✓
                   </div>
                 </div>
@@ -8274,12 +8274,12 @@ function LandingPage({ onRegistrar, onIniciarSesion }) {
               color: "#0EA5E9",
               contenido: (
                 <div>
-                  <div style={{ background: "#0d2c54", borderRadius: 10, padding: "12px 14px", display: "flex", alignItems: "flex-end", gap: 8, height: 84, marginBottom: 10 }}>
+                  <div style={{ background: "#0d3524", borderRadius: 10, padding: "12px 14px", display: "flex", alignItems: "flex-end", gap: 8, height: 84, marginBottom: 10 }}>
                     {[30, 48, 40, 62, 58, 75, 66].map((h, i) => (
                       <div key={i} style={{ flex: 1, height: `${h}%`, borderRadius: 3, background: i === 5 ? "#0EA5E9" : "#1e5fb4" }} />
                     ))}
                   </div>
-                  <div style={{ background: "#0d2c54", borderRadius: 8, padding: "9px 12px", display: "flex", justifyContent: "space-between" }}>
+                  <div style={{ background: "#0d3524", borderRadius: 8, padding: "9px 12px", display: "flex", justifyContent: "space-between" }}>
                     <span style={{ fontFamily: "Inter, sans-serif", fontSize: 10, color: "#9FB6D6" }}>Ingreso este mes</span>
                     <span style={{ fontFamily: "Inter, sans-serif", fontSize: 12, fontWeight: 800, color: "#10B981" }}>▲ 18%</span>
                   </div>
