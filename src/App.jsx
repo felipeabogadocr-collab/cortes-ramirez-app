@@ -759,7 +759,7 @@ function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-const APP_VERSION = "1.8.2";
+const APP_VERSION = "1.8.3";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -5666,14 +5666,20 @@ function ContabilidadTab({ usuarioActual }) {
   const hoy = new Date();
   let recaudadoTotal = 0;
   let recaudadoMes = 0;
+  const porMedioPagoMes = {};
   ids.forEach((id) => {
     (clientes[id]?.pagos || []).forEach((p) => {
       const valor = Number(p.valor) || 0;
       recaudadoTotal += valor;
       const fechaPago = new Date(p.fecha);
-      if (fechaPago.getFullYear() === hoy.getFullYear() && fechaPago.getMonth() === hoy.getMonth()) recaudadoMes += valor;
+      if (fechaPago.getFullYear() === hoy.getFullYear() && fechaPago.getMonth() === hoy.getMonth()) {
+        recaudadoMes += valor;
+        const medio = p.medioPago || "Otro";
+        porMedioPagoMes[medio] = (porMedioPagoMes[medio] || 0) + valor;
+      }
     });
   });
+  const mediosPagoOrdenados = Object.entries(porMedioPagoMes).sort((a, b) => b[1] - a[1]);
 
   // Clientes con un valor acordado pero sin ni un solo pago registrado —
   // fácil que se pierdan de vista entre los que sí van pagando poco a poco.
@@ -5710,6 +5716,27 @@ function ContabilidadTab({ usuarioActual }) {
           </Card>
         )}
       </div>
+      {mediosPagoOrdenados.length > 0 && (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 20, marginTop: -8 }}>
+          {mediosPagoOrdenados.map(([medio, valor]) => (
+            <span
+              key={medio}
+              style={{
+                fontFamily: "Inter, sans-serif",
+                fontSize: 11.5,
+                fontWeight: 600,
+                padding: "5px 12px",
+                borderRadius: 20,
+                background: COLORS.surfaceSoft,
+                border: `1px solid ${COLORS.border}`,
+                color: COLORS.inkSoft,
+              }}
+            >
+              {medio}: <strong style={{ color: COLORS.headingText }}>{formatoCOP(valor)}</strong>
+            </span>
+          ))}
+        </div>
+      )}
       {clientesSinPagos.length > 0 && (
         <div style={{ marginBottom: 20 }}>
           <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, fontWeight: 700, color: "#8B5CF6", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 10 }}>
