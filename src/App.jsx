@@ -759,7 +759,7 @@ function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-const APP_VERSION = "1.8.3";
+const APP_VERSION = "1.9.0";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -2407,7 +2407,13 @@ function useEventosAgenda() {
     });
   };
 
-  return { ids, eventos, cargado, crear, eliminar, reload: cargar };
+  const actualizar = async (id, cambios) => {
+    const actualizado = { ...eventos[id], ...cambios };
+    await storageSet(`evento:${id}`, JSON.stringify(actualizado), true);
+    setEventos((prev) => ({ ...prev, [id]: actualizado }));
+  };
+
+  return { ids, eventos, cargado, crear, eliminar, actualizar, reload: cargar };
 }
 
 // Revisa cada 30s si algún evento de la agenda ya se cumplió y todavía no se
@@ -2479,11 +2485,18 @@ function useAgendaRecordatorios() {
   }, []);
 }
 
+const FILTROS_AGENDA = [
+  { id: "todos", nombre: "Todos" },
+  { id: "hoy", nombre: "Hoy" },
+  { id: "semana", nombre: "Esta semana" },
+];
+
 function AgendaTab() {
-  const { ids, eventos, cargado, crear, eliminar } = useEventosAgenda();
+  const { ids, eventos, cargado, crear, eliminar, actualizar } = useEventosAgenda();
   const [mostrarForm, setMostrarForm] = useState(false);
   const [form, setForm] = useState({ titulo: "", fecha: "", hora: "", notas: "" });
   const [permisoNotif, setPermisoNotif] = useState(typeof Notification !== "undefined" ? Notification.permission : "unsupported");
+  const [filtroTiempo, setFiltroTiempo] = useState("todos");
   const { confirmar, ConfirmarDialogo } = useConfirmarDialogo();
 
   const pedirPermiso = async () => {
@@ -2510,7 +2523,13 @@ function AgendaTab() {
     .sort((a, b) => `${a.fecha}T${a.hora || "00:00"}`.localeCompare(`${b.fecha}T${b.hora || "00:00"}`));
 
   const hoyISO = new Date().toISOString().slice(0, 10);
-  const proximos = lista.filter((e) => e.fecha >= hoyISO);
+  const finSemana = new Date();
+  finSemana.setDate(finSemana.getDate() + (7 - finSemana.getDay()));
+  const finSemanaISO = finSemana.toISOString().slice(0, 10);
+
+  let proximos = lista.filter((e) => e.fecha >= hoyISO);
+  if (filtroTiempo === "hoy") proximos = proximos.filter((e) => e.fecha === hoyISO);
+  else if (filtroTiempo === "semana") proximos = proximos.filter((e) => e.fecha <= finSemanaISO);
   const pasados = lista.filter((e) => e.fecha < hoyISO);
 
   return (
@@ -2530,7 +2549,26 @@ function AgendaTab() {
         </Card>
       )}
 
-      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 16 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
+        <div style={{ display: "flex", gap: 6 }}>
+          {FILTROS_AGENDA.map((f) => (
+            <button
+              key={f.id}
+              onClick={() => setFiltroTiempo(f.id)}
+              className="drx-btn-ghost"
+              style={{
+                ...buttonGhost,
+                padding: "6px 14px",
+                fontSize: 12.5,
+                background: filtroTiempo === f.id ? COLORS.navy : COLORS.panel,
+                color: filtroTiempo === f.id ? "#FFFFFF" : COLORS.inkSoft,
+                borderColor: filtroTiempo === f.id ? COLORS.navy : COLORS.border,
+              }}
+            >
+              {f.nombre}
+            </button>
+          ))}
+        </div>
         <button className="drx-btn-primary" style={buttonPrimary} onClick={() => setMostrarForm((v) => !v)}>
           {mostrarForm ? "Cancelar" : "+ Nuevo evento"}
         </button>
@@ -2573,7 +2611,7 @@ function AgendaTab() {
           <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, fontWeight: 700, color: COLORS.muted, textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 10 }}>Próximos</p>
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             {proximos.map((e) => (
-              <EventoAgendaCard key={e.id} evento={e} onEliminar={() => eliminarClick(e.id, e.titulo)} />
+              <EventoAgendaCard key={e.id} evento={e} onEliminar={() => eliminarClick(e.id, e.titulo)} onCompletar={() => actualizar(e.id, { completado: !e.completado })} />
             ))}
           </div>
         </div>
@@ -2597,13 +2635,35 @@ function AgendaTab() {
   );
 }
 
-function EventoAgendaCard({ evento, onEliminar, pasado }) {
+function EventoAgendaCard({ evento, onEliminar, onCompletar, pasado }) {
   const fechaTexto = new Date(`${evento.fecha}T${evento.hora || "00:00"}:00`).toLocaleDateString("es-CO", { weekday: "long", day: "numeric", month: "long" });
   return (
-    <Card style={{ padding: 14, opacity: pasado ? 0.6 : 1 }}>
+    <Card style={{ padding: 14, opacity: pasado || evento.completado ? 0.55 : 1 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10, flexWrap: "wrap" }}>
+        {onCompletar && (
+          <button
+            onClick={onCompletar}
+            title={evento.completado ? "Marcar como pendiente" : "Marcar como completado"}
+            style={{
+              width: 22,
+              height: 22,
+              borderRadius: "50%",
+              border: `2px solid ${evento.completado ? "#16A34A" : COLORS.border}`,
+              background: evento.completado ? "#16A34A" : "transparent",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              color: "#FFFFFF",
+              cursor: "pointer",
+              flexShrink: 0,
+              marginTop: 2,
+            }}
+          >
+            {evento.completado && <Icono tipo="check" size={12} />}
+          </button>
+        )}
         <div style={{ flex: 1, minWidth: 180 }}>
-          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 14, fontWeight: 700, color: COLORS.ink, margin: 0, textTransform: "capitalize" }}>{evento.titulo}</p>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 14, fontWeight: 700, color: COLORS.ink, margin: 0, textTransform: "capitalize", textDecoration: evento.completado ? "line-through" : "none" }}>{evento.titulo}</p>
           <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, margin: "4px 0 0", textTransform: "capitalize" }}>
             {fechaTexto}
             {evento.hora ? ` · ${evento.hora}` : ""}
@@ -2613,6 +2673,33 @@ function EventoAgendaCard({ evento, onEliminar, pasado }) {
         <button onClick={onEliminar} style={{ background: "none", border: "none", cursor: "pointer", color: COLORS.muted, display: "flex", flexShrink: 0 }} title="Eliminar evento">
           <Icono tipo="papelera" size={15} />
         </button>
+      </div>
+    </Card>
+  );
+}
+
+function ProximoEventoResumen({ onIr }) {
+  const { ids, eventos, cargado } = useEventosAgenda();
+  if (!cargado) return null;
+  const hoyISO = new Date().toISOString().slice(0, 10);
+  const proximo = ids
+    .map((id) => eventos[id])
+    .filter((e) => e?.titulo && e.fecha >= hoyISO)
+    .sort((a, b) => `${a.fecha}T${a.hora || "00:00"}`.localeCompare(`${b.fecha}T${b.hora || "00:00"}`))[0];
+  if (!proximo) return null;
+  const fechaTexto = new Date(`${proximo.fecha}T${proximo.hora || "00:00"}:00`).toLocaleDateString("es-CO", { weekday: "long", day: "numeric", month: "long" });
+  return (
+    <Card style={{ marginBottom: 24, cursor: "pointer" }} onClick={() => onIr("agenda")}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <div style={{ width: 34, height: 34, borderRadius: 9, background: COLORS.accentSoft, display: "flex", alignItems: "center", justifyContent: "center", color: COLORS.navy, flexShrink: 0 }}>
+          <Icono tipo="calendario" size={16} />
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11, fontWeight: 700, color: COLORS.muted, textTransform: "uppercase", letterSpacing: 0.5, margin: 0 }}>Próximo en tu agenda</p>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 14, fontWeight: 700, color: COLORS.ink, margin: "3px 0 0" }}>
+            {proximo.titulo} <span style={{ fontWeight: 500, color: COLORS.muted, textTransform: "capitalize" }}>— {fechaTexto}{proximo.hora ? ` · ${proximo.hora}` : ""}</span>
+          </p>
+        </div>
       </div>
     </Card>
   );
@@ -2665,6 +2752,7 @@ function ResumenTab({ nombre, usuarioId, onIr }) {
             { texto: "+ Nuevo cliente", tab: "clientes" },
             { texto: "+ Nuevo documento", tab: "documentos" },
             { texto: "+ Registrar pago", tab: "contabilidad" },
+            { texto: "+ Evento en agenda", tab: "agenda" },
           ].map((a) => (
             <button
               key={a.tab}
@@ -2677,6 +2765,8 @@ function ResumenTab({ nombre, usuarioId, onIr }) {
           ))}
         </div>
       </div>
+
+      <ProximoEventoResumen onIr={onIr} />
 
       {(() => {
         const d = diagnosticoOperacion(r);
@@ -4031,6 +4121,11 @@ function ClientesTab({ usuarioActual }) {
 
   const idsOrdenados = [...ids].sort((a, b) => {
     if (orden === "az") return (clientes[a]?.nombre || "").localeCompare(clientes[b]?.nombre || "");
+    if (orden === "pago") {
+      const pa = clientes[a]?.proximoPago?.fecha || "9999-99-99";
+      const pb = clientes[b]?.proximoPago?.fecha || "9999-99-99";
+      return pa.localeCompare(pb);
+    }
     const fa = clientes[a]?.ultimaActuacion || "";
     const fb = clientes[b]?.ultimaActuacion || "";
     return fb.localeCompare(fa);
@@ -4098,6 +4193,21 @@ function ClientesTab({ usuarioActual }) {
           >
             A-Z
           </button>
+          <button
+            onClick={() => setOrden("pago")}
+            style={{
+              border: "none",
+              padding: "8px 14px",
+              fontFamily: "Inter, sans-serif",
+              fontSize: 12,
+              fontWeight: 600,
+              cursor: "pointer",
+              background: orden === "pago" ? COLORS.accentSoft : COLORS.panel,
+              color: orden === "pago" ? COLORS.navy : COLORS.muted,
+            }}
+          >
+            Próximo pago
+          </button>
         </div>
         <label style={{ display: "flex", alignItems: "center", gap: 6, fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.inkSoft, cursor: "pointer" }}>
           <input type="checkbox" checked={soloSinRadicado} onChange={(e) => setSoloSinRadicado(e.target.checked)} />
@@ -4111,7 +4221,13 @@ function ClientesTab({ usuarioActual }) {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
         <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted, margin: 0 }}>
           {idsFiltrados.length} cliente{idsFiltrados.length !== 1 ? "s" : ""}
-          {textoFiltro ? ` de ${ids.length}` : orden === "az" ? " · orden alfabético" : " · ordenados por última actuación"}
+          {textoFiltro
+            ? ` de ${ids.length}`
+            : orden === "az"
+            ? " · orden alfabético"
+            : orden === "pago"
+            ? " · ordenados por próximo pago"
+            : " · ordenados por última actuación"}
         </p>
         <div style={{ display: "flex", gap: 8 }}>
           <button
@@ -4360,6 +4476,23 @@ function ClientesTab({ usuarioActual }) {
                         }}
                       >
                         {copiado === `rad-${id}` ? "✓ Copiado" : `Radicado: ${c.radicado}`}
+                      </span>
+                    )}
+                    {c.proximoPago?.fecha && (
+                      <span
+                        style={{
+                          fontFamily: "Inter, sans-serif",
+                          fontSize: 11,
+                          fontWeight: 600,
+                          padding: "3px 9px",
+                          borderRadius: 20,
+                          background: "#EEF2FF",
+                          color: "#4338CA",
+                          border: "1px solid #DDE3FB",
+                        }}
+                      >
+                        <Icono tipo="calendario" size={10} style={{ marginRight: 3, verticalAlign: -1 }} />
+                        Próximo pago: {new Date(`${c.proximoPago.fecha}T12:00:00`).toLocaleDateString("es-CO", { day: "2-digit", month: "short" })}
                       </span>
                     )}
                     <span
