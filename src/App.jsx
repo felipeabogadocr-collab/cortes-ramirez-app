@@ -759,7 +759,7 @@ function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-const APP_VERSION = "1.9.0";
+const APP_VERSION = "1.9.1";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -5085,6 +5085,10 @@ function VigilanciaTab() {
 
   const conRadicado = ids.filter((id) => clientes[id]?.radicado?.trim());
   const sinRadicado = ids.filter((id) => !clientes[id]?.radicado?.trim());
+  const sinRevisarHaceTiempo = conRadicado.filter((id) => {
+    const consultadoEn = clientes[id]?.ramaJudicial?.consultadoEn;
+    return !consultadoEn || diasDesde(consultadoEn) >= 15;
+  }).length;
 
   // Prioriza "Con novedad" arriba de todo — son los procesos que realmente
   // necesitan atención hoy — y dentro de cada estado respeta el orden en
@@ -5179,6 +5183,9 @@ function VigilanciaTab() {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, flexWrap: "wrap", gap: 10 }}>
         <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted, margin: 0 }}>
           {conRadicado.length} proceso{conRadicado.length !== 1 ? "s" : ""} con radicado registrado
+          {sinRevisarHaceTiempo > 0 && (
+            <span style={{ color: "#B45309", fontWeight: 600 }}> · {sinRevisarHaceTiempo} sin revisar hace 15+ días</span>
+          )}
         </p>
         {conRadicado.length > 0 && (
           <button className="drx-btn-primary" style={buttonPrimary} onClick={consultarTodos} disabled={consultandoTodos}>
@@ -5255,9 +5262,19 @@ function VigilanciaTab() {
                   <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, margin: "3px 0 0" }}>
                     {c.tipoProceso} · {c.areaProceso} {dias !== null && `· última novedad hace ${dias} día${dias !== 1 ? "s" : ""}`}
                   </p>
-                  {c.ramaJudicial?.consultadoEn && (
+                  {c.ramaJudicial?.consultadoEn ? (
                     <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11, color: COLORS.muted, margin: "3px 0 0" }}>
                       Última consulta a Rama Judicial: {new Date(c.ramaJudicial.consultadoEn).toLocaleString("es-CO", { dateStyle: "medium", timeStyle: "short" })}
+                      {diasDesde(c.ramaJudicial.consultadoEn) >= 15 && (
+                        <span style={{ color: "#B45309", fontWeight: 600, marginLeft: 6 }}>
+                          <Icono tipo="alerta" size={10} style={{ marginRight: 2, verticalAlign: -1 }} />
+                          lleva {diasDesde(c.ramaJudicial.consultadoEn)} días sin revisarse
+                        </span>
+                      )}
+                    </p>
+                  ) : (
+                    <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11, color: "#B45309", fontWeight: 600, margin: "3px 0 0", display: "flex", alignItems: "center", gap: 4 }}>
+                      <Icono tipo="alerta" size={10} /> Nunca se ha consultado en Rama Judicial
                     </p>
                   )}
                   </div>
@@ -6488,9 +6505,21 @@ function ContenidoTab() {
 
   const itemsDelDia = (porFecha[diaSeleccionado] || []).sort((a, b) => (a.hora || "").localeCompare(b.hora || ""));
 
+  const pendientesMes = lista.filter((it) => {
+    const f = new Date(`${it.fecha}T12:00:00`);
+    return it.estado !== "Publicado" && f.getFullYear() === mesActual.getFullYear() && f.getMonth() === mesActual.getMonth();
+  }).length;
+
   return (
     <div>
-      <EncabezadoSeccion titulo="Calendario de contenido" color="#8B5CF6" />
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+        <EncabezadoSeccion titulo="Calendario de contenido" color="#8B5CF6" />
+        {pendientesMes > 0 && (
+          <span style={{ fontFamily: "Inter, sans-serif", fontSize: 12, fontWeight: 700, padding: "5px 12px", borderRadius: 20, background: "#F3E8FF", color: "#7E22CE", marginBottom: 26 }}>
+            {pendientesMes} pendiente{pendientesMes !== 1 ? "s" : ""} este mes
+          </span>
+        )}
+      </div>
 
       <div
         style={{
@@ -6698,6 +6727,18 @@ function ContenidoTab() {
                   )}
                   <button className="drx-btn-ghost" style={{ ...buttonGhost, fontSize: 11.5, padding: "5px 10px" }} onClick={() => abrirEdicion(it)}>
                     Editar
+                  </button>
+                  <button
+                    className="drx-btn-ghost"
+                    style={{ ...buttonGhost, fontSize: 11.5, padding: "5px 10px" }}
+                    onClick={() => {
+                      const fechaSiguiente = new Date(`${it.fecha}T12:00:00`);
+                      fechaSiguiente.setDate(fechaSiguiente.getDate() + 7);
+                      crear({ titulo: it.titulo, plataformas: it.plataformas || [], fecha: fechaSiguiente.toISOString().slice(0, 10), hora: it.hora || "", estado: "Idea", asignadoA: it.asignadoA || "", notas: it.notas || "" });
+                    }}
+                    title="Crea una copia de esta idea 7 días después"
+                  >
+                    Repetir en 1 semana
                   </button>
                   <button className="drx-btn-ghost" style={{ ...buttonGhost, fontSize: 11.5, padding: "5px 10px" }} onClick={() => eliminar(it.id)}>
                     Eliminar
