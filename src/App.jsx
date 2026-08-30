@@ -759,7 +759,7 @@ function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-const APP_VERSION = "1.9.1";
+const APP_VERSION = "1.9.2";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -6968,9 +6968,9 @@ function DocumentosTab() {
     setEditandoDocId(null);
   };
 
-  // Cuando publiquemos la app, pon aquí el link real (ej: "https://firmas.cortesramirezabogados.com")
-  // y el mensaje pasará automáticamente de "escribe este código" a "haz clic aquí".
-  const ENLACE_FIRMA = "";
+  // Enlace directo a la pantalla de firma (#firmar) — así el cliente hace un
+  // solo clic en vez de tener que abrir la app y buscar dónde escribir el código.
+  const ENLACE_FIRMA = typeof window !== "undefined" ? `${window.location.origin}/#firmar` : "";
 
   const enviarPorWhatsapp = (d, id) => {
     const numero = `${d.whatsappIndicativo || ""}${(d.whatsappNumero || "").replace(/[^0-9]/g, "")}`;
@@ -7058,6 +7058,15 @@ function DocumentosTab() {
       ? idsOrdenadosPorEstado
       : idsOrdenadosPorEstado.filter((id) => calcularEstado(docs[id]?.firmantes || []) === filtroEstadoDoc);
 
+  // Cuántos documentos pendientes están por vencer o ya vencieron (el enlace
+  // de firma expira a los 30 días) — para verlo de un vistazo sin tener que
+  // revisar documento por documento.
+  const porVencer = ids.filter((id) => {
+    const d = docs[id];
+    if (!d || calcularEstado(d.firmantes || []) === "listo") return false;
+    return 30 - (diasDesde(d.creadoEn) || 0) <= 5;
+  }).length;
+
   return (
     <div>
       <EncabezadoSeccion titulo="Firmar documentos" color="#10B981" />
@@ -7074,6 +7083,7 @@ function DocumentosTab() {
         <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted, margin: 0 }}>
           {idsFiltrados.length} documento{idsFiltrados.length !== 1 ? "s" : ""}
           {filtro.trim() ? ` de ${ids.length}` : ""} · comparte el código con tus clientes para que firmen
+          {porVencer > 0 && <span style={{ color: "#B45309", fontWeight: 600 }}> · {porVencer} por vencer o vencido{porVencer !== 1 ? "s" : ""}</span>}
         </p>
         <button className="drx-btn-primary drx-cta-shine" style={buttonPrimary} onClick={() => setShowForm((s) => !s)}>
           {showForm ? "Cancelar" : "+ Nuevo documento"}
