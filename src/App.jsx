@@ -759,7 +759,7 @@ function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-const APP_VERSION = "1.7.1";
+const APP_VERSION = "1.8.0";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -1373,6 +1373,19 @@ const TOOLS_ASISTENTE = [
         areaProceso: { type: "string", description: "Civil, Penal, Laboral, Familia, Comercial, Administrativo, Constitucional u Otro" },
         radicado: { type: "string" },
         notas: { type: "string" },
+        otras_personas: {
+          type: "array",
+          description: "Otras personas involucradas en el mismo contrato o proceso (ej: co-arrendatarios, socios, herederos), si las menciona el abogado.",
+          items: {
+            type: "object",
+            properties: {
+              nombre: { type: "string" },
+              telefono: { type: "string" },
+              rol: { type: "string", description: "Ej: cónyuge, socio, co-arrendatario, heredero" },
+            },
+            required: ["nombre"],
+          },
+        },
       },
       required: ["nombre"],
     },
@@ -1547,6 +1560,7 @@ async function ejecutarHerramienta(nombreHerramienta, input) {
       areaProceso: input.areaProceso || AREAS_PROCESO[0],
       radicado: input.radicado || "",
       notas: input.notas || "",
+      otrasPersonas: (input.otras_personas || []).map((p) => ({ id: uid(), nombre: p.nombre, telefono: p.telefono || "", rol: p.rol || "" })),
       timeline: [],
       ultimaActuacion: new Date().toISOString(),
     };
@@ -1554,7 +1568,8 @@ async function ejecutarHerramienta(nombreHerramienta, input) {
     const idsRaw = await storageGet("indice-clientes", false);
     const ids = idsRaw ? JSON.parse(idsRaw) : [];
     await storageSet("indice-clientes", JSON.stringify([id, ...ids]), false);
-    return { mensaje: `Cliente "${input.nombre}" creado correctamente.` };
+    const otras = nuevoCliente.otrasPersonas.length ? ` junto con ${nuevoCliente.otrasPersonas.map((p) => p.nombre).join(", ")}` : "";
+    return { mensaje: `Cliente "${input.nombre}" creado correctamente${otras}.` };
   }
 
   if (nombreHerramienta === "registrar_pago") {
@@ -3742,7 +3757,43 @@ const FORM_CLIENTE_INICIAL = {
   planPago: null,
   valorTotal: "",
   abogadoAsignado: "",
+  otrasPersonas: [],
 };
+
+// Un contrato o proceso muchas veces no es con una sola persona — un
+// arriendo con dos arrendatarios, una sucesión entre varios herederos, una
+// sociedad con varios socios. Esto deja agregar a las demás personas
+// involucradas sin tener que crear un "cliente" aparte por cada una.
+function EditorOtrasPersonas({ personas, onChange }) {
+  const lista = personas || [];
+
+  const agregar = () => onChange([...lista, { id: uid(), nombre: "", telefono: "", rol: "" }]);
+  const quitar = (id) => onChange(lista.filter((p) => p.id !== id));
+  const actualizar = (id, campo, valor) => onChange(lista.map((p) => (p.id === id ? { ...p, [campo]: valor } : p)));
+
+  return (
+    <div style={{ marginTop: 12 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: lista.length > 0 ? 8 : 0 }}>
+        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, fontWeight: 600, color: COLORS.inkSoft, margin: 0 }}>
+          Otras personas en este mismo contrato o proceso (opcional)
+        </p>
+        <button className="drx-btn-ghost" style={{ ...buttonGhost, padding: "5px 10px", fontSize: 12 }} onClick={agregar}>
+          + Agregar persona
+        </button>
+      </div>
+      {lista.map((p) => (
+        <div key={p.id} className="drx-grid-form" style={{ display: "grid", gridTemplateColumns: "1.3fr 1fr 1fr auto", gap: 8, marginTop: 8, alignItems: "center" }}>
+          <input className="drx-input" style={{ ...inputStyle, padding: "8px 10px", fontSize: 13 }} value={p.nombre} onChange={(e) => actualizar(p.id, "nombre", e.target.value)} placeholder="Nombre completo" />
+          <input className="drx-input" style={{ ...inputStyle, padding: "8px 10px", fontSize: 13 }} value={p.telefono} onChange={(e) => actualizar(p.id, "telefono", e.target.value)} placeholder="Teléfono (opcional)" />
+          <input className="drx-input" style={{ ...inputStyle, padding: "8px 10px", fontSize: 13 }} value={p.rol} onChange={(e) => actualizar(p.id, "rol", e.target.value)} placeholder="Rol (ej: cónyuge, socio)" />
+          <button onClick={() => quitar(p.id)} style={{ background: "none", border: "none", cursor: "pointer", color: COLORS.muted, display: "flex" }} title="Quitar">
+            <Icono tipo="check" size={14} style={{ transform: "rotate(45deg)" }} />
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 const FRECUENCIAS_PAGO = ["Semanal", "Quincenal", "Mensual", "Pago único", "Otro"];
 
@@ -4091,7 +4142,7 @@ function ClientesTab({ usuarioActual }) {
       {showForm && (
         <Card style={{ marginBottom: 16 }}>
           <div className="drx-grid-form" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-            <Field label="Nombre completo">
+            <Field label="Nombre principal (contacto)">
               <input className="drx-input" style={inputStyle} value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} />
             </Field>
             <Field label="Teléfono">
@@ -4147,6 +4198,7 @@ function ClientesTab({ usuarioActual }) {
               <input className="drx-input" style={inputStyle} value={form.notas} onChange={(e) => setForm({ ...form, notas: e.target.value })} />
             </Field>
           </div>
+          <EditorOtrasPersonas personas={form.otrasPersonas} onChange={(otrasPersonas) => setForm({ ...form, otrasPersonas })} />
           <PlanDePagoIA planPago={form.planPago} onChange={(planPago) => setForm({ ...form, planPago })} />
           <button className="drx-btn-primary" style={{ ...buttonPrimary, marginTop: 14 }} onClick={guardar}>
             Guardar cliente
@@ -4163,7 +4215,7 @@ function ClientesTab({ usuarioActual }) {
             return (
               <Card key={id}>
                 <div className="drx-grid-form" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                  <Field label="Nombre completo">
+                  <Field label="Nombre principal (contacto)">
                     <input className="drx-input" style={inputStyle} value={formEdicion.nombre || ""} onChange={(e) => setFormEdicion({ ...formEdicion, nombre: e.target.value })} />
                   </Field>
                   <Field label="Teléfono">
@@ -4223,6 +4275,7 @@ function ClientesTab({ usuarioActual }) {
                     <input className="drx-input" style={inputStyle} value={formEdicion.notas || ""} onChange={(e) => setFormEdicion({ ...formEdicion, notas: e.target.value })} />
                   </Field>
                 </div>
+                <EditorOtrasPersonas personas={formEdicion.otrasPersonas} onChange={(otrasPersonas) => setFormEdicion({ ...formEdicion, otrasPersonas })} />
                 <PlanDePagoIA planPago={formEdicion.planPago} onChange={(planPago) => setFormEdicion({ ...formEdicion, planPago })} />
                 <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
                   <button className="drx-btn-ghost" style={buttonGhost} onClick={() => setEditandoId(null)}>
@@ -4272,6 +4325,11 @@ function ClientesTab({ usuarioActual }) {
                       </span>
                     )}
                   </p>
+                  {c.otrasPersonas?.length > 0 && (
+                    <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, margin: "4px 0 0", display: "flex", alignItems: "center", gap: 5 }}>
+                      <Icono tipo="persona" size={12} /> También: {c.otrasPersonas.map((p) => p.nombre + (p.rol ? ` (${p.rol})` : "")).filter(Boolean).join(", ")}
+                    </p>
+                  )}
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
                     {c.tipoProceso && (
                       <span style={{ fontFamily: "Inter, sans-serif", fontSize: 11, fontWeight: 600, padding: "3px 9px", borderRadius: 20, background: COLORS.accentSoft, color: COLORS.navy, border: "1px solid #C7D6EA" }}>
