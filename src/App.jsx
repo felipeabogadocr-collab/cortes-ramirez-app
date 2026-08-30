@@ -759,7 +759,7 @@ function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-const APP_VERSION = "1.8.1";
+const APP_VERSION = "1.8.2";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -5663,6 +5663,18 @@ function ContabilidadTab({ usuarioActual }) {
     return saldo && saldo > 0 ? sum + saldo : sum;
   }, 0);
 
+  const hoy = new Date();
+  let recaudadoTotal = 0;
+  let recaudadoMes = 0;
+  ids.forEach((id) => {
+    (clientes[id]?.pagos || []).forEach((p) => {
+      const valor = Number(p.valor) || 0;
+      recaudadoTotal += valor;
+      const fechaPago = new Date(p.fecha);
+      if (fechaPago.getFullYear() === hoy.getFullYear() && fechaPago.getMonth() === hoy.getMonth()) recaudadoMes += valor;
+    });
+  });
+
   // Clientes con un valor acordado pero sin ni un solo pago registrado —
   // fácil que se pierdan de vista entre los que sí van pagando poco a poco.
   const clientesSinPagos = ids
@@ -5676,14 +5688,28 @@ function ContabilidadTab({ usuarioActual }) {
   return (
     <div>
       <EncabezadoSeccion titulo="Contabilidad" color="#F43F5E" />
-      {carteraTotal > 0 && (
-        <Card style={{ marginBottom: 20, borderLeft: "4px solid #F43F5E", background: "#FEF2F2" }}>
-          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, fontWeight: 700, color: "#B45309", textTransform: "uppercase", letterSpacing: 0.5, margin: 0 }}>
-            Cartera pendiente total
+      <div className="drx-grid-form" style={{ display: "grid", gridTemplateColumns: carteraTotal > 0 ? "1fr 1fr 1fr" : "1fr 1fr", gap: 12, marginBottom: 20 }}>
+        <Card style={{ borderLeft: "4px solid #10B981", background: "#F0FDF4" }}>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, fontWeight: 700, color: "#166534", textTransform: "uppercase", letterSpacing: 0.5, margin: 0 }}>
+            Recaudado este mes
           </p>
-          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 26, fontWeight: 800, color: "#B42318", margin: "4px 0 0" }}>{formatoCOP(carteraTotal)}</p>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 22, fontWeight: 800, color: "#166534", margin: "4px 0 0" }}>{formatoCOP(recaudadoMes)}</p>
         </Card>
-      )}
+        <Card style={{ borderLeft: `4px solid ${COLORS.accentBright}`, background: COLORS.accentSoft }}>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, fontWeight: 700, color: COLORS.navy, textTransform: "uppercase", letterSpacing: 0.5, margin: 0 }}>
+            Recaudado histórico
+          </p>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 22, fontWeight: 800, color: COLORS.navy, margin: "4px 0 0" }}>{formatoCOP(recaudadoTotal)}</p>
+        </Card>
+        {carteraTotal > 0 && (
+          <Card style={{ borderLeft: "4px solid #F43F5E", background: "#FEF2F2" }}>
+            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, fontWeight: 700, color: "#B45309", textTransform: "uppercase", letterSpacing: 0.5, margin: 0 }}>
+              Cartera pendiente total
+            </p>
+            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 22, fontWeight: 800, color: "#B42318", margin: "4px 0 0" }}>{formatoCOP(carteraTotal)}</p>
+          </Card>
+        )}
+      </div>
       {clientesSinPagos.length > 0 && (
         <div style={{ marginBottom: 20 }}>
           <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, fontWeight: 700, color: "#8B5CF6", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 10 }}>
