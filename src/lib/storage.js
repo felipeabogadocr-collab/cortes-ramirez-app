@@ -76,6 +76,18 @@ function parseRecordKey(key) {
   return { ...info, id: key.slice(idx + 1) };
 }
 
+// storageGet/storageSet atrapan sus propios errores para no tumbar la
+// pantalla que los llama (ver los catch más abajo) — pero eso significa que
+// si Supabase falla (sin internet, un corte breve, etc.) el resto de la app
+// seguía como si nada, mostrando "se guardó correctamente" sobre un cambio
+// que en realidad nunca llegó al servidor. Este evento avisa a quien esté
+// escuchando (el aviso global en App.jsx) para que el usuario se entere de
+// una vez, en vez de descubrirlo días después cuando el dato ya no está.
+function avisarErrorAlmacenamiento(tipo, key, error) {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent("nomos:error-almacenamiento", { detail: { tipo, key, mensaje: error?.message || String(error) } }));
+}
+
 export async function storageGet(key) {
   try {
     if (INDEX_TABLES[key]) {
@@ -141,6 +153,7 @@ export async function storageGet(key) {
     return data ? data.value : null;
   } catch (e) {
     console.error("storageGet error", key, e);
+    avisarErrorAlmacenamiento("get", key, e);
     return null;
   }
 }
@@ -279,6 +292,7 @@ export async function storageSet(key, value) {
     return true;
   } catch (e) {
     console.error("storageSet error", key, e);
+    avisarErrorAlmacenamiento("set", key, e);
     return false;
   }
 }

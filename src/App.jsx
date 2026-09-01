@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, Fragment } from "react";
+import { useState, useEffect, useRef, useCallback, Fragment, Component } from "react";
 import { supabase } from "./lib/supabaseClient";
 
 const uid = () => Math.random().toString(36).slice(2, 10).toUpperCase();
@@ -768,7 +768,7 @@ function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-const APP_VERSION = "1.9.6";
+const APP_VERSION = "1.9.7";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -10822,7 +10822,134 @@ function saludarPorVoz(nombre) {
   }
 }
 
-export default function App() {
+// Antes, si guardar algo en Supabase fallaba (sin internet, un corte breve,
+// etc.), storageSet/storageGet se tragaban el error en silencio y la app
+// seguía como si todo hubiera salido bien — el usuario veía "se guardó
+// correctamente" aunque el cambio nunca llegó al servidor, y solo se daba
+// cuenta días después cuando el dato ya no estaba. Este aviso global
+// escucha esos fallos (storage.js los emite como evento) y avisa de una
+// vez, para que el usuario sepa que debe revisar su conexión y reintentar.
+function AvisoErroresAlmacenamiento() {
+  const [aviso, setAviso] = useState("");
+  const ultimoRef = useRef(0);
+
+  useEffect(() => {
+    const manejar = (e) => {
+      const ahora = Date.now();
+      if (ahora - ultimoRef.current < 4000) return;
+      ultimoRef.current = ahora;
+      const mensaje =
+        e.detail?.tipo === "set"
+          ? "No se pudo guardar tu último cambio. Revisa tu conexión a internet e inténtalo de nuevo."
+          : "No se pudieron cargar algunos datos. Revisa tu conexión a internet.";
+      setAviso(mensaje);
+      setTimeout(() => setAviso(""), 6000);
+    };
+    window.addEventListener("nomos:error-almacenamiento", manejar);
+    return () => window.removeEventListener("nomos:error-almacenamiento", manejar);
+  }, []);
+
+  if (!aviso) return null;
+  return (
+    <div
+      role="alert"
+      style={{
+        position: "fixed",
+        bottom: 20,
+        left: "50%",
+        transform: "translateX(-50%)",
+        zIndex: 4000,
+        background: "#B42318",
+        color: "#fff",
+        padding: "11px 20px",
+        borderRadius: 10,
+        fontFamily: "Inter, sans-serif",
+        fontSize: 13,
+        fontWeight: 600,
+        boxShadow: "0 10px 30px rgba(0,0,0,0.3)",
+        maxWidth: "90vw",
+        textAlign: "center",
+      }}
+    >
+      ⚠️ {aviso}
+    </div>
+  );
+}
+
+// Red de seguridad ante cualquier error inesperado al dibujar la interfaz
+// (dato corrupto, propiedad que no existía, etc.): sin esto, React "desmonta"
+// toda la app y el usuario se queda mirando una pantalla en blanco sin ningún
+// mensaje ni forma de recuperarse salvo adivinar que debe recargar. Con esto,
+// se muestra una pantalla clara con un botón para recargar.
+class ErrorBoundary extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { error: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { error };
+  }
+
+  componentDidCatch(error, info) {
+    console.error("Error no controlado en la interfaz:", error, info);
+  }
+
+  render() {
+    if (this.state.error) {
+      return (
+        <div
+          style={{
+            minHeight: "100vh",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 16,
+            padding: 32,
+            textAlign: "center",
+            fontFamily: "Inter, sans-serif",
+            background: "#F7F8FA",
+          }}
+        >
+          <p style={{ fontSize: 40, margin: 0 }}>⚠️</p>
+          <p style={{ fontSize: 18, fontWeight: 700, color: "#11213A", margin: 0 }}>Algo salió mal</p>
+          <p style={{ fontSize: 13.5, color: "#4C5A6B", margin: 0, maxWidth: 420 }}>
+            La aplicación tuvo un error inesperado. Tus datos guardados están a salvo — solo hay que recargar la página para
+            continuar.
+          </p>
+          <button
+            onClick={() => window.location.reload()}
+            style={{
+              fontFamily: "Inter, sans-serif",
+              fontWeight: 700,
+              fontSize: 13.5,
+              padding: "10px 22px",
+              borderRadius: 10,
+              border: "none",
+              background: "#0B3D2E",
+              color: "#fff",
+              cursor: "pointer",
+            }}
+          >
+            Recargar página
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+export default function AppConErrorBoundary() {
+  return (
+    <ErrorBoundary>
+      <App />
+    </ErrorBoundary>
+  );
+}
+
+function App() {
   useEffect(() => {
     ensureFonts();
   }, []);
@@ -11061,6 +11188,7 @@ export default function App() {
     <div className={`drx-app-shell ${oscuro ? "drx-tema-oscuro" : "drx-tema-claro"}`} style={{ background: COLORS.bg, minHeight: "100%", display: "flex" }}>
       <GlobalStyle />
       <TexturaGrano />
+      <AvisoErroresAlmacenamiento />
       <div
         className={`drx-sidebar-overlay${sidebarMovilAbierta ? " drx-sidebar-abierta" : ""}`}
         onClick={() => setSidebarMovilAbierta(false)}
