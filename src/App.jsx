@@ -768,7 +768,7 @@ function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-const APP_VERSION = "1.9.7";
+const APP_VERSION = "1.10.0";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -8072,16 +8072,20 @@ function useUsuariosDespacho() {
   return { usuarios, cargado, crear, actualizar, eliminar, reload: cargar };
 }
 
-// Marca de Nomos: tres barras redondeadas en escalera descendente — evoca
-// la jerarquía de normas (norma constitucional, ley, reglamento) sin caer en
-// los clichés visuales del sector (balanza, martillo, columna). Funciona
-// igual de bien como ícono suelto que como parte del isotipo con caja.
+// Marca de Nomos: un documento con la esquina doblada (expediente, contrato)
+// y un check dinámico atravesándolo en diagonal — evoca el trabajo real del
+// despacho (documentos, firma electrónica, casos resueltos) sin caer en los
+// clichés visuales del sector (balanza, martillo, columna). El check está
+// "recortado" del documento con fill-rule evenodd, así que funciona igual de
+// bien en cualquier fondo (caja de color, tarjeta blanca, marca de agua).
 function IconoNomos({ size = 16 }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
-      <rect x="4" y="4.3" width="16" height="3.4" rx="1.7" />
-      <rect x="4" y="10.3" width="11" height="3.4" rx="1.7" />
-      <rect x="4" y="16.3" width="6" height="3.4" rx="1.7" />
+    <svg width={size} height={size} viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+      <path
+        fillRule="evenodd"
+        fill="currentColor"
+        d="M7.2,3 H13.8 L18,7.2 V17.8 A2.2,2.2 0 0 1 15.8,20 H7.2 A2.2,2.2 0 0 1 5,17.8 V5.2 A2.2,2.2 0 0 1 7.2,3 Z M8.03,15.11 L10.54,17.73 L12.14,17.63 L17.62,10.39 L15.94,9.13 L10.46,16.37 L12.06,16.27 L9.55,13.65 Z"
+      />
     </svg>
   );
 }
