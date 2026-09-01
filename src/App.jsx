@@ -393,7 +393,7 @@ async function descargarPdfFirmado(doc) {
 
   pdf.setFont("helvetica", "bold");
   pdf.setFontSize(16);
-  pdf.text(doc.titulo || "Documento", marginX, y);
+  pdf.text(doc.titulo || "Documento", pageWidth / 2, y, { align: "center" });
   y += 8;
   pdf.setDrawColor(11, 61, 46);
   pdf.setLineWidth(1.2);
@@ -453,6 +453,15 @@ async function descargarPdfFirmado(doc) {
     pdf.setTextColor(11, 18, 32);
     y += alto + 14;
   });
+
+  const totalPaginas = pdf.internal.getNumberOfPages();
+  for (let pagina = 1; pagina <= totalPaginas; pagina++) {
+    pdf.setPage(pagina);
+    pdf.setFont("helvetica", "normal");
+    pdf.setFontSize(9);
+    pdf.setTextColor(148, 163, 184);
+    pdf.text(`Página ${pagina} de ${totalPaginas}`, pageWidth / 2, pageHeight - 24, { align: "center" });
+  }
 
   const nombreArchivo = (doc.titulo || "documento").replace(/[^a-z0-9]+/gi, "_").toLowerCase();
   const blob = pdf.output("blob");
@@ -759,7 +768,7 @@ function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-const APP_VERSION = "1.9.5";
+const APP_VERSION = "1.9.6";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -1629,16 +1638,16 @@ async function ejecutarHerramienta(nombreHerramienta, input) {
     pdf.setTextColor(255, 255, 255);
     pdf.setFont("helvetica", "bold");
     pdf.setFontSize(18);
-    pdf.text(input.titulo || "Informe de Operación", marginX, 50);
+    pdf.text(input.titulo || "Informe de Operación", pageWidth / 2, 48, { align: "center" });
     pdf.setFontSize(11);
     pdf.setFont("helvetica", "normal");
-    pdf.text(getNombreDespacho(), marginX, 70);
+    pdf.text(getNombreDespacho(), pageWidth / 2, 70, { align: "center" });
 
     y = 130;
     pdf.setTextColor(11, 18, 32);
     pdf.setFont("helvetica", "bold");
     pdf.setFontSize(13);
-    pdf.text(`Diagnóstico general: ${d.etiqueta} (${d.puntaje}/100)`, marginX, y);
+    pdf.text(`Diagnóstico general: ${d.etiqueta} (${d.puntaje}/100)`, pageWidth / 2, y, { align: "center" });
     y += 30;
 
     const filas = [
@@ -1653,30 +1662,50 @@ async function ejecutarHerramienta(nombreHerramienta, input) {
       ["Documentos donde falta tu firma", String(r.docsFaltaAbogado)],
       ["Procesos con novedad en vigilancia", String(r.procesosConNovedad)],
     ];
-    pdf.setFont("helvetica", "normal");
+    const filaAlto = 24;
     pdf.setFontSize(11);
-    filas.forEach(([etiqueta, valor]) => {
+    filas.forEach(([etiqueta, valor], idx) => {
+      if (idx % 2 === 0) {
+        pdf.setFillColor(244, 246, 249);
+        pdf.rect(marginX, y - 15, pageWidth - marginX * 2, filaAlto, "F");
+      }
       pdf.setFont("helvetica", "normal");
-      pdf.text(etiqueta, marginX, y);
+      pdf.setTextColor(75, 85, 99);
+      pdf.text(etiqueta, marginX + 8, y);
       pdf.setFont("helvetica", "bold");
-      pdf.text(valor, marginX + 260, y);
-      y += 22;
+      pdf.setTextColor(11, 18, 32);
+      pdf.text(valor, pageWidth - marginX - 8, y, { align: "right" });
+      y += filaAlto;
     });
+    pdf.setDrawColor(210, 214, 220);
+    pdf.setLineWidth(0.6);
+    pdf.line(marginX, y - filaAlto + 6, pageWidth - marginX, y - filaAlto + 6);
 
     if (d.sugerencias.length) {
-      y += 12;
+      y += 20;
       pdf.setFont("helvetica", "bold");
       pdf.setFontSize(12);
-      pdf.text("Sugerencias:", marginX, y);
-      y += 20;
+      pdf.setTextColor(11, 18, 32);
+      pdf.text("Sugerencias", marginX, y);
+      y += 8;
+      pdf.setDrawColor(11, 61, 46);
+      pdf.setLineWidth(1);
+      pdf.line(marginX, y, marginX + 60, y);
+      y += 18;
       pdf.setFont("helvetica", "normal");
       pdf.setFontSize(10.5);
+      pdf.setTextColor(30, 41, 59);
       d.sugerencias.forEach((s) => {
-        const lineas = pdf.splitTextToSize(`• ${s}`, pageWidth - marginX * 2);
-        pdf.text(lineas, marginX, y);
-        y += lineas.length * 14 + 6;
+        const lineas = pdf.splitTextToSize(`•  ${s}`, pageWidth - marginX * 2 - 10);
+        pdf.text(lineas, marginX + 6, y);
+        y += lineas.length * 14 + 8;
       });
     }
+
+    pdf.setFont("helvetica", "normal");
+    pdf.setFontSize(9);
+    pdf.setTextColor(148, 163, 184);
+    pdf.text(`Generado el ${new Date().toLocaleString("es-CO", { dateStyle: "medium", timeStyle: "short" })}`, pageWidth / 2, pdf.internal.pageSize.getHeight() - 30, { align: "center" });
 
     const blob = pdf.output("blob");
     const url = URL.createObjectURL(blob);
@@ -5502,8 +5531,14 @@ function useUrlRecibo(reciboImagen) {
   return url;
 }
 
-function ReciboCard({ cliente, pago }) {
+function ReciboCard({ cliente, pago, onEditar, onEliminar }) {
   const [copiado, setCopiado] = useState(false);
+  const [editando, setEditando] = useState(false);
+  const [medioPago, setMedioPago] = useState(pago.medioPago);
+  const [valor, setValor] = useState(String(pago.valor ?? ""));
+  const [fecha, setFecha] = useState(new Date(pago.fecha).toISOString().slice(0, 10));
+  const [concepto, setConcepto] = useState(pago.concepto || "");
+  const [guardando, setGuardando] = useState(false);
   const numero = numeroWhatsappCliente(cliente.telefono);
   const urlRecibo = useUrlRecibo(pago.reciboImagen);
 
@@ -5511,6 +5546,56 @@ function ReciboCard({ cliente, pago }) {
     const mensaje = `Hola ${cliente.nombre || ""} 👋\n\n*${getNombreDespacho()}* te confirma la recepción de tu pago:\n\n💳 Medio: ${pago.medioPago}\n💰 Valor: ${formatoCOP(pago.valor)}\n📅 Fecha: ${new Date(pago.fecha).toLocaleDateString("es-CO", { dateStyle: "long" })}${pago.concepto ? `\n📝 Concepto: ${pago.concepto}` : ""}\n\nTe adjuntamos el recibo. ¡Gracias por tu confianza!`;
     window.open(`https://wa.me/${numero}?text=${encodeURIComponent(mensaje)}`, "_blank");
   };
+
+  const guardarEdicion = async () => {
+    if (!valor || Number(valor) <= 0) return;
+    setGuardando(true);
+    await onEditar({
+      medioPago,
+      valor: Number(valor),
+      fecha: new Date(`${fecha}T12:00:00`).toISOString(),
+      concepto: concepto.trim(),
+    });
+    setGuardando(false);
+    setEditando(false);
+  };
+
+  if (editando) {
+    return (
+      <div style={{ background: COLORS.surfaceSoft, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: 12, marginTop: 10 }}>
+        <div className="drx-grid-form" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
+          <Field label="Medio de pago">
+            <select className="drx-input" style={inputStyle} value={medioPago} onChange={(e) => setMedioPago(e.target.value)}>
+              {MEDIOS_PAGO.map((m) => (
+                <option key={m} value={m}>
+                  {m}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Valor (COP)">
+            <input className="drx-input" style={inputStyle} type="number" value={valor} onChange={(e) => setValor(e.target.value)} />
+          </Field>
+        </div>
+        <div className="drx-grid-form" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
+          <Field label="Fecha del pago">
+            <input type="date" className="drx-input" style={inputStyle} value={fecha} onChange={(e) => setFecha(e.target.value)} />
+          </Field>
+          <Field label="Concepto (opcional)">
+            <input className="drx-input" style={inputStyle} value={concepto} onChange={(e) => setConcepto(e.target.value)} />
+          </Field>
+        </div>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button className="drx-btn-primary" style={{ ...buttonPrimary, padding: "6px 14px", fontSize: 12 }} onClick={guardarEdicion} disabled={guardando}>
+            {guardando ? "Guardando..." : "Guardar cambios"}
+          </button>
+          <button className="drx-btn-ghost" style={{ ...buttonGhost, padding: "6px 14px", fontSize: 12 }} onClick={() => setEditando(false)} disabled={guardando}>
+            Cancelar
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{ display: "flex", gap: 14, flexWrap: "wrap", alignItems: "flex-start", background: COLORS.surfaceSoft, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: 12, marginTop: 10 }}>
@@ -5552,6 +5637,16 @@ function ReciboCard({ cliente, pago }) {
           {numero && (
             <button className="drx-btn-primary" style={{ ...buttonPrimary, padding: "5px 12px", fontSize: 12, background: "#1DA851" }} onClick={enviarPorWhatsapp}>
               Enviar por WhatsApp ↗
+            </button>
+          )}
+          {onEditar && (
+            <button className="drx-btn-ghost" style={{ ...buttonGhost, padding: "5px 12px", fontSize: 12 }} onClick={() => setEditando(true)}>
+              Editar
+            </button>
+          )}
+          {onEliminar && (
+            <button className="drx-btn-ghost" style={{ ...buttonGhost, padding: "5px 12px", fontSize: 12, color: "#B42318", borderColor: "#F2B8B5" }} onClick={onEliminar}>
+              Eliminar
             </button>
           )}
         </div>
@@ -5771,12 +5866,21 @@ function ReportesTab() {
   );
 }
 
+const ORDEN_CONTABILIDAD = [
+  { valor: "nombre", etiqueta: "Nombre" },
+  { valor: "saldo", etiqueta: "Saldo pendiente (mayor primero)" },
+  { valor: "ultimoPago", etiqueta: "Último pago (más reciente primero)" },
+];
+
 function ContabilidadTab({ usuarioActual }) {
   const { ids } = useIndex("indice-clientes", false);
   const [clientes, setClientes] = useState({});
   const [formAbiertoId, setFormAbiertoId] = useState(null);
   const [filtro, setFiltro] = useState("");
   const [soloPendientes, setSoloPendientes] = useState(false);
+  const [orden, setOrden] = useState("nombre");
+  const [expandidos, setExpandidos] = useState({});
+  const { confirmar, ConfirmarDialogo } = useConfirmarDialogo();
 
   const cargar = useCallback(async () => {
     const entries = {};
@@ -5824,6 +5928,28 @@ function ContabilidadTab({ usuarioActual }) {
     setFormAbiertoId(null);
   };
 
+  const editarPago = async (id, pagoId, cambios) => {
+    const cliente = clientes[id];
+    const pagos = (cliente.pagos || []).map((p) => (p.id === pagoId ? { ...p, ...cambios } : p));
+    const actualizado = { ...cliente, pagos };
+    await storageSet(`cliente:${id}`, JSON.stringify(actualizado), false);
+    setClientes((prev) => ({ ...prev, [id]: actualizado }));
+    registrarAuditoria(usuarioActual, "editar_pago", "cliente", id, { nombre: cliente.nombre, valor: cambios.valor });
+  };
+
+  const eliminarPago = async (id, pagoId) => {
+    const cliente = clientes[id];
+    const pago = (cliente.pagos || []).find((p) => p.id === pagoId);
+    const ok = await confirmar(
+      `¿Seguro que quieres eliminar este pago${pago ? ` de ${formatoCOP(pago.valor)} (${new Date(pago.fecha).toLocaleDateString("es-CO")})` : ""}? Esta acción no se puede deshacer.`
+    );
+    if (!ok) return;
+    const actualizado = { ...cliente, pagos: (cliente.pagos || []).filter((p) => p.id !== pagoId) };
+    await storageSet(`cliente:${id}`, JSON.stringify(actualizado), false);
+    setClientes((prev) => ({ ...prev, [id]: actualizado }));
+    registrarAuditoria(usuarioActual, "eliminar_pago", "cliente", id, { nombre: cliente.nombre, valor: pago?.valor });
+  };
+
   const proximosPagos = ids
     .map((id) => ({ id, c: clientes[id] }))
     .filter(({ c }) => c?.proximoPago?.fecha)
@@ -5840,6 +5966,13 @@ function ContabilidadTab({ usuarioActual }) {
     const saldo = saldoDe(clientes[id]);
     return saldo && saldo > 0 ? sum + saldo : sum;
   }, 0);
+  const clientesConSaldoPendiente = ids.filter((id) => (saldoDe(clientes[id]) || 0) > 0).length;
+
+  const ultimoPagoDe = (c) => {
+    const pagos = c?.pagos || [];
+    if (pagos.length === 0) return null;
+    return pagos.reduce((mas, p) => (new Date(p.fecha) > new Date(mas.fecha) ? p : mas), pagos[0]);
+  };
 
   const hoy = new Date();
   let recaudadoTotal = 0;
@@ -5868,6 +6001,18 @@ function ContabilidadTab({ usuarioActual }) {
   const textoFiltro = filtro.trim().toLowerCase();
   let idsFiltrados = textoFiltro ? ids.filter((id) => clientes[id]?.nombre?.toLowerCase().includes(textoFiltro)) : ids;
   if (soloPendientes) idsFiltrados = idsFiltrados.filter((id) => (saldoDe(clientes[id]) || 0) > 0);
+  idsFiltrados = [...idsFiltrados].sort((a, b) => {
+    if (orden === "saldo") return (saldoDe(clientes[b]) || 0) - (saldoDe(clientes[a]) || 0);
+    if (orden === "ultimoPago") {
+      const fa = ultimoPagoDe(clientes[a])?.fecha;
+      const fb = ultimoPagoDe(clientes[b])?.fecha;
+      if (!fa && !fb) return 0;
+      if (!fa) return 1;
+      if (!fb) return -1;
+      return new Date(fb) - new Date(fa);
+    }
+    return (clientes[a]?.nombre || "").localeCompare(clientes[b]?.nombre || "");
+  });
 
   return (
     <div>
@@ -5891,6 +6036,9 @@ function ContabilidadTab({ usuarioActual }) {
               Cartera pendiente total
             </p>
             <p style={{ fontFamily: "Inter, sans-serif", fontSize: 22, fontWeight: 800, color: "#B42318", margin: "4px 0 0" }}>{formatoCOP(carteraTotal)}</p>
+            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11, color: "#B45309", margin: "3px 0 0" }}>
+              {clientesConSaldoPendiente} cliente{clientesConSaldoPendiente !== 1 ? "s" : ""} con saldo pendiente
+            </p>
           </Card>
         )}
       </div>
@@ -5931,20 +6079,38 @@ function ContabilidadTab({ usuarioActual }) {
             ⏰ Próximos pagos por vencer
           </p>
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {proximosPagos.map(({ id, c, dias }) => (
-              <div key={id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "#FEF3E2", border: "1px solid #FCE3B8", borderRadius: 8, padding: "10px 14px", flexWrap: "wrap", gap: 8 }}>
-                <div>
-                  <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, fontWeight: 600, color: "#92400E", margin: 0 }}>{c.nombre}</p>
-                  <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, color: "#B45309", margin: "2px 0 0" }}>
-                    {textoEstadoPago(dias)}
-                    {c.proximoPago.valorEsperado ? ` · ${formatoCOP(c.proximoPago.valorEsperado)}` : ""}
-                  </p>
+            {proximosPagos.map(({ id, c, dias }) => {
+              const vencido = dias < 0;
+              return (
+                <div
+                  key={id}
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    background: vencido ? "#FEF2F2" : "#FEF3E2",
+                    border: vencido ? "1px solid #F2B8B5" : "1px solid #FCE3B8",
+                    borderRadius: 8,
+                    padding: "10px 14px",
+                    flexWrap: "wrap",
+                    gap: 8,
+                  }}
+                >
+                  <div>
+                    <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, fontWeight: 600, color: vencido ? "#B42318" : "#92400E", margin: 0 }}>
+                      {c.nombre} {vencido && <span style={{ marginLeft: 6, fontSize: 10.5, fontWeight: 800, textTransform: "uppercase", letterSpacing: 0.5 }}>Vencido</span>}
+                    </p>
+                    <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, color: vencido ? "#B42318" : "#B45309", margin: "2px 0 0" }}>
+                      {textoEstadoPago(dias)}
+                      {c.proximoPago.valorEsperado ? ` · ${formatoCOP(c.proximoPago.valorEsperado)}` : ""}
+                    </p>
+                  </div>
+                  <button className="drx-btn-primary" style={{ ...buttonPrimary, padding: "6px 12px", fontSize: 12, background: "#1DA851" }} onClick={() => enviarRecordatorioPago(c)}>
+                    Enviar recordatorio ↗
+                  </button>
                 </div>
-                <button className="drx-btn-primary" style={{ ...buttonPrimary, padding: "6px 12px", fontSize: 12, background: "#1DA851" }} onClick={() => enviarRecordatorioPago(c)}>
-                  Enviar recordatorio ↗
-                </button>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
@@ -5961,6 +6127,13 @@ function ContabilidadTab({ usuarioActual }) {
           <input type="checkbox" checked={soloPendientes} onChange={(e) => setSoloPendientes(e.target.checked)} />
           Solo con saldo pendiente
         </label>
+        <select className="drx-input" style={{ ...inputStyle, maxWidth: 240 }} value={orden} onChange={(e) => setOrden(e.target.value)}>
+          {ORDEN_CONTABILIDAD.map((o) => (
+            <option key={o.valor} value={o.valor}>
+              Ordenar por: {o.etiqueta}
+            </option>
+          ))}
+        </select>
       </div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
         <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted, margin: 0 }}>
@@ -5997,6 +6170,7 @@ function ContabilidadTab({ usuarioActual }) {
           const totalPagado = pagos.reduce((sum, p) => sum + (Number(p.valor) || 0), 0);
           const valorTotal = Number(c.valorTotal) || 0;
           const saldo = valorTotal > 0 ? valorTotal - totalPagado : null;
+          const ultimoPago = ultimoPagoDe(c);
 
           return (
             <Card key={id} style={{ borderLeft: "4px solid #F43F5E" }}>
@@ -6007,6 +6181,7 @@ function ContabilidadTab({ usuarioActual }) {
                   <p style={{ fontFamily: "Inter, sans-serif", fontSize: 17, fontWeight: 700, margin: 0, color: COLORS.ink }}>{c.nombre}</p>
                   <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.muted, margin: "4px 0 0" }}>
                     {pagos.length} pago{pagos.length !== 1 ? "s" : ""} registrado{pagos.length !== 1 ? "s" : ""} · Total: {formatoCOP(totalPagado)}
+                    {ultimoPago && ` · Último pago: ${new Date(ultimoPago.fecha).toLocaleDateString("es-CO", { dateStyle: "medium" })}`}
                   </p>
                   {saldo !== null && (
                     <p
@@ -6034,15 +6209,33 @@ function ContabilidadTab({ usuarioActual }) {
 
               {formAbiertoId === id && <FormularioPago cliente={c} onRegistrar={(datos) => registrarPago(id, datos)} />}
 
-              {pagos.length > 0 && (
-                <div>
-                  {[...pagos]
-                    .sort((a, b) => new Date(b.fecha) - new Date(a.fecha))
-                    .map((p) => (
-                      <ReciboCard key={p.id} cliente={c} pago={p} />
+              {pagos.length > 0 && (() => {
+                const ordenados = [...pagos].sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+                const expandido = !!expandidos[id];
+                const visibles = expandido ? ordenados : ordenados.slice(0, 3);
+                return (
+                  <div>
+                    {visibles.map((p) => (
+                      <ReciboCard
+                        key={p.id}
+                        cliente={c}
+                        pago={p}
+                        onEditar={(cambios) => editarPago(id, p.id, cambios)}
+                        onEliminar={() => eliminarPago(id, p.id)}
+                      />
                     ))}
-                </div>
-              )}
+                    {ordenados.length > 3 && (
+                      <button
+                        className="drx-btn-ghost"
+                        style={{ ...buttonGhost, padding: "5px 12px", fontSize: 12, marginTop: 10 }}
+                        onClick={() => setExpandidos((prev) => ({ ...prev, [id]: !expandido }))}
+                      >
+                        {expandido ? "Mostrar menos" : `Ver todos los pagos (${ordenados.length})`}
+                      </button>
+                    )}
+                  </div>
+                );
+              })()}
             </Card>
           );
         })}
@@ -6051,6 +6244,7 @@ function ContabilidadTab({ usuarioActual }) {
           <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted }}>Ningún cliente coincide con "{filtro}".</p>
         )}
       </div>
+      {ConfirmarDialogo}
     </div>
   );
 }
