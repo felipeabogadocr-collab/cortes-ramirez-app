@@ -759,7 +759,7 @@ function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-const APP_VERSION = "1.9.4";
+const APP_VERSION = "1.9.5";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -9683,6 +9683,7 @@ function PlataformaTab() {
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState("");
   const [cambiando, setCambiando] = useState(null);
+  const [filtro, setFiltro] = useState("");
   const { confirmar, ConfirmarDialogo } = useConfirmarDialogo();
 
   const cargar = useCallback(async () => {
@@ -9744,8 +9745,12 @@ function PlataformaTab() {
     setCambiando(null);
   };
 
-  const pendientes = despachos.filter((d) => !d.activo);
-  const activos = despachos.filter((d) => d.activo);
+  const textoFiltro = filtro.trim().toLowerCase();
+  const despachosFiltrados = textoFiltro
+    ? despachos.filter((d) => d.nombre?.toLowerCase().includes(textoFiltro) || d.adminEmail?.toLowerCase().includes(textoFiltro))
+    : despachos;
+  const pendientes = despachosFiltrados.filter((d) => !d.activo);
+  const activos = despachosFiltrados.filter((d) => d.activo);
   const HACE_7_DIAS = Date.now() - 7 * 24 * 60 * 60 * 1000;
   const activosUsandoEstaSemana = activos.filter((d) => d.ultimaActividad && new Date(d.ultimaActividad).getTime() >= HACE_7_DIAS).length;
 
@@ -9787,6 +9792,14 @@ function PlataformaTab() {
         o desactivas uno que dejó de pagar.
       </div>
 
+      <input
+        className="drx-input"
+        style={{ ...inputStyle, maxWidth: 320, marginBottom: 18 }}
+        placeholder="Buscar despacho por nombre o correo..."
+        value={filtro}
+        onChange={(e) => setFiltro(e.target.value)}
+      />
+
       {error && <p style={{ color: "#B42318", fontSize: 13, marginBottom: 14, fontFamily: "Inter, sans-serif" }}>{error}</p>}
       {cargando && <Spinner />}
 
@@ -9804,6 +9817,9 @@ function PlataformaTab() {
                     <p style={{ fontFamily: "Inter, sans-serif", fontSize: 14, fontWeight: 700, color: COLORS.ink, margin: 0 }}>{d.nombre}</p>
                     <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, color: COLORS.muted, margin: "2px 0 0" }}>
                       {d.adminEmail || "sin administrador"} · registrado {new Date(d.creado_en).toLocaleDateString("es-CO", { dateStyle: "medium" })}
+                      {diasDesde(d.creado_en) >= 3 && (
+                        <span style={{ color: "#B42318", fontWeight: 600 }}> · lleva {diasDesde(d.creado_en)} días esperando</span>
+                      )}
                     </p>
                   </div>
                   <div style={{ display: "flex", gap: 8 }}>
