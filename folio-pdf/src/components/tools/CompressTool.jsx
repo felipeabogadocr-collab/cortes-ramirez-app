@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
-import { fileToBytes, compressPdf } from "../../lib/pdfUtils.js";
-import { IconUpload, IconFile } from "../Icons.jsx";
+import { fileToBytes, compressPdf, excedeTamano, MAX_FILE_MB } from "../../lib/pdfUtils.js";
+import { IconUpload, IconFile, Spinner } from "../Icons.jsx";
 import UploadNote from "../UploadNote.jsx";
 import DownloadCard from "../DownloadCard.jsx";
 
@@ -43,7 +43,12 @@ export default function CompressTool() {
         accept="application/pdf"
         style={{ display: "none" }}
         onChange={(e) => {
-          setFile(e.target.files[0]);
+          const f = e.target.files[0];
+          if (f && excedeTamano(f)) {
+            setError(`El archivo supera ${MAX_FILE_MB} MB.`);
+            return;
+          }
+          setFile(f);
           setResult(null);
           setError("");
         }}
@@ -64,7 +69,13 @@ export default function CompressTool() {
       {error && <p style={{ color: "var(--danger)", fontSize: 13, marginTop: 10 }}>{error}</p>}
 
       <button className="btn-primary" style={{ marginTop: 14, display: "block" }} onClick={comprimir} disabled={busy || !file}>
-        {busy ? "Comprimiendo…" : "Comprimir"}
+        {busy ? (
+          <>
+            <Spinner /> Comprimiendo…
+          </>
+        ) : (
+          "Comprimir"
+        )}
       </button>
 
       {result && (
@@ -72,7 +83,15 @@ export default function CompressTool() {
           <p style={{ margin: "16px 0 0", fontSize: 13 }}>
             Original: <strong>{kb(result.original)}</strong> → Comprimido: <strong>{kb(result.nuevo)}</strong>
           </p>
-          <DownloadCard bytes={result.bytes} defaultName="comprimido-folio.pdf" herramienta="Comprimir PDF" />
+          <DownloadCard
+            bytes={result.bytes}
+            defaultName="comprimido-folio.pdf"
+            herramienta="Comprimir PDF"
+            onDownloaded={() => {
+              setFile(null);
+              setResult(null);
+            }}
+          />
         </>
       )}
     </div>

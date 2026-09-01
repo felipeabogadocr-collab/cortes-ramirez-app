@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { fileToBytes, renderThumbnails, signPdf } from "../../lib/pdfUtils.js";
+import { fileToBytes, renderThumbnails, signPdf, excedeTamano, MAX_FILE_MB } from "../../lib/pdfUtils.js";
 import DownloadCard from "../DownloadCard.jsx";
-import { IconEdit, IconImage, IconType, IconUpload, IconShield } from "../Icons.jsx";
+import { IconEdit, IconImage, IconType, IconUpload, IconShield, Spinner } from "../Icons.jsx";
 import UploadNote from "../UploadNote.jsx";
 
 const STAMP_W = 640;
@@ -281,6 +281,10 @@ export default function SignTool() {
 
   async function cargar(file) {
     if (!file) return;
+    if (excedeTamano(file)) {
+      setError(`El archivo supera ${MAX_FILE_MB} MB.`);
+      return;
+    }
     setBusy(true);
     setError("");
     try {
@@ -350,7 +354,9 @@ export default function SignTool() {
         />
         <button className="btn-upload" onClick={() => inputRef.current.click()} disabled={busy}>
           {busy ? (
-            "Cargando…"
+            <>
+              <Spinner /> Cargando…
+            </>
           ) : (
             <>
               <IconUpload /> Subir PDF
@@ -548,7 +554,13 @@ export default function SignTool() {
         {error && <p style={{ color: "var(--danger)", fontSize: 13, marginTop: 10 }}>{error}</p>}
 
         <button className="btn-primary" style={{ marginTop: 14 }} onClick={aplicar} disabled={busy}>
-          {busy ? "Firmando…" : "Firmar PDF"}
+          {busy ? (
+            <>
+              <Spinner /> Firmando…
+            </>
+          ) : (
+            "Firmar PDF"
+          )}
         </button>
         <button
           className="btn-ghost"
@@ -566,7 +578,19 @@ export default function SignTool() {
         </button>
 
         {resultado && (
-          <DownloadCard bytes={resultado} defaultName="firmado-folio.pdf" herramienta="Firmar PDF" />
+          <DownloadCard
+            bytes={resultado}
+            defaultName="firmado-folio.pdf"
+            herramienta="Firmar PDF"
+            onDownloaded={() => {
+              setBytes(null);
+              setFirmaDibujada(null);
+              setFirmaImagen(null);
+              setNombre("");
+              setStampUrl(null);
+              setResultado(null);
+            }}
+          />
         )}
       </div>
     </div>

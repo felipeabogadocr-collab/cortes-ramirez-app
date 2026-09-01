@@ -148,6 +148,16 @@ export function IconFile({ size = 18 }) {
   );
 }
 
+export function IconRotate({ size = 14 }) {
+  return base(
+    <>
+      <path d="M3.5 12a8.5 8.5 0 1 0 3-6.5" />
+      <path d="M3.5 4v4.5H8" />
+    </>,
+    size
+  );
+}
+
 export function IconEdit({ size = 16 }) {
   return base(
     <path d="M12 20h9M4 20l.6-3.2L14.5 7l3.2 3.2L8 20H4z" />,
@@ -163,6 +173,10 @@ export function IconType({ size = 16 }) {
     </>,
     size
   );
+}
+
+export function Spinner({ size = 14 }) {
+  return <span className="spinner" style={{ width: size, height: size }} aria-hidden="true" />;
 }
 
 export function IconChat({ size = 16 }) {

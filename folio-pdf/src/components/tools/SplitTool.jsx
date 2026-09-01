@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import JSZip from "jszip";
-import { fileToBytes, getPageCount, splitPdf } from "../../lib/pdfUtils.js";
-import { IconUpload } from "../Icons.jsx";
+import { fileToBytes, getPageCount, splitPdf, excedeTamano, MAX_FILE_MB } from "../../lib/pdfUtils.js";
+import { IconUpload, Spinner } from "../Icons.jsx";
 import UploadNote from "../UploadNote.jsx";
 import DownloadCard from "../DownloadCard.jsx";
 
@@ -16,6 +16,10 @@ export default function SplitTool() {
 
   async function cargar(file) {
     if (!file) return;
+    if (excedeTamano(file)) {
+      setError(`El archivo supera ${MAX_FILE_MB} MB.`);
+      return;
+    }
     setBusy(true);
     setError("");
     try {
@@ -81,7 +85,9 @@ export default function SplitTool() {
         />
         <button className="btn-upload" onClick={() => inputRef.current.click()} disabled={busy}>
           {busy ? (
-            "Cargando…"
+            <>
+              <Spinner /> Cargando…
+            </>
           ) : (
             <>
               <IconUpload /> Subir PDF
@@ -130,7 +136,13 @@ export default function SplitTool() {
       {error && <p style={{ color: "var(--danger)", fontSize: 13, marginTop: 10 }}>{error}</p>}
 
       <button className="btn-primary" style={{ marginTop: 12 }} onClick={dividir} disabled={busy}>
-        {busy ? "Dividiendo…" : "Dividir PDF"}
+        {busy ? (
+          <>
+            <Spinner /> Dividiendo…
+          </>
+        ) : (
+          "Dividir PDF"
+        )}
       </button>
 
       {resultado && (
@@ -139,6 +151,12 @@ export default function SplitTool() {
           defaultName={resultado.filename}
           mime={resultado.mime}
           herramienta="Dividir PDF"
+          onDownloaded={() => {
+            setBytes(null);
+            setTotal(0);
+            setRangos("");
+            setResultado(null);
+          }}
         />
       )}
     </div>

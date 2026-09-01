@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
-import { mergePdfs } from "../../lib/pdfUtils.js";
-import { IconUpload } from "../Icons.jsx";
+import { mergePdfs, excedeTamano, MAX_FILE_MB } from "../../lib/pdfUtils.js";
+import { IconUpload, Spinner } from "../Icons.jsx";
 import UploadNote from "../UploadNote.jsx";
 import DownloadCard from "../DownloadCard.jsx";
 
@@ -12,9 +12,10 @@ export default function MergeTool() {
   const inputRef = useRef(null);
 
   function addFiles(fileList) {
-    const nuevos = Array.from(fileList).filter((f) => f.type === "application/pdf" || f.name.toLowerCase().endsWith(".pdf"));
+    const candidatos = Array.from(fileList).filter((f) => f.type === "application/pdf" || f.name.toLowerCase().endsWith(".pdf"));
+    const nuevos = candidatos.filter((f) => !excedeTamano(f));
     setFiles((prev) => [...prev, ...nuevos]);
-    setError("");
+    setError(candidatos.length > nuevos.length ? `Algunos archivos superan ${MAX_FILE_MB} MB y no se agregaron.` : "");
     setResultado(null);
   }
 
@@ -68,6 +69,12 @@ export default function MergeTool() {
       </button>
       <UploadNote />
 
+      {files.length === 0 && (
+        <p style={{ fontSize: 12.5, color: "var(--muted)", marginTop: 14, textAlign: "center" }}>
+          Aún no has agregado archivos.
+        </p>
+      )}
+
       <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 8 }}>
         {files.map((f, i) => (
           <div
@@ -94,11 +101,25 @@ export default function MergeTool() {
       {error && <p style={{ color: "var(--danger)", fontSize: 13, marginTop: 10 }}>{error}</p>}
 
       <button className="btn-primary" style={{ marginTop: 16 }} onClick={unir} disabled={busy || files.length < 2}>
-        {busy ? "Uniendo…" : "Unir PDF"}
+        {busy ? (
+          <>
+            <Spinner /> Uniendo…
+          </>
+        ) : (
+          "Unir PDF"
+        )}
       </button>
 
       {resultado && (
-        <DownloadCard bytes={resultado} defaultName="unido-folio.pdf" herramienta="Unir PDF" />
+        <DownloadCard
+          bytes={resultado}
+          defaultName="unido-folio.pdf"
+          herramienta="Unir PDF"
+          onDownloaded={() => {
+            setFiles([]);
+            setResultado(null);
+          }}
+        />
       )}
     </div>
   );

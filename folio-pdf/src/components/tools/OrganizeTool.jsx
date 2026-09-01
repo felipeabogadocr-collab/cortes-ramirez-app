@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
-import { fileToBytes, renderThumbnails, organizePdf, extractPage } from "../../lib/pdfUtils.js";
-import { IconUpload } from "../Icons.jsx";
+import { fileToBytes, renderThumbnails, organizePdf, extractPage, excedeTamano, MAX_FILE_MB } from "../../lib/pdfUtils.js";
+import { IconUpload, IconRotate, Spinner } from "../Icons.jsx";
 import UploadNote from "../UploadNote.jsx";
 import DownloadCard from "../DownloadCard.jsx";
 
@@ -15,6 +15,10 @@ export default function OrganizeTool() {
 
   async function cargar(file) {
     if (!file) return;
+    if (excedeTamano(file)) {
+      setError(`El archivo supera ${MAX_FILE_MB} MB.`);
+      return;
+    }
     setBusy(true);
     setError("");
     try {
@@ -92,7 +96,9 @@ export default function OrganizeTool() {
         />
         <button className="btn-upload" onClick={() => inputRef.current.click()} disabled={busy}>
           {busy ? (
-            "Cargando…"
+            <>
+              <Spinner /> Cargando…
+            </>
           ) : (
             <>
               <IconUpload /> Subir PDF
@@ -140,7 +146,9 @@ export default function OrganizeTool() {
             <div style={{ display: "flex", gap: 4, flexWrap: "wrap", justifyContent: "center" }}>
               <button className="btn-icon" onClick={() => mover(i, -1)} title="Mover antes" disabled={i === 0}>↑</button>
               <button className="btn-icon" onClick={() => mover(i, 1)} title="Mover después" disabled={i === pages.length - 1}>↓</button>
-              <button className="btn-icon" onClick={() => rotar(i)} title="Rotar 90°">⟳</button>
+              <button className="btn-icon" onClick={() => rotar(i)} title="Rotar 90°">
+                <IconRotate size={13} />
+              </button>
               <button className="btn-icon" onClick={() => extraer(i)} title="Extraer esta página">⇩</button>
               <button className="btn-icon" onClick={() => alternarEliminar(i)} title={p.deleted ? "Restaurar" : "Eliminar"}>
                 {p.deleted ? "↺" : "✕"}
@@ -153,7 +161,13 @@ export default function OrganizeTool() {
       {error && <p style={{ color: "var(--danger)", fontSize: 13, marginTop: 10 }}>{error}</p>}
 
       <button className="btn-primary" style={{ marginTop: 16 }} onClick={guardar} disabled={busy}>
-        {busy ? "Guardando…" : "Guardar cambios"}
+        {busy ? (
+          <>
+            <Spinner /> Guardando…
+          </>
+        ) : (
+          "Guardar cambios"
+        )}
       </button>
 
       {paginaExtraida && (
@@ -161,11 +175,21 @@ export default function OrganizeTool() {
           bytes={paginaExtraida.bytes}
           defaultName={paginaExtraida.filename}
           herramienta="Organizar páginas"
+          onDownloaded={() => setPaginaExtraida(null)}
         />
       )}
 
       {resultado && (
-        <DownloadCard bytes={resultado} defaultName="organizado-folio.pdf" herramienta="Organizar páginas" />
+        <DownloadCard
+          bytes={resultado}
+          defaultName="organizado-folio.pdf"
+          herramienta="Organizar páginas"
+          onDownloaded={() => {
+            setBytes(null);
+            setPages([]);
+            setResultado(null);
+          }}
+        />
       )}
     </div>
   );

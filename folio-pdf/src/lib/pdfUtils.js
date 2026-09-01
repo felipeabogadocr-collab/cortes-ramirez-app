@@ -9,6 +9,15 @@ export async function fileToBytes(file) {
   return new Uint8Array(await file.arrayBuffer());
 }
 
+// Límite defensivo por archivo: evita que un archivo enorme cuelgue o
+// tumbe la pestaña al procesarlo por completo en el navegador.
+export const MAX_FILE_MB = 50;
+const MAX_FILE_BYTES = MAX_FILE_MB * 1024 * 1024;
+
+export function excedeTamano(file) {
+  return file.size > MAX_FILE_BYTES;
+}
+
 export function downloadBytes(bytes, filename, mime = "application/pdf", herramienta = null) {
   const blob = new Blob([bytes], { type: mime });
   const url = URL.createObjectURL(blob);
@@ -95,15 +104,17 @@ export async function splitPdf(bytes, ranges) {
   return results;
 }
 
-// Convierte una lista de imágenes (File, jpg/png) en un solo PDF, una imagen por página.
-export async function imagesToPdf(files) {
+// Convierte una lista de imágenes (jpg/png) en un solo PDF, una imagen por página.
+// items: [{ file: File, rotation?: 0|90|180|270 }]
+export async function imagesToPdf(items) {
   const out = await PDFDocument.create();
-  for (const file of files) {
+  for (const { file, rotation = 0 } of items) {
     const bytes = await fileToBytes(file);
     const isPng = file.type.includes("png");
     const image = isPng ? await out.embedPng(bytes) : await out.embedJpg(bytes);
     const page = out.addPage([image.width, image.height]);
     page.drawImage(image, { x: 0, y: 0, width: image.width, height: image.height });
+    if (rotation) page.setRotation(degrees(rotation));
   }
   return out.save();
 }
