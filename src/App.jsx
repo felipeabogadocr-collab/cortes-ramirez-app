@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, Fragment, Component } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo, Fragment, Component } from "react";
 import { supabase } from "./lib/supabaseClient";
 
 const uid = () => Math.random().toString(36).slice(2, 10).toUpperCase();
@@ -117,6 +117,49 @@ function exportarCSV(nombreArchivo, columnas, filas) {
   const a = document.createElement("a");
   a.href = url;
   a.download = nombreArchivo;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// Descarga un evento de la Agenda como archivo .ics (estándar iCalendar),
+// para poder importarlo en Google Calendar, Outlook o el calendario del
+// celular — así una audiencia o vencimiento registrado en Nomos también
+// puede vivir en el calendario que el abogado ya revisa todos los días.
+function descargarICS(evento) {
+  const escapar = (t) => String(t || "").replace(/([,;])/g, "\\$1").replace(/\n/g, "\\n");
+  const ahora = new Date().toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
+  const fechaBase = evento.fecha.replace(/-/g, "");
+  let dtStart, dtEnd;
+  if (evento.hora) {
+    const [h, m] = evento.hora.split(":");
+    dtStart = `${fechaBase}T${h.padStart(2, "0")}${m.padStart(2, "0")}00`;
+    const finDate = new Date(`${evento.fecha}T${evento.hora}:00`);
+    finDate.setHours(finDate.getHours() + 1);
+    const fh = String(finDate.getHours()).padStart(2, "0");
+    const fm = String(finDate.getMinutes()).padStart(2, "0");
+    dtEnd = `${fechaBase}T${fh}${fm}00`;
+  }
+  const lineas = [
+    "BEGIN:VCALENDAR",
+    "VERSION:2.0",
+    "PRODID:-//Nomos//Agenda//ES",
+    "BEGIN:VEVENT",
+    `UID:${evento.id}@nomos`,
+    `DTSTAMP:${ahora}`,
+    evento.hora ? `DTSTART:${dtStart}` : `DTSTART;VALUE=DATE:${fechaBase}`,
+    evento.hora ? `DTEND:${dtEnd}` : `DTEND;VALUE=DATE:${fechaBase}`,
+    `SUMMARY:${escapar(evento.titulo)}`,
+    evento.notas ? `DESCRIPTION:${escapar(evento.notas)}` : "",
+    "END:VEVENT",
+    "END:VCALENDAR",
+  ].filter(Boolean);
+  const blob = new Blob([lineas.join("\r\n")], { type: "text/calendar;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${(evento.titulo || "evento").replace(/[^a-z0-9]+/gi, "_").toLowerCase()}.ics`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
@@ -768,7 +811,7 @@ function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-const APP_VERSION = "1.10.0";
+const APP_VERSION = "1.11.0";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -2699,9 +2742,14 @@ function EventoAgendaCard({ evento, onEliminar, onCompletar, pasado }) {
           </p>
           {evento.notas && <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.inkSoft, margin: "6px 0 0" }}>{evento.notas}</p>}
         </div>
-        <button onClick={onEliminar} style={{ background: "none", border: "none", cursor: "pointer", color: COLORS.muted, display: "flex", flexShrink: 0 }} title="Eliminar evento">
-          <Icono tipo="papelera" size={15} />
-        </button>
+        <div style={{ display: "flex", gap: 10, alignItems: "center", flexShrink: 0 }}>
+          <button onClick={() => descargarICS(evento)} style={{ background: "none", border: "none", cursor: "pointer", color: COLORS.muted, display: "flex" }} title="Agregar a Google Calendar / Outlook (.ics)">
+            <Icono tipo="calendario" size={15} />
+          </button>
+          <button onClick={onEliminar} style={{ background: "none", border: "none", cursor: "pointer", color: COLORS.muted, display: "flex" }} title="Eliminar evento">
+            <Icono tipo="papelera" size={15} />
+          </button>
+        </div>
       </div>
     </Card>
   );
@@ -2736,6 +2784,7 @@ function ProximoEventoResumen({ onIr }) {
 
 function ResumenTab({ nombre, usuarioId, onIr }) {
   const r = useResumenGeneral();
+  const rep = useDatosReportes();
   const versiculo = fraseDelDia(VERSICULOS);
   const tareasPendientes = r.clientesInactivos + r.docsFaltaAbogado + r.pagosPendientes + r.procesosConNovedad;
 
@@ -2910,6 +2959,35 @@ function ResumenTab({ nombre, usuarioId, onIr }) {
           <MiniEstadistica etiqueta="Asistentes" valor={r.totalAsistentes} />
         </SeccionEstadisticas>
       </div>
+
+      {!rep.cargando && rep.listaClientes.length > 0 && (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 14, marginBottom: 20 }}>
+          <Card>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+              <p style={{ fontFamily: "Inter, sans-serif", fontSize: 14, fontWeight: 700, color: COLORS.ink, margin: 0 }}>Ingresos por mes</p>
+              <button className="drx-btn-ghost" style={{ ...buttonGhost, padding: "4px 10px", fontSize: 11.5 }} onClick={() => onIr("reportes")}>
+                Ver reportes →
+              </button>
+            </div>
+            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, color: COLORS.muted, marginBottom: 14 }}>Últimos 6 meses</p>
+            {rep.mesesEtiquetas.map((m) => (
+              <BarraReporte key={m.clave} etiqueta={m.etiqueta} valor={rep.ingresosPorMes[m.clave]} maximo={rep.maxIngresoMes} color="#2F80ED" formatoValor={formatoCOP} />
+            ))}
+          </Card>
+          <Card>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+              <p style={{ fontFamily: "Inter, sans-serif", fontSize: 14, fontWeight: 700, color: COLORS.ink, margin: 0 }}>Procesos por estado</p>
+              <button className="drx-btn-ghost" style={{ ...buttonGhost, padding: "4px 10px", fontSize: 11.5 }} onClick={() => onIr("vigilancia")}>
+                Ver vigilancia →
+              </button>
+            </div>
+            {ESTADOS_VIGILANCIA.map((estado) => (
+              <BarraReporte key={estado} etiqueta={estado} valor={rep.conteoEstados[estado]} maximo={rep.maxEstado} color={COLOR_ESTADO_VIGILANCIA[estado]} />
+            ))}
+            {rep.sinRevisar > 0 && <BarraReporte etiqueta="Sin revisar todavía" valor={rep.sinRevisar} maximo={rep.maxEstado} color="#94A3B8" />}
+          </Card>
+        </div>
+      )}
 
       {tareasPendientes === 0 && <EstadoVacio icono={<Icono tipo="check" size={26} />} texto="Todo al día — no hay pendientes urgentes por ahora." />}
     </div>
@@ -4148,37 +4226,44 @@ function ClientesTab({ usuarioActual }) {
     setClientes((prev) => ({ ...prev, [id]: actualizado }));
   };
 
-  const idsOrdenados = [...ids].sort((a, b) => {
-    if (orden === "az") return (clientes[a]?.nombre || "").localeCompare(clientes[b]?.nombre || "");
-    if (orden === "pago") {
-      const pa = clientes[a]?.proximoPago?.fecha || "9999-99-99";
-      const pb = clientes[b]?.proximoPago?.fecha || "9999-99-99";
-      return pa.localeCompare(pb);
-    }
-    const fa = clientes[a]?.ultimaActuacion || "";
-    const fb = clientes[b]?.ultimaActuacion || "";
-    return fb.localeCompare(fa);
-  });
-
-  const textoFiltro = filtro.trim().toLowerCase();
-  let idsFiltrados = textoFiltro
-    ? idsOrdenados.filter((id) => {
-        const c = clientes[id];
-        if (!c) return false;
-        return (
-          c.nombre?.toLowerCase().includes(textoFiltro) ||
-          c.radicado?.toLowerCase().includes(textoFiltro) ||
-          c.telefono?.toLowerCase().includes(textoFiltro)
-        );
-      })
-    : idsOrdenados;
-  if (soloSinRadicado) idsFiltrados = idsFiltrados.filter((id) => !clientes[id]?.radicado?.trim());
-  if (soloInactivos) {
-    idsFiltrados = idsFiltrados.filter((id) => {
-      const dias = diasDesde(clientes[id]?.ultimaActuacion);
-      return dias !== null && dias >= DIAS_ALERTA_INACTIVIDAD;
+  // Ordenar + filtrar recorre TODOS los clientes — se memoiza para que no se
+  // repita en cada render (por ejemplo, cada tecla escrita en el formulario
+  // de un cliente que ni siquiera está en la lista filtrada), que en
+  // despachos con muchos clientes se sentía como que la pantalla iba lenta.
+  const idsFiltrados = useMemo(() => {
+    const idsOrdenados = [...ids].sort((a, b) => {
+      if (orden === "az") return (clientes[a]?.nombre || "").localeCompare(clientes[b]?.nombre || "");
+      if (orden === "pago") {
+        const pa = clientes[a]?.proximoPago?.fecha || "9999-99-99";
+        const pb = clientes[b]?.proximoPago?.fecha || "9999-99-99";
+        return pa.localeCompare(pb);
+      }
+      const fa = clientes[a]?.ultimaActuacion || "";
+      const fb = clientes[b]?.ultimaActuacion || "";
+      return fb.localeCompare(fa);
     });
-  }
+
+    const textoFiltro = filtro.trim().toLowerCase();
+    let resultado = textoFiltro
+      ? idsOrdenados.filter((id) => {
+          const c = clientes[id];
+          if (!c) return false;
+          return (
+            c.nombre?.toLowerCase().includes(textoFiltro) ||
+            c.radicado?.toLowerCase().includes(textoFiltro) ||
+            c.telefono?.toLowerCase().includes(textoFiltro)
+          );
+        })
+      : idsOrdenados;
+    if (soloSinRadicado) resultado = resultado.filter((id) => !clientes[id]?.radicado?.trim());
+    if (soloInactivos) {
+      resultado = resultado.filter((id) => {
+        const dias = diasDesde(clientes[id]?.ultimaActuacion);
+        return dias !== null && dias >= DIAS_ALERTA_INACTIVIDAD;
+      });
+    }
+    return resultado;
+  }, [ids, clientes, orden, filtro, soloSinRadicado, soloInactivos]);
 
   return (
     <div>
@@ -4250,7 +4335,7 @@ function ClientesTab({ usuarioActual }) {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
         <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted, margin: 0 }}>
           {idsFiltrados.length} cliente{idsFiltrados.length !== 1 ? "s" : ""}
-          {textoFiltro
+          {filtro.trim()
             ? ` de ${ids.length}`
             : orden === "az"
             ? " · orden alfabético"
@@ -4553,6 +4638,24 @@ function ClientesTab({ usuarioActual }) {
                     }}
                   >
                     Compartir portal ↗
+                  </button>
+                  <button
+                    className="drx-btn-ghost"
+                    style={buttonGhost}
+                    title="Copiar nombre, teléfono, correo y radicado"
+                    onClick={() => {
+                      const datos = [
+                        c.nombre,
+                        c.telefono ? `Tel: ${c.telefono}` : null,
+                        c.email ? `Correo: ${c.email}` : null,
+                        c.radicado ? `Radicado: ${c.radicado}` : null,
+                      ]
+                        .filter(Boolean)
+                        .join("\n");
+                      copiar(datos, `todo-${id}`);
+                    }}
+                  >
+                    {copiado === `todo-${id}` ? "✓ Copiado" : "Copiar datos"}
                   </button>
                   <button className="drx-btn-ghost" style={buttonGhost} onClick={() => empezarEdicion(id)}>
                     Editar
@@ -5670,7 +5773,13 @@ function BarraReporte({ etiqueta, valor, maximo, color, formatoValor }) {
   );
 }
 
-function ReportesTab() {
+const COLOR_ESTADO_VIGILANCIA = { "En trámite": "#2F80ED", "Con novedad": "#F5A524", "Pendiente de revisión": "#8B5CF6", Finalizado: "#10B981" };
+
+// Todos los números y series que alimentan las gráficas de Reportes —
+// extraído a un hook aparte para que el panel de Resumen pueda mostrar un
+// adelanto de las mismas gráficas sin duplicar el cálculo ni volver a pedir
+// todos los clientes por separado.
+function useDatosReportes() {
   const { ids } = useIndex("indice-clientes", false);
   const { usuarios } = useUsuariosDespacho();
   const [clientes, setClientes] = useState({});
@@ -5730,7 +5839,6 @@ function ReportesTab() {
     else sinRevisar++;
   });
   const maxEstado = Math.max(1, ...Object.values(conteoEstados), sinRevisar);
-  const COLOR_ESTADO = { "En trámite": "#2F80ED", "Con novedad": "#F5A524", "Pendiente de revisión": "#8B5CF6", Finalizado: "#10B981" };
 
   // Carga de trabajo por abogado.
   const cargaPorAbogado = {};
@@ -5754,6 +5862,52 @@ function ReportesTab() {
 
   const clientesConPago = listaClientes.filter((c) => (c.pagos || []).length > 0).length;
   const ticketPromedio = clientesConPago > 0 ? ingresoTotalHistorico / clientesConPago : 0;
+
+  return {
+    cargando,
+    listaClientes,
+    usuarios,
+    mesesEtiquetas,
+    ingresosPorMes,
+    ingresoTotalHistorico,
+    maxIngresoMes,
+    ingresoMesActual,
+    cambioMensual,
+    carteraPendienteTotal,
+    conteoEstados,
+    sinRevisar,
+    maxEstado,
+    filasCarga,
+    maxCarga,
+    filasArea,
+    maxArea,
+    clientesConPago,
+    ticketPromedio,
+  };
+}
+
+function ReportesTab() {
+  const {
+    cargando,
+    usuarios,
+    mesesEtiquetas,
+    ingresosPorMes,
+    ingresoTotalHistorico,
+    maxIngresoMes,
+    ingresoMesActual,
+    cambioMensual,
+    carteraPendienteTotal,
+    conteoEstados,
+    sinRevisar,
+    maxEstado,
+    filasCarga,
+    maxCarga,
+    filasArea,
+    maxArea,
+    clientesConPago,
+    ticketPromedio,
+    listaClientes,
+  } = useDatosReportes();
 
   if (cargando) {
     return (
@@ -5827,7 +5981,7 @@ function ReportesTab() {
       <Card style={{ marginBottom: 16 }}>
         <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, fontWeight: 700, color: COLORS.ink, marginBottom: 14 }}>Procesos por estado</p>
         {ESTADOS_VIGILANCIA.map((estado) => (
-          <BarraReporte key={estado} etiqueta={estado} valor={conteoEstados[estado]} maximo={maxEstado} color={COLOR_ESTADO[estado]} />
+          <BarraReporte key={estado} etiqueta={estado} valor={conteoEstados[estado]} maximo={maxEstado} color={COLOR_ESTADO_VIGILANCIA[estado]} />
         ))}
         {sinRevisar > 0 && <BarraReporte etiqueta="Sin revisar todavía" valor={sinRevisar} maximo={maxEstado} color="#94A3B8" />}
         {listaClientes.length === 0 && <EstadoVacio icono={<Icono tipo="grafico" size={26} />} texto="Aún no hay clientes registrados." />}
@@ -5998,21 +6152,28 @@ function ContabilidadTab({ usuarioActual }) {
     .map((id) => clientes[id])
     .filter((c) => c && Number(c.valorTotal) > 0 && (c.pagos || []).length === 0);
 
-  const textoFiltro = filtro.trim().toLowerCase();
-  let idsFiltrados = textoFiltro ? ids.filter((id) => clientes[id]?.nombre?.toLowerCase().includes(textoFiltro)) : ids;
-  if (soloPendientes) idsFiltrados = idsFiltrados.filter((id) => (saldoDe(clientes[id]) || 0) > 0);
-  idsFiltrados = [...idsFiltrados].sort((a, b) => {
-    if (orden === "saldo") return (saldoDe(clientes[b]) || 0) - (saldoDe(clientes[a]) || 0);
-    if (orden === "ultimoPago") {
-      const fa = ultimoPagoDe(clientes[a])?.fecha;
-      const fb = ultimoPagoDe(clientes[b])?.fecha;
-      if (!fa && !fb) return 0;
-      if (!fa) return 1;
-      if (!fb) return -1;
-      return new Date(fb) - new Date(fa);
-    }
-    return (clientes[a]?.nombre || "").localeCompare(clientes[b]?.nombre || "");
-  });
+  // Filtrar y ordenar es O(n log n) sobre todos los clientes — sin memoizar,
+  // se repetía en CADA render (incluyendo cada tecla escrita en cualquier
+  // otro campo de la pantalla, no solo el filtro), lo que se sentía como
+  // lentitud en despachos con muchos clientes. useMemo solo lo recalcula
+  // cuando algo que realmente afecta el resultado cambió.
+  const idsFiltrados = useMemo(() => {
+    const textoFiltro = filtro.trim().toLowerCase();
+    let resultado = textoFiltro ? ids.filter((id) => clientes[id]?.nombre?.toLowerCase().includes(textoFiltro)) : ids;
+    if (soloPendientes) resultado = resultado.filter((id) => (saldoDe(clientes[id]) || 0) > 0);
+    return [...resultado].sort((a, b) => {
+      if (orden === "saldo") return (saldoDe(clientes[b]) || 0) - (saldoDe(clientes[a]) || 0);
+      if (orden === "ultimoPago") {
+        const fa = ultimoPagoDe(clientes[a])?.fecha;
+        const fb = ultimoPagoDe(clientes[b])?.fecha;
+        if (!fa && !fb) return 0;
+        if (!fa) return 1;
+        if (!fb) return -1;
+        return new Date(fb) - new Date(fa);
+      }
+      return (clientes[a]?.nombre || "").localeCompare(clientes[b]?.nombre || "");
+    });
+  }, [ids, clientes, filtro, soloPendientes, orden]);
 
   return (
     <div>
@@ -7796,7 +7957,17 @@ function ModalNotificaciones({
     // Como ya no hay una capa oscura de fondo cubriendo toda la pantalla
     // (el panel sale directo de la campanita, no como ventana aparte), hay
     // que detectar el clic afuera nosotros mismos para poder cerrarlo.
+    //
+    // Ojo: este listener escucha "mousedown", que dispara ANTES que el
+    // "click" del propio botón de la campanita. Si el usuario hacía clic en
+    // la campanita para cerrar el panel, este listener corría primero (lo
+    // cerraba por "clic afuera", ya que el botón está fuera de panelRef) y
+    // justo después el onClick del botón volvía a alternar el estado — con
+    // lo que el panel se reabría solo de inmediato (se sentía como que las
+    // notificaciones "desaparecían" al usar la campanita). Por eso hay que
+    // ignorar explícitamente los clics que caen sobre el propio botón.
     const alHacerClicAfuera = (e) => {
+      if (e.target.closest?.("[data-notif-bell]")) return;
       if (panelRef.current && !panelRef.current.contains(e.target)) onCerrar();
     };
     window.addEventListener("keydown", alPresionarTecla);
@@ -11377,6 +11548,7 @@ function App() {
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
             <div style={{ position: "relative" }}>
             <button
+              data-notif-bell
               className={`drx-btn-ghost${mostrarNotificaciones ? " drx-campana-sonando" : ""}`}
               onClick={() => setMostrarNotificaciones((v) => !v)}
               title="Notificaciones"
