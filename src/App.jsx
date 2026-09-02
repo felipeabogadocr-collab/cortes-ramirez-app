@@ -4712,7 +4712,7 @@ const PLANES_PRECIO = [
   {
     nombre: "Abogado",
     precio: "$35.000",
-    periodo: "/mes por abogado",
+    periodo: "/mes (1 abogado)",
     descripcion: "Para el abogado independiente que quiere dejar el Excel y el WhatsApp desordenado.",
     caracteristicas: ["1 usuario", "Hasta 30 clientes activos", "Firma electrónica de documentos", "Vigilancia judicial automática", "Portal del cliente"],
     destacado: false,
