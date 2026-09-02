@@ -814,7 +814,7 @@ function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-const APP_VERSION = "1.11.1";
+const APP_VERSION = "1.12.0";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -2967,15 +2967,23 @@ function ResumenTab({ nombre, usuarioId, onIr }) {
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 14, marginBottom: 20 }}>
           <Card>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
-              <p style={{ fontFamily: "Inter, sans-serif", fontSize: 14, fontWeight: 700, color: COLORS.ink, margin: 0 }}>Ingresos por mes</p>
+              <p style={{ fontFamily: "Inter, sans-serif", fontSize: 14, fontWeight: 700, color: COLORS.ink, margin: 0 }}>Ingresos vs. egresos</p>
               <button className="drx-btn-ghost" style={{ ...buttonGhost, padding: "4px 10px", fontSize: 11.5 }} onClick={() => onIr("reportes")}>
                 Ver reportes →
               </button>
             </div>
-            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, color: COLORS.muted, marginBottom: 14 }}>Últimos 6 meses</p>
-            {rep.mesesEtiquetas.map((m) => (
-              <BarraReporte key={m.clave} etiqueta={m.etiqueta} valor={rep.ingresosPorMes[m.clave]} maximo={rep.maxIngresoMes} color="#2F80ED" formatoValor={formatoCOP} />
-            ))}
+            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, color: COLORS.muted, marginBottom: 14 }}>
+              Últimos 6 meses · Neto: {formatoCOP(rep.netoTotalHistorico)}
+            </p>
+            <GraficaBarrasAgrupadas
+              categorias={rep.mesesEtiquetas.map((m) => m.etiqueta)}
+              series={[
+                { nombre: "Ingresos", color: "#2F80ED", valores: rep.mesesEtiquetas.map((m) => rep.ingresosPorMes[m.clave]) },
+                { nombre: "Egresos", color: "#F43F5E", valores: rep.mesesEtiquetas.map((m) => rep.egresosPorMes[m.clave]) },
+              ]}
+              formatoValor={formatoCOP}
+              alto={130}
+            />
           </Card>
           <Card>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
@@ -2984,10 +2992,13 @@ function ResumenTab({ nombre, usuarioId, onIr }) {
                 Ver vigilancia →
               </button>
             </div>
-            {ESTADOS_VIGILANCIA.map((estado) => (
-              <BarraReporte key={estado} etiqueta={estado} valor={rep.conteoEstados[estado]} maximo={rep.maxEstado} color={COLOR_ESTADO_VIGILANCIA[estado]} />
-            ))}
-            {rep.sinRevisar > 0 && <BarraReporte etiqueta="Sin revisar todavía" valor={rep.sinRevisar} maximo={rep.maxEstado} color="#94A3B8" />}
+            <GraficaBarras
+              alto={130}
+              datos={[
+                ...ESTADOS_VIGILANCIA.map((estado) => ({ etiqueta: estado, valor: rep.conteoEstados[estado], color: COLOR_ESTADO_VIGILANCIA[estado] })),
+                ...(rep.sinRevisar > 0 ? [{ etiqueta: "Sin revisar", valor: rep.sinRevisar, color: "#94A3B8" }] : []),
+              ]}
+            />
           </Card>
         </div>
       )}
@@ -5762,16 +5773,105 @@ function ReciboCard({ cliente, pago, onEditar, onEliminar }) {
   );
 }
 
-function BarraReporte({ etiqueta, valor, maximo, color, formatoValor }) {
-  const porcentaje = maximo > 0 ? Math.max(4, Math.round((valor / maximo) * 100)) : 0;
+// Gráfica de barras VERTICALES de una sola serie — una barra por categoría,
+// cada una con su propio color opcional (para "Procesos por estado",
+// "Distribución por área", etc.) o un color único para toda la serie (para
+// "Carga por abogado"). Reemplaza a las barras horizontales de antes por un
+// formato de columnas más parecido a un reporte financiero real.
+function GraficaBarras({ datos, color, formatoValor, alto = 150 }) {
+  const max = Math.max(1, ...datos.map((d) => Math.abs(Number(d.valor)) || 0));
   return (
-    <div style={{ marginBottom: 10 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-        <span style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.inkSoft }}>{etiqueta}</span>
-        <span style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, fontWeight: 700, color: COLORS.ink }}>{formatoValor ? formatoValor(valor) : valor}</span>
+    <div>
+      <div style={{ display: "flex", alignItems: "flex-end", gap: 10, height: alto, borderBottom: `2px solid ${COLORS.border}` }}>
+        {datos.map((d, i) => {
+          const h = Math.max(3, Math.round((Math.abs(Number(d.valor)) / max) * (alto - 26)));
+          return (
+            <div key={d.etiqueta + i} style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end", height: "100%" }}>
+              <span
+                style={{
+                  fontFamily: "Inter, sans-serif",
+                  fontSize: 10.5,
+                  fontWeight: 700,
+                  color: COLORS.ink,
+                  marginBottom: 5,
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  maxWidth: "100%",
+                }}
+              >
+                {formatoValor ? formatoValor(d.valor) : d.valor}
+              </span>
+              <div
+                title={`${d.etiqueta}: ${formatoValor ? formatoValor(d.valor) : d.valor}`}
+                style={{ width: "100%", maxWidth: 42, height: h, background: d.color || color, borderRadius: "6px 6px 0 0", transition: "height 0.4s ease" }}
+              />
+            </div>
+          );
+        })}
       </div>
-      <div style={{ background: COLORS.accentSoft, borderRadius: 6, height: 10, overflow: "hidden" }}>
-        <div style={{ width: `${porcentaje}%`, height: "100%", background: color, borderRadius: 6 }} />
+      <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
+        {datos.map((d, i) => (
+          <div
+            key={d.etiqueta + i}
+            style={{
+              flex: 1,
+              minWidth: 0,
+              textAlign: "center",
+              fontFamily: "Inter, sans-serif",
+              fontSize: 10.5,
+              color: COLORS.muted,
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
+            title={d.etiqueta}
+          >
+            {d.etiqueta}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// Igual que GraficaBarras, pero agrupada: varias series (ingresos/egresos,
+// por ejemplo) una al lado de la otra dentro de cada categoría, con
+// leyenda — para comparar dos magnitudes por mes de un vistazo.
+function GraficaBarrasAgrupadas({ categorias, series, formatoValor, alto = 150 }) {
+  const max = Math.max(1, ...series.flatMap((s) => s.valores.map((v) => Math.abs(Number(v)) || 0)));
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "flex-end", gap: 14, height: alto, borderBottom: `2px solid ${COLORS.border}` }}>
+        {categorias.map((cat, i) => (
+          <div key={cat + i} style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "flex-end", justifyContent: "center", gap: 4, height: "100%" }}>
+            {series.map((s, si) => {
+              const v = Number(s.valores[i]) || 0;
+              const h = Math.max(3, Math.round((Math.abs(v) / max) * (alto - 26)));
+              return (
+                <div
+                  key={si}
+                  title={`${s.nombre} · ${cat}: ${formatoValor ? formatoValor(v) : v}`}
+                  style={{ flex: 1, maxWidth: 22, minWidth: 8, height: h, background: s.color, borderRadius: "5px 5px 0 0", transition: "height 0.4s ease" }}
+                />
+              );
+            })}
+          </div>
+        ))}
+      </div>
+      <div style={{ display: "flex", gap: 14, marginTop: 8 }}>
+        {categorias.map((cat, i) => (
+          <div key={i} style={{ flex: 1, minWidth: 0, textAlign: "center", fontFamily: "Inter, sans-serif", fontSize: 10.5, color: COLORS.muted }}>
+            {cat}
+          </div>
+        ))}
+      </div>
+      <div style={{ display: "flex", gap: 14, marginTop: 12, flexWrap: "wrap" }}>
+        {series.map((s, i) => (
+          <span key={i} style={{ display: "inline-flex", alignItems: "center", gap: 5, fontFamily: "Inter, sans-serif", fontSize: 11.5, color: COLORS.inkSoft }}>
+            <span style={{ width: 9, height: 9, borderRadius: 2, background: s.color, display: "inline-block" }} /> {s.nombre}
+          </span>
+        ))}
       </div>
     </div>
   );
@@ -5786,6 +5886,7 @@ const COLOR_ESTADO_VIGILANCIA = { "En trámite": "#2F80ED", "Con novedad": "#F5A
 function useDatosReportes() {
   const { ids } = useIndex("indice-clientes", false);
   const { usuarios } = useUsuariosDespacho();
+  const { egresos } = useEgresos();
   const [clientes, setClientes] = useState({});
   const [cargando, setCargando] = useState(true);
 
@@ -5826,6 +5927,22 @@ function useDatosReportes() {
   const ingresoMesActual = ingresosPorMes[claveMesActual] || 0;
   const ingresoMesAnterior = claveMesAnterior ? ingresosPorMes[claveMesAnterior] || 0 : 0;
   const cambioMensual = ingresoMesAnterior > 0 ? Math.round(((ingresoMesActual - ingresoMesAnterior) / ingresoMesAnterior) * 100) : null;
+
+  // Egresos por mes — de nada sirve ver solo lo que entra si no se ve
+  // también lo que sale; sin esto "cómo va tu empresa" solo contaba la
+  // mitad de la historia (nunca se veía si en realidad se estaba perdiendo
+  // plata pese a tener buenos ingresos).
+  const egresosPorMes = Object.fromEntries(mesesEtiquetas.map((m) => [m.clave, 0]));
+  let egresoTotalHistorico = 0;
+  egresos.forEach((e) => {
+    const valor = Number(e.valor) || 0;
+    egresoTotalHistorico += valor;
+    const clave = e.fecha?.slice(0, 7);
+    if (clave && egresosPorMes[clave] !== undefined) egresosPorMes[clave] += valor;
+  });
+  const egresoMesActual = egresosPorMes[claveMesActual] || 0;
+  const netoMesActual = ingresoMesActual - egresoMesActual;
+  const netoTotalHistorico = ingresoTotalHistorico - egresoTotalHistorico;
 
   // Cartera pendiente total (mismo criterio que en Contabilidad).
   const carteraPendienteTotal = listaClientes.reduce((sum, c) => {
@@ -5877,6 +5994,11 @@ function useDatosReportes() {
     maxIngresoMes,
     ingresoMesActual,
     cambioMensual,
+    egresosPorMes,
+    egresoTotalHistorico,
+    egresoMesActual,
+    netoMesActual,
+    netoTotalHistorico,
     carteraPendienteTotal,
     conteoEstados,
     sinRevisar,
@@ -5900,6 +6022,11 @@ function ReportesTab() {
     maxIngresoMes,
     ingresoMesActual,
     cambioMensual,
+    egresosPorMes,
+    egresoTotalHistorico,
+    egresoMesActual,
+    netoMesActual,
+    netoTotalHistorico,
     carteraPendienteTotal,
     conteoEstados,
     sinRevisar,
@@ -5964,6 +6091,22 @@ function ReportesTab() {
         </Card>
         <Card>
           <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, fontWeight: 700, color: COLORS.muted, textTransform: "uppercase", letterSpacing: 0.5, margin: 0 }}>
+            Egresos este mes
+          </p>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 24, fontWeight: 800, color: egresoMesActual > 0 ? "#B42318" : COLORS.ink, margin: "4px 0 0" }}>
+            {formatoCOP(egresoMesActual)}
+          </p>
+        </Card>
+        <Card>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, fontWeight: 700, color: COLORS.muted, textTransform: "uppercase", letterSpacing: 0.5, margin: 0 }}>
+            Neto este mes
+          </p>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 24, fontWeight: 800, color: netoMesActual >= 0 ? "#166534" : "#B42318", margin: "4px 0 0" }}>
+            {formatoCOP(netoMesActual)}
+          </p>
+        </Card>
+        <Card>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, fontWeight: 700, color: COLORS.muted, textTransform: "uppercase", letterSpacing: 0.5, margin: 0 }}>
             Cartera pendiente
           </p>
           <p style={{ fontFamily: "Inter, sans-serif", fontSize: 24, fontWeight: 800, color: carteraPendienteTotal > 0 ? "#B42318" : COLORS.ink, margin: "4px 0 0" }}>
@@ -5973,33 +6116,44 @@ function ReportesTab() {
       </div>
 
       <Card style={{ marginBottom: 16 }}>
-        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, fontWeight: 700, color: COLORS.ink, marginBottom: 4 }}>Ingresos por mes</p>
+        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, fontWeight: 700, color: COLORS.ink, marginBottom: 4 }}>Ingresos vs. egresos por mes</p>
         <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, marginBottom: 14 }}>
-          Histórico total recaudado: {formatoCOP(ingresoTotalHistorico)}
+          Histórico: {formatoCOP(ingresoTotalHistorico)} recaudado · {formatoCOP(egresoTotalHistorico)} en egresos · Neto {formatoCOP(netoTotalHistorico)}
         </p>
-        {mesesEtiquetas.map((m) => (
-          <BarraReporte key={m.clave} etiqueta={m.etiqueta} valor={ingresosPorMes[m.clave]} maximo={maxIngresoMes} color="#2F80ED" formatoValor={formatoCOP} />
-        ))}
+        <GraficaBarrasAgrupadas
+          categorias={mesesEtiquetas.map((m) => m.etiqueta)}
+          series={[
+            { nombre: "Ingresos", color: "#2F80ED", valores: mesesEtiquetas.map((m) => ingresosPorMes[m.clave]) },
+            { nombre: "Egresos", color: "#F43F5E", valores: mesesEtiquetas.map((m) => egresosPorMes[m.clave]) },
+          ]}
+          formatoValor={formatoCOP}
+        />
       </Card>
 
       <Card style={{ marginBottom: 16 }}>
         <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, fontWeight: 700, color: COLORS.ink, marginBottom: 14 }}>Procesos por estado</p>
-        {ESTADOS_VIGILANCIA.map((estado) => (
-          <BarraReporte key={estado} etiqueta={estado} valor={conteoEstados[estado]} maximo={maxEstado} color={COLOR_ESTADO_VIGILANCIA[estado]} />
-        ))}
-        {sinRevisar > 0 && <BarraReporte etiqueta="Sin revisar todavía" valor={sinRevisar} maximo={maxEstado} color="#94A3B8" />}
-        {listaClientes.length === 0 && <EstadoVacio icono={<Icono tipo="grafico" size={26} />} texto="Aún no hay clientes registrados." />}
+        {listaClientes.length === 0 ? (
+          <EstadoVacio icono={<Icono tipo="grafico" size={26} />} texto="Aún no hay clientes registrados." />
+        ) : (
+          <GraficaBarras
+            datos={[
+              ...ESTADOS_VIGILANCIA.map((estado) => ({ etiqueta: estado, valor: conteoEstados[estado], color: COLOR_ESTADO_VIGILANCIA[estado] })),
+              ...(sinRevisar > 0 ? [{ etiqueta: "Sin revisar", valor: sinRevisar, color: "#94A3B8" }] : []),
+            ]}
+          />
+        )}
       </Card>
 
-      <Card>
+      <Card style={{ marginBottom: 16 }}>
         <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, fontWeight: 700, color: COLORS.ink, marginBottom: 4 }}>Carga de trabajo por abogado</p>
         <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, marginBottom: 14 }}>
           Cuántos clientes tiene asignados cada uno. Se asigna desde "Clientes" al crear o editar un cliente.
         </p>
-        {filasCarga.length === 0 && <EstadoVacio icono={<Icono tipo="grafico" size={26} />} texto="Aún no hay clientes registrados." />}
-        {filasCarga.map(([nombre, n]) => (
-          <BarraReporte key={nombre} etiqueta={nombre} valor={n} maximo={maxCarga} color="#7C3AED" />
-        ))}
+        {filasCarga.length === 0 ? (
+          <EstadoVacio icono={<Icono tipo="grafico" size={26} />} texto="Aún no hay clientes registrados." />
+        ) : (
+          <GraficaBarras datos={filasCarga.map(([nombre, n]) => ({ etiqueta: nombre, valor: n }))} color="#7C3AED" />
+        )}
         {usuarios.length > 0 && filasCarga.length > 0 && (
           <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, color: COLORS.muted, marginTop: 10 }}>
             {usuarios.length} usuario{usuarios.length !== 1 ? "s" : ""} en el despacho.
@@ -6010,10 +6164,11 @@ function ReportesTab() {
       <Card>
         <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, fontWeight: 700, color: COLORS.ink, marginBottom: 4 }}>Distribución por área del derecho</p>
         <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, marginBottom: 14 }}>En qué se concentra el despacho — útil para decidir dónde especializarse.</p>
-        {filasArea.length === 0 && <EstadoVacio icono={<Icono tipo="balanza" size={26} />} texto="Aún no hay clientes registrados." />}
-        {filasArea.map(([area, n]) => (
-          <BarraReporte key={area} etiqueta={area} valor={n} maximo={maxArea} color={COLOR_AREA_PROCESO[area] || "#6B7480"} />
-        ))}
+        {filasArea.length === 0 ? (
+          <EstadoVacio icono={<Icono tipo="balanza" size={26} />} texto="Aún no hay clientes registrados." />
+        ) : (
+          <GraficaBarras datos={filasArea.map(([area, n]) => ({ etiqueta: area, valor: n, color: COLOR_AREA_PROCESO[area] || "#6B7480" }))} />
+        )}
         {clientesConPago > 0 && (
           <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, color: COLORS.muted, marginTop: 10 }}>
             Ticket promedio por cliente que ha pagado: <strong style={{ color: COLORS.headingText }}>{formatoCOP(ticketPromedio)}</strong>
@@ -6030,6 +6185,185 @@ const ORDEN_CONTABILIDAD = [
   { valor: "ultimoPago", etiqueta: "Último pago (más reciente primero)" },
 ];
 
+const CATEGORIAS_EGRESO = ["Arriendo", "Nómina", "Servicios públicos", "Insumos de oficina", "Impuestos", "Software y herramientas", "Marketing", "Otro"];
+
+// Los egresos del despacho (arriendo, nómina, servicios...) no pertenecen a
+// ningún cliente puntual, así que se guardan como una sola lista bajo una
+// clave simple (igual que "ideas-contenido") en vez de como registros de
+// cliente — no había ninguna forma de ver salidas de dinero, solo entradas,
+// así que el "cómo va tu empresa" solo contaba la mitad de la historia.
+function useEgresos() {
+  const [egresos, setEgresosState] = useState([]);
+  const [cargado, setCargado] = useState(false);
+
+  const cargar = useCallback(async () => {
+    const raw = await storageGet("egresos-contabilidad", false);
+    setEgresosState(raw ? JSON.parse(raw) : []);
+    setCargado(true);
+  }, []);
+
+  useEffect(() => {
+    cargar();
+  }, [cargar]);
+
+  const crear = async (datos) => {
+    const nuevo = {
+      id: uid(),
+      fecha: new Date(`${datos.fecha}T12:00:00`).toISOString(),
+      concepto: datos.concepto.trim(),
+      categoria: datos.categoria,
+      valor: Number(datos.valor) || 0,
+    };
+    const actualizados = [nuevo, ...egresos];
+    await storageSet("egresos-contabilidad", JSON.stringify(actualizados), false);
+    setEgresosState(actualizados);
+    return nuevo;
+  };
+
+  const editar = async (id, cambios) => {
+    const actualizados = egresos.map((e) => (e.id === id ? { ...e, ...cambios } : e));
+    await storageSet("egresos-contabilidad", JSON.stringify(actualizados), false);
+    setEgresosState(actualizados);
+  };
+
+  const eliminar = async (id) => {
+    const actualizados = egresos.filter((e) => e.id !== id);
+    await storageSet("egresos-contabilidad", JSON.stringify(actualizados), false);
+    setEgresosState(actualizados);
+  };
+
+  return { egresos, cargado, crear, editar, eliminar };
+}
+
+function FormularioEgreso({ onRegistrar }) {
+  const hoyStr = new Date().toISOString().slice(0, 10);
+  const [concepto, setConcepto] = useState("");
+  const [categoria, setCategoria] = useState(CATEGORIAS_EGRESO[0]);
+  const [valor, setValor] = useState("");
+  const [fecha, setFecha] = useState(hoyStr);
+  const [guardando, setGuardando] = useState(false);
+
+  const registrar = async () => {
+    if (!concepto.trim() || !valor || Number(valor) <= 0) return;
+    setGuardando(true);
+    await onRegistrar({ concepto, categoria, valor, fecha });
+    setConcepto("");
+    setValor("");
+    setFecha(hoyStr);
+    setGuardando(false);
+  };
+
+  return (
+    <div style={{ marginTop: 12, borderTop: `1px solid ${COLORS.border}`, paddingTop: 14 }}>
+      <div className="drx-grid-form" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+        <Field label="Concepto">
+          <input className="drx-input" style={inputStyle} value={concepto} onChange={(e) => setConcepto(e.target.value)} placeholder="Ej: Arriendo oficina julio" />
+        </Field>
+        <Field label="Categoría">
+          <select className="drx-input" style={inputStyle} value={categoria} onChange={(e) => setCategoria(e.target.value)}>
+            {CATEGORIAS_EGRESO.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+          </select>
+        </Field>
+      </div>
+      <div className="drx-grid-form" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+        <Field label="Valor (COP)">
+          <input className="drx-input" style={inputStyle} type="number" value={valor} onChange={(e) => setValor(e.target.value)} placeholder="Ej: 800000" />
+        </Field>
+        <Field label="Fecha">
+          <input type="date" className="drx-input" style={inputStyle} value={fecha} onChange={(e) => setFecha(e.target.value)} />
+        </Field>
+      </div>
+      <button
+        className="drx-btn-primary"
+        style={{ ...buttonPrimary, marginTop: 14, background: "#F43F5E" }}
+        onClick={registrar}
+        disabled={guardando || !concepto.trim() || !valor}
+      >
+        {guardando ? "Guardando..." : "Registrar egreso"}
+      </button>
+    </div>
+  );
+}
+
+function EgresoCard({ egreso, onEditar, onEliminar }) {
+  const [editando, setEditando] = useState(false);
+  const [concepto, setConcepto] = useState(egreso.concepto);
+  const [categoria, setCategoria] = useState(egreso.categoria);
+  const [valor, setValor] = useState(String(egreso.valor ?? ""));
+  const [fecha, setFecha] = useState(new Date(egreso.fecha).toISOString().slice(0, 10));
+  const [guardando, setGuardando] = useState(false);
+
+  const guardarEdicion = async () => {
+    if (!concepto.trim() || !valor || Number(valor) <= 0) return;
+    setGuardando(true);
+    await onEditar({ concepto: concepto.trim(), categoria, valor: Number(valor), fecha: new Date(`${fecha}T12:00:00`).toISOString() });
+    setGuardando(false);
+    setEditando(false);
+  };
+
+  if (editando) {
+    return (
+      <div style={{ background: COLORS.surfaceSoft, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: 12, marginTop: 10 }}>
+        <div className="drx-grid-form" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
+          <Field label="Concepto">
+            <input className="drx-input" style={inputStyle} value={concepto} onChange={(e) => setConcepto(e.target.value)} />
+          </Field>
+          <Field label="Categoría">
+            <select className="drx-input" style={inputStyle} value={categoria} onChange={(e) => setCategoria(e.target.value)}>
+              {CATEGORIAS_EGRESO.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+          </Field>
+        </div>
+        <div className="drx-grid-form" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
+          <Field label="Valor (COP)">
+            <input className="drx-input" style={inputStyle} type="number" value={valor} onChange={(e) => setValor(e.target.value)} />
+          </Field>
+          <Field label="Fecha">
+            <input type="date" className="drx-input" style={inputStyle} value={fecha} onChange={(e) => setFecha(e.target.value)} />
+          </Field>
+        </div>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button className="drx-btn-primary" style={{ ...buttonPrimary, padding: "6px 14px", fontSize: 12 }} onClick={guardarEdicion} disabled={guardando}>
+            {guardando ? "Guardando..." : "Guardar cambios"}
+          </button>
+          <button className="drx-btn-ghost" style={{ ...buttonGhost, padding: "6px 14px", fontSize: 12 }} onClick={() => setEditando(false)} disabled={guardando}>
+            Cancelar
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap", background: COLORS.surfaceSoft, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: 12, marginTop: 10 }}>
+      <div>
+        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, fontWeight: 600, color: COLORS.ink, margin: 0 }}>
+          {formatoCOP(egreso.valor)} · {egreso.concepto}
+        </p>
+        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, margin: "3px 0 0" }}>
+          {egreso.categoria} · {new Date(egreso.fecha).toLocaleDateString("es-CO", { dateStyle: "medium" })}
+        </p>
+      </div>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <button className="drx-btn-ghost" style={{ ...buttonGhost, padding: "5px 12px", fontSize: 12 }} onClick={() => setEditando(true)}>
+          Editar
+        </button>
+        <button className="drx-btn-ghost" style={{ ...buttonGhost, padding: "5px 12px", fontSize: 12, color: "#B42318", borderColor: "#F2B8B5" }} onClick={onEliminar}>
+          Eliminar
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function ContabilidadTab({ usuarioActual }) {
   const { ids } = useIndex("indice-clientes", false);
   const [clientes, setClientes] = useState({});
@@ -6038,7 +6372,22 @@ function ContabilidadTab({ usuarioActual }) {
   const [soloPendientes, setSoloPendientes] = useState(false);
   const [orden, setOrden] = useState("nombre");
   const [expandidos, setExpandidos] = useState({});
+  const [mostrarFormEgreso, setMostrarFormEgreso] = useState(false);
+  const { egresos, crear: crearEgreso, editar: editarEgreso, eliminar: eliminarEgresoBase } = useEgresos();
   const { confirmar, ConfirmarDialogo } = useConfirmarDialogo();
+
+  const registrarEgreso = async (datos) => {
+    const nuevo = await crearEgreso(datos);
+    registrarAuditoria(usuarioActual, "registrar_egreso", "egreso", nuevo.id, { concepto: nuevo.concepto, valor: nuevo.valor });
+    setMostrarFormEgreso(false);
+  };
+
+  const eliminarEgreso = async (egreso) => {
+    const ok = await confirmar(`¿Seguro que quieres eliminar el egreso "${egreso.concepto}" de ${formatoCOP(egreso.valor)}? Esta acción no se puede deshacer.`);
+    if (!ok) return;
+    await eliminarEgresoBase(egreso.id);
+    registrarAuditoria(usuarioActual, "eliminar_egreso", "egreso", egreso.id, { concepto: egreso.concepto, valor: egreso.valor });
+  };
 
   const cargar = useCallback(async () => {
     const entries = {};
@@ -6150,6 +6499,42 @@ function ContabilidadTab({ usuarioActual }) {
   });
   const mediosPagoOrdenados = Object.entries(porMedioPagoMes).sort((a, b) => b[1] - a[1]);
 
+  // Salidas de dinero (arriendo, nómina, servicios...) — sin esto, la
+  // pantalla solo mostraba lo que entraba y nunca lo que salía, así que no
+  // servía para saber si el despacho realmente está ganando plata o no.
+  let egresoTotal = 0;
+  let egresoMes = 0;
+  const porCategoriaEgresoMes = {};
+  egresos.forEach((e) => {
+    const valor = Number(e.valor) || 0;
+    egresoTotal += valor;
+    const fechaEgreso = new Date(e.fecha);
+    if (fechaEgreso.getFullYear() === hoy.getFullYear() && fechaEgreso.getMonth() === hoy.getMonth()) {
+      egresoMes += valor;
+      porCategoriaEgresoMes[e.categoria] = (porCategoriaEgresoMes[e.categoria] || 0) + valor;
+    }
+  });
+  const netoMes = recaudadoMes - egresoMes;
+  const netoTotal = recaudadoTotal - egresoTotal;
+
+  const mesesEgresos = [];
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(hoy.getFullYear(), hoy.getMonth() - i, 1);
+    mesesEgresos.push({ clave: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`, etiqueta: d.toLocaleDateString("es-CO", { month: "short", year: "2-digit" }) });
+  }
+  const ingresosPorMesGrafica = Object.fromEntries(mesesEgresos.map((m) => [m.clave, 0]));
+  const egresosPorMesGrafica = Object.fromEntries(mesesEgresos.map((m) => [m.clave, 0]));
+  ids.forEach((id) => {
+    (clientes[id]?.pagos || []).forEach((p) => {
+      const clave = p.fecha?.slice(0, 7);
+      if (clave && ingresosPorMesGrafica[clave] !== undefined) ingresosPorMesGrafica[clave] += Number(p.valor) || 0;
+    });
+  });
+  egresos.forEach((e) => {
+    const clave = e.fecha?.slice(0, 7);
+    if (clave && egresosPorMesGrafica[clave] !== undefined) egresosPorMesGrafica[clave] += Number(e.valor) || 0;
+  });
+
   // Clientes con un valor acordado pero sin ni un solo pago registrado —
   // fácil que se pierdan de vista entre los que sí van pagando poco a poco.
   const clientesSinPagos = ids
@@ -6182,12 +6567,24 @@ function ContabilidadTab({ usuarioActual }) {
   return (
     <div>
       <EncabezadoSeccion titulo="Contabilidad" color="#F43F5E" />
-      <div className="drx-grid-form" style={{ display: "grid", gridTemplateColumns: carteraTotal > 0 ? "1fr 1fr 1fr" : "1fr 1fr", gap: 12, marginBottom: 20 }}>
+      <div className="drx-grid-form" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: 12, marginBottom: 20 }}>
         <Card style={{ borderLeft: "4px solid #10B981", background: "#F0FDF4" }}>
           <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, fontWeight: 700, color: "#166534", textTransform: "uppercase", letterSpacing: 0.5, margin: 0 }}>
             Recaudado este mes
           </p>
           <p style={{ fontFamily: "Inter, sans-serif", fontSize: 22, fontWeight: 800, color: "#166534", margin: "4px 0 0" }}>{formatoCOP(recaudadoMes)}</p>
+        </Card>
+        <Card style={{ borderLeft: "4px solid #F43F5E", background: "#FEF2F2" }}>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, fontWeight: 700, color: "#B42318", textTransform: "uppercase", letterSpacing: 0.5, margin: 0 }}>
+            Egresos este mes
+          </p>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 22, fontWeight: 800, color: "#B42318", margin: "4px 0 0" }}>{formatoCOP(egresoMes)}</p>
+        </Card>
+        <Card style={{ borderLeft: `4px solid ${netoMes >= 0 ? "#10B981" : "#B42318"}`, background: netoMes >= 0 ? COLORS.accentSoft : "#FEF2F2" }}>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, fontWeight: 700, color: netoMes >= 0 ? COLORS.navy : "#B42318", textTransform: "uppercase", letterSpacing: 0.5, margin: 0 }}>
+            Neto este mes
+          </p>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 22, fontWeight: 800, color: netoMes >= 0 ? COLORS.navy : "#B42318", margin: "4px 0 0" }}>{formatoCOP(netoMes)}</p>
         </Card>
         <Card style={{ borderLeft: `4px solid ${COLORS.accentBright}`, background: COLORS.accentSoft }}>
           <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, fontWeight: 700, color: COLORS.navy, textTransform: "uppercase", letterSpacing: 0.5, margin: 0 }}>
@@ -6195,8 +6592,20 @@ function ContabilidadTab({ usuarioActual }) {
           </p>
           <p style={{ fontFamily: "Inter, sans-serif", fontSize: 22, fontWeight: 800, color: COLORS.navy, margin: "4px 0 0" }}>{formatoCOP(recaudadoTotal)}</p>
         </Card>
+        <Card style={{ borderLeft: "4px solid #6B7480", background: COLORS.surfaceSoft }}>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, fontWeight: 700, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.5, margin: 0 }}>
+            Egresos histórico
+          </p>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 22, fontWeight: 800, color: COLORS.ink, margin: "4px 0 0" }}>{formatoCOP(egresoTotal)}</p>
+        </Card>
+        <Card style={{ borderLeft: `4px solid ${netoTotal >= 0 ? "#10B981" : "#B42318"}` }}>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, fontWeight: 700, color: COLORS.muted, textTransform: "uppercase", letterSpacing: 0.5, margin: 0 }}>
+            Neto histórico
+          </p>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 22, fontWeight: 800, color: netoTotal >= 0 ? "#166534" : "#B42318", margin: "4px 0 0" }}>{formatoCOP(netoTotal)}</p>
+        </Card>
         {carteraTotal > 0 && (
-          <Card style={{ borderLeft: "4px solid #F43F5E", background: "#FEF2F2" }}>
+          <Card style={{ borderLeft: "4px solid #F5A524", background: "#FEF3E2" }}>
             <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, fontWeight: 700, color: "#B45309", textTransform: "uppercase", letterSpacing: 0.5, margin: 0 }}>
               Cartera pendiente total
             </p>
@@ -6207,6 +6616,44 @@ function ContabilidadTab({ usuarioActual }) {
           </Card>
         )}
       </div>
+
+      <Card style={{ marginBottom: 20 }}>
+        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, fontWeight: 700, color: COLORS.ink, marginBottom: 4 }}>Ingresos vs. egresos por mes</p>
+        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, marginBottom: 14 }}>Últimos 6 meses</p>
+        <GraficaBarrasAgrupadas
+          categorias={mesesEgresos.map((m) => m.etiqueta)}
+          series={[
+            { nombre: "Ingresos", color: "#10B981", valores: mesesEgresos.map((m) => ingresosPorMesGrafica[m.clave]) },
+            { nombre: "Egresos", color: "#F43F5E", valores: mesesEgresos.map((m) => egresosPorMesGrafica[m.clave]) },
+          ]}
+          formatoValor={formatoCOP}
+        />
+      </Card>
+
+      <Card style={{ marginBottom: 20 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: mostrarFormEgreso ? 0 : 4, flexWrap: "wrap", gap: 8 }}>
+          <div>
+            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, fontWeight: 700, color: COLORS.ink, margin: 0 }}>Egresos</p>
+            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, margin: "4px 0 0" }}>Arriendo, nómina, servicios y demás salidas de dinero del despacho.</p>
+          </div>
+          <button className="drx-btn-ghost" style={buttonGhost} onClick={() => setMostrarFormEgreso((v) => !v)}>
+            {mostrarFormEgreso ? "Cancelar" : "+ Registrar egreso"}
+          </button>
+        </div>
+        {mostrarFormEgreso && <FormularioEgreso onRegistrar={registrarEgreso} />}
+        {egresos.length > 0 ? (
+          <div style={{ marginTop: mostrarFormEgreso ? 16 : 12 }}>
+            {[...egresos]
+              .sort((a, b) => new Date(b.fecha) - new Date(a.fecha))
+              .map((e) => (
+                <EgresoCard key={e.id} egreso={e} onEditar={(cambios) => editarEgreso(e.id, cambios)} onEliminar={() => eliminarEgreso(e)} />
+              ))}
+          </div>
+        ) : (
+          !mostrarFormEgreso && <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted, marginTop: 10 }}>Todavía no has registrado ningún egreso.</p>
+        )}
+      </Card>
+
       {mediosPagoOrdenados.length > 0 && (
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 20, marginTop: -8 }}>
           {mediosPagoOrdenados.map(([medio, valor]) => (
