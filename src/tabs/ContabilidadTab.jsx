@@ -4,6 +4,7 @@
 // Contabilidad no tenga que descargar/parsear todo este código de entrada.
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { storageGet, storageSet, obtenerUrlReciboImagen, getNombreDespacho } from "../lib/storage";
+import { numeroEnLetras } from "../lib/numeroEnLetras.js";
 import {
   COLORS,
   uid,
@@ -35,9 +36,152 @@ import {
   numeroWhatsappCliente,
   textoEstadoPago,
   enviarRecordatorioPago,
+  ensureJsPDF,
 } from "../App.jsx";
 
 const MEDIOS_PAGO = ["Nequi", "Daviplata", "Nu", "Cuenta bancaria", "Llave"];
+
+// Cuenta de cobro (distinta de la factura electrónica DIAN, que requiere un
+// proveedor tecnológico de pago): el documento tradicional que usan
+// abogados independientes bajo el régimen simplificado para cobrar sus
+// honorarios, con numeración consecutiva, datos del responsable y el valor
+// en letras. Datos del responsable (perfil-abogado, ya usado también en
+// Firmar documentos) y consecutivo se guardan en el almacenamiento propio
+// del despacho — nada de esto pasa por un servicio externo, es gratis.
+async function siguienteConsecutivoCuentaCobro() {
+  const raw = await storageGet("consecutivo-cuenta-cobro", false);
+  const actual = raw ? Number(raw) || 0 : 0;
+  const siguiente = actual + 1;
+  await storageSet("consecutivo-cuenta-cobro", String(siguiente), false);
+  return siguiente;
+}
+
+async function generarCuentaDeCobroPdf({ cliente, pago, datosResponsable, numero }) {
+  await ensureJsPDF();
+  const { jsPDF } = window.jspdf;
+  const pdf = new jsPDF({ unit: "pt", format: "carta" });
+  const pageWidth = pdf.internal.pageSize.getWidth();
+  const marginX = 64;
+  let y = 90;
+
+  const nombreDespacho = getNombreDespacho();
+  const responsable = (datosResponsable?.nombre || nombreDespacho || "").trim();
+  const documento = (datosResponsable?.documento || "").trim();
+  const ciudad = (datosResponsable?.ciudad || "").trim();
+  const fechaTexto = new Date(pago.fecha).toLocaleDateString("es-CO", { day: "numeric", month: "long", year: "numeric" });
+  const concepto = pago.concepto?.trim() || "servicios de asesoría y gestión jurídica";
+
+  pdf.setFont("helvetica", "bold");
+  pdf.setFontSize(18);
+  pdf.text("CUENTA DE COBRO", pageWidth / 2, y, { align: "center" });
+  y += 22;
+  pdf.setFont("helvetica", "normal");
+  pdf.setFontSize(12);
+  pdf.text(`No. ${numero}`, pageWidth / 2, y, { align: "center" });
+  y += 40;
+
+  pdf.setFontSize(11);
+  pdf.text(`${ciudad || "___________"}, ${fechaTexto}`, marginX, y);
+  y += 40;
+
+  pdf.setFontSize(12);
+  const parrafo1 = `Debe a ${responsable}${documento ? `, identificado(a) con C.C./NIT No. ${documento}` : ""}, la suma de:`;
+  const lineas1 = pdf.splitTextToSize(parrafo1, pageWidth - marginX * 2);
+  pdf.text(lineas1, marginX, y);
+  y += lineas1.length * 16 + 10;
+
+  pdf.setFont("helvetica", "bold");
+  const lineasValor = pdf.splitTextToSize(`${numeroEnLetras(pago.valor)} (${formatoCOP(pago.valor)})`, pageWidth - marginX * 2);
+  pdf.text(lineasValor, marginX, y);
+  y += lineasValor.length * 16 + 20;
+
+  pdf.setFont("helvetica", "normal");
+  const parrafo2 = `Por concepto de: ${concepto}, prestados a ${cliente.nombre || "el/la cliente"}.`;
+  const lineas2 = pdf.splitTextToSize(parrafo2, pageWidth - marginX * 2);
+  pdf.text(lineas2, marginX, y);
+  y += lineas2.length * 16 + 60;
+
+  pdf.line(marginX, y, marginX + 220, y);
+  y += 16;
+  pdf.setFont("helvetica", "bold");
+  pdf.text(responsable || nombreDespacho, marginX, y);
+  y += 15;
+  pdf.setFont("helvetica", "normal");
+  if (documento) {
+    pdf.text(`C.C./NIT No. ${documento}`, marginX, y);
+    y += 15;
+  }
+  pdf.text(nombreDespacho, marginX, y);
+
+  pdf.setFontSize(9);
+  pdf.setTextColor(150, 150, 150);
+  pdf.text(`Generado electrónicamente · ${nombreDespacho}`, marginX, pdf.internal.pageSize.getHeight() - 40);
+
+  const nombreArchivo = `cuenta_de_cobro_${numero}_${(cliente.nombre || "cliente").replace(/[^a-z0-9]+/gi, "_").toLowerCase()}.pdf`;
+  pdf.save(nombreArchivo);
+}
+
+function PanelDatosCuentaCobro({ datos, onGuardar }) {
+  const [abierto, setAbierto] = useState(false);
+  const [nombre, setNombre] = useState(datos?.nombre || "");
+  const [documento, setDocumento] = useState(datos?.documento || "");
+  const [ciudad, setCiudad] = useState(datos?.ciudad || "");
+  const [guardando, setGuardando] = useState(false);
+
+  useEffect(() => {
+    setNombre(datos?.nombre || "");
+    setDocumento(datos?.documento || "");
+    setCiudad(datos?.ciudad || "");
+  }, [datos]);
+
+  const guardar = async () => {
+    setGuardando(true);
+    await onGuardar({ nombre: nombre.trim(), documento: documento.trim(), ciudad: ciudad.trim() });
+    setGuardando(false);
+    setAbierto(false);
+  };
+
+  const completo = datos?.nombre && datos?.documento;
+
+  return (
+    <Card style={{ marginBottom: 20 }}>
+      <button
+        onClick={() => setAbierto((a) => !a)}
+        style={{ background: "none", border: "none", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%", padding: 0 }}
+      >
+        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 14, fontWeight: 700, color: COLORS.ink, margin: 0, display: "flex", alignItems: "center", gap: 6 }}>
+          <Icono tipo="documento" size={14} /> Datos para cuenta de cobro {completo ? "" : "(faltan por completar)"}
+        </p>
+        <span style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.muted }}>{abierto ? "Ocultar ▲" : "Editar ▼"}</span>
+      </button>
+      {!abierto && (
+        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, marginTop: 6 }}>
+          {completo
+            ? `${datos.nombre} · C.C./NIT ${datos.documento}${datos.ciudad ? ` · ${datos.ciudad}` : ""}`
+            : "Se usan para generar tus cuentas de cobro (nombre, cédula o NIT, ciudad)."}
+        </p>
+      )}
+      {abierto && (
+        <div style={{ marginTop: 14 }}>
+          <div className="drx-grid-form" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+            <Field label="Nombre completo del responsable">
+              <input className="drx-input" style={inputStyle} value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Ej: Christian Felipe Cortés Ramírez" />
+            </Field>
+            <Field label="C.C. o NIT">
+              <input className="drx-input" style={inputStyle} value={documento} onChange={(e) => setDocumento(e.target.value)} placeholder="Ej: 1.234.567.890" />
+            </Field>
+          </div>
+          <Field label="Ciudad (opcional)">
+            <input className="drx-input" style={{ ...inputStyle, maxWidth: 260 }} value={ciudad} onChange={(e) => setCiudad(e.target.value)} placeholder="Ej: Bogotá D.C." />
+          </Field>
+          <button className="drx-btn-primary" style={{ ...buttonPrimary, marginTop: 12 }} onClick={guardar} disabled={guardando || !nombre.trim()}>
+            {guardando ? "Guardando…" : "Guardar datos"}
+          </button>
+        </div>
+      )}
+    </Card>
+  );
+}
 
 function FormularioPago({ cliente, onRegistrar }) {
   const hoyStr = new Date().toISOString().slice(0, 10);
@@ -132,7 +276,7 @@ function useUrlRecibo(reciboImagen) {
   return url;
 }
 
-function ReciboCard({ cliente, pago, onEditar, onEliminar }) {
+function ReciboCard({ cliente, pago, onEditar, onEliminar, datosResponsable }) {
   const [copiado, setCopiado] = useState(false);
   const [editando, setEditando] = useState(false);
   const [medioPago, setMedioPago] = useState(pago.medioPago);
@@ -140,12 +284,24 @@ function ReciboCard({ cliente, pago, onEditar, onEliminar }) {
   const [fecha, setFecha] = useState(new Date(pago.fecha).toISOString().slice(0, 10));
   const [concepto, setConcepto] = useState(pago.concepto || "");
   const [guardando, setGuardando] = useState(false);
+  const [generandoCuenta, setGenerandoCuenta] = useState(false);
   const numero = numeroWhatsappCliente(cliente.telefono);
   const urlRecibo = useUrlRecibo(pago.reciboImagen);
 
   const enviarPorWhatsapp = () => {
     const mensaje = `Hola ${cliente.nombre || ""} 👋\n\n*${getNombreDespacho()}* te confirma la recepción de tu pago:\n\n💳 Medio: ${pago.medioPago}\n💰 Valor: ${formatoCOP(pago.valor)}\n📅 Fecha: ${new Date(pago.fecha).toLocaleDateString("es-CO", { dateStyle: "long" })}${pago.concepto ? `\n📝 Concepto: ${pago.concepto}` : ""}\n\nTe adjuntamos el recibo. ¡Gracias por tu confianza!`;
     window.open(`https://wa.me/${numero}?text=${encodeURIComponent(mensaje)}`, "_blank");
+  };
+
+  const descargarCuentaDeCobro = async () => {
+    setGenerandoCuenta(true);
+    try {
+      const numeroConsecutivo = await siguienteConsecutivoCuentaCobro();
+      await generarCuentaDeCobroPdf({ cliente, pago, datosResponsable, numero: numeroConsecutivo });
+    } catch (e) {
+      console.error("No se pudo generar la cuenta de cobro:", e);
+    }
+    setGenerandoCuenta(false);
   };
 
   const guardarEdicion = async () => {
@@ -240,6 +396,15 @@ function ReciboCard({ cliente, pago, onEditar, onEliminar }) {
               Enviar por WhatsApp ↗
             </button>
           )}
+          <button className="drx-btn-ghost" style={{ ...buttonGhost, padding: "5px 12px", fontSize: 12 }} onClick={descargarCuentaDeCobro} disabled={generandoCuenta}>
+            {generandoCuenta ? (
+              "Generando…"
+            ) : (
+              <>
+                <Icono tipo="documento" size={13} style={{ marginRight: 4, verticalAlign: -2 }} /> Cuenta de cobro (PDF)
+              </>
+            )}
+          </button>
           {onEditar && (
             <button className="drx-btn-ghost" style={{ ...buttonGhost, padding: "5px 12px", fontSize: 12 }} onClick={() => setEditando(true)}>
               Editar
@@ -542,6 +707,22 @@ export default function ContabilidadTab({ usuarioActual }) {
   const { ingresos: otrosIngresos, crear: crearOtroIngreso, editar: editarOtroIngreso, eliminar: eliminarOtroIngresoBase } = useOtrosIngresos();
   const { confirmar, ConfirmarDialogo } = useConfirmarDialogo();
 
+  // Mismos datos que usa "Firmar documentos" para la firma del abogado
+  // (perfil-abogado) — aquí se completan también con documento y ciudad,
+  // que necesita la cuenta de cobro pero la firma no.
+  const [datosResponsable, setDatosResponsable] = useState(null);
+  useEffect(() => {
+    (async () => {
+      const raw = await storageGet("perfil-abogado", false);
+      setDatosResponsable(raw ? JSON.parse(raw) : {});
+    })();
+  }, []);
+  const guardarDatosResponsable = async (datos) => {
+    const actualizado = { ...datosResponsable, ...datos };
+    await storageSet("perfil-abogado", JSON.stringify(actualizado), false);
+    setDatosResponsable(actualizado);
+  };
+
   const registrarEgreso = async (datos) => {
     const nuevo = await crearEgreso(datos);
     registrarAuditoria(usuarioActual, "registrar_egreso", "egreso", nuevo.id, { concepto: nuevo.concepto, valor: nuevo.valor });
@@ -783,6 +964,8 @@ export default function ContabilidadTab({ usuarioActual }) {
   return (
     <div>
       <EncabezadoSeccion titulo="Contabilidad" color="#F43F5E" />
+
+      <PanelDatosCuentaCobro datos={datosResponsable} onGuardar={guardarDatosResponsable} />
 
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 20 }}>
         <button
@@ -1234,6 +1417,7 @@ export default function ContabilidadTab({ usuarioActual }) {
                         pago={p}
                         onEditar={(cambios) => editarPago(id, p.id, cambios)}
                         onEliminar={() => eliminarPago(id, p.id)}
+                        datosResponsable={datosResponsable}
                       />
                     ))}
                     {ordenados.length > 3 && (
