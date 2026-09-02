@@ -839,7 +839,7 @@ function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-const APP_VERSION = "1.13.1";
+const APP_VERSION = "1.14.0";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -5906,6 +5906,7 @@ function useDatosReportes() {
   const { ids } = useIndex("indice-clientes", false);
   const { usuarios } = useUsuariosDespacho();
   const { egresos } = useEgresos();
+  const { ingresos: otrosIngresos } = useOtrosIngresos();
   const [clientes, setClientes] = useState({});
   const [cargando, setCargando] = useState(true);
 
@@ -5939,6 +5940,15 @@ function useDatosReportes() {
       const clave = p.fecha?.slice(0, 7);
       if (clave && ingresosPorMes[clave] !== undefined) ingresosPorMes[clave] += valor;
     });
+  });
+  // Otros ingresos (no amarrados a ningún cliente puntual) también cuentan
+  // como plata que entró — sin esto, "Ingresos por mes" en Reportes/Resumen
+  // no coincidía con el total real que ya se veía en Contabilidad.
+  otrosIngresos.forEach((i) => {
+    const valor = Number(i.valor) || 0;
+    ingresoTotalHistorico += valor;
+    const clave = i.fecha?.slice(0, 7);
+    if (clave && ingresosPorMes[clave] !== undefined) ingresosPorMes[clave] += valor;
   });
   const maxIngresoMes = Math.max(1, ...Object.values(ingresosPorMes));
   const claveMesActual = mesesEtiquetas[mesesEtiquetas.length - 1].clave;
@@ -6383,6 +6393,185 @@ function EgresoCard({ egreso, onEditar, onEliminar }) {
   );
 }
 
+const CATEGORIAS_OTRO_INGRESO = ["Ingreso administrativo", "Rendimientos financieros", "Reembolso", "Asesoría o consulta puntual", "Otro / no identificado"];
+
+// Igual que useEgresos, pero para plata que ENTRA sin estar amarrada a
+// ningún cliente puntual (rendimientos, reembolsos, algo que llegó y no se
+// sabe bien de dónde viene o qué categoría ponerle) — antes la única forma
+// de registrar un ingreso era como el pago de un cliente específico, así
+// que cualquier entrada de plata "suelta" no tenía dónde vivir.
+function useOtrosIngresos() {
+  const [ingresos, setIngresosState] = useState([]);
+  const [cargado, setCargado] = useState(false);
+
+  const cargar = useCallback(async () => {
+    const raw = await storageGet("otros-ingresos-contabilidad", false);
+    setIngresosState(raw ? JSON.parse(raw) : []);
+    setCargado(true);
+  }, []);
+
+  useEffect(() => {
+    cargar();
+  }, [cargar]);
+
+  const crear = async (datos) => {
+    const nuevo = {
+      id: uid(),
+      fecha: new Date(`${datos.fecha}T12:00:00`).toISOString(),
+      concepto: datos.concepto.trim(),
+      categoria: datos.categoria,
+      valor: Number(datos.valor) || 0,
+    };
+    const actualizados = [nuevo, ...ingresos];
+    await storageSet("otros-ingresos-contabilidad", JSON.stringify(actualizados), false);
+    setIngresosState(actualizados);
+    return nuevo;
+  };
+
+  const editar = async (id, cambios) => {
+    const actualizados = ingresos.map((i) => (i.id === id ? { ...i, ...cambios } : i));
+    await storageSet("otros-ingresos-contabilidad", JSON.stringify(actualizados), false);
+    setIngresosState(actualizados);
+  };
+
+  const eliminar = async (id) => {
+    const actualizados = ingresos.filter((i) => i.id !== id);
+    await storageSet("otros-ingresos-contabilidad", JSON.stringify(actualizados), false);
+    setIngresosState(actualizados);
+  };
+
+  return { ingresos, cargado, crear, editar, eliminar };
+}
+
+function FormularioOtroIngreso({ onRegistrar }) {
+  const hoyStr = new Date().toISOString().slice(0, 10);
+  const [concepto, setConcepto] = useState("");
+  const [categoria, setCategoria] = useState(CATEGORIAS_OTRO_INGRESO[0]);
+  const [valor, setValor] = useState("");
+  const [fecha, setFecha] = useState(hoyStr);
+  const [guardando, setGuardando] = useState(false);
+
+  const registrar = async () => {
+    if (!concepto.trim() || !valor || Number(valor) <= 0) return;
+    setGuardando(true);
+    await onRegistrar({ concepto, categoria, valor, fecha });
+    setConcepto("");
+    setValor("");
+    setFecha(hoyStr);
+    setGuardando(false);
+  };
+
+  return (
+    <div style={{ marginTop: 12, borderTop: `1px solid ${COLORS.border}`, paddingTop: 14 }}>
+      <div className="drx-grid-form" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+        <Field label="Concepto">
+          <input className="drx-input" style={inputStyle} value={concepto} onChange={(e) => setConcepto(e.target.value)} placeholder="Ej: Rendimientos cuenta de ahorros" />
+        </Field>
+        <Field label="Categoría">
+          <select className="drx-input" style={inputStyle} value={categoria} onChange={(e) => setCategoria(e.target.value)}>
+            {CATEGORIAS_OTRO_INGRESO.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+          </select>
+        </Field>
+      </div>
+      <div className="drx-grid-form" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+        <Field label="Valor (COP)">
+          <CampoDinero style={inputStyle} value={valor} onChange={(e) => setValor(e.target.value)} placeholder="Ej: 300.000" />
+        </Field>
+        <Field label="Fecha">
+          <input type="date" className="drx-input" style={inputStyle} value={fecha} onChange={(e) => setFecha(e.target.value)} />
+        </Field>
+      </div>
+      <button
+        className="drx-btn-primary"
+        style={{ ...buttonPrimary, marginTop: 14, background: "#10B981" }}
+        onClick={registrar}
+        disabled={guardando || !concepto.trim() || !valor}
+      >
+        {guardando ? "Guardando..." : "Registrar ingreso"}
+      </button>
+    </div>
+  );
+}
+
+function OtroIngresoCard({ ingreso, onEditar, onEliminar }) {
+  const [editando, setEditando] = useState(false);
+  const [concepto, setConcepto] = useState(ingreso.concepto);
+  const [categoria, setCategoria] = useState(ingreso.categoria);
+  const [valor, setValor] = useState(String(ingreso.valor ?? ""));
+  const [fecha, setFecha] = useState(new Date(ingreso.fecha).toISOString().slice(0, 10));
+  const [guardando, setGuardando] = useState(false);
+
+  const guardarEdicion = async () => {
+    if (!concepto.trim() || !valor || Number(valor) <= 0) return;
+    setGuardando(true);
+    await onEditar({ concepto: concepto.trim(), categoria, valor: Number(valor), fecha: new Date(`${fecha}T12:00:00`).toISOString() });
+    setGuardando(false);
+    setEditando(false);
+  };
+
+  if (editando) {
+    return (
+      <div style={{ background: COLORS.surfaceSoft, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: 12, marginTop: 10 }}>
+        <div className="drx-grid-form" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
+          <Field label="Concepto">
+            <input className="drx-input" style={inputStyle} value={concepto} onChange={(e) => setConcepto(e.target.value)} />
+          </Field>
+          <Field label="Categoría">
+            <select className="drx-input" style={inputStyle} value={categoria} onChange={(e) => setCategoria(e.target.value)}>
+              {CATEGORIAS_OTRO_INGRESO.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+          </Field>
+        </div>
+        <div className="drx-grid-form" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
+          <Field label="Valor (COP)">
+            <CampoDinero style={inputStyle} value={valor} onChange={(e) => setValor(e.target.value)} />
+          </Field>
+          <Field label="Fecha">
+            <input type="date" className="drx-input" style={inputStyle} value={fecha} onChange={(e) => setFecha(e.target.value)} />
+          </Field>
+        </div>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button className="drx-btn-primary" style={{ ...buttonPrimary, padding: "6px 14px", fontSize: 12 }} onClick={guardarEdicion} disabled={guardando}>
+            {guardando ? "Guardando..." : "Guardar cambios"}
+          </button>
+          <button className="drx-btn-ghost" style={{ ...buttonGhost, padding: "6px 14px", fontSize: 12 }} onClick={() => setEditando(false)} disabled={guardando}>
+            Cancelar
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap", background: COLORS.surfaceSoft, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: 12, marginTop: 10 }}>
+      <div>
+        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, fontWeight: 600, color: COLORS.ink, margin: 0 }}>
+          {formatoCOP(ingreso.valor)} · {ingreso.concepto}
+        </p>
+        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, margin: "3px 0 0" }}>
+          {ingreso.categoria} · {new Date(ingreso.fecha).toLocaleDateString("es-CO", { dateStyle: "medium" })}
+        </p>
+      </div>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <button className="drx-btn-ghost" style={{ ...buttonGhost, padding: "5px 12px", fontSize: 12 }} onClick={() => setEditando(true)}>
+          Editar
+        </button>
+        <button className="drx-btn-ghost" style={{ ...buttonGhost, padding: "5px 12px", fontSize: 12, color: "#B42318", borderColor: "#F2B8B5" }} onClick={onEliminar}>
+          Eliminar
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function ContabilidadTab({ usuarioActual }) {
   const { ids } = useIndex("indice-clientes", false);
   const [clientes, setClientes] = useState({});
@@ -6391,14 +6580,20 @@ function ContabilidadTab({ usuarioActual }) {
   const [soloPendientes, setSoloPendientes] = useState(false);
   const [orden, setOrden] = useState("nombre");
   const [expandidos, setExpandidos] = useState({});
-  const [mostrarFormEgreso, setMostrarFormEgreso] = useState(false);
+  // Antes solo había una forma de registrar plata: entrando al cliente
+  // puntual y buscando su botón de "+ Registrar pago". Esta barra de arriba
+  // deja registrar cualquiera de los 3 movimientos (pago de cliente, egreso,
+  // u otro ingreso suelto) sin tener que ir a buscar nada primero.
+  const [modoRegistro, setModoRegistro] = useState(null); // null | "pago" | "egreso" | "ingreso"
+  const [pagoRapidoClienteId, setPagoRapidoClienteId] = useState("");
   const { egresos, crear: crearEgreso, editar: editarEgreso, eliminar: eliminarEgresoBase } = useEgresos();
+  const { ingresos: otrosIngresos, crear: crearOtroIngreso, editar: editarOtroIngreso, eliminar: eliminarOtroIngresoBase } = useOtrosIngresos();
   const { confirmar, ConfirmarDialogo } = useConfirmarDialogo();
 
   const registrarEgreso = async (datos) => {
     const nuevo = await crearEgreso(datos);
     registrarAuditoria(usuarioActual, "registrar_egreso", "egreso", nuevo.id, { concepto: nuevo.concepto, valor: nuevo.valor });
-    setMostrarFormEgreso(false);
+    setModoRegistro(null);
   };
 
   const eliminarEgreso = async (egreso) => {
@@ -6406,6 +6601,19 @@ function ContabilidadTab({ usuarioActual }) {
     if (!ok) return;
     await eliminarEgresoBase(egreso.id);
     registrarAuditoria(usuarioActual, "eliminar_egreso", "egreso", egreso.id, { concepto: egreso.concepto, valor: egreso.valor });
+  };
+
+  const registrarOtroIngreso = async (datos) => {
+    const nuevo = await crearOtroIngreso(datos);
+    registrarAuditoria(usuarioActual, "registrar_otro_ingreso", "otro_ingreso", nuevo.id, { concepto: nuevo.concepto, valor: nuevo.valor });
+    setModoRegistro(null);
+  };
+
+  const eliminarOtroIngreso = async (ingreso) => {
+    const ok = await confirmar(`¿Seguro que quieres eliminar el ingreso "${ingreso.concepto}" de ${formatoCOP(ingreso.valor)}? Esta acción no se puede deshacer.`);
+    if (!ok) return;
+    await eliminarOtroIngresoBase(ingreso.id);
+    registrarAuditoria(usuarioActual, "eliminar_otro_ingreso", "otro_ingreso", ingreso.id, { concepto: ingreso.concepto, valor: ingreso.valor });
   };
 
   const cargar = useCallback(async () => {
@@ -6533,8 +6741,24 @@ function ContabilidadTab({ usuarioActual }) {
       porCategoriaEgresoMes[e.categoria] = (porCategoriaEgresoMes[e.categoria] || 0) + valor;
     }
   });
-  const netoMes = recaudadoMes - egresoMes;
-  const netoTotal = recaudadoTotal - egresoTotal;
+  // Ingresos sueltos que no son el pago de ningún cliente puntual
+  // (rendimientos, reembolsos, algo administrativo que no se sabe bien
+  // dónde clasificar) — sin esto se quedaban fuera de "cuánto entró".
+  let otrosIngresosTotal = 0;
+  let otrosIngresosMes = 0;
+  otrosIngresos.forEach((i) => {
+    const valor = Number(i.valor) || 0;
+    otrosIngresosTotal += valor;
+    const fechaIngreso = new Date(i.fecha);
+    if (fechaIngreso.getFullYear() === hoy.getFullYear() && fechaIngreso.getMonth() === hoy.getMonth()) {
+      otrosIngresosMes += valor;
+    }
+  });
+
+  const ingresoTotalMes = recaudadoMes + otrosIngresosMes;
+  const ingresoTotalHistoricoTodo = recaudadoTotal + otrosIngresosTotal;
+  const netoMes = ingresoTotalMes - egresoMes;
+  const netoTotal = ingresoTotalHistoricoTodo - egresoTotal;
 
   const mesesEgresos = [];
   for (let i = 5; i >= 0; i--) {
@@ -6548,6 +6772,10 @@ function ContabilidadTab({ usuarioActual }) {
       const clave = p.fecha?.slice(0, 7);
       if (clave && ingresosPorMesGrafica[clave] !== undefined) ingresosPorMesGrafica[clave] += Number(p.valor) || 0;
     });
+  });
+  otrosIngresos.forEach((i) => {
+    const clave = i.fecha?.slice(0, 7);
+    if (clave && ingresosPorMesGrafica[clave] !== undefined) ingresosPorMesGrafica[clave] += Number(i.valor) || 0;
   });
   egresos.forEach((e) => {
     const clave = e.fecha?.slice(0, 7);
@@ -6586,6 +6814,76 @@ function ContabilidadTab({ usuarioActual }) {
   return (
     <div>
       <EncabezadoSeccion titulo="Contabilidad" color="#F43F5E" />
+
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 20 }}>
+        <button
+          className="drx-btn-primary"
+          style={{ ...buttonPrimary, background: modoRegistro === "pago" ? COLORS.navyDeep : COLORS.navy }}
+          onClick={() => setModoRegistro(modoRegistro === "pago" ? null : "pago")}
+        >
+          {modoRegistro === "pago" ? "Cancelar" : "+ Registrar pago de cliente"}
+        </button>
+        <button
+          className="drx-btn-primary"
+          style={{ ...buttonPrimary, background: "#F43F5E" }}
+          onClick={() => setModoRegistro(modoRegistro === "egreso" ? null : "egreso")}
+        >
+          {modoRegistro === "egreso" ? "Cancelar" : "+ Registrar egreso"}
+        </button>
+        <button
+          className="drx-btn-primary"
+          style={{ ...buttonPrimary, background: "#10B981" }}
+          onClick={() => setModoRegistro(modoRegistro === "ingreso" ? null : "ingreso")}
+        >
+          {modoRegistro === "ingreso" ? "Cancelar" : "+ Registrar otro ingreso"}
+        </button>
+      </div>
+
+      {modoRegistro === "pago" && (
+        <Card style={{ marginBottom: 20, borderLeft: `4px solid ${COLORS.navy}` }}>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, fontWeight: 700, color: COLORS.ink, marginBottom: 4 }}>Registrar pago de un cliente</p>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, marginBottom: 14 }}>Elige el cliente sin tener que buscarlo abajo en la lista.</p>
+          <Field label="Cliente">
+            <select className="drx-input" style={inputStyle} value={pagoRapidoClienteId} onChange={(e) => setPagoRapidoClienteId(e.target.value)}>
+              <option value="">Selecciona un cliente...</option>
+              {[...ids]
+                .sort((a, b) => (clientes[a]?.nombre || "").localeCompare(clientes[b]?.nombre || ""))
+                .map((id) => (
+                  <option key={id} value={id}>
+                    {clientes[id]?.nombre || "(sin nombre)"}
+                  </option>
+                ))}
+            </select>
+          </Field>
+          {pagoRapidoClienteId && clientes[pagoRapidoClienteId] && (
+            <FormularioPago
+              cliente={clientes[pagoRapidoClienteId]}
+              onRegistrar={async (datos) => {
+                await registrarPago(pagoRapidoClienteId, datos);
+                setPagoRapidoClienteId("");
+                setModoRegistro(null);
+              }}
+            />
+          )}
+        </Card>
+      )}
+      {modoRegistro === "egreso" && (
+        <Card style={{ marginBottom: 20, borderLeft: "4px solid #F43F5E" }}>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, fontWeight: 700, color: COLORS.ink, marginBottom: 4 }}>Registrar egreso</p>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, marginBottom: 14 }}>Arriendo, nómina, servicios y demás salidas de dinero del despacho.</p>
+          <FormularioEgreso onRegistrar={registrarEgreso} />
+        </Card>
+      )}
+      {modoRegistro === "ingreso" && (
+        <Card style={{ marginBottom: 20, borderLeft: "4px solid #10B981" }}>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, fontWeight: 700, color: COLORS.ink, marginBottom: 4 }}>Registrar otro ingreso</p>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, marginBottom: 14 }}>
+            Para plata que entra sin ser el pago de un cliente puntual — rendimientos, reembolsos, algo administrativo o que no sabes bien cómo clasificar.
+          </p>
+          <FormularioOtroIngreso onRegistrar={registrarOtroIngreso} />
+        </Card>
+      )}
+
       <div className="drx-grid-form" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: 12, marginBottom: 20 }}>
         <Card style={{ borderLeft: "4px solid #10B981", background: "#F0FDF4" }}>
           <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, fontWeight: 700, color: "#166534", textTransform: "uppercase", letterSpacing: 0.5, margin: 0 }}>
@@ -6610,6 +6908,12 @@ function ContabilidadTab({ usuarioActual }) {
             Recaudado histórico
           </p>
           <p style={{ fontFamily: "Inter, sans-serif", fontSize: 22, fontWeight: 800, color: COLORS.navy, margin: "4px 0 0" }}>{formatoCOP(recaudadoTotal)}</p>
+        </Card>
+        <Card style={{ borderLeft: "4px solid #10B981", background: "#F0FDF4" }}>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, fontWeight: 700, color: "#166534", textTransform: "uppercase", letterSpacing: 0.5, margin: 0 }}>
+            Otros ingresos este mes
+          </p>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 22, fontWeight: 800, color: "#166534", margin: "4px 0 0" }}>{formatoCOP(otrosIngresosMes)}</p>
         </Card>
         <Card style={{ borderLeft: "4px solid #6B7480", background: COLORS.surfaceSoft }}>
           <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, fontWeight: 700, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.5, margin: 0 }}>
@@ -6650,18 +6954,10 @@ function ContabilidadTab({ usuarioActual }) {
       </Card>
 
       <Card style={{ marginBottom: 20 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: mostrarFormEgreso ? 0 : 4, flexWrap: "wrap", gap: 8 }}>
-          <div>
-            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, fontWeight: 700, color: COLORS.ink, margin: 0 }}>Egresos</p>
-            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, margin: "4px 0 0" }}>Arriendo, nómina, servicios y demás salidas de dinero del despacho.</p>
-          </div>
-          <button className="drx-btn-ghost" style={buttonGhost} onClick={() => setMostrarFormEgreso((v) => !v)}>
-            {mostrarFormEgreso ? "Cancelar" : "+ Registrar egreso"}
-          </button>
-        </div>
-        {mostrarFormEgreso && <FormularioEgreso onRegistrar={registrarEgreso} />}
+        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, fontWeight: 700, color: COLORS.ink, margin: 0 }}>Egresos</p>
+        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, margin: "4px 0 0" }}>Arriendo, nómina, servicios y demás salidas de dinero del despacho.</p>
         {egresos.length > 0 ? (
-          <div style={{ marginTop: mostrarFormEgreso ? 16 : 12 }}>
+          <div style={{ marginTop: 12 }}>
             {[...egresos]
               .sort((a, b) => new Date(b.fecha) - new Date(a.fecha))
               .map((e) => (
@@ -6669,7 +6965,25 @@ function ContabilidadTab({ usuarioActual }) {
               ))}
           </div>
         ) : (
-          !mostrarFormEgreso && <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted, marginTop: 10 }}>Todavía no has registrado ningún egreso.</p>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted, marginTop: 10 }}>Todavía no has registrado ningún egreso.</p>
+        )}
+      </Card>
+
+      <Card style={{ marginBottom: 20 }}>
+        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, fontWeight: 700, color: COLORS.ink, margin: 0 }}>Otros ingresos</p>
+        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, margin: "4px 0 0" }}>
+          Plata que entró sin ser el pago de un cliente puntual — rendimientos, reembolsos, algo administrativo.
+        </p>
+        {otrosIngresos.length > 0 ? (
+          <div style={{ marginTop: 12 }}>
+            {[...otrosIngresos]
+              .sort((a, b) => new Date(b.fecha) - new Date(a.fecha))
+              .map((i) => (
+                <OtroIngresoCard key={i.id} ingreso={i} onEditar={(cambios) => editarOtroIngreso(i.id, cambios)} onEliminar={() => eliminarOtroIngreso(i)} />
+              ))}
+          </div>
+        ) : (
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted, marginTop: 10 }}>Todavía no has registrado ningún otro ingreso.</p>
         )}
       </Card>
 
