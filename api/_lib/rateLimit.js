@@ -10,15 +10,16 @@ function obtenerIp(req) {
 }
 
 // Devuelve true si la solicitud puede continuar, false si superó el límite.
-export async function dentroDelLimite(admin, req, ruta, maxIntentos, ventanaMinutos) {
-  const ip = obtenerIp(req);
+// La "clave" puede ser una IP o cualquier otro identificador (ej. un
+// despacho_id) — reutiliza la misma tabla, solo cambia qué se está contando.
+export async function dentroDelLimitePorClave(admin, clave, ruta, maxIntentos, ventanaMinutos) {
   const desde = new Date(Date.now() - ventanaMinutos * 60 * 1000).toISOString();
 
   const { count, error } = await admin
     .from("limite_solicitudes")
     .select("id", { count: "exact", head: true })
     .eq("ruta", ruta)
-    .eq("ip", ip)
+    .eq("ip", clave)
     .gte("creado_en", desde);
 
   if (error) {
@@ -30,7 +31,7 @@ export async function dentroDelLimite(admin, req, ruta, maxIntentos, ventanaMinu
 
   if ((count || 0) >= maxIntentos) return false;
 
-  await admin.from("limite_solicitudes").insert({ ip, ruta });
+  await admin.from("limite_solicitudes").insert({ ip: clave, ruta });
 
   // Limpieza oportunista de registros viejos, para que la tabla no crezca
   // indefinidamente (no es crítico que corra siempre, solo de vez en cuando).
@@ -40,4 +41,8 @@ export async function dentroDelLimite(admin, req, ruta, maxIntentos, ventanaMinu
   }
 
   return true;
+}
+
+export async function dentroDelLimite(admin, req, ruta, maxIntentos, ventanaMinutos) {
+  return dentroDelLimitePorClave(admin, obtenerIp(req), ruta, maxIntentos, ventanaMinutos);
 }

@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import { supabase } from "../lib/supabaseClient";
 import { storageGet, storageSet, getNombreDespacho } from "../lib/storage";
 import {
   COLORS, uid, useIndex, useUsuariosDespacho, Field, inputStyle, buttonPrimary, buttonGhost,
@@ -46,9 +47,14 @@ function contextoEstrategia(estrategia) {
 
 async function generarIdeasCalendario(tema, estrategia) {
   const contexto = contextoEstrategia(estrategia);
+  const { data: sesionData } = await supabase.auth.getSession();
+  const token = sesionData?.session?.access_token;
   const response = await fetch("/api/assistant", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
     body: JSON.stringify({
       model: "claude-sonnet-4-6",
       max_tokens: 600,
@@ -301,9 +307,14 @@ function CommunityManagerIA({ estrategia, onGuardarIdeas }) {
         (contexto ? `${contexto} ` : "") +
         `Responde siempre en español, en un tono cercano y motivador, con listas y pasos claros cuando aplique.`;
       const mensajesAPI = nuevos.map((m) => ({ role: m.rol === "usuario" ? "user" : "assistant", content: m.texto }));
+      const { data: sesionData } = await supabase.auth.getSession();
+      const token = sesionData?.session?.access_token;
       const response = await fetch("/api/assistant", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         body: JSON.stringify({ model: "claude-sonnet-4-6", max_tokens: 900, system: systemPrompt, messages: mensajesAPI }),
       });
       const data = await response.json();

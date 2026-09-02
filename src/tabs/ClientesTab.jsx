@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import { supabase } from "../lib/supabaseClient";
 import { storageGet, storageSet, getNombreDespacho } from "../lib/storage";
 import {
   COLORS, uid, registrarAuditoria, diasDesde, exportarCSV, useIndex, useConfirmarDialogo,
@@ -60,9 +61,14 @@ const FRECUENCIAS_PAGO = ["Semanal", "Quincenal", "Mensual", "Pago único", "Otr
 
 async function organizarPagoConIA(descripcion) {
   const hoy = new Date().toISOString().slice(0, 10);
+  const { data: sesionData } = await supabase.auth.getSession();
+  const token = sesionData?.session?.access_token;
   const response = await fetch("/api/assistant", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
     body: JSON.stringify({
       model: "claude-sonnet-4-6",
       max_tokens: 300,

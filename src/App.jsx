@@ -679,7 +679,7 @@ function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-const APP_VERSION = "1.29.0";
+const APP_VERSION = "1.30.0";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -2010,12 +2010,18 @@ function AsistenteIA({ nombre, usuarioId, onAccionCompletada }) {
         return { role: m.rol === "usuario" ? "user" : "assistant", content: m.texto };
       });
 
+      const { data: sesionDataIA } = await supabase.auth.getSession();
+      const tokenIA = sesionDataIA?.session?.access_token;
+
       let respuestaFinal = "";
       let archivoGenerado = null;
       for (let intento = 0; intento < 3; intento++) {
         const response = await fetch("/api/assistant", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            ...(tokenIA ? { Authorization: `Bearer ${tokenIA}` } : {}),
+          },
           body: JSON.stringify({ model: "claude-sonnet-4-6", max_tokens: 700, system: systemPrompt, tools: TOOLS_ASISTENTE, messages: mensajesAPI }),
         });
         const data = await response.json();

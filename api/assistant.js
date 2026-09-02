@@ -9,10 +9,29 @@
 // formato que espera Gemini.
 
 import { supabaseAdmin } from "./_lib/supabaseAdmin.js";
-import { dentroDelLimite } from "./_lib/rateLimit.js";
+import { dentroDelLimite, dentroDelLimitePorClave } from "./_lib/rateLimit.js";
 
 const GEMINI_MODEL = "gemini-3.6-flash";
 const MAX_TOKENS_CAP = 2000;
+
+// La cuota gratuita de Gemini la comparten TODOS los despachos de la
+// plataforma — sin esto, un despacho usando el asistente sin parar podría
+// agotarla para el resto. El límite por IP (más abajo) no alcanza solo: un
+// despacho entero detrás de la misma IP de oficina comparte ese cupo, y
+// alguien que cambia de red no tiene tope real.
+async function obtenerDespachoId(admin, req) {
+  const authHeader = req.headers.authorization || "";
+  const token = authHeader.replace(/^Bearer\s+/i, "");
+  if (!token) return null;
+  try {
+    const { data: userData, error } = await admin.auth.getUser(token);
+    if (error || !userData?.user) return null;
+    const { data: perfil } = await admin.from("perfiles").select("despacho_id").eq("id", userData.user.id).maybeSingle();
+    return perfil?.despacho_id || null;
+  } catch (e) {
+    return null;
+  }
+}
 
 function toGeminiTools(tools) {
   if (!tools || tools.length === 0) return undefined;
@@ -133,6 +152,16 @@ export default async function handler(req, res) {
   const puedeContinuar = await dentroDelLimite(admin, req, "assistant", 60, 60);
   if (!puedeContinuar) {
     return res.status(429).json({ error: "Demasiadas solicitudes al asistente. Espera un momento e inténtalo de nuevo." });
+  }
+
+  const despachoId = await obtenerDespachoId(admin, req);
+  if (despachoId) {
+    const despachoDentroDelLimite = await dentroDelLimitePorClave(admin, `despacho:${despachoId}`, "assistant_despacho", 100, 60);
+    if (!despachoDentroDelLimite) {
+      return res.status(429).json({
+        error: "Tu despacho alcanzó el límite de uso del asistente de IA por esta hora (se comparte entre todos los despachos de la plataforma). Espera un momento e inténtalo de nuevo.",
+      });
+    }
   }
 
   const contenidos = toGeminiContents(messages);

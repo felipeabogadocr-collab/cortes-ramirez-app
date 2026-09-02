@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { supabase } from "../lib/supabaseClient";
 import { storageGet, storageSet } from "../lib/storage";
 import {
   COLORS, uid, diasDesde, useIndex, inputStyle, buttonPrimary, buttonGhost, Card,
@@ -7,9 +8,14 @@ import {
 } from "../App.jsx";
 
 async function explicarActuacion(actuacion, anotacion) {
+  const { data: sesionData } = await supabase.auth.getSession();
+  const token = sesionData?.session?.access_token;
   const response = await fetch("/api/assistant", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
     body: JSON.stringify({
       model: "claude-sonnet-4-6",
       max_tokens: 300,
