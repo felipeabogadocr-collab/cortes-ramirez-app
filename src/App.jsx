@@ -14,6 +14,7 @@ const DocumentosTab = lazy(() => import("./tabs/DocumentosTab.jsx"));
 const PlataformaTab = lazy(() => import("./tabs/PlataformaTab.jsx"));
 const UsuariosPermisosTab = lazy(() => import("./tabs/UsuariosPermisosTab.jsx"));
 import { supabase } from "./lib/supabaseClient";
+import { contrasenaFiltrada } from "./lib/pwnedPassword.js";
 import {
   diasDesde, diasHasta, calcularProximaFechaPorFrecuencia, formatoCOP, calcularEstado,
   numeroWhatsappCliente, textoEstadoPago, TAMANO_MAX_ARCHIVO_MB, archivoDemasiadoGrande,
@@ -679,7 +680,7 @@ function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-const APP_VERSION = "1.32.0";
+const APP_VERSION = "1.33.0";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -6094,6 +6095,15 @@ function LoginGate({ onIngresar, onCancelar, pantallaInicial }) {
     }
     setEnviando(true);
     setError("");
+    // Cumplir las reglas de longitud/combinación no evita algo como
+    // "Nequi12345" — se revisa además contra contraseñas ya filtradas en
+    // brechas de datos conocidas (ver src/lib/pwnedPassword.js). Si la API
+    // no responde, no se bloquea el registro por eso.
+    if (await contrasenaFiltrada(contrasena)) {
+      setError("Esa contraseña ha aparecido en filtraciones de datos conocidas — cualquiera puede probarla. Usa una distinta.");
+      setEnviando(false);
+      return;
+    }
     try {
       // Se crea el usuario de Auth desde el navegador (no con service_role)
       // para que Supabase mande el correo real de confirmación. Sin ese
