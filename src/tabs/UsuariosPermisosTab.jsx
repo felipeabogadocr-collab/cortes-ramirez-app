@@ -38,6 +38,145 @@ function UltimaSesionUsuario({ usuarioId }) {
   return `Última sesión: ${new Date(fecha).toLocaleString("es-CO", { dateStyle: "medium", timeStyle: "short" })}`;
 }
 
+// Genera un correo y contraseña al azar con acceso temporal, para probar la
+// app en vivo (o prestárselo a alguien) sin usar tus propias credenciales.
+// La cuenta se puede seguir usando después de vencida (queda en la lista de
+// usuarios como cualquier otra, para borrarla a mano), pero deja de poder
+// iniciar sesión — ver App.jsx: iniciarSesion / cargarPerfilActual.
+function PanelAccesoPrueba() {
+  const [minutos, setMinutos] = useState(10);
+  const [rol, setRol] = useState("Administrador");
+  const [generando, setGenerando] = useState(false);
+  const [error, setError] = useState("");
+  const [resultado, setResultado] = useState(null);
+  const [copiado, setCopiado] = useState("");
+  const [segundosRestantes, setSegundosRestantes] = useState(null);
+
+  useEffect(() => {
+    if (!resultado) return;
+    const actualizar = () => {
+      const restante = Math.max(0, Math.round((new Date(resultado.expiraEn).getTime() - Date.now()) / 1000));
+      setSegundosRestantes(restante);
+    };
+    actualizar();
+    const intervalo = setInterval(actualizar, 1000);
+    return () => clearInterval(intervalo);
+  }, [resultado]);
+
+  const generar = async () => {
+    setGenerando(true);
+    setError("");
+    try {
+      const { data: sesionData } = await supabase.auth.getSession();
+      const token = sesionData?.session?.access_token;
+      const response = await fetch("/api/usuarios/crear-prueba", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ minutos, rol }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "No se pudo crear el acceso de prueba.");
+      setResultado(data);
+    } catch (e) {
+      setError(e.message);
+    }
+    setGenerando(false);
+  };
+
+  const copiar = (texto, etiqueta) => {
+    navigator.clipboard?.writeText(texto);
+    setCopiado(etiqueta);
+    setTimeout(() => setCopiado(""), 1500);
+  };
+
+  const vencido = segundosRestantes === 0;
+  const minutosRestantes = segundosRestantes !== null ? Math.floor(segundosRestantes / 60) : null;
+  const segundosResto = segundosRestantes !== null ? segundosRestantes % 60 : null;
+
+  return (
+    <Card style={{ marginBottom: 20, borderLeft: "4px solid #2F80ED" }}>
+      <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, fontWeight: 600, color: COLORS.headingText, marginBottom: 4, display: "flex", alignItems: "center", gap: 5 }}>
+        <Icono tipo="reloj" size={14} /> Acceso de prueba
+      </p>
+      <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, marginBottom: 12 }}>
+        Genera un correo y contraseña al azar (no hace falta que el correo exista) para probar la app o compartirlo con
+        alguien sin usar tus propias credenciales. Deja de funcionar solo, al vencer el tiempo.
+      </p>
+
+      {!resultado ? (
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
+          <Field label="Duración">
+            <select className="drx-input" style={{ ...inputStyle, width: "auto" }} value={minutos} onChange={(e) => setMinutos(Number(e.target.value))}>
+              <option value={10}>10 minutos</option>
+              <option value={20}>20 minutos</option>
+              <option value={30}>30 minutos</option>
+              <option value={60}>1 hora</option>
+            </select>
+          </Field>
+          <Field label="Rol">
+            <select className="drx-input" style={{ ...inputStyle, width: "auto" }} value={rol} onChange={(e) => setRol(e.target.value)}>
+              <option value="Administrador">Administrador (ve todo)</option>
+              <option value="Abogado">Abogado</option>
+              <option value="Asistente">Asistente</option>
+            </select>
+          </Field>
+          <button className="drx-btn-primary" style={buttonPrimary} onClick={generar} disabled={generando}>
+            {generando ? "Generando…" : "Generar acceso de prueba"}
+          </button>
+        </div>
+      ) : (
+        <div style={{ background: vencido ? "#FEF2F2" : COLORS.accentSoft, border: `1px solid ${vencido ? "#F3C6C0" : "#C7D6EA"}`, borderRadius: 10, padding: 14 }}>
+          {vencido ? (
+            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, fontWeight: 600, color: "#B42318", margin: 0 }}>
+              Este acceso ya venció. Genera uno nuevo si lo sigues necesitando.
+            </p>
+          ) : (
+            <>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10, flexWrap: "wrap", gap: 8 }}>
+                <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, fontWeight: 700, color: COLORS.navy, margin: 0 }}>
+                  Vence en {minutosRestantes}:{String(segundosResto).padStart(2, "0")}
+                </p>
+                <button
+                  className="drx-btn-ghost"
+                  style={{ ...buttonGhost, padding: "5px 10px", fontSize: 11.5 }}
+                  onClick={() => copiar(`Correo: ${resultado.email}\nContraseña: ${resultado.contrasena}`, "todo")}
+                >
+                  {copiado === "todo" ? "✓ Copiado" : "Copiar correo y contraseña"}
+                </button>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, background: "#FFFFFF", border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "8px 12px" }}>
+                  <code style={{ fontFamily: "monospace", fontSize: 13, color: COLORS.ink }}>{resultado.email}</code>
+                  <button className="drx-btn-ghost" style={{ ...buttonGhost, padding: "3px 8px", fontSize: 11 }} onClick={() => copiar(resultado.email, "correo")}>
+                    {copiado === "correo" ? "✓" : "Copiar"}
+                  </button>
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, background: "#FFFFFF", border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "8px 12px" }}>
+                  <code style={{ fontFamily: "monospace", fontSize: 13, color: COLORS.ink }}>{resultado.contrasena}</code>
+                  <button className="drx-btn-ghost" style={{ ...buttonGhost, padding: "3px 8px", fontSize: 11 }} onClick={() => copiar(resultado.contrasena, "contrasena")}>
+                    {copiado === "contrasena" ? "✓" : "Copiar"}
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
+          <button
+            className="drx-btn-ghost"
+            style={{ ...buttonGhost, marginTop: 10, fontSize: 11.5, padding: "5px 10px" }}
+            onClick={() => {
+              setResultado(null);
+              setSegundosRestantes(null);
+            }}
+          >
+            Generar otro
+          </button>
+        </div>
+      )}
+      {error && <p style={{ color: "#B42318", fontSize: 12.5, marginTop: 10, fontFamily: "Inter, sans-serif" }}>{error}</p>}
+    </Card>
+  );
+}
+
 export default function UsuariosPermisosTab({ usuarioActual, onDespachoRenombrado }) {
   const usuarioActualId = usuarioActual.id;
   const { usuarios, crear: crearUsuario, actualizar, eliminar: eliminarUsuario } = useUsuariosDespacho();
@@ -291,6 +430,8 @@ export default function UsuariosPermisosTab({ usuarioActual, onDespachoRenombrad
           </div>
         )}
       </Card>
+
+      <PanelAccesoPrueba />
 
       <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 16 }}>
         <button className="drx-btn-primary" style={buttonPrimary} onClick={() => setMostrarForm((s) => !s)}>

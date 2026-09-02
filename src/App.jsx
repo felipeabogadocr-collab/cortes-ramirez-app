@@ -679,7 +679,7 @@ function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-const APP_VERSION = "1.30.0";
+const APP_VERSION = "1.31.0";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -1228,28 +1228,6 @@ function TarjetaResumen({ titulo, valor, detalle, onClick, color, alerta }) {
       <p style={{ fontFamily: "Inter, sans-serif", fontSize: 22, fontWeight: 800, color, margin: "8px 0 4px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{valor}</p>
       <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, color: COLORS.muted, margin: 0 }}>{detalle}</p>
     </button>
-  );
-}
-
-function MiniEstadistica({ etiqueta, valor, color }) {
-  return (
-    <div style={{ textAlign: "center", minWidth: 84 }}>
-      <p style={{ fontFamily: "Inter, sans-serif", fontSize: 20, fontWeight: 800, color: color || COLORS.headingText, margin: 0 }}>{valor}</p>
-      <p style={{ fontFamily: "Inter, sans-serif", fontSize: 10.5, color: COLORS.muted, margin: "2px 0 0" }}>{etiqueta}</p>
-    </div>
-  );
-}
-
-function SeccionEstadisticas({ titulo, color, onClick, children }) {
-  return (
-    <Card
-      onClick={onClick}
-      className="drx-card"
-      style={{ cursor: onClick ? "pointer" : "default", padding: 18, textAlign: "left", borderTop: `3px solid ${color}` }}
-    >
-      <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, fontWeight: 700, color, textTransform: "uppercase", letterSpacing: 0.6, margin: "0 0 14px" }}>{titulo}</p>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 14, justifyContent: "space-between" }}>{children}</div>
-    </Card>
   );
 }
 
@@ -2611,44 +2589,6 @@ function ResumenTab({ nombre, usuarioId, onIr }) {
           </Card>
         </div>
       )}
-
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))", gap: 14, marginBottom: 20 }}>
-        <SeccionEstadisticas titulo="Financiero" color="#10B981" onClick={() => onIr("contabilidad")}>
-          <MiniEstadistica etiqueta="Hoy" valor={formatoCOP(r.recaudadoHoy)} color="#10B981" />
-          <MiniEstadistica etiqueta="Semana" valor={formatoCOP(r.recaudadoSemana)} color="#14B8A6" />
-          <MiniEstadistica etiqueta="Mes" valor={formatoCOP(r.recaudadoMes)} color="#2F80ED" />
-          <MiniEstadistica etiqueta="Histórico" valor={formatoCOP(r.recaudadoTotal)} />
-          <MiniEstadistica etiqueta="Pendiente" valor={formatoCOP(r.pendienteTotal)} color={r.pendienteTotal > 0 ? "#F43F5E" : undefined} />
-          <MiniEstadistica etiqueta="Pagos" valor={r.numeroPagos} />
-          <MiniEstadistica etiqueta="Promedio" valor={formatoCOP(r.promedioPago)} />
-        </SeccionEstadisticas>
-
-        <SeccionEstadisticas titulo="Clientes" color="#8B5CF6" onClick={() => onIr("clientes")}>
-          <MiniEstadistica etiqueta="Total" valor={r.totalClientes} />
-          <MiniEstadistica etiqueta="Activos" valor={r.clientesActivos} color="#10B981" />
-          <MiniEstadistica etiqueta="Inactivos" valor={r.clientesInactivos} color={r.clientesInactivos > 0 ? "#F43F5E" : undefined} />
-          <MiniEstadistica etiqueta="Con radicado" valor={r.clientesConRadicado} />
-        </SeccionEstadisticas>
-
-        <SeccionEstadisticas titulo="Vigilancia judicial" color="#F5A524" onClick={() => onIr("vigilancia")}>
-          <MiniEstadistica etiqueta="En trámite" valor={r.vigilanciaEnTramite} />
-          <MiniEstadistica etiqueta="Con novedad" valor={r.procesosConNovedad} color={r.procesosConNovedad > 0 ? "#F43F5E" : undefined} />
-          <MiniEstadistica etiqueta="Por revisar" valor={r.vigilanciaPendienteRevision} color="#F5A524" />
-          <MiniEstadistica etiqueta="Finalizados" valor={r.vigilanciaFinalizado} />
-        </SeccionEstadisticas>
-
-        <SeccionEstadisticas titulo="Contenido" color="#8B5CF6" onClick={() => onIr("contenido")}>
-          <MiniEstadistica etiqueta="Pendiente hoy" valor={r.contenidoPendienteHoy} color={r.contenidoPendienteHoy > 0 ? "#F5A524" : undefined} />
-          <MiniEstadistica etiqueta="Vencido" valor={r.contenidoVencido} color={r.contenidoVencido > 0 ? "#F43F5E" : undefined} />
-        </SeccionEstadisticas>
-
-        <SeccionEstadisticas titulo="Equipo" color="#6B7480">
-          <MiniEstadistica etiqueta="Usuarios" valor={r.totalUsuarios} />
-          <MiniEstadistica etiqueta="Administradores" valor={r.totalAdministradores} />
-          <MiniEstadistica etiqueta="Abogados" valor={r.totalAbogados} />
-          <MiniEstadistica etiqueta="Asistentes" valor={r.totalAsistentes} />
-        </SeccionEstadisticas>
-      </div>
 
       {!rep.cargando && rep.listaClientes.length > 0 && (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 14, marginBottom: 20 }}>
@@ -5074,6 +5014,7 @@ function LandingPage({ onRegistrar, onIniciarSesion }) {
   const [scrolleado, setScrolleado] = useState(false);
   const [mostrarSubir, setMostrarSubir] = useState(false);
   const [mostrarCtaFlotante, setMostrarCtaFlotante] = useState(false);
+  const [menuMovilAbierto, setMenuMovilAbierto] = useState(false);
 
   useEffect(() => {
     const alScroll = () => {
@@ -5105,6 +5046,28 @@ function LandingPage({ onRegistrar, onIniciarSesion }) {
         .drx-faq details[open] summary::after { content: "−"; }
         @keyframes drx-subir { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: translateY(0); } }
         .drx-hero-item { opacity: 0; animation: drx-subir 0.7s ease forwards; }
+
+        /* Móvil: los links de navegación se esconden detrás de un botón de
+           hamburguesa en vez de desbordarse a una segunda línea — en
+           escritorio y tablet quedan igual que siempre, fijos en la barra. */
+        .drx-landing-hamburguesa { display: none; }
+        @media (max-width: 760px) {
+          .drx-landing-links { display: none !important; }
+          .drx-landing-inicio-desktop { display: none !important; }
+          .drx-landing-hamburguesa {
+            display: flex !important;
+            align-items: center;
+            justify-content: center;
+            width: 38px;
+            height: 38px;
+            flex-shrink: 0;
+            background: transparent;
+            border: 1px solid ${COLORS.border};
+            border-radius: 8px;
+            cursor: pointer;
+            color: ${COLORS.headingText};
+          }
+        }
       `}</style>
 
       <TexturaGrano />
@@ -5128,7 +5091,7 @@ function LandingPage({ onRegistrar, onIniciarSesion }) {
         </div>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: scrolleado ? "10px 24px" : "14px 24px", maxWidth: 1040, margin: "0 auto", flexWrap: "wrap", gap: 12, transition: "padding 0.2s ease" }}>
           <InsigniaPlataforma />
-          <div style={{ display: "flex", alignItems: "center", gap: 22, flexWrap: "wrap" }}>
+          <div className="drx-landing-links" style={{ display: "flex", alignItems: "center", gap: 22, flexWrap: "wrap" }}>
             <a href="#funciones" className="drx-navlink" style={navLinkStyle}>Funciones</a>
             <a href="#seguridad" className="drx-navlink" style={navLinkStyle}>Seguridad</a>
             <a href="#planes" className="drx-navlink" style={navLinkStyle}>Planes</a>
@@ -5137,6 +5100,7 @@ function LandingPage({ onRegistrar, onIniciarSesion }) {
           <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
             <button
               onClick={onIniciarSesion}
+              className="drx-landing-inicio-desktop"
               style={{ background: "none", border: "none", color: COLORS.muted, fontFamily: "Inter, sans-serif", fontSize: 13, fontWeight: 600, cursor: "pointer", textDecoration: "underline" }}
             >
               Iniciar sesión
@@ -5145,8 +5109,56 @@ function LandingPage({ onRegistrar, onIniciarSesion }) {
               Registrar despacho
             </button>
             <BotonTema oscuro={oscuro} onClick={alternar} />
+            <button
+              className="drx-landing-hamburguesa"
+              onClick={() => setMenuMovilAbierto((v) => !v)}
+              title="Menú"
+              aria-label="Abrir menú"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                <line x1="3" y1="6" x2="21" y2="6" />
+                <line x1="3" y1="12" x2="21" y2="12" />
+                <line x1="3" y1="18" x2="21" y2="18" />
+              </svg>
+            </button>
           </div>
         </div>
+        {menuMovilAbierto && (
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              padding: "4px 24px 16px",
+              borderTop: `1px solid ${COLORS.border}`,
+              background: oscuro ? "rgba(26,33,44,0.98)" : "#FFFFFF",
+            }}
+          >
+            {[
+              { href: "#funciones", texto: "Funciones" },
+              { href: "#seguridad", texto: "Seguridad" },
+              { href: "#planes", texto: "Planes" },
+              { href: "#faq", texto: "Preguntas frecuentes" },
+            ].map((link) => (
+              <a
+                key={link.href}
+                href={link.href}
+                onClick={() => setMenuMovilAbierto(false)}
+                style={{ ...navLinkStyle, padding: "12px 0", borderBottom: `1px solid ${COLORS.border}` }}
+              >
+                {link.texto}
+              </a>
+            ))}
+            <button
+              onClick={() => {
+                setMenuMovilAbierto(false);
+                onIniciarSesion();
+              }}
+              style={{ ...navLinkStyle, background: "none", border: "none", textAlign: "left", padding: "12px 0", cursor: "pointer", fontFamily: "Inter, sans-serif" }}
+            >
+              Iniciar sesión
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="drx-glow" style={{ textAlign: "center", padding: "40px 20px 50px", position: "relative", overflow: "hidden" }}>
@@ -6134,7 +6146,19 @@ function LoginGate({ onIngresar, onCancelar, pantallaInicial }) {
     if (!email.trim() || !contrasena.trim() || segundosBloqueoLogin > 0) return;
     setEnviando(true);
     setError("");
-    const { error: loginError } = await supabase.auth.signInWithPassword({ email: email.trim(), password: contrasena });
+    const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({ email: email.trim(), password: contrasena });
+    // Las cuentas de prueba creadas desde "Usuarios y permisos" (ver
+    // PanelAccesoPrueba) tienen expira_en — si ya pasó, se corta el acceso
+    // aquí mismo, antes de dejar entrar al panel.
+    if (!loginError && loginData?.user) {
+      const { data: perfilRecienLogueado } = await supabase.from("perfiles").select("expira_en").eq("id", loginData.user.id).maybeSingle();
+      if (perfilRecienLogueado?.expira_en && new Date(perfilRecienLogueado.expira_en).getTime() <= Date.now()) {
+        await supabase.auth.signOut();
+        setError("Este acceso de prueba ya expiró. Pide que te generen uno nuevo.");
+        setEnviando(false);
+        return;
+      }
+    }
     if (loginError) {
       const anterior = leerJSONLocal(LLAVE_INTENTOS_LOGIN, { intentos: 0 });
       const intentos = (anterior.intentos || 0) + 1;
@@ -6889,6 +6913,15 @@ function App() {
       return;
     }
     const { data: perfil } = await supabase.from("perfiles").select("*, despachos(nombre, activo)").eq("id", user.id).maybeSingle();
+    // Red de seguridad para una sesión de prueba que sigue abierta cuando
+    // vence — el corte "de verdad" (que muestra el mensaje) pasa en
+    // iniciarSesion, este solo evita que se quede adentro del panel.
+    if (perfil?.expira_en && new Date(perfil.expira_en).getTime() <= Date.now()) {
+      await supabase.auth.signOut();
+      setDespachoActual(null);
+      setUsuarioActual(null);
+      return;
+    }
     setDespachoActual(perfil?.despacho_id || null, perfil?.despachos?.nombre || "");
     const usuario = perfil
       ? { ...perfil, email: user.email, despachoNombre: perfil.despachos?.nombre || "", despachoActivo: perfil.despachos?.activo !== false }
@@ -6925,6 +6958,17 @@ function App() {
     });
     return () => suscripcion.subscription.unsubscribe();
   }, [cargarPerfilActual]);
+
+  // Revisa cada 30s si el acceso de prueba con el que se inició sesión ya
+  // venció (ver PanelAccesoPrueba) — así no hay que esperar a un refresh
+  // para que se corte, mientras dure la sesión abierta.
+  useEffect(() => {
+    if (!usuarioActual?.expira_en) return;
+    const intervalo = setInterval(() => {
+      if (new Date(usuarioActual.expira_en).getTime() <= Date.now()) cargarPerfilActual(false);
+    }, 30 * 1000);
+    return () => clearInterval(intervalo);
+  }, [usuarioActual?.expira_en, cargarPerfilActual]);
 
   const iniciarSesion = () => {
     setCambiandoUsuario(false);

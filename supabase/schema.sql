@@ -425,3 +425,13 @@ create index if not exists errores_cliente_creado_en_idx on errores_cliente (cre
 alter table errores_cliente enable row level security;
 -- Sin políticas a propósito: se escribe y se lee solo desde el servidor con
 -- la llave service_role, nunca directo desde el navegador.
+
+-- Accesos de prueba con vencimiento ------------------------------------------
+-- Un Administrador puede generar, desde "Usuarios y permisos", un usuario
+-- de correo y contraseña al azar para prestarle acceso temporal a alguien
+-- (ej. para que revise algo en vivo) sin usar sus propias credenciales.
+-- expira_en queda null en los usuarios normales; en los de prueba se
+-- verifica al iniciar sesión y cada 30s mientras la sesión sigue abierta
+-- (ver App.jsx: iniciarSesion / cargarPerfilActual).
+
+alter table perfiles add column if not exists expira_en timestamptz;
