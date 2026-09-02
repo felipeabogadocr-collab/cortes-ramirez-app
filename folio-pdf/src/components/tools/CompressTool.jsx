@@ -1,16 +1,24 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { fileToBytes, compressPdf, excedeTamano, MAX_FILE_MB } from "../../lib/pdfUtils.js";
 import { IconUpload, IconFile, Spinner } from "../Icons.jsx";
 import UploadNote from "../UploadNote.jsx";
 import DownloadCard from "../DownloadCard.jsx";
 import DropZone from "../DropZone.jsx";
 
-export default function CompressTool() {
+export default function CompressTool({ chainedFile, onConsumedChain, onSendTo }) {
   const [file, setFile] = useState(null);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState("");
   const inputRef = useRef(null);
+
+  useEffect(() => {
+    if (chainedFile) {
+      elegirArchivo(chainedFile);
+      onConsumedChain?.();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chainedFile]);
 
   function elegirArchivo(f) {
     if (f && excedeTamano(f)) {
@@ -95,6 +103,8 @@ export default function CompressTool() {
               setFile(null);
               setResult(null);
             }}
+            chainOptions={onSendTo ? [{ id: "firmar", label: "Firmar este PDF" }] : null}
+            onChain={onSendTo}
           />
         </>
       )}

@@ -104,6 +104,17 @@ test("Extraer texto: muestra el texto extraído y permite descargarlo", async ({
   expect(contenido).toContain("Documento de prueba");
 });
 
+test("encadenar herramientas: Unir PDF -> Comprimir este PDF sin volver a subir", async ({ page }) => {
+  await openTool(page, "UNIR PDF");
+  await page.setInputFiles('input[type="file"]', [SAMPLE_PDF, SAMPLE_PDF]);
+  await page.locator("main").getByRole("button", { name: "Unir PDF" }).click();
+  await expect(page.getByText("Tu archivo está listo")).toBeVisible({ timeout: 10000 });
+  await page.getByRole("button", { name: /Comprimir este PDF/ }).click();
+  // Debe llegar directo a Comprimir PDF con el archivo ya cargado, sin pantalla de subida.
+  await expect(page.locator("h2", { hasText: "Comprimir PDF" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Comprimir", exact: true })).toBeEnabled({ timeout: 10000 });
+});
+
 test("el scroll sube al inicio al cambiar de herramienta desde el pie de página", async ({ page }) => {
   await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
   await page.locator(".footer-link", { hasText: "Unir PDF" }).click();

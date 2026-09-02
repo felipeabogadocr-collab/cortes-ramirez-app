@@ -226,7 +226,7 @@ function DragStampBox({ stampUrl, box, setBox, containerRef }) {
   );
 }
 
-export default function SignTool() {
+export default function SignTool({ chainedFile, onConsumedChain }) {
   const [bytes, setBytes] = useState(null);
   const [thumbs, setThumbs] = useState([]);
   const [pageIndex, setPageIndex] = useState(0);
@@ -279,6 +279,14 @@ export default function SignTool() {
       cancelado = true;
     };
   }, [metodo, nombre, firmaDibujada, firmaImagen, estiloFirmaId, negrilla]);
+
+  useEffect(() => {
+    if (chainedFile) {
+      cargar(chainedFile);
+      onConsumedChain?.();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chainedFile]);
 
   async function cargar(file) {
     if (!file) return;

@@ -14,7 +14,7 @@ import DropZone from "../DropZone.jsx";
 
 const MIN_CAJA = 0.01; // fracción mínima de ancho/alto para contar como un tachón real
 
-export default function RedactTool() {
+export default function RedactTool({ onSendTo }) {
   const [bytes, setBytes] = useState(null);
   const [totalPaginas, setTotalPaginas] = useState(0);
   const [pageIndex, setPageIndex] = useState(0);
@@ -304,6 +304,15 @@ export default function RedactTool() {
           defaultName="tachado-folio.pdf"
           herramienta="Tachar información sensible"
           onDownloaded={limpiarTodo}
+          chainOptions={
+            onSendTo
+              ? [
+                  { id: "comprimir", label: "Comprimir este PDF" },
+                  { id: "firmar", label: "Firmar este PDF" },
+                ]
+              : null
+          }
+          onChain={onSendTo}
         />
       )}
     </div>

@@ -5,7 +5,7 @@ import UploadNote from "../UploadNote.jsx";
 import DownloadCard from "../DownloadCard.jsx";
 import DropZone from "../DropZone.jsx";
 
-export default function ImagesToPdfTool() {
+export default function ImagesToPdfTool({ onSendTo }) {
   const [files, setFiles] = useState([]); // { file, rotation, url }
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -142,6 +142,16 @@ export default function ImagesToPdfTool() {
           defaultName="imagenes-folio.pdf"
           herramienta="Imágenes a PDF"
           onDownloaded={limpiarTodo}
+          chainOptions={
+            onSendTo
+              ? [
+                  { id: "organizar", label: "Organizar páginas" },
+                  { id: "comprimir", label: "Comprimir este PDF" },
+                  { id: "firmar", label: "Firmar este PDF" },
+                ]
+              : null
+          }
+          onChain={onSendTo}
         />
       )}
     </div>

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { downloadBytes } from "../lib/pdfUtils.js";
-import { IconCheck } from "./Icons.jsx";
+import { IconCheck, IconArrowRight } from "./Icons.jsx";
 
 const MAX_NOMBRE = 120;
 
@@ -22,7 +22,16 @@ function sanitizar(nombre) {
 // Tarjeta que aparece cuando un archivo ya está listo: deja revisar/cambiar
 // el nombre y solo dispara la descarga real con un clic directo del usuario
 // (necesario para que funcione bien en Safari de iOS).
-export default function DownloadCard({ bytes, defaultName, mime = "application/pdf", herramienta, onDownloaded, style }) {
+export default function DownloadCard({
+  bytes,
+  defaultName,
+  mime = "application/pdf",
+  herramienta,
+  onDownloaded,
+  chainOptions,
+  onChain,
+  style,
+}) {
   const [base, ext] = splitExt(defaultName);
   const [nombre, setNombre] = useState(base);
 
@@ -30,6 +39,11 @@ export default function DownloadCard({ bytes, defaultName, mime = "application/p
     const limpio = sanitizar(nombre) || sanitizar(base) || "documento-folio";
     downloadBytes(bytes, `${limpio}${ext}`, mime, herramienta);
     if (onDownloaded) onDownloaded();
+  }
+
+  function enviar(toolId) {
+    const limpio = sanitizar(nombre) || sanitizar(base) || "documento-folio";
+    onChain(toolId, bytes, `${limpio}${ext}`, mime);
   }
 
   return (
@@ -61,6 +75,16 @@ export default function DownloadCard({ bytes, defaultName, mime = "application/p
       <button className="btn-primary" onClick={descargar}>
         Descargar {ext.replace(".", "").toUpperCase() || "archivo"}
       </button>
+
+      {chainOptions && chainOptions.length > 0 && (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 10 }}>
+          {chainOptions.map((opt) => (
+            <button key={opt.id} className="btn-ghost" style={{ fontSize: 12 }} onClick={() => enviar(opt.id)}>
+              {opt.label} <IconArrowRight size={11} />
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

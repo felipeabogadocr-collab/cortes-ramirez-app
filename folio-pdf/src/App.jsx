@@ -53,6 +53,14 @@ export default function App() {
   const [theme, setTheme] = useState(() => localStorage.getItem("folio_theme") || "light");
   const [accepted, setAccepted] = useState(hasAcceptedLead());
   const [activeTool, setActiveTool] = useState(null);
+  const [chainedFile, setChainedFile] = useState(null);
+
+  // Deja que una herramienta mande su resultado directo a otra (ej. "Comprimir
+  // este PDF" después de unirlo), sin tener que descargarlo y volver a subirlo.
+  function enviarA(toolId, bytes, filename, mime) {
+    setChainedFile(new File([bytes], filename, { type: mime || "application/pdf" }));
+    setActiveTool(toolId);
+  }
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
@@ -184,7 +192,11 @@ export default function App() {
                 </p>
               }
             >
-              <Active.Component />
+              <Active.Component
+                onSendTo={enviarA}
+                chainedFile={chainedFile}
+                onConsumedChain={() => setChainedFile(null)}
+              />
             </Suspense>
           </div>
         )}

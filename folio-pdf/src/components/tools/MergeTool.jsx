@@ -5,7 +5,7 @@ import UploadNote from "../UploadNote.jsx";
 import DownloadCard from "../DownloadCard.jsx";
 import DropZone from "../DropZone.jsx";
 
-export default function MergeTool() {
+export default function MergeTool({ onSendTo }) {
   const [files, setFiles] = useState([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -122,6 +122,16 @@ export default function MergeTool() {
             setFiles([]);
             setResultado(null);
           }}
+          chainOptions={
+            onSendTo
+              ? [
+                  { id: "comprimir", label: "Comprimir este PDF" },
+                  { id: "firmar", label: "Firmar este PDF" },
+                  { id: "organizar", label: "Organizar páginas" },
+                ]
+              : null
+          }
+          onChain={onSendTo}
         />
       )}
     </div>

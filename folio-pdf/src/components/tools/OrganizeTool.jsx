@@ -1,11 +1,11 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { fileToBytes, renderThumbnails, organizePdf, extractPage, excedeTamano, MAX_FILE_MB } from "../../lib/pdfUtils.js";
 import { IconUpload, IconRotate, Spinner } from "../Icons.jsx";
 import UploadNote from "../UploadNote.jsx";
 import DownloadCard from "../DownloadCard.jsx";
 import DropZone from "../DropZone.jsx";
 
-export default function OrganizeTool() {
+export default function OrganizeTool({ chainedFile, onConsumedChain, onSendTo }) {
   const [bytes, setBytes] = useState(null);
   const [pages, setPages] = useState([]); // { index, rotation, deleted, thumb }
   const [busy, setBusy] = useState(false);
@@ -13,6 +13,14 @@ export default function OrganizeTool() {
   const [resultado, setResultado] = useState(null);
   const [paginaExtraida, setPaginaExtraida] = useState(null);
   const inputRef = useRef(null);
+
+  useEffect(() => {
+    if (chainedFile) {
+      cargar(chainedFile);
+      onConsumedChain?.();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chainedFile]);
 
   async function cargar(file) {
     if (!file) return;
@@ -192,6 +200,15 @@ export default function OrganizeTool() {
             setPages([]);
             setResultado(null);
           }}
+          chainOptions={
+            onSendTo
+              ? [
+                  { id: "comprimir", label: "Comprimir este PDF" },
+                  { id: "firmar", label: "Firmar este PDF" },
+                ]
+              : null
+          }
+          onChain={onSendTo}
         />
       )}
     </div>

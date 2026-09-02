@@ -5,7 +5,7 @@ import UploadNote from "../UploadNote.jsx";
 import DownloadCard from "../DownloadCard.jsx";
 import DropZone from "../DropZone.jsx";
 
-export default function RotateAllTool() {
+export default function RotateAllTool({ onSendTo }) {
   const [bytes, setBytes] = useState(null);
   const [total, setTotal] = useState(0);
   const [angulo, setAngulo] = useState(90);
@@ -129,6 +129,15 @@ export default function RotateAllTool() {
           defaultName="rotado-folio.pdf"
           herramienta="Rotar PDF"
           onDownloaded={limpiarTodo}
+          chainOptions={
+            onSendTo
+              ? [
+                  { id: "comprimir", label: "Comprimir este PDF" },
+                  { id: "firmar", label: "Firmar este PDF" },
+                ]
+              : null
+          }
+          onChain={onSendTo}
         />
       )}
     </div>
