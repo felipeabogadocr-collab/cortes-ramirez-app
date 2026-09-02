@@ -839,7 +839,7 @@ function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-const APP_VERSION = "1.14.0";
+const APP_VERSION = "1.15.0";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -6586,6 +6586,10 @@ function ContabilidadTab({ usuarioActual }) {
   // u otro ingreso suelto) sin tener que ir a buscar nada primero.
   const [modoRegistro, setModoRegistro] = useState(null); // null | "pago" | "egreso" | "ingreso"
   const [pagoRapidoClienteId, setPagoRapidoClienteId] = useState("");
+  const [filtroEgreso, setFiltroEgreso] = useState("");
+  const [categoriaFiltroEgreso, setCategoriaFiltroEgreso] = useState("Todas");
+  const [filtroOtroIngreso, setFiltroOtroIngreso] = useState("");
+  const [categoriaFiltroOtroIngreso, setCategoriaFiltroOtroIngreso] = useState("Todas");
   const { egresos, crear: crearEgreso, editar: editarEgreso, eliminar: eliminarEgresoBase } = useEgresos();
   const { ingresos: otrosIngresos, crear: crearOtroIngreso, editar: editarOtroIngreso, eliminar: eliminarOtroIngresoBase } = useOtrosIngresos();
   const { confirmar, ConfirmarDialogo } = useConfirmarDialogo();
@@ -6731,16 +6735,18 @@ function ContabilidadTab({ usuarioActual }) {
   // servía para saber si el despacho realmente está ganando plata o no.
   let egresoTotal = 0;
   let egresoMes = 0;
-  const porCategoriaEgresoMes = {};
+  const porCategoriaEgresoTotal = {};
   egresos.forEach((e) => {
     const valor = Number(e.valor) || 0;
     egresoTotal += valor;
+    porCategoriaEgresoTotal[e.categoria] = (porCategoriaEgresoTotal[e.categoria] || 0) + valor;
     const fechaEgreso = new Date(e.fecha);
     if (fechaEgreso.getFullYear() === hoy.getFullYear() && fechaEgreso.getMonth() === hoy.getMonth()) {
       egresoMes += valor;
-      porCategoriaEgresoMes[e.categoria] = (porCategoriaEgresoMes[e.categoria] || 0) + valor;
     }
   });
+  const categoriasEgresoOrdenadas = Object.entries(porCategoriaEgresoTotal).sort((a, b) => b[1] - a[1]);
+  const categoriaMayorGasto = categoriasEgresoOrdenadas[0] || null;
   // Ingresos sueltos que no son el pago de ningún cliente puntual
   // (rendimientos, reembolsos, algo administrativo que no se sabe bien
   // dónde clasificar) — sin esto se quedaban fuera de "cuánto entró".
@@ -6782,11 +6788,26 @@ function ContabilidadTab({ usuarioActual }) {
     if (clave && egresosPorMesGrafica[clave] !== undefined) egresosPorMesGrafica[clave] += Number(e.valor) || 0;
   });
 
+  // Promedio mensual (últimos 6 meses) — útil para presupuestar: cuánto
+  // suele entrar/salir un mes típico, en vez de solo ver el mes actual.
+  const promedioIngresoMensual = mesesEgresos.reduce((s, m) => s + ingresosPorMesGrafica[m.clave], 0) / mesesEgresos.length;
+  const promedioEgresoMensual = mesesEgresos.reduce((s, m) => s + egresosPorMesGrafica[m.clave], 0) / mesesEgresos.length;
+
   // Clientes con un valor acordado pero sin ni un solo pago registrado —
   // fácil que se pierdan de vista entre los que sí van pagando poco a poco.
   const clientesSinPagos = ids
     .map((id) => clientes[id])
     .filter((c) => c && Number(c.valorTotal) > 0 && (c.pagos || []).length === 0);
+
+  const egresosFiltrados = [...egresos]
+    .filter((e) => categoriaFiltroEgreso === "Todas" || e.categoria === categoriaFiltroEgreso)
+    .filter((e) => !filtroEgreso.trim() || e.concepto.toLowerCase().includes(filtroEgreso.trim().toLowerCase()))
+    .sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+
+  const otrosIngresosFiltrados = [...otrosIngresos]
+    .filter((i) => categoriaFiltroOtroIngreso === "Todas" || i.categoria === categoriaFiltroOtroIngreso)
+    .filter((i) => !filtroOtroIngreso.trim() || i.concepto.toLowerCase().includes(filtroOtroIngreso.trim().toLowerCase()))
+    .sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
 
   // Filtrar y ordenar es O(n log n) sobre todos los clientes — sin memoizar,
   // se repetía en CADA render (incluyendo cada tecla escrita en cualquier
@@ -6942,7 +6963,9 @@ function ContabilidadTab({ usuarioActual }) {
 
       <Card style={{ marginBottom: 20 }}>
         <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, fontWeight: 700, color: COLORS.ink, marginBottom: 4 }}>Ingresos vs. egresos por mes</p>
-        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, marginBottom: 14 }}>Últimos 6 meses</p>
+        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, marginBottom: 14 }}>
+          Últimos 6 meses · Promedio mensual: {formatoCOP(promedioIngresoMensual)} de ingresos, {formatoCOP(promedioEgresoMensual)} de egresos
+        </p>
         <GraficaBarrasAgrupadas
           categorias={mesesEgresos.map((m) => m.etiqueta)}
           series={[
@@ -6953,37 +6976,133 @@ function ContabilidadTab({ usuarioActual }) {
         />
       </Card>
 
+      {categoriasEgresoOrdenadas.length > 0 && (
+        <Card style={{ marginBottom: 20 }}>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, fontWeight: 700, color: COLORS.ink, marginBottom: 4 }}>Egresos por categoría</p>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, marginBottom: 14 }}>
+            Histórico completo · La que más consume: <strong style={{ color: COLORS.headingText }}>{categoriaMayorGasto?.[0]}</strong> ({formatoCOP(categoriaMayorGasto?.[1] || 0)})
+          </p>
+          <GraficaBarras datos={categoriasEgresoOrdenadas.map(([categoria, valor]) => ({ etiqueta: categoria, valor }))} color="#F43F5E" formatoValor={formatoCOP} />
+        </Card>
+      )}
+
       <Card style={{ marginBottom: 20 }}>
-        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, fontWeight: 700, color: COLORS.ink, margin: 0 }}>Egresos</p>
-        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, margin: "4px 0 0" }}>Arriendo, nómina, servicios y demás salidas de dinero del despacho.</p>
-        {egresos.length > 0 ? (
-          <div style={{ marginTop: 12 }}>
-            {[...egresos]
-              .sort((a, b) => new Date(b.fecha) - new Date(a.fecha))
-              .map((e) => (
-                <EgresoCard key={e.id} egreso={e} onEditar={(cambios) => editarEgreso(e.id, cambios)} onEliminar={() => eliminarEgreso(e)} />
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 8, marginBottom: 4 }}>
+          <div>
+            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, fontWeight: 700, color: COLORS.ink, margin: 0 }}>Egresos</p>
+            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, margin: "4px 0 0" }}>Arriendo, nómina, servicios y demás salidas de dinero del despacho.</p>
+          </div>
+          {egresos.length > 0 && (
+            <button
+              className="drx-btn-ghost"
+              style={{ ...buttonGhost, fontSize: 12, padding: "5px 12px" }}
+              onClick={() =>
+                exportarCSV(
+                  "egresos.csv",
+                  [
+                    { titulo: "Fecha", valor: (e) => new Date(e.fecha).toLocaleDateString("es-CO") },
+                    { titulo: "Categoría", valor: (e) => e.categoria },
+                    { titulo: "Concepto", valor: (e) => e.concepto },
+                    { titulo: "Valor", valor: (e) => e.valor },
+                  ],
+                  egresosFiltrados
+                )
+              }
+            >
+              Exportar CSV
+            </button>
+          )}
+        </div>
+        {egresos.length > 0 && (
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 14 }}>
+            <input
+              className="drx-input"
+              style={{ ...inputStyle, maxWidth: 260, flex: 1, minWidth: 160 }}
+              placeholder="Buscar por concepto..."
+              value={filtroEgreso}
+              onChange={(e) => setFiltroEgreso(e.target.value)}
+            />
+            <select className="drx-input" style={{ ...inputStyle, maxWidth: 220 }} value={categoriaFiltroEgreso} onChange={(e) => setCategoriaFiltroEgreso(e.target.value)}>
+              <option value="Todas">Todas las categorías</option>
+              {CATEGORIAS_EGRESO.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
               ))}
+            </select>
+          </div>
+        )}
+        {egresosFiltrados.length > 0 ? (
+          <div style={{ marginTop: 12 }}>
+            {egresosFiltrados.map((e) => (
+              <EgresoCard key={e.id} egreso={e} onEditar={(cambios) => editarEgreso(e.id, cambios)} onEliminar={() => eliminarEgreso(e)} />
+            ))}
           </div>
         ) : (
-          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted, marginTop: 10 }}>Todavía no has registrado ningún egreso.</p>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted, marginTop: 10 }}>
+            {egresos.length === 0 ? "Todavía no has registrado ningún egreso." : "Ningún egreso coincide con el filtro."}
+          </p>
         )}
       </Card>
 
       <Card style={{ marginBottom: 20 }}>
-        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, fontWeight: 700, color: COLORS.ink, margin: 0 }}>Otros ingresos</p>
-        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, margin: "4px 0 0" }}>
-          Plata que entró sin ser el pago de un cliente puntual — rendimientos, reembolsos, algo administrativo.
-        </p>
-        {otrosIngresos.length > 0 ? (
-          <div style={{ marginTop: 12 }}>
-            {[...otrosIngresos]
-              .sort((a, b) => new Date(b.fecha) - new Date(a.fecha))
-              .map((i) => (
-                <OtroIngresoCard key={i.id} ingreso={i} onEditar={(cambios) => editarOtroIngreso(i.id, cambios)} onEliminar={() => eliminarOtroIngreso(i)} />
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 8, marginBottom: 4 }}>
+          <div>
+            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, fontWeight: 700, color: COLORS.ink, margin: 0 }}>Otros ingresos</p>
+            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, margin: "4px 0 0" }}>
+              Plata que entró sin ser el pago de un cliente puntual — rendimientos, reembolsos, algo administrativo.
+            </p>
+          </div>
+          {otrosIngresos.length > 0 && (
+            <button
+              className="drx-btn-ghost"
+              style={{ ...buttonGhost, fontSize: 12, padding: "5px 12px" }}
+              onClick={() =>
+                exportarCSV(
+                  "otros-ingresos.csv",
+                  [
+                    { titulo: "Fecha", valor: (i) => new Date(i.fecha).toLocaleDateString("es-CO") },
+                    { titulo: "Categoría", valor: (i) => i.categoria },
+                    { titulo: "Concepto", valor: (i) => i.concepto },
+                    { titulo: "Valor", valor: (i) => i.valor },
+                  ],
+                  otrosIngresosFiltrados
+                )
+              }
+            >
+              Exportar CSV
+            </button>
+          )}
+        </div>
+        {otrosIngresos.length > 0 && (
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 14 }}>
+            <input
+              className="drx-input"
+              style={{ ...inputStyle, maxWidth: 260, flex: 1, minWidth: 160 }}
+              placeholder="Buscar por concepto..."
+              value={filtroOtroIngreso}
+              onChange={(e) => setFiltroOtroIngreso(e.target.value)}
+            />
+            <select className="drx-input" style={{ ...inputStyle, maxWidth: 220 }} value={categoriaFiltroOtroIngreso} onChange={(e) => setCategoriaFiltroOtroIngreso(e.target.value)}>
+              <option value="Todas">Todas las categorías</option>
+              {CATEGORIAS_OTRO_INGRESO.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
               ))}
+            </select>
+          </div>
+        )}
+        {otrosIngresosFiltrados.length > 0 ? (
+          <div style={{ marginTop: 12 }}>
+            {otrosIngresosFiltrados.map((i) => (
+              <OtroIngresoCard key={i.id} ingreso={i} onEditar={(cambios) => editarOtroIngreso(i.id, cambios)} onEliminar={() => eliminarOtroIngreso(i)} />
+            ))}
           </div>
         ) : (
-          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted, marginTop: 10 }}>Todavía no has registrado ningún otro ingreso.</p>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted, marginTop: 10 }}>
+            {otrosIngresos.length === 0 ? "Todavía no has registrado ningún otro ingreso." : "Ningún ingreso coincide con el filtro."}
+          </p>
         )}
       </Card>
 
