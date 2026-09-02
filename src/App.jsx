@@ -615,7 +615,16 @@ const GlobalStyle = () => (
         position: fixed !important;
         left: 0;
         top: 0;
+        /* 100vh en el navegador móvil mide el viewport MÁS GRANDE posible
+           (con la barra de direcciones oculta) — cuando esa barra está
+           visible, el 100vh calculado se pasa de la altura real y el cajón
+           terminaba recortado/con un salto raro abajo (la parte de "Cambiar
+           de usuario / Cerrar sesión" se veía pegada arriba con un hueco en
+           blanco debajo). 100dvh sigue el alto real y visible del momento;
+           se declara después como mejora progresiva — donde no existe, el
+           navegador simplemente se queda con el 100vh de arriba. */
         height: 100vh !important;
+        height: 100dvh !important;
         width: 250px !important;
         max-width: 82vw;
         transform: translateX(-105%);
@@ -839,7 +848,7 @@ function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-const APP_VERSION = "1.16.0";
+const APP_VERSION = "1.16.1";
 
 function SelloVersion({ oscuro }) {
   return (
