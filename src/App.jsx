@@ -839,7 +839,7 @@ function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-const APP_VERSION = "1.15.0";
+const APP_VERSION = "1.16.0";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -1154,6 +1154,7 @@ async function calcularResumenOperacion() {
   let clientesInactivos = 0;
   let clientesActivos = 0;
   let pagosPendientes = 0;
+  let pagosAtrasados = 0;
   let procesosConNovedad = 0;
   let vigilanciaEnTramite = 0;
   let vigilanciaPendienteRevision = 0;
@@ -1177,11 +1178,15 @@ async function calcularResumenOperacion() {
     if (!raw) continue;
     const c = JSON.parse(raw);
     const dias = diasDesde(c.ultimaActuacion);
-    if (dias !== null && dias >= DIAS_ALERTA_INACTIVIDAD) clientesInactivos++;
+    // Un caso ya Finalizado sin movimiento reciente es normal (terminó, no
+    // hay nada más que hacer) — no debería contar como "cliente descuidado"
+    // igual que uno en trámite que lleva semanas sin que nadie lo revise.
+    if (dias !== null && dias >= DIAS_ALERTA_INACTIVIDAD && c.estadoVigilancia !== "Finalizado") clientesInactivos++;
     else clientesActivos++;
     if (c.proximoPago?.fecha) {
       const diasPago = diasHasta(c.proximoPago.fecha);
       if (diasPago !== null && diasPago <= DIAS_AVISO_PROXIMO_PAGO) pagosPendientes++;
+      if (diasPago !== null && diasPago < 0) pagosAtrasados++;
       if (c.proximoPago.valorEsperado) pendienteTotal += Number(c.proximoPago.valorEsperado) || 0;
     }
     if (c.radicado?.trim()) clientesConRadicado++;
@@ -1246,6 +1251,7 @@ async function calcularResumenOperacion() {
     docsFaltaAbogado,
     docsListos,
     pagosPendientes,
+    pagosAtrasados,
     procesosConNovedad,
     vigilanciaEnTramite,
     vigilanciaPendienteRevision,
@@ -1276,6 +1282,7 @@ function useResumenGeneral() {
     docsFaltaAbogado: 0,
     docsListos: 0,
     pagosPendientes: 0,
+    pagosAtrasados: 0,
     procesosConNovedad: 0,
     vigilanciaEnTramite: 0,
     vigilanciaPendienteRevision: 0,
@@ -1307,43 +1314,58 @@ function useResumenGeneral() {
   return { ...resumen, reload: cargar };
 }
 
+// El puntaje se calcula como PROPORCIÓN sobre el total de clientes, no como
+// una resta fija por cada problema — antes, un despacho con apenas 2 o 3
+// clientes se hundía al fondo con solo 1 pago por vencer (algo normal, no
+// un problema real), mientras que en uno grande ese mismo 1 caso casi ni se
+// notaba. Así, "3 de 5 clientes inactivos" pesa lo que debe pesar (60%),
+// y "3 de 60" también — sigue siendo estricto con problemas reales, pero
+// ya no castiga por tener pocos datos cargados todavía.
 function diagnosticoOperacion(r) {
   let puntaje = 100;
   const razones = [];
   const sugerencias = [];
+  const baseClientes = Math.max(1, r.totalClientes);
 
   if (r.clientesInactivos > 0) {
-    puntaje -= Math.min(30, r.clientesInactivos * 8);
+    const proporcion = r.clientesInactivos / baseClientes;
+    puntaje -= Math.round(Math.min(28, proporcion * 45));
     razones.push(`${r.clientesInactivos} cliente${r.clientesInactivos !== 1 ? "s" : ""} sin novedades hace más de ${DIAS_ALERTA_INACTIVIDAD} días`);
     sugerencias.push("Ponte al día con los clientes sin actividad reciente — un mensaje corto ya ayuda.");
   }
-  if (r.pagosPendientes > 0) {
-    puntaje -= Math.min(25, r.pagosPendientes * 10);
-    razones.push(`${r.pagosPendientes} pago${r.pagosPendientes !== 1 ? "s" : ""} por vencer o atrasado${r.pagosPendientes !== 1 ? "s" : ""}`);
-    sugerencias.push("Envía los recordatorios de pago pendientes desde Contabilidad.");
+  // Solo los pagos YA ATRASADOS bajan el puntaje — un pago próximo a vencer
+  // (todavía dentro del plazo) es flujo de caja normal, no un problema.
+  if (r.pagosAtrasados > 0) {
+    const proporcion = r.pagosAtrasados / baseClientes;
+    puntaje -= Math.round(Math.min(26, proporcion * 55));
+    razones.push(`${r.pagosAtrasados} pago${r.pagosAtrasados !== 1 ? "s" : ""} atrasado${r.pagosAtrasados !== 1 ? "s" : ""}`);
+    sugerencias.push("Envía los recordatorios de los pagos atrasados desde Contabilidad.");
   }
   if (r.procesosConNovedad > 0) {
-    puntaje -= Math.min(20, r.procesosConNovedad * 10);
+    const proporcion = r.procesosConNovedad / baseClientes;
+    puntaje -= Math.round(Math.min(18, proporcion * 35));
     razones.push(`${r.procesosConNovedad} proceso${r.procesosConNovedad !== 1 ? "s" : ""} con novedad en vigilancia judicial`);
     sugerencias.push("Revisa los procesos marcados con novedad en Vigilancia judicial.");
   }
-  if (r.recaudadoMes === 0 && r.totalClientes > 0) {
-    puntaje -= 15;
-    razones.push("todavía no hay pagos registrados este mes");
-    sugerencias.push("Registra los pagos del mes para llevar el control real de caja.");
+  // Solo cuenta en contra si NUNCA ha entrado plata (no un mes suelto sin
+  // pagos, que puede ser perfectamente normal según el ritmo del despacho).
+  if (r.recaudadoTotal === 0 && r.totalClientes > 0) {
+    puntaje -= 10;
+    razones.push("todavía no hay ningún pago registrado");
+    sugerencias.push("Registra los pagos que ya has recibido para llevar el control real de caja.");
   }
-  puntaje = Math.max(0, Math.min(100, puntaje));
+  puntaje = Math.max(0, Math.min(100, Math.round(puntaje)));
 
   let etiqueta;
   let color;
   if (puntaje >= 85) {
-    etiqueta = "Vas muy bien";
+    etiqueta = "Este mes vas muy bien";
     color = "#10B981";
   } else if (puntaje >= 60) {
-    etiqueta = "Vas bien, con puntos por mejorar";
+    etiqueta = "Este mes vas bien, y podemos mejorar";
     color = "#F5A524";
   } else {
-    etiqueta = "Necesita tu atención";
+    etiqueta = "Este mes necesita tu atención";
     color = "#F43F5E";
   }
 
