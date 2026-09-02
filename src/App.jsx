@@ -679,7 +679,7 @@ function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-const APP_VERSION = "1.28.0";
+const APP_VERSION = "1.29.0";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -6646,6 +6646,98 @@ function AvisoErroresAlmacenamiento() {
 // toda la app y el usuario se queda mirando una pantalla en blanco sin ningún
 // mensaje ni forma de recuperarse salvo adivinar que debe recargar. Con esto,
 // se muestra una pantalla clara con un botón para recargar.
+// Compartida entre el ErrorBoundary de toda la app y el de cada pestaña —
+// antes esto solo quedaba en la consola de quien lo sufría, y nadie más se
+// enteraba. Nunca debe poder tumbar la interfaz: si falla el reporte mismo,
+// se ignora en silencio (ver api/errores/registrar.js y Plataforma →
+// "Errores recientes de la interfaz").
+async function reportarErrorFrontend(error, info, contexto) {
+  console.error(`Error no controlado en la interfaz${contexto ? ` (${contexto})` : ""}:`, error, info);
+  try {
+    let usuarioId = null;
+    try {
+      const { data } = await supabase.auth.getUser();
+      usuarioId = data?.user?.id || null;
+    } catch (e) {
+      // sin sesión o sin red — se reporta igual, sin usuarioId
+    }
+    await fetch("/api/errores/registrar", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        mensaje: `${contexto ? `[${contexto}] ` : ""}${error?.message || String(error)}`,
+        pila: error?.stack || "",
+        infoComponente: info?.componentStack || "",
+        url: typeof window !== "undefined" ? window.location.href : "",
+        despachoId: getDespachoActualId(),
+        usuarioId,
+        userAgent: typeof navigator !== "undefined" ? navigator.userAgent : "",
+      }),
+    });
+  } catch (e) {
+    // sin red, endpoint caído, etc. — no hay nada más que hacer aquí.
+  }
+}
+
+// Envuelve cada pestaña por separado: si una sección se cae por un error
+// inesperado, solo esa parte de la pantalla se reemplaza por un aviso — el
+// resto de la app (menú, otras pestañas) sigue funcionando en vez de
+// quedar toda en blanco esperando un reload completo.
+export class TabErrorBoundary extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { error: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { error };
+  }
+
+  componentDidCatch(error, info) {
+    reportarErrorFrontend(error, info, this.props.nombre);
+  }
+
+  render() {
+    if (this.state.error) {
+      return (
+        <div
+          style={{
+            background: "#FEF2F2",
+            border: "1px solid #F3C6C0",
+            borderRadius: 12,
+            padding: 24,
+            textAlign: "center",
+            fontFamily: "Inter, sans-serif",
+          }}
+        >
+          <p style={{ fontSize: 28, margin: 0 }}>⚠️</p>
+          <p style={{ fontSize: 15, fontWeight: 700, color: "#11213A", margin: "8px 0 4px" }}>Esta sección tuvo un problema</p>
+          <p style={{ fontSize: 13, color: "#4C5A6B", margin: "0 0 14px" }}>
+            El resto de Nomos sigue funcionando — puedes cambiar de pestaña con normalidad. Tus datos guardados están a salvo.
+          </p>
+          <button
+            onClick={() => this.setState({ error: null })}
+            style={{
+              fontFamily: "Inter, sans-serif",
+              fontWeight: 700,
+              fontSize: 13,
+              padding: "8px 18px",
+              borderRadius: 10,
+              border: "none",
+              background: "#0B3D2E",
+              color: "#fff",
+              cursor: "pointer",
+            }}
+          >
+            Reintentar
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 class ErrorBoundary extends Component {
   constructor(props) {
     super(props);
@@ -6657,37 +6749,7 @@ class ErrorBoundary extends Component {
   }
 
   componentDidCatch(error, info) {
-    console.error("Error no controlado en la interfaz:", error, info);
-    // Se reporta al servidor para que el superadmin pueda verlo en
-    // "Plataforma" — antes esto solo quedaba en la consola de quien lo
-    // sufrió, y nadie más se enteraba. Nunca debe poder tumbar la app: si
-    // falla el reporte mismo, se ignora en silencio.
-    (async () => {
-      try {
-        let usuarioId = null;
-        try {
-          const { data } = await supabase.auth.getUser();
-          usuarioId = data?.user?.id || null;
-        } catch (e) {
-          // sin sesión o sin red — se reporta igual, sin usuarioId
-        }
-        await fetch("/api/errores/registrar", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            mensaje: error?.message || String(error),
-            pila: error?.stack || "",
-            infoComponente: info?.componentStack || "",
-            url: typeof window !== "undefined" ? window.location.href : "",
-            despachoId: getDespachoActualId(),
-            usuarioId,
-            userAgent: typeof navigator !== "undefined" ? navigator.userAgent : "",
-          }),
-        });
-      } catch (e) {
-        // sin red, endpoint caído, etc. — no hay nada más que hacer aquí.
-      }
-    })();
+    reportarErrorFrontend(error, info, "");
   }
 
   render() {
@@ -7264,54 +7326,76 @@ function App() {
             </div>
           )}
           <div key={tab} className="drx-tab-transition" style={{ maxWidth: 760, margin: "0 auto" }}>
-            {tab === "resumen" && puedeVer("resumen") && <ResumenTab nombre={usuarioActual.nombre} usuarioId={usuarioActual.id} onIr={setTab} />}
+            {tab === "resumen" && puedeVer("resumen") && (
+              <TabErrorBoundary nombre="resumen">
+                <ResumenTab nombre={usuarioActual.nombre} usuarioId={usuarioActual.id} onIr={setTab} />
+              </TabErrorBoundary>
+            )}
             {tab === "agenda" && puedeVer("agenda") && (
-              <Suspense fallback={<Spinner />}>
-                <AgendaTab />
-              </Suspense>
+              <TabErrorBoundary nombre="agenda">
+                <Suspense fallback={<Spinner />}>
+                  <AgendaTab />
+                </Suspense>
+              </TabErrorBoundary>
             )}
             {tab === "clientes" && puedeVer("clientes") && (
-              <Suspense fallback={<Spinner />}>
-                <ClientesTab usuarioActual={usuarioActual} />
-              </Suspense>
+              <TabErrorBoundary nombre="clientes">
+                <Suspense fallback={<Spinner />}>
+                  <ClientesTab usuarioActual={usuarioActual} />
+                </Suspense>
+              </TabErrorBoundary>
             )}
             {tab === "vigilancia" && puedeVer("vigilancia") && (
-              <Suspense fallback={<Spinner />}>
-                <VigilanciaTab />
-              </Suspense>
+              <TabErrorBoundary nombre="vigilancia">
+                <Suspense fallback={<Spinner />}>
+                  <VigilanciaTab />
+                </Suspense>
+              </TabErrorBoundary>
             )}
             {tab === "contabilidad" && puedeVer("contabilidad") && (
-              <Suspense fallback={<Spinner />}>
-                <ContabilidadTab usuarioActual={usuarioActual} />
-              </Suspense>
+              <TabErrorBoundary nombre="contabilidad">
+                <Suspense fallback={<Spinner />}>
+                  <ContabilidadTab usuarioActual={usuarioActual} />
+                </Suspense>
+              </TabErrorBoundary>
             )}
             {tab === "contenido" && puedeVer("contenido") && (
-              <Suspense fallback={<Spinner />}>
-                <ContenidoTab />
-              </Suspense>
+              <TabErrorBoundary nombre="contenido">
+                <Suspense fallback={<Spinner />}>
+                  <ContenidoTab />
+                </Suspense>
+              </TabErrorBoundary>
             )}
             {tab === "documentos" && puedeVer("documentos") && (
-              <Suspense fallback={<Spinner />}>
-                <DocumentosTab />
-              </Suspense>
+              <TabErrorBoundary nombre="documentos">
+                <Suspense fallback={<Spinner />}>
+                  <DocumentosTab />
+                </Suspense>
+              </TabErrorBoundary>
             )}
             {tab === "reportes" && puedeVer("reportes") && (
-              <Suspense fallback={<Spinner />}>
-                <ReportesTab />
-              </Suspense>
+              <TabErrorBoundary nombre="reportes">
+                <Suspense fallback={<Spinner />}>
+                  <ReportesTab />
+                </Suspense>
+              </TabErrorBoundary>
             )}
             {tab === "usuarios" && usuarioActual.rol === "Administrador" && (
-              <Suspense fallback={<Spinner />}>
-                <UsuariosPermisosTab
-                  usuarioActual={usuarioActual}
-                  onDespachoRenombrado={(nuevoNombre) => setUsuarioActual((prev) => (prev ? { ...prev, despachoNombre: nuevoNombre } : prev))}
-                />
-              </Suspense>
+              <TabErrorBoundary nombre="usuarios">
+                <Suspense fallback={<Spinner />}>
+                  <UsuariosPermisosTab
+                    usuarioActual={usuarioActual}
+                    onDespachoRenombrado={(nuevoNombre) => setUsuarioActual((prev) => (prev ? { ...prev, despachoNombre: nuevoNombre } : prev))}
+                  />
+                </Suspense>
+              </TabErrorBoundary>
             )}
             {tab === "plataforma" && usuarioActual.es_superadmin && (
-              <Suspense fallback={<Spinner />}>
-                <PlataformaTab />
-              </Suspense>
+              <TabErrorBoundary nombre="plataforma">
+                <Suspense fallback={<Spinner />}>
+                  <PlataformaTab />
+                </Suspense>
+              </TabErrorBoundary>
             )}
           </div>
         </div>
