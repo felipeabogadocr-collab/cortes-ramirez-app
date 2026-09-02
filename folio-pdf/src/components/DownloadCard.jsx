@@ -59,7 +59,7 @@ export default function DownloadCard({ bytes, defaultName, mime = "application/p
         <span style={{ fontSize: 13, color: "var(--muted)", flexShrink: 0 }}>{ext}</span>
       </div>
       <button className="btn-primary" onClick={descargar}>
-        Descargar {ext === ".zip" ? "ZIP" : "PDF"}
+        Descargar {ext.replace(".", "").toUpperCase() || "archivo"}
       </button>
     </div>
   );

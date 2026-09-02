@@ -1,17 +1,10 @@
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import Header from "./components/Header.jsx";
 import Footer from "./components/Footer.jsx";
 import PrivacyNotice from "./components/PrivacyNotice.jsx";
 import WhatsAppFloat from "./components/WhatsAppFloat.jsx";
 import Toast from "./components/Toast.jsx";
 import LeadGate, { hasAcceptedLead } from "./components/LeadGate.jsx";
-import MergeTool from "./components/tools/MergeTool.jsx";
-import OrganizeTool from "./components/tools/OrganizeTool.jsx";
-import SplitTool from "./components/tools/SplitTool.jsx";
-import SignTool from "./components/tools/SignTool.jsx";
-import ImagesToPdfTool from "./components/tools/ImagesToPdfTool.jsx";
-import CompressTool from "./components/tools/CompressTool.jsx";
-import PdfToImagesTool from "./components/tools/PdfToImagesTool.jsx";
 import {
   IconPaperclip,
   IconFolder,
@@ -20,11 +13,28 @@ import {
   IconImage,
   IconImages,
   IconCompress,
+  IconRotate,
+  IconRedact,
+  IconTextDoc,
   IconLock,
   IconGlobe,
   IconCheck,
   IconArrowRight,
+  Spinner,
 } from "./components/Icons.jsx";
+
+// Cada herramienta se carga solo cuando el usuario la abre: así la página de
+// inicio no descarga pdf-lib/pdfjs-dist/jszip hasta que hagan falta de verdad.
+const MergeTool = lazy(() => import("./components/tools/MergeTool.jsx"));
+const OrganizeTool = lazy(() => import("./components/tools/OrganizeTool.jsx"));
+const SplitTool = lazy(() => import("./components/tools/SplitTool.jsx"));
+const SignTool = lazy(() => import("./components/tools/SignTool.jsx"));
+const ImagesToPdfTool = lazy(() => import("./components/tools/ImagesToPdfTool.jsx"));
+const PdfToImagesTool = lazy(() => import("./components/tools/PdfToImagesTool.jsx"));
+const CompressTool = lazy(() => import("./components/tools/CompressTool.jsx"));
+const RotateAllTool = lazy(() => import("./components/tools/RotateAllTool.jsx"));
+const RedactTool = lazy(() => import("./components/tools/RedactTool.jsx"));
+const ExtractTextTool = lazy(() => import("./components/tools/ExtractTextTool.jsx"));
 
 const TOOLS = [
   { id: "unir", label: "Unir PDF", Icon: IconPaperclip, Component: MergeTool },
@@ -34,6 +44,9 @@ const TOOLS = [
   { id: "imagenes", label: "Imágenes a PDF", Icon: IconImage, Component: ImagesToPdfTool },
   { id: "pdf-a-imagenes", label: "PDF a Imágenes", Icon: IconImages, Component: PdfToImagesTool },
   { id: "comprimir", label: "Comprimir PDF", Icon: IconCompress, Component: CompressTool },
+  { id: "rotar", label: "Rotar PDF", Icon: IconRotate, Component: RotateAllTool },
+  { id: "tachar", label: "Tachar información", Icon: IconRedact, Component: RedactTool },
+  { id: "extraer-texto", label: "Extraer texto", Icon: IconTextDoc, Component: ExtractTextTool },
 ];
 
 export default function App() {
@@ -164,7 +177,15 @@ export default function App() {
               </span>
               {Active.label}
             </h2>
-            <Active.Component />
+            <Suspense
+              fallback={
+                <p style={{ display: "flex", alignItems: "center", gap: 8, color: "var(--muted)", fontSize: 13 }}>
+                  <Spinner /> Cargando herramienta…
+                </p>
+              }
+            >
+              <Active.Component />
+            </Suspense>
           </div>
         )}
       </main>

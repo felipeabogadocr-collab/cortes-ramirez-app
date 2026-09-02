@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { fileToBytes, renderThumbnails, signPdf, excedeTamano, MAX_FILE_MB } from "../../lib/pdfUtils.js";
 import DownloadCard from "../DownloadCard.jsx";
+import DropZone from "../DropZone.jsx";
 import { IconEdit, IconImage, IconType, IconUpload, IconShield, Spinner } from "../Icons.jsx";
 import UploadNote from "../UploadNote.jsx";
 
@@ -345,24 +346,26 @@ export default function SignTool() {
           Sube el PDF que quieres firmar. La firma es electrónica simple (no una firma digital
           certificada), y queda acompañada de un sello automático con nombre, fecha y hora.
         </p>
-        <input
-          ref={inputRef}
-          type="file"
-          accept="application/pdf"
-          style={{ display: "none" }}
-          onChange={(e) => cargar(e.target.files[0])}
-        />
-        <button className="btn-upload" onClick={() => inputRef.current.click()} disabled={busy}>
-          {busy ? (
-            <>
-              <Spinner /> Cargando…
-            </>
-          ) : (
-            <>
-              <IconUpload /> Subir PDF
-            </>
-          )}
-        </button>
+        <DropZone onFiles={(files) => cargar(files[0])} disabled={busy}>
+          <input
+            ref={inputRef}
+            type="file"
+            accept="application/pdf"
+            style={{ display: "none" }}
+            onChange={(e) => cargar(e.target.files[0])}
+          />
+          <button className="btn-upload" onClick={() => inputRef.current.click()} disabled={busy}>
+            {busy ? (
+              <>
+                <Spinner /> Cargando…
+              </>
+            ) : (
+              <>
+                <IconUpload /> Subir PDF
+              </>
+            )}
+          </button>
+        </DropZone>
         <UploadNote />
         {error && <p style={{ color: "var(--danger)", fontSize: 13, marginTop: 10 }}>{error}</p>}
       </div>

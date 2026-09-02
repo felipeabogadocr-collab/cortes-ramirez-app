@@ -3,6 +3,7 @@ import { mergePdfs, excedeTamano, MAX_FILE_MB } from "../../lib/pdfUtils.js";
 import { IconUpload, Spinner } from "../Icons.jsx";
 import UploadNote from "../UploadNote.jsx";
 import DownloadCard from "../DownloadCard.jsx";
+import DropZone from "../DropZone.jsx";
 
 export default function MergeTool() {
   const [files, setFiles] = useState([]);
@@ -56,17 +57,19 @@ export default function MergeTool() {
       <p style={{ color: "var(--muted)", fontSize: 13 }}>
         Selecciona 2 o más archivos PDF y ordénalos como quieras antes de unirlos.
       </p>
-      <input
-        ref={inputRef}
-        type="file"
-        accept="application/pdf"
-        multiple
-        style={{ display: "none" }}
-        onChange={(e) => addFiles(e.target.files)}
-      />
-      <button className="btn-upload" onClick={() => inputRef.current.click()}>
-        <IconUpload /> Agregar PDF
-      </button>
+      <DropZone onFiles={addFiles}>
+        <input
+          ref={inputRef}
+          type="file"
+          accept="application/pdf"
+          multiple
+          style={{ display: "none" }}
+          onChange={(e) => addFiles(e.target.files)}
+        />
+        <button className="btn-upload" onClick={() => inputRef.current.click()}>
+          <IconUpload /> Agregar PDF
+        </button>
+      </DropZone>
       <UploadNote />
 
       {files.length === 0 && (

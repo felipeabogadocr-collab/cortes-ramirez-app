@@ -3,6 +3,7 @@ import { imagesToPdf, excedeTamano, MAX_FILE_MB } from "../../lib/pdfUtils.js";
 import { IconUpload, Spinner, IconRotate } from "../Icons.jsx";
 import UploadNote from "../UploadNote.jsx";
 import DownloadCard from "../DownloadCard.jsx";
+import DropZone from "../DropZone.jsx";
 
 export default function ImagesToPdfTool() {
   const [files, setFiles] = useState([]); // { file, rotation, url }
@@ -74,17 +75,19 @@ export default function ImagesToPdfTool() {
       <p style={{ color: "var(--muted)", fontSize: 13 }}>
         Sube fotos o imágenes (JPG/PNG) — cada una se convierte en una página del PDF, en el orden que definas. Puedes rotarlas antes de generar el PDF.
       </p>
-      <input
-        ref={inputRef}
-        type="file"
-        accept="image/png,image/jpeg"
-        multiple
-        style={{ display: "none" }}
-        onChange={(e) => addFiles(e.target.files)}
-      />
-      <button className="btn-upload" onClick={() => inputRef.current.click()}>
-        <IconUpload /> Agregar imágenes
-      </button>
+      <DropZone onFiles={addFiles}>
+        <input
+          ref={inputRef}
+          type="file"
+          accept="image/png,image/jpeg"
+          multiple
+          style={{ display: "none" }}
+          onChange={(e) => addFiles(e.target.files)}
+        />
+        <button className="btn-upload" onClick={() => inputRef.current.click()}>
+          <IconUpload /> Agregar imágenes
+        </button>
+      </DropZone>
       <UploadNote />
 
       {files.length === 0 && (

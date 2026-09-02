@@ -78,6 +78,22 @@ export async function renderPageImages(bytes, { scale = 2, format = "png", pageI
   return out;
 }
 
+// Renderiza una sola página como data URL, a buena resolución para editar
+// (marcar tachones, posicionar una firma, etc.).
+export async function renderSinglePage(bytes, pageIndex, scale = 1.3) {
+  const doc = await pdfjsLib.getDocument({ data: bytes.slice() }).promise;
+  const page = await doc.getPage(pageIndex + 1);
+  const viewport = page.getViewport({ scale });
+  const canvas = document.createElement("canvas");
+  canvas.width = viewport.width;
+  canvas.height = viewport.height;
+  const ctx = canvas.getContext("2d");
+  await page.render({ canvasContext: ctx, viewport }).promise;
+  const dataUrl = canvas.toDataURL("image/png");
+  await doc.destroy();
+  return dataUrl;
+}
+
 export async function getPageCount(bytes) {
   const doc = await PDFDocument.load(bytes);
   return doc.getPageCount();
@@ -177,4 +193,75 @@ function dataUrlToBytes(dataUrl) {
 export async function compressPdf(bytes) {
   const doc = await PDFDocument.load(bytes);
   return doc.save({ useObjectStreams: true });
+}
+
+// Rota TODAS las páginas del PDF el mismo ángulo (90/180/270), sumado a la
+// rotación que ya tuviera cada página.
+export async function rotateAllPages(bytes, angle) {
+  const doc = await PDFDocument.load(bytes);
+  doc.getPages().forEach((page) => {
+    page.setRotation(degrees((page.getRotation().angle + angle + 360) % 360));
+  });
+  return doc.save();
+}
+
+// Extrae el texto legible de un PDF (sin conservar formato) y lo une en un
+// solo string, con las páginas separadas por un salto de línea doble.
+export async function extractText(bytes) {
+  const doc = await pdfjsLib.getDocument({ data: bytes.slice() }).promise;
+  const paginas = [];
+  for (let i = 1; i <= doc.numPages; i++) {
+    const page = await doc.getPage(i);
+    const contenido = await page.getTextContent();
+    const texto = contenido.items.map((it) => it.str).join(" ");
+    paginas.push(texto.trim());
+  }
+  await doc.destroy();
+  return paginas.join("\n\n");
+}
+
+// Tacha información sensible: dibuja rectángulos negros sobre las páginas
+// indicadas y las convierte en imagen para que el texto oculto quede
+// realmente eliminado (no solo cubierto visualmente). Las páginas sin
+// tachones se copian tal cual, conservando su calidad original.
+// redacciones: { [pageIndex]: [{ x, y, width, height }] } en fracción 0-1
+// del tamaño de la página, origen arriba-izquierda.
+export async function redactPdf(bytes, redacciones) {
+  const src = await PDFDocument.load(bytes);
+  const out = await PDFDocument.create();
+  const pdfjsDoc = await pdfjsLib.getDocument({ data: bytes.slice() }).promise;
+  const total = src.getPageCount();
+
+  for (let i = 0; i < total; i++) {
+    const cajas = redacciones[i];
+    if (!cajas || !cajas.length) {
+      const [copiada] = await out.copyPages(src, [i]);
+      out.addPage(copiada);
+      continue;
+    }
+
+    const page = await pdfjsDoc.getPage(i + 1);
+    const scale = 2;
+    const viewport = page.getViewport({ scale });
+    const canvas = document.createElement("canvas");
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+    const ctx = canvas.getContext("2d");
+    await page.render({ canvasContext: ctx, viewport }).promise;
+
+    ctx.fillStyle = "#000000";
+    cajas.forEach((c) => {
+      ctx.fillRect(c.x * canvas.width, c.y * canvas.height, c.width * canvas.width, c.height * canvas.height);
+    });
+
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+    const imgBytes = new Uint8Array(await blob.arrayBuffer());
+    const image = await out.embedPng(imgBytes);
+    const { width: pw, height: ph } = src.getPage(i).getSize();
+    const nuevaPagina = out.addPage([pw, ph]);
+    nuevaPagina.drawImage(image, { x: 0, y: 0, width: pw, height: ph });
+  }
+
+  await pdfjsDoc.destroy();
+  return out.save();
 }

@@ -3,6 +3,7 @@ import { fileToBytes, compressPdf, excedeTamano, MAX_FILE_MB } from "../../lib/p
 import { IconUpload, IconFile, Spinner } from "../Icons.jsx";
 import UploadNote from "../UploadNote.jsx";
 import DownloadCard from "../DownloadCard.jsx";
+import DropZone from "../DropZone.jsx";
 
 export default function CompressTool() {
   const [file, setFile] = useState(null);
@@ -10,6 +11,16 @@ export default function CompressTool() {
   const [result, setResult] = useState(null);
   const [error, setError] = useState("");
   const inputRef = useRef(null);
+
+  function elegirArchivo(f) {
+    if (f && excedeTamano(f)) {
+      setError(`El archivo supera ${MAX_FILE_MB} MB.`);
+      return;
+    }
+    setFile(f);
+    setResult(null);
+    setError("");
+  }
 
   async function comprimir() {
     if (!file) return;
@@ -37,33 +48,26 @@ export default function CompressTool() {
         Compresión ligera: reduce el peso del archivo optimizando su estructura interna. No recomprime
         imágenes, así que el ahorro varía según el documento.
       </p>
-      <input
-        ref={inputRef}
-        type="file"
-        accept="application/pdf"
-        style={{ display: "none" }}
-        onChange={(e) => {
-          const f = e.target.files[0];
-          if (f && excedeTamano(f)) {
-            setError(`El archivo supera ${MAX_FILE_MB} MB.`);
-            return;
-          }
-          setFile(f);
-          setResult(null);
-          setError("");
-        }}
-      />
-      <button className="btn-upload" onClick={() => inputRef.current.click()}>
-        {file ? (
-          <>
-            <IconFile /> {file.name}
-          </>
-        ) : (
-          <>
-            <IconUpload /> Subir PDF
-          </>
-        )}
-      </button>
+      <DropZone onFiles={(files) => elegirArchivo(files[0])}>
+        <input
+          ref={inputRef}
+          type="file"
+          accept="application/pdf"
+          style={{ display: "none" }}
+          onChange={(e) => elegirArchivo(e.target.files[0])}
+        />
+        <button className="btn-upload" onClick={() => inputRef.current.click()}>
+          {file ? (
+            <>
+              <IconFile /> {file.name}
+            </>
+          ) : (
+            <>
+              <IconUpload /> Subir PDF
+            </>
+          )}
+        </button>
+      </DropZone>
       <UploadNote />
 
       {error && <p style={{ color: "var(--danger)", fontSize: 13, marginTop: 10 }}>{error}</p>}

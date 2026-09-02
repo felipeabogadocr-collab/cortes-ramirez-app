@@ -13,6 +13,9 @@ const HERRAMIENTAS = [
   { id: "imagenes", label: "Imágenes a PDF" },
   { id: "pdf-a-imagenes", label: "PDF a Imágenes" },
   { id: "comprimir", label: "Comprimir PDF" },
+  { id: "rotar", label: "Rotar PDF" },
+  { id: "tachar", label: "Tachar información" },
+  { id: "extraer-texto", label: "Extraer texto" },
 ];
 
 function scrollToTop() {

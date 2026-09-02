@@ -203,6 +203,13 @@ select:focus-visible {
   cursor: not-allowed;
 }
 
+/* Resalta la zona de subida mientras se arrastra un archivo encima. */
+.dropzone-active {
+  background: var(--panel-2);
+  outline: 2px dashed var(--brand-2);
+  outline-offset: 4px;
+}
+
 /* Botones de "subir archivo": usan el color de marca para resaltar sobre el resto de la UI. */
 .btn-upload {
   background: var(--brand);
@@ -237,25 +244,19 @@ select:focus-visible {
   letter-spacing: 0.5px;
 }
 
-/* Flex en vez de grid a propósito: si la última fila queda incompleta,
-   los elementos sobrantes quedan centrados en vez de pegados a la
-   izquierda con espacio vacío al lado. */
+/* 10 herramientas = 2 filas de 5 exactas en escritorio. Si en el futuro el
+   número de herramientas deja de ser múltiplo de las columnas, usar flexbox
+   con wrap + justify-content:center en su lugar para que la fila incompleta
+   quede centrada en vez de pegada a la izquierda. */
 .tools-grid {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
   gap: 14px;
 }
 
-.tools-grid > * {
-  flex: 1 1 190px;
-  max-width: 230px;
-}
-
-@media (max-width: 480px) {
-  .tools-grid > * {
-    flex-basis: 100%;
-    max-width: none;
+@media (max-width: 900px) {
+  .tools-grid {
+    grid-template-columns: repeat(2, 1fr);
   }
 }
 

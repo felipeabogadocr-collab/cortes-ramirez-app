@@ -3,6 +3,7 @@ import { fileToBytes, renderThumbnails, organizePdf, extractPage, excedeTamano, 
 import { IconUpload, IconRotate, Spinner } from "../Icons.jsx";
 import UploadNote from "../UploadNote.jsx";
 import DownloadCard from "../DownloadCard.jsx";
+import DropZone from "../DropZone.jsx";
 
 export default function OrganizeTool() {
   const [bytes, setBytes] = useState(null);
@@ -87,24 +88,26 @@ export default function OrganizeTool() {
         <p style={{ color: "var(--muted)", fontSize: 13 }}>
           Sube un PDF para reordenar, rotar, eliminar o extraer páginas.
         </p>
-        <input
-          ref={inputRef}
-          type="file"
-          accept="application/pdf"
-          style={{ display: "none" }}
-          onChange={(e) => cargar(e.target.files[0])}
-        />
-        <button className="btn-upload" onClick={() => inputRef.current.click()} disabled={busy}>
-          {busy ? (
-            <>
-              <Spinner /> Cargando…
-            </>
-          ) : (
-            <>
-              <IconUpload /> Subir PDF
-            </>
-          )}
-        </button>
+        <DropZone onFiles={(files) => cargar(files[0])} disabled={busy}>
+          <input
+            ref={inputRef}
+            type="file"
+            accept="application/pdf"
+            style={{ display: "none" }}
+            onChange={(e) => cargar(e.target.files[0])}
+          />
+          <button className="btn-upload" onClick={() => inputRef.current.click()} disabled={busy}>
+            {busy ? (
+              <>
+                <Spinner /> Cargando…
+              </>
+            ) : (
+              <>
+                <IconUpload /> Subir PDF
+              </>
+            )}
+          </button>
+        </DropZone>
         <UploadNote />
         {error && <p style={{ color: "var(--danger)", fontSize: 13, marginTop: 10 }}>{error}</p>}
       </div>

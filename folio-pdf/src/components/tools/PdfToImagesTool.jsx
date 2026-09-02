@@ -4,6 +4,7 @@ import { fileToBytes, renderThumbnails, renderPageImages, excedeTamano, MAX_FILE
 import { IconUpload, Spinner, IconCheck } from "../Icons.jsx";
 import UploadNote from "../UploadNote.jsx";
 import DownloadCard from "../DownloadCard.jsx";
+import DropZone from "../DropZone.jsx";
 
 export default function PdfToImagesTool() {
   const [bytes, setBytes] = useState(null);
@@ -90,24 +91,26 @@ export default function PdfToImagesTool() {
         <p style={{ color: "var(--muted)", fontSize: 13 }}>
           Sube un PDF para convertir sus páginas en imágenes JPG o PNG.
         </p>
-        <input
-          ref={inputRef}
-          type="file"
-          accept="application/pdf"
-          style={{ display: "none" }}
-          onChange={(e) => cargar(e.target.files[0])}
-        />
-        <button className="btn-upload" onClick={() => inputRef.current.click()} disabled={busy}>
-          {busy ? (
-            <>
-              <Spinner /> Cargando…
-            </>
-          ) : (
-            <>
-              <IconUpload /> Subir PDF
-            </>
-          )}
-        </button>
+        <DropZone onFiles={(files) => cargar(files[0])} disabled={busy}>
+          <input
+            ref={inputRef}
+            type="file"
+            accept="application/pdf"
+            style={{ display: "none" }}
+            onChange={(e) => cargar(e.target.files[0])}
+          />
+          <button className="btn-upload" onClick={() => inputRef.current.click()} disabled={busy}>
+            {busy ? (
+              <>
+                <Spinner /> Cargando…
+              </>
+            ) : (
+              <>
+                <IconUpload /> Subir PDF
+              </>
+            )}
+          </button>
+        </DropZone>
         <UploadNote />
         {error && <p style={{ color: "var(--danger)", fontSize: 13, marginTop: 10 }}>{error}</p>}
       </div>

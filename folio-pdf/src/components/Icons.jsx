@@ -108,6 +108,29 @@ export function IconImages({ size = 26 }) {
   );
 }
 
+export function IconTextDoc({ size = 26 }) {
+  return base(
+    <>
+      <path d="M6 3h8l4 4v13a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z" />
+      <path d="M14 3v4h4" />
+      <path d="M8 12h8M8 15.5h8M8 8.5h4" />
+    </>,
+    size
+  );
+}
+
+export function IconRedact({ size = 26 }) {
+  return base(
+    <>
+      <path d="M6 3h8l4 4v13a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z" />
+      <path d="M14 3v4h4" />
+      <path d="M8 15.5h8" />
+      <rect x="8" y="10" width="8" height="3" fill="currentColor" stroke="none" />
+    </>,
+    size
+  );
+}
+
 export function IconCompress({ size = 26 }) {
   return base(
     <>
