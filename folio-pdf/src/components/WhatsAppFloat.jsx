@@ -11,6 +11,7 @@ export default function WhatsAppFloat() {
       rel="noopener noreferrer"
       aria-label="Escribir por WhatsApp"
       title="Escríbenos por WhatsApp"
+      className="whatsapp-float"
       style={{
         position: "fixed",
         right: 20,

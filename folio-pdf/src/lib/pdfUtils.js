@@ -1,6 +1,7 @@
 import { PDFDocument, degrees } from "pdf-lib";
 import * as pdfjsLib from "pdfjs-dist";
 import workerSrc from "pdfjs-dist/build/pdf.worker.min.mjs?url";
+import { registrarEvento } from "./analytics.js";
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc;
 
@@ -8,7 +9,16 @@ export async function fileToBytes(file) {
   return new Uint8Array(await file.arrayBuffer());
 }
 
-export function downloadBytes(bytes, filename, mime = "application/pdf") {
+// Límite defensivo por archivo: evita que un archivo enorme cuelgue o
+// tumbe la pestaña al procesarlo por completo en el navegador.
+export const MAX_FILE_MB = 50;
+const MAX_FILE_BYTES = MAX_FILE_MB * 1024 * 1024;
+
+export function excedeTamano(file) {
+  return file.size > MAX_FILE_BYTES;
+}
+
+export function downloadBytes(bytes, filename, mime = "application/pdf", herramienta = null) {
   const blob = new Blob([bytes], { type: mime });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -18,6 +28,8 @@ export function downloadBytes(bytes, filename, mime = "application/pdf") {
   a.click();
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 5000);
+  window.dispatchEvent(new CustomEvent("folio:download", { detail: { filename } }));
+  if (herramienta) registrarEvento(herramienta);
 }
 
 // Devuelve una miniatura (data URL) de cada página de un PDF.
@@ -36,6 +48,50 @@ export async function renderThumbnails(bytes, scale = 0.35) {
   }
   await doc.destroy();
   return thumbs;
+}
+
+// Renderiza páginas de un PDF como imágenes (PNG o JPG) a buena resolución
+// para exportar, no solo para vista previa. pageIndexes: array de índices
+// (0-based) a exportar; por defecto exporta todas las páginas.
+export async function renderPageImages(bytes, { scale = 2, format = "png", pageIndexes = null } = {}) {
+  const doc = await pdfjsLib.getDocument({ data: bytes.slice() }).promise;
+  const indices = pageIndexes || Array.from({ length: doc.numPages }, (_, i) => i);
+  const mime = format === "jpg" || format === "jpeg" ? "image/jpeg" : "image/png";
+  const out = [];
+  for (const i of indices) {
+    const page = await doc.getPage(i + 1);
+    const viewport = page.getViewport({ scale });
+    const canvas = document.createElement("canvas");
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+    const ctx = canvas.getContext("2d");
+    if (mime === "image/jpeg") {
+      // El JPG no soporta transparencia: fondo blanco para que no salga en negro.
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+    await page.render({ canvasContext: ctx, viewport }).promise;
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, mime, 0.92));
+    out.push({ index: i, bytes: new Uint8Array(await blob.arrayBuffer()) });
+  }
+  await doc.destroy();
+  return out;
+}
+
+// Renderiza una sola página como data URL, a buena resolución para editar
+// (marcar tachones, posicionar una firma, etc.).
+export async function renderSinglePage(bytes, pageIndex, scale = 1.3) {
+  const doc = await pdfjsLib.getDocument({ data: bytes.slice() }).promise;
+  const page = await doc.getPage(pageIndex + 1);
+  const viewport = page.getViewport({ scale });
+  const canvas = document.createElement("canvas");
+  canvas.width = viewport.width;
+  canvas.height = viewport.height;
+  const ctx = canvas.getContext("2d");
+  await page.render({ canvasContext: ctx, viewport }).promise;
+  const dataUrl = canvas.toDataURL("image/png");
+  await doc.destroy();
+  return dataUrl;
 }
 
 export async function getPageCount(bytes) {
@@ -92,15 +148,17 @@ export async function splitPdf(bytes, ranges) {
   return results;
 }
 
-// Convierte una lista de imágenes (File, jpg/png) en un solo PDF, una imagen por página.
-export async function imagesToPdf(files) {
+// Convierte una lista de imágenes (jpg/png) en un solo PDF, una imagen por página.
+// items: [{ file: File, rotation?: 0|90|180|270 }]
+export async function imagesToPdf(items) {
   const out = await PDFDocument.create();
-  for (const file of files) {
+  for (const { file, rotation = 0 } of items) {
     const bytes = await fileToBytes(file);
     const isPng = file.type.includes("png");
     const image = isPng ? await out.embedPng(bytes) : await out.embedJpg(bytes);
     const page = out.addPage([image.width, image.height]);
     page.drawImage(image, { x: 0, y: 0, width: image.width, height: image.height });
+    if (rotation) page.setRotation(degrees(rotation));
   }
   return out.save();
 }
@@ -135,4 +193,75 @@ function dataUrlToBytes(dataUrl) {
 export async function compressPdf(bytes) {
   const doc = await PDFDocument.load(bytes);
   return doc.save({ useObjectStreams: true });
+}
+
+// Rota TODAS las páginas del PDF el mismo ángulo (90/180/270), sumado a la
+// rotación que ya tuviera cada página.
+export async function rotateAllPages(bytes, angle) {
+  const doc = await PDFDocument.load(bytes);
+  doc.getPages().forEach((page) => {
+    page.setRotation(degrees((page.getRotation().angle + angle + 360) % 360));
+  });
+  return doc.save();
+}
+
+// Extrae el texto legible de un PDF (sin conservar formato) y lo une en un
+// solo string, con las páginas separadas por un salto de línea doble.
+export async function extractText(bytes) {
+  const doc = await pdfjsLib.getDocument({ data: bytes.slice() }).promise;
+  const paginas = [];
+  for (let i = 1; i <= doc.numPages; i++) {
+    const page = await doc.getPage(i);
+    const contenido = await page.getTextContent();
+    const texto = contenido.items.map((it) => it.str).join(" ");
+    paginas.push(texto.trim());
+  }
+  await doc.destroy();
+  return paginas.join("\n\n");
+}
+
+// Tacha información sensible: dibuja rectángulos negros sobre las páginas
+// indicadas y las convierte en imagen para que el texto oculto quede
+// realmente eliminado (no solo cubierto visualmente). Las páginas sin
+// tachones se copian tal cual, conservando su calidad original.
+// redacciones: { [pageIndex]: [{ x, y, width, height }] } en fracción 0-1
+// del tamaño de la página, origen arriba-izquierda.
+export async function redactPdf(bytes, redacciones) {
+  const src = await PDFDocument.load(bytes);
+  const out = await PDFDocument.create();
+  const pdfjsDoc = await pdfjsLib.getDocument({ data: bytes.slice() }).promise;
+  const total = src.getPageCount();
+
+  for (let i = 0; i < total; i++) {
+    const cajas = redacciones[i];
+    if (!cajas || !cajas.length) {
+      const [copiada] = await out.copyPages(src, [i]);
+      out.addPage(copiada);
+      continue;
+    }
+
+    const page = await pdfjsDoc.getPage(i + 1);
+    const scale = 2;
+    const viewport = page.getViewport({ scale });
+    const canvas = document.createElement("canvas");
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+    const ctx = canvas.getContext("2d");
+    await page.render({ canvasContext: ctx, viewport }).promise;
+
+    ctx.fillStyle = "#000000";
+    cajas.forEach((c) => {
+      ctx.fillRect(c.x * canvas.width, c.y * canvas.height, c.width * canvas.width, c.height * canvas.height);
+    });
+
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+    const imgBytes = new Uint8Array(await blob.arrayBuffer());
+    const image = await out.embedPng(imgBytes);
+    const { width: pw, height: ph } = src.getPage(i).getSize();
+    const nuevaPagina = out.addPage([pw, ph]);
+    nuevaPagina.drawImage(image, { x: 0, y: 0, width: pw, height: ph });
+  }
+
+  await pdfjsDoc.destroy();
+  return out.save();
 }
