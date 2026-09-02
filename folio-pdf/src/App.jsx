@@ -19,6 +19,7 @@ import {
   IconLock,
   IconGlobe,
   IconCheck,
+  IconUsers,
   IconArrowRight,
   Spinner,
 } from "./components/Icons.jsx";
@@ -53,7 +54,18 @@ export default function App() {
   const [theme, setTheme] = useState(() => localStorage.getItem("folio_theme") || "light");
   const [accepted, setAccepted] = useState(hasAcceptedLead());
   const [activeTool, setActiveTool] = useState(null);
+  const [pendingToolId, setPendingToolId] = useState(null);
   const [chainedFile, setChainedFile] = useState(null);
+
+  // El registro (nombre + celular) solo se pide la primera vez que alguien
+  // intenta abrir una herramienta, no apenas entra a la página.
+  function abrirHerramienta(id) {
+    if (accepted) {
+      setActiveTool(id);
+    } else {
+      setPendingToolId(id);
+    }
+  }
 
   // Deja que una herramienta mande su resultado directo a otra (ej. "Comprimir
   // este PDF" después de unirlo), sin tener que descargarlo y volver a subirlo.
@@ -76,15 +88,6 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, [activeTool]);
 
-  if (!accepted) {
-    return (
-      <>
-        <LeadGate onDone={() => setAccepted(true)} />
-        <WhatsAppFloat />
-      </>
-    );
-  }
-
   const Active = TOOLS.find((t) => t.id === activeTool);
 
   return (
@@ -102,7 +105,7 @@ export default function App() {
         {!Active && (
           <div className="fade-in">
             <div style={{ textAlign: "center", marginBottom: 22 }}>
-              <span className="eyebrow uppercase">Plataforma 100% gratuita</span>
+              <span className="eyebrow uppercase">Para todos, sin excepción</span>
               <h1
                 className="uppercase"
                 style={{
@@ -119,9 +122,12 @@ export default function App() {
                 Herramientas PDF gratis
               </h1>
               <p style={{ color: "var(--muted)", fontSize: 14, margin: "0 0 14px" }}>
-                Para estudiantes y abogados. Rápidas, sencillas y sin costo.
+                Para cualquier persona: estudiantes, abogados y todos los demás. Rápidas, sencillas y sin costo.
               </p>
               <div className="trust-badges" style={{ justifyContent: "center" }}>
+                <span className="trust-badge">
+                  <IconUsers /> Para todos
+                </span>
                 <span className="trust-badge">
                   <IconLock /> Sin almacenamiento
                 </span>
@@ -138,7 +144,7 @@ export default function App() {
                 <button
                   key={t.id}
                   className="card tool-card"
-                  onClick={() => setActiveTool(t.id)}
+                  onClick={() => abrirHerramienta(t.id)}
                   style={{
                     padding: "24px 14px",
                     display: "flex",
@@ -202,9 +208,20 @@ export default function App() {
         )}
       </main>
 
-      <Footer onSelectTool={setActiveTool} onExplore={() => setActiveTool(null)} />
+      <Footer onSelectTool={abrirHerramienta} onExplore={() => setActiveTool(null)} />
       <WhatsAppFloat />
       <Toast />
+
+      {pendingToolId && (
+        <LeadGate
+          onDone={() => {
+            setAccepted(true);
+            setActiveTool(pendingToolId);
+            setPendingToolId(null);
+          }}
+          onCancel={() => setPendingToolId(null)}
+        />
+      )}
     </div>
   );
 }

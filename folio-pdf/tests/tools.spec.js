@@ -6,21 +6,45 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SAMPLE_PDF = path.join(__dirname, "fixtures/sample.pdf");
 const SAMPLE_PNG = path.join(__dirname, "fixtures/sample.png");
 
-test.beforeEach(async ({ page }) => {
+// Un visitante nuevo (contexto sin localStorage) debe poder ver el inicio
+// libremente; el registro solo debe aparecer al elegir una herramienta.
+// Se prueba antes que nada, en su propia sesión limpia, para no pagar dos
+// veces la carga de la fuente de Google Fonts (lenta en este entorno).
+test("un visitante nuevo ve el inicio sin que le pidan registrarse, y el registro solo aparece al elegir una herramienta", async ({ page }) => {
   await page.goto("/");
-  await page.evaluate(() => localStorage.setItem("folio_lead_ok", "1"));
-  await page.reload();
+
+  // La cuadrícula debe verse de una, sin ningún formulario de por medio.
+  await expect(page.locator(".tool-card")).toHaveCount(10);
+  await expect(page.getByText("Bienvenido a Folio")).not.toBeVisible();
+
+  await page.locator(".tool-card", { hasText: "UNIR PDF" }).click();
+  await expect(page.getByText("Bienvenido a Folio")).toBeVisible();
+
+  await page.getByPlaceholder("Tu nombre completo").fill("Ana Prueba");
+  await page.getByPlaceholder("9999999999").fill("3001234567");
+  await page.getByRole("checkbox").check();
+  await page.getByRole("button", { name: "Continuar a la herramienta" }).click();
+
+  // Debe llegar directo a Unir PDF, sin pasar por WhatsApp.
+  await expect(page.locator("h2", { hasText: "Unir PDF" })).toBeVisible();
 });
 
 async function openTool(page, label) {
   await page.locator(".tool-card", { hasText: label }).click();
 }
 
-test("la cuadrícula del inicio muestra las 10 herramientas", async ({ page }) => {
-  await expect(page.locator(".tool-card")).toHaveCount(10);
-});
+test.describe("con el registro ya aceptado", () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto("/");
+    await page.evaluate(() => localStorage.setItem("folio_lead_ok", "1"));
+    await page.reload();
+  });
 
-test("Unir PDF: sube dos archivos y descarga el resultado", async ({ page }) => {
+  test("la cuadrícula del inicio muestra las 10 herramientas", async ({ page }) => {
+    await expect(page.locator(".tool-card")).toHaveCount(10);
+  });
+
+  test("Unir PDF: sube dos archivos y descarga el resultado", async ({ page }) => {
   await openTool(page, "UNIR PDF");
   await page.setInputFiles('input[type="file"]', [SAMPLE_PDF, SAMPLE_PDF]);
   await page.locator("main").getByRole("button", { name: "Unir PDF" }).click();
@@ -115,10 +139,11 @@ test("encadenar herramientas: Unir PDF -> Comprimir este PDF sin volver a subir"
   await expect(page.getByRole("button", { name: "Comprimir", exact: true })).toBeEnabled({ timeout: 10000 });
 });
 
-test("el scroll sube al inicio al cambiar de herramienta desde el pie de página", async ({ page }) => {
-  await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
-  await page.locator(".footer-link", { hasText: "Unir PDF" }).click();
-  await page.waitForTimeout(600);
-  const scrollY = await page.evaluate(() => window.scrollY);
-  expect(scrollY).toBeLessThan(50);
+  test("el scroll sube al inicio al cambiar de herramienta desde el pie de página", async ({ page }) => {
+    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+    await page.locator(".footer-link", { hasText: "Unir PDF" }).click();
+    await page.waitForTimeout(600);
+    const scrollY = await page.evaluate(() => window.scrollY);
+    expect(scrollY).toBeLessThan(50);
+  });
 });

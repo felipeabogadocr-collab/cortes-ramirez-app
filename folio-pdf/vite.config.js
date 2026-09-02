@@ -15,7 +15,7 @@ export default defineConfig({
         name: "Folio · Herramientas PDF gratis",
         short_name: "Folio",
         lang: "es",
-        description: "Unir, organizar, dividir, firmar y comprimir PDF — 100% en tu navegador, sin registros ni costo.",
+        description: "Unir, organizar, dividir, firmar y comprimir PDF — 100% en tu navegador, sin registros ni costo. Gratis para todos.",
         theme_color: "#0a2342",
         background_color: "#f5f6f8",
         display: "standalone",

@@ -50,6 +50,18 @@ export function IconCheck({ size = 16 }) {
   return base(<path d="M4 12l5 5L20 6" />, size, 2.2);
 }
 
+export function IconUsers({ size = 16 }) {
+  return base(
+    <>
+      <circle cx="9" cy="8" r="3" />
+      <path d="M3.5 19c0-3 2.5-5 5.5-5s5.5 2 5.5 5" />
+      <path d="M16 4.5a3 3 0 0 1 0 5.8" />
+      <path d="M18.5 14c2 .4 3.5 2 3.5 5" />
+    </>,
+    size
+  );
+}
+
 export function IconPaperclip({ size = 26 }) {
   return base(
     <path d="M8 12.5l6.5-6.5a3.5 3.5 0 0 1 5 5L11 19.5a5.5 5.5 0 0 1-8-8L13.5 1" transform="translate(0.5 1)" />,

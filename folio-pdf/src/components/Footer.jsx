@@ -57,7 +57,7 @@ export default function Footer({ onSelectTool, onExplore }) {
               </span>
             </div>
             <p style={{ fontSize: 13, color: "var(--footer-muted)", lineHeight: 1.6, maxWidth: 260, margin: "0 0 14px" }}>
-              Herramientas PDF gratuitas para estudiantes y abogados en Colombia.
+              Herramientas PDF gratuitas para todos, en cualquier lugar.
             </p>
             <span
               title={`Versión ${APP_VERSION}, actualizada el ${LAST_UPDATED}`}

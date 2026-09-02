@@ -3,7 +3,6 @@ import Logo from "./Logo.jsx";
 import { registrarLead } from "../lib/analytics.js";
 import { IconLock, IconShield } from "./Icons.jsx";
 
-const WHATSAPP_NUMBER = "573192875428";
 const STORAGE_KEY = "folio_lead_ok";
 
 export function hasAcceptedLead() {
@@ -28,17 +27,17 @@ const INDICATIVOS = [
   { code: "+507", country: "Panamá", digits: 8 },
 ];
 
-export default function LeadGate({ onDone }) {
+export default function LeadGate({ onDone, onCancel }) {
   const [nombre, setNombre] = useState("");
   const [indicativo, setIndicativo] = useState("+57");
   const [numero, setNumero] = useState("");
-  const [confirmaWhatsapp, setConfirmaWhatsapp] = useState(false);
+  const [confirmaDatos, setConfirmaDatos] = useState(false);
   const [error, setError] = useState("");
 
   const paisInfo = INDICATIVOS.find((i) => i.code === indicativo);
   const digitos = numero.trim().replace(/\D/g, "");
   const numeroValido = digitos.length === paisInfo.digits;
-  const listo = nombre.trim().length >= 2 && numeroValido && confirmaWhatsapp;
+  const listo = nombre.trim().length >= 2 && numeroValido && confirmaDatos;
 
   function continuar() {
     if (nombre.trim().length < 2) {
@@ -49,8 +48,8 @@ export default function LeadGate({ onDone }) {
       setError(`El número de ${paisInfo.country} debe tener ${paisInfo.digits} dígitos (sin el indicativo).`);
       return;
     }
-    if (!confirmaWhatsapp) {
-      setError("Debes confirmar que ese número tiene WhatsApp activo para continuar.");
+    if (!confirmaDatos) {
+      setError("Debes confirmar tus datos para continuar.");
       return;
     }
     const telefonoCompleto = `${indicativo}${digitos}`;
@@ -60,27 +59,47 @@ export default function LeadGate({ onDone }) {
       // si el navegador bloquea localStorage, igual dejamos continuar
     }
     registrarLead(nombre.trim(), telefonoCompleto);
-    const texto = encodeURIComponent(
-      `Hola, soy ${nombre.trim()} (${telefonoCompleto}). Quiero recibir por WhatsApp actualizaciones, noticias de LITIA.ai y acceder a descuentos.`
-    );
-    window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=${texto}`, "_blank", "noopener,noreferrer");
     onDone();
   }
 
   return (
     <div
       style={{
-        minHeight: "100dvh",
+        position: "fixed",
+        inset: 0,
+        zIndex: 200,
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
         padding: 20,
-        background: "var(--bg)",
-        position: "relative",
+        background: "rgba(8, 12, 18, 0.6)",
       }}
     >
-      <div className="bg-blobs" aria-hidden="true" />
-      <div className="card" style={{ maxWidth: 420, width: "100%", padding: "28px 26px", position: "relative" }}>
+      <div className="card fade-in" style={{ maxWidth: 420, width: "100%", padding: "28px 26px", position: "relative" }}>
+        {onCancel && (
+          <button
+            onClick={onCancel}
+            aria-label="Cerrar"
+            title="Cerrar"
+            style={{
+              position: "absolute",
+              top: 12,
+              right: 12,
+              width: 28,
+              height: 28,
+              borderRadius: "50%",
+              border: "1px solid var(--border)",
+              background: "var(--panel-2)",
+              color: "var(--text)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: 14,
+            }}
+          >
+            ✕
+          </button>
+        )}
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, marginBottom: 18 }}>
           <Logo size={44} />
           <h1 style={{ fontSize: 20, margin: 0, textAlign: "center" }}>Bienvenido a Folio</h1>
@@ -101,7 +120,7 @@ export default function LeadGate({ onDone }) {
         />
 
         <label style={{ fontSize: 12, fontWeight: 600, display: "block", margin: "12px 0 4px" }}>
-          Celular de WhatsApp (con indicativo) *
+          Celular (con indicativo) *
         </label>
         <div style={{ display: "flex", gap: 8 }}>
           <select
@@ -136,8 +155,7 @@ export default function LeadGate({ onDone }) {
           <span style={{ flexShrink: 0, marginTop: 1 }}>
             <IconShield size={12} />
           </span>
-          Tu número solo se usa para contactarte por WhatsApp; nunca se comparte ni se vende a
-          terceros.
+          Tus datos nunca se comparten ni se venden a terceros.
         </p>
 
         <label
@@ -152,25 +170,23 @@ export default function LeadGate({ onDone }) {
         >
           <input
             type="checkbox"
-            checked={confirmaWhatsapp}
-            onChange={(e) => setConfirmaWhatsapp(e.target.checked)}
+            checked={confirmaDatos}
+            onChange={(e) => setConfirmaDatos(e.target.checked)}
             required
             style={{ marginTop: 2 }}
           />
           <span>
-            Confirmo que este es <strong>mi</strong> número y que tiene WhatsApp activo. *
+            Confirmo que estos son <strong>mis</strong> datos. *
           </span>
         </label>
 
         {error && <p style={{ color: "var(--danger)", fontSize: 12, marginTop: 8 }}>{error}</p>}
 
         <button className="btn-primary" style={{ width: "100%", marginTop: 18 }} onClick={continuar} disabled={!listo}>
-          Acepto recibir novedades y descuentos por WhatsApp — Continuar
+          Continuar a la herramienta
         </button>
         <p style={{ fontSize: 10.5, color: "var(--muted)", textAlign: "center", marginTop: 10 }}>
-          Al continuar se abrirá WhatsApp para confirmar tu número, y aceptas recibir por ahí
-          actualizaciones y noticias de LITIA.ai, y acceder a descuentos. Tus documentos nunca se
-          almacenan.
+          Tus documentos nunca se almacenan ni se suben a ningún servidor.
         </p>
         <div className="trust-badges" style={{ justifyContent: "center", marginTop: 12 }}>
           <span className="trust-badge">
