@@ -839,7 +839,7 @@ function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-const APP_VERSION = "1.13.0";
+const APP_VERSION = "1.13.1";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -1386,7 +1386,7 @@ function MiniEstadistica({ etiqueta, valor, color }) {
   );
 }
 
-function SeccionEstadisticas({ titulo, color, onClick, hijos }) {
+function SeccionEstadisticas({ titulo, color, onClick, children }) {
   return (
     <Card
       onClick={onClick}
@@ -1394,7 +1394,7 @@ function SeccionEstadisticas({ titulo, color, onClick, hijos }) {
       style={{ cursor: onClick ? "pointer" : "default", padding: 18, textAlign: "left", borderTop: `3px solid ${color}` }}
     >
       <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, fontWeight: 700, color, textTransform: "uppercase", letterSpacing: 0.6, margin: "0 0 14px" }}>{titulo}</p>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 14, justifyContent: "space-between" }}>{hijos}</div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 14, justifyContent: "space-between" }}>{children}</div>
     </Card>
   );
 }
