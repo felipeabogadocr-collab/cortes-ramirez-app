@@ -702,7 +702,7 @@ function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-const APP_VERSION = "1.25.0";
+const APP_VERSION = "1.26.0";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -3723,181 +3723,11 @@ export function LineaDeTiempo({ cliente, onAgregar }) {
   );
 }
 
-const ESTADOS_CASO = ["Activo", "En espera", "Cerrado"];
-
-function CasosTab() {
-  const { ids, addId, removeId } = useIndex("indice-casos", false);
-  const [casos, setCasos] = useState({});
-  const [form, setForm] = useState({ titulo: "", cliente: "", estado: "Activo", proximaFecha: "", notas: "" });
-  const [showForm, setShowForm] = useState(false);
-  const [editandoId, setEditandoId] = useState(null);
-  const [formEdicion, setFormEdicion] = useState({});
-
-  useEffect(() => {
-    (async () => {
-      const entries = {};
-      for (const id of ids) {
-        const raw = await storageGet(`caso:${id}`, false);
-        if (raw) entries[id] = JSON.parse(raw);
-      }
-      setCasos(entries);
-    })();
-  }, [ids]);
-
-  const guardar = async () => {
-    if (!form.titulo.trim()) return;
-    const id = uid();
-    await storageSet(`caso:${id}`, JSON.stringify(form), false);
-    await addId(id);
-    setForm({ titulo: "", cliente: "", estado: "Activo", proximaFecha: "", notas: "" });
-    setShowForm(false);
-  };
-
-  const empezarEdicion = (id) => {
-    setEditandoId(id);
-    setFormEdicion(casos[id]);
-  };
-
-  const guardarEdicion = async (id) => {
-    if (!formEdicion.titulo?.trim()) return;
-    await storageSet(`caso:${id}`, JSON.stringify(formEdicion), false);
-    setCasos((prev) => ({ ...prev, [id]: formEdicion }));
-    setEditandoId(null);
-  };
-
-  return (
-    <div>
-      <EncabezadoSeccion titulo="Casos" color="#8B5CF6" />
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted, margin: 0 }}>
-          {ids.length} caso{ids.length !== 1 ? "s" : ""} en seguimiento
-        </p>
-        <button className="drx-btn-primary drx-cta-shine" style={buttonPrimary} onClick={() => setShowForm((s) => !s)}>
-          {showForm ? "Cancelar" : "+ Nuevo caso"}
-        </button>
-      </div>
-
-      {showForm && (
-        <Card style={{ marginBottom: 16 }}>
-          <div className="drx-grid-form" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-            <Field label="Título del proceso">
-              <input className="drx-input" style={inputStyle} value={form.titulo} onChange={(e) => setForm({ ...form, titulo: e.target.value })} />
-            </Field>
-            <Field label="Cliente">
-              <input className="drx-input" style={inputStyle} value={form.cliente} onChange={(e) => setForm({ ...form, cliente: e.target.value })} />
-            </Field>
-            <Field label="Estado">
-              <select className="drx-input" style={inputStyle} value={form.estado} onChange={(e) => setForm({ ...form, estado: e.target.value })}>
-                {ESTADOS_CASO.map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
-              </select>
-            </Field>
-            <Field label="Próxima fecha clave">
-              <input type="date" className="drx-input" style={inputStyle} value={form.proximaFecha} onChange={(e) => setForm({ ...form, proximaFecha: e.target.value })} />
-            </Field>
-          </div>
-          <div style={{ marginTop: 12 }}>
-            <Field label="Notas">
-              <input className="drx-input" style={inputStyle} value={form.notas} onChange={(e) => setForm({ ...form, notas: e.target.value })} />
-            </Field>
-          </div>
-          <button className="drx-btn-primary" style={{ ...buttonPrimary, marginTop: 14 }} onClick={guardar}>
-            Guardar caso
-          </button>
-        </Card>
-      )}
-
-      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-        {ids.map((id) => {
-          const c = casos[id];
-          if (!c) return null;
-
-          if (editandoId === id) {
-            return (
-              <Card key={id}>
-                <div className="drx-grid-form" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                  <Field label="Título del proceso">
-                    <input className="drx-input" style={inputStyle} value={formEdicion.titulo || ""} onChange={(e) => setFormEdicion({ ...formEdicion, titulo: e.target.value })} />
-                  </Field>
-                  <Field label="Cliente">
-                    <input className="drx-input" style={inputStyle} value={formEdicion.cliente || ""} onChange={(e) => setFormEdicion({ ...formEdicion, cliente: e.target.value })} />
-                  </Field>
-                  <Field label="Estado">
-                    <select className="drx-input" style={inputStyle} value={formEdicion.estado || "Activo"} onChange={(e) => setFormEdicion({ ...formEdicion, estado: e.target.value })}>
-                      {ESTADOS_CASO.map((s) => (
-                        <option key={s} value={s}>
-                          {s}
-                        </option>
-                      ))}
-                    </select>
-                  </Field>
-                  <Field label="Próxima fecha clave">
-                    <input type="date" className="drx-input" style={inputStyle} value={formEdicion.proximaFecha || ""} onChange={(e) => setFormEdicion({ ...formEdicion, proximaFecha: e.target.value })} />
-                  </Field>
-                </div>
-                <div style={{ marginTop: 12 }}>
-                  <Field label="Notas">
-                    <input className="drx-input" style={inputStyle} value={formEdicion.notas || ""} onChange={(e) => setFormEdicion({ ...formEdicion, notas: e.target.value })} />
-                  </Field>
-                </div>
-                <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
-                  <button className="drx-btn-ghost" style={buttonGhost} onClick={() => setEditandoId(null)}>
-                    Cancelar
-                  </button>
-                  <button className="drx-btn-primary" style={buttonPrimary} onClick={() => guardarEdicion(id)}>
-                    Guardar cambios
-                  </button>
-                </div>
-              </Card>
-            );
-          }
-
-          return (
-            <Card key={id}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                <div>
-                  <p style={{ fontFamily: "Inter, sans-serif", fontSize: 17, fontWeight: 700, margin: 0, color: COLORS.ink }}>{c.titulo}</p>
-                  <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted, margin: "4px 0 0" }}>
-                    Cliente: {c.cliente || "—"}
-                    {c.proximaFecha ? ` · Próxima fecha: ${c.proximaFecha}` : ""}
-                  </p>
-                  {c.notas && <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.inkSoft, margin: "6px 0 0" }}>{c.notas}</p>}
-                </div>
-                <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-                  <span
-                    style={{
-                      fontFamily: "Inter, sans-serif",
-                      fontSize: 12,
-                      fontWeight: 600,
-                      padding: "4px 10px",
-                      borderRadius: 20,
-                      background: c.estado === "Cerrado" ? "#EDEDED" : COLORS.accentSoft,
-                      color: c.estado === "Cerrado" ? COLORS.black : COLORS.navy,
-                      border: `1px solid ${c.estado === "Cerrado" ? "#D8D8D8" : "#C7D6EA"}`,
-                    }}
-                  >
-                    {c.estado}
-                  </span>
-                  <button className="drx-btn-ghost" style={buttonGhost} onClick={() => empezarEdicion(id)}>
-                    Editar
-                  </button>
-                  <button className="drx-btn-ghost" style={buttonGhost} onClick={() => removeId(id)}>
-                    Eliminar
-                  </button>
-                </div>
-              </div>
-            </Card>
-          );
-        })}
-        {ids.length === 0 && !showForm && (
-          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted }}>Aún no has registrado casos.</p>
-        )}
-      </div>
-    </div>
-  );
+export async function consultarRamaJudicial(radicado) {
+  const response = await fetch(`/api/rama-judicial/consultar?radicado=${encodeURIComponent(radicado)}`);
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || "No se pudo consultar la Rama Judicial");
+  return data;
 }
 
 function VistaPortalCliente() {

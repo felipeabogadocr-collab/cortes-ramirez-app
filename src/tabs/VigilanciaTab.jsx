@@ -3,15 +3,8 @@ import { storageGet, storageSet } from "../lib/storage";
 import {
   COLORS, uid, diasDesde, useIndex, inputStyle, buttonPrimary, buttonGhost, Card,
   EncabezadoSeccion, Icono, AvatarIniciales, EstadoVacio, LineaDeTiempo, COLOR_AREA_PROCESO,
-  ESTADOS_VIGILANCIA,
+  ESTADOS_VIGILANCIA, consultarRamaJudicial,
 } from "../App.jsx";
-
-async function consultarRamaJudicial(radicado) {
-  const response = await fetch(`/api/rama-judicial/consultar?radicado=${encodeURIComponent(radicado)}`);
-  const data = await response.json();
-  if (!response.ok) throw new Error(data.error || "No se pudo consultar la Rama Judicial");
-  return data;
-}
 
 async function explicarActuacion(actuacion, anotacion) {
   const response = await fetch("/api/assistant", {
