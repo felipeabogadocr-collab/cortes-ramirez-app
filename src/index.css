@@ -10,6 +10,17 @@ body,
   min-height: 100%;
 }
 
+/* Red de seguridad para celular: si algún elemento (una barra de búsqueda,
+   un botón con texto largo, etc.) termina un poco más ancho de lo que cabe
+   en la pantalla, sin esto el navegador deja scrollear todo el documento
+   hacia los lados — y como normalmente arranca corrido unos píxeles, el
+   texto se ve "cortado" del lado izquierdo en todas las pantallas. Esto
+   garantiza que nunca haya scroll horizontal, pase lo que pase adentro. */
+html, body {
+  overflow-x: hidden;
+  width: 100%;
+}
+
 body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;

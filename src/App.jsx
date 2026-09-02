@@ -644,7 +644,10 @@ const GlobalStyle = () => (
         cursor: pointer;
         color: var(--drx-heading);
       }
-      .drx-topbar { padding: 12px 14px !important; flex-wrap: wrap; }
+      .drx-topbar { padding: 10px 12px !important; flex-wrap: wrap; row-gap: 8px !important; }
+      .drx-topbar > div:not(.drx-topbar-acciones) { order: 3; flex-basis: 100%; max-width: 100% !important; }
+      .drx-topbar-acciones { gap: 6px !important; }
+      .drx-oculta-movil { display: none !important; }
       .drx-content-area { padding: 14px 14px 28px !important; }
       .drx-grid-form { grid-template-columns: 1fr !important; }
       .drx-tabla-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
@@ -811,7 +814,7 @@ function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-const APP_VERSION = "1.11.0";
+const APP_VERSION = "1.11.1";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -3864,12 +3867,13 @@ function BuscadorGlobal({ onIr }) {
   };
 
   return (
-    <div style={{ position: "relative", flex: 1, maxWidth: 320 }}>
+    <div style={{ position: "relative", flex: 1, minWidth: 0, maxWidth: 320 }}>
       <input
         ref={inputRef}
         className="drx-input"
-        style={{ ...inputStyle, width: "100%" }}
-        placeholder="Buscar cliente o documento... (Ctrl+K)"
+        style={{ ...inputStyle, width: "100%", minWidth: 0, boxSizing: "border-box" }}
+        placeholder="Buscar cliente o documento..."
+        title="Buscar cliente o documento (Ctrl+K)"
         value={q}
         onChange={(e) => {
           setQ(e.target.value);
@@ -11545,7 +11549,7 @@ function App() {
             </svg>
           </button>
           <BuscadorGlobal onIr={setTab} />
-          <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
+          <div className="drx-topbar-acciones" style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
             <div style={{ position: "relative" }}>
             <button
               data-notif-bell
@@ -11605,8 +11609,9 @@ function App() {
               />
             )}
             </div>
-            <button className="drx-btn-ghost" style={buttonGhost} onClick={() => setModoPublico(true)}>
-              Ver vista del cliente ↗
+            <button className="drx-btn-ghost" style={buttonGhost} onClick={() => setModoPublico(true)} title="Ver vista del cliente">
+              <Icono tipo="ojo" size={13} style={{ marginRight: 4, verticalAlign: -2 }} />
+              <span className="drx-oculta-movil">Ver vista del cliente ↗</span>
             </button>
             <BotonTema oscuro={oscuro} onClick={alternar} />
           </div>
