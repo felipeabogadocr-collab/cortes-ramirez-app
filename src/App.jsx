@@ -243,6 +243,7 @@ import {
   storageGet,
   storageSet,
   setDespachoActual,
+  getDespachoActualId,
   getNombreDespacho,
   buscarGlobal,
   obtenerPapelera,
@@ -678,7 +679,7 @@ function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-const APP_VERSION = "1.27.0";
+const APP_VERSION = "1.28.0";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -6657,6 +6658,36 @@ class ErrorBoundary extends Component {
 
   componentDidCatch(error, info) {
     console.error("Error no controlado en la interfaz:", error, info);
+    // Se reporta al servidor para que el superadmin pueda verlo en
+    // "Plataforma" — antes esto solo quedaba en la consola de quien lo
+    // sufrió, y nadie más se enteraba. Nunca debe poder tumbar la app: si
+    // falla el reporte mismo, se ignora en silencio.
+    (async () => {
+      try {
+        let usuarioId = null;
+        try {
+          const { data } = await supabase.auth.getUser();
+          usuarioId = data?.user?.id || null;
+        } catch (e) {
+          // sin sesión o sin red — se reporta igual, sin usuarioId
+        }
+        await fetch("/api/errores/registrar", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            mensaje: error?.message || String(error),
+            pila: error?.stack || "",
+            infoComponente: info?.componentStack || "",
+            url: typeof window !== "undefined" ? window.location.href : "",
+            despachoId: getDespachoActualId(),
+            usuarioId,
+            userAgent: typeof navigator !== "undefined" ? navigator.userAgent : "",
+          }),
+        });
+      } catch (e) {
+        // sin red, endpoint caído, etc. — no hay nada más que hacer aquí.
+      }
+    })();
   }
 
   render() {

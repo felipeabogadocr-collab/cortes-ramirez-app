@@ -2,8 +2,76 @@ import { useState, useEffect, useCallback } from "react";
 import { supabase } from "../lib/supabaseClient";
 import {
   COLORS, diasDesde, useConfirmarDialogo, inputStyle, buttonPrimary, buttonGhost, Card,
-  EncabezadoSeccion, Spinner,
+  EncabezadoSeccion, Spinner, Icono,
 } from "../App.jsx";
+
+// Errores no controlados que el ErrorBoundary del frontend atrapa se
+// reportan a /api/errores/registrar (ver App.jsx) — este panel deja verlos
+// sin tener que depender de que un usuario lo reporte por WhatsApp.
+function PanelErroresCliente() {
+  const [abierto, setAbierto] = useState(false);
+  const [cargado, setCargado] = useState(false);
+  const [cargando, setCargando] = useState(false);
+  const [errores, setErrores] = useState([]);
+  const [errorCarga, setErrorCarga] = useState("");
+
+  const cargar = useCallback(async () => {
+    setCargando(true);
+    setErrorCarga("");
+    try {
+      const { data: sesionData } = await supabase.auth.getSession();
+      const token = sesionData?.session?.access_token;
+      const response = await fetch("/api/errores/registrar", { headers: { Authorization: `Bearer ${token}` } });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "No se pudo cargar la lista de errores.");
+      setErrores(data.errores || []);
+      setCargado(true);
+    } catch (e) {
+      setErrorCarga(e.message);
+    }
+    setCargando(false);
+  }, []);
+
+  useEffect(() => {
+    if (abierto && !cargado && !cargando) cargar();
+  }, [abierto, cargado, cargando, cargar]);
+
+  return (
+    <Card style={{ marginTop: 20 }}>
+      <button
+        onClick={() => setAbierto((a) => !a)}
+        style={{ background: "none", border: "none", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%", padding: 0 }}
+      >
+        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, fontWeight: 700, color: COLORS.ink, margin: 0, display: "flex", alignItems: "center", gap: 6 }}>
+          <Icono tipo="alerta" size={14} /> Errores recientes de la interfaz {cargado ? `(${errores.length})` : ""}
+        </p>
+        <span style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.muted }}>{abierto ? "Ocultar ▲" : "Ver ▼"}</span>
+      </button>
+
+      {abierto && (
+        <div style={{ marginTop: 14 }}>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, marginBottom: 12 }}>
+            Últimos 50 errores inesperados que sufrió algún usuario (de cualquier despacho), capturados automáticamente.
+          </p>
+          {cargando && <Spinner />}
+          {errorCarga && <p style={{ color: "#B42318", fontSize: 12.5, fontFamily: "Inter, sans-serif" }}>{errorCarga}</p>}
+          {cargado && errores.length === 0 && <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.muted }}>Ninguno registrado. Buena señal.</p>}
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {errores.map((e) => (
+              <div key={e.id} style={{ background: "#FEF2F2", border: "1px solid #F3C6C0", borderRadius: 8, padding: "8px 12px" }}>
+                <p style={{ fontFamily: "monospace", fontSize: 12, color: "#B42318", margin: 0, wordBreak: "break-word" }}>{e.mensaje}</p>
+                <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11, color: COLORS.muted, margin: "4px 0 0" }}>
+                  {new Date(e.creado_en).toLocaleString("es-CO", { dateStyle: "medium", timeStyle: "short" })}
+                  {e.url ? ` · ${e.url}` : ""}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </Card>
+  );
+}
 
 export default function PlataformaTab() {
   const [despachos, setDespachos] = useState([]);
@@ -198,6 +266,7 @@ export default function PlataformaTab() {
           </div>
         </>
       )}
+      <PanelErroresCliente />
       {ConfirmarDialogo}
     </div>
   );

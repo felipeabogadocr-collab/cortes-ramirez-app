@@ -401,3 +401,27 @@ create policy "cada despacho actualiza sus propios recibos" on storage.objects
   for update
   using (bucket_id = 'recibos' and (storage.foldername(name))[1] = mi_despacho_id()::text)
   with check (bucket_id = 'recibos' and (storage.foldername(name))[1] = mi_despacho_id()::text);
+
+-- Reporte de errores del cliente ---------------------------------------------
+-- Antes, si la interfaz se caía con un error inesperado (el ErrorBoundary lo
+-- atrapa para no dejar la pantalla en blanco), el detalle solo quedaba en la
+-- consola del navegador de esa persona — nadie más se enteraba. Esta tabla
+-- guarda ese detalle para poder revisarlo desde "Plataforma" (superadmin).
+
+create table if not exists errores_cliente (
+  id bigserial primary key,
+  mensaje text not null,
+  pila text,
+  info_componente text,
+  url text,
+  despacho_id uuid references despachos (id) on delete set null,
+  usuario_id uuid references auth.users (id) on delete set null,
+  user_agent text,
+  creado_en timestamptz not null default now()
+);
+
+create index if not exists errores_cliente_creado_en_idx on errores_cliente (creado_en desc);
+
+alter table errores_cliente enable row level security;
+-- Sin políticas a propósito: se escribe y se lee solo desde el servidor con
+-- la llave service_role, nunca directo desde el navegador.
