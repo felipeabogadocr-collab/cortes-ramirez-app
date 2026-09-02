@@ -435,3 +435,31 @@ alter table errores_cliente enable row level security;
 -- (ver App.jsx: iniciarSesion / cargarPerfilActual).
 
 alter table perfiles add column if not exists expira_en timestamptz;
+
+-- Foto de perfil ---------------------------------------------------------
+-- Mismo patrón que el bucket "recibos": privado, organizado por
+-- despacho_id, con políticas que solo dejan a cada despacho subir/leer/
+-- actualizar dentro de su propia carpeta. En "perfiles" solo se guarda la
+-- ruta del archivo, nunca la imagen.
+
+alter table perfiles add column if not exists foto_url text;
+
+insert into storage.buckets (id, name, public)
+values ('avatares', 'avatares', false)
+on conflict (id) do nothing;
+
+drop policy if exists "cada despacho sube sus propios avatares" on storage.objects;
+create policy "cada despacho sube sus propios avatares" on storage.objects
+  for insert
+  with check (bucket_id = 'avatares' and (storage.foldername(name))[1] = mi_despacho_id()::text);
+
+drop policy if exists "cada despacho lee sus propios avatares" on storage.objects;
+create policy "cada despacho lee sus propios avatares" on storage.objects
+  for select
+  using (bucket_id = 'avatares' and (storage.foldername(name))[1] = mi_despacho_id()::text);
+
+drop policy if exists "cada despacho actualiza sus propios avatares" on storage.objects;
+create policy "cada despacho actualiza sus propios avatares" on storage.objects
+  for update
+  using (bucket_id = 'avatares' and (storage.foldername(name))[1] = mi_despacho_id()::text)
+  with check (bucket_id = 'avatares' and (storage.foldername(name))[1] = mi_despacho_id()::text);

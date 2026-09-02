@@ -37,6 +37,7 @@ import {
   textoEstadoPago,
   enviarRecordatorioPago,
   ensureJsPDF,
+  LOGO_SRC,
 } from "../App.jsx";
 
 const MEDIOS_PAGO = ["Nequi", "Daviplata", "Nu", "Cuenta bancaria", "Llave"];
@@ -62,7 +63,7 @@ async function generarCuentaDeCobroPdf({ cliente, pago, datosResponsable, numero
   const pdf = new jsPDF({ unit: "pt", format: "carta" });
   const pageWidth = pdf.internal.pageSize.getWidth();
   const marginX = 64;
-  let y = 90;
+  let y = 66;
 
   const nombreDespacho = getNombreDespacho();
   const responsable = (datosResponsable?.nombre || nombreDespacho || "").trim();
@@ -70,6 +71,18 @@ async function generarCuentaDeCobroPdf({ cliente, pago, datosResponsable, numero
   const ciudad = (datosResponsable?.ciudad || "").trim();
   const fechaTexto = new Date(pago.fecha).toLocaleDateString("es-CO", { day: "numeric", month: "long", year: "numeric" });
   const concepto = pago.concepto?.trim() || "servicios de asesoría y gestión jurídica";
+
+  // Mismo logo que ya se usa en el recibo de pago (canvas) — centrado
+  // arriba, para que la cuenta de cobro se vea igual de institucional.
+  try {
+    const logoSize = 56;
+    pdf.addImage(LOGO_SRC, "PNG", pageWidth / 2 - logoSize / 2, y, logoSize, logoSize);
+    y += logoSize + 24;
+  } catch (e) {
+    // Si por lo que sea el logo no carga (formato inesperado), el PDF se
+    // genera igual, solo sin la imagen — nunca debe bloquear la cuenta de
+    // cobro por esto.
+  }
 
   pdf.setFont("helvetica", "bold");
   pdf.setFontSize(18);

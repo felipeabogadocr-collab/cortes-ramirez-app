@@ -43,6 +43,25 @@ export async function obtenerUrlReciboImagen(ruta) {
   return URL.createObjectURL(data);
 }
 
+// Foto de perfil de un usuario — mismo patrón que los recibos: se sube al
+// bucket "avatares" (aislado por despacho vía RLS) y en "perfiles" solo se
+// guarda la ruta, nunca la imagen completa.
+export async function subirFotoPerfil(usuarioId, blob) {
+  if (!despachoActualId) throw new Error("Sin despacho activo");
+  const extension = blob.type === "image/png" ? "png" : "jpg";
+  const ruta = `${despachoActualId}/${usuarioId}.${extension}`;
+  const { error } = await supabase.storage.from("avatares").upload(ruta, blob, { contentType: blob.type, upsert: true });
+  if (error) throw error;
+  return ruta;
+}
+
+export async function obtenerUrlFotoPerfil(ruta) {
+  if (!ruta) return null;
+  const { data, error } = await supabase.storage.from("avatares").download(ruta);
+  if (error) throw error;
+  return URL.createObjectURL(data);
+}
+
 // Para textos (PDFs, WhatsApp, recibos, etc.) que antes decían siempre
 // "Cortés Ramírez Abogados" a mano: ahora usan el nombre del despacho de la
 // sesión activa, para que la misma app sirva a cualquier despacho.
