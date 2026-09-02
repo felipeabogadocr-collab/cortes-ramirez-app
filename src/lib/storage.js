@@ -88,8 +88,35 @@ function avisarErrorAlmacenamiento(tipo, key, error) {
   window.dispatchEvent(new CustomEvent("nomos:error-almacenamiento", { detail: { tipo, key, mensaje: error?.message || String(error) } }));
 }
 
+// Un corte breve de conexión (típico en celular, cambiando de wifi a datos,
+// etc.) antes tumbaba la carga a la primera sin más — el usuario veía "no
+// se pudieron cargar los datos" por algo que se resolvía solo medio segundo
+// después. Ahora se reintenta una vez antes de darse por vencido y avisar.
+async function conReintento(fn, key, tipo) {
+  try {
+    return await fn();
+  } catch (e) {
+    console.warn(`${tipo === "set" ? "storageSet" : "storageGet"} falló, reintentando una vez...`, key, e);
+    await new Promise((resolve) => setTimeout(resolve, 700));
+    try {
+      return await fn();
+    } catch (e2) {
+      console.error(`${tipo === "set" ? "storageSet" : "storageGet"} error (tras reintento)`, key, e2);
+      avisarErrorAlmacenamiento(tipo, key, e2);
+      throw e2;
+    }
+  }
+}
+
 export async function storageGet(key) {
   try {
+    return await conReintento(() => storageGetInterno(key), key, "get");
+  } catch (e) {
+    return null;
+  }
+}
+
+async function storageGetInterno(key) {
     if (INDEX_TABLES[key]) {
       const table = INDEX_TABLES[key];
       const { data, error } = await supabase
@@ -151,11 +178,6 @@ export async function storageGet(key) {
       .maybeSingle();
     if (error) throw error;
     return data ? data.value : null;
-  } catch (e) {
-    console.error("storageGet error", key, e);
-    avisarErrorAlmacenamiento("get", key, e);
-    return null;
-  }
 }
 
 async function syncIndexTable(table, newIds) {
@@ -245,6 +267,16 @@ export async function buscarGlobal(texto) {
 
 export async function storageSet(key, value) {
   try {
+    return await conReintento(() => storageSetInterno(key, value), key, "set");
+  } catch (e) {
+    return false;
+  }
+}
+
+// Los reintentos son seguros aquí porque todas las escrituras son upsert
+// por id (o el patrón de borrado suave de syncIndexTable): repetir el mismo
+// envío no duplica nada, en el peor caso sobreescribe con el mismo valor.
+async function storageSetInterno(key, value) {
     if (INDEX_TABLES[key]) {
       const ids = value ? JSON.parse(value) : [];
       await syncIndexTable(INDEX_TABLES[key], ids);
@@ -290,9 +322,4 @@ export async function storageSet(key, value) {
       .upsert({ key, despacho_id: despachoActualId, value, updated_at: new Date().toISOString() });
     if (error) throw error;
     return true;
-  } catch (e) {
-    console.error("storageSet error", key, e);
-    avisarErrorAlmacenamiento("set", key, e);
-    return false;
-  }
 }

@@ -47,7 +47,16 @@ function toGeminiContents(messages) {
           parts.push({ inlineData: { mimeType: block.source.media_type || "application/pdf", data: block.source.data } });
         } else if (block.type === "tool_use") {
           toolIdToName[block.id] = block.name;
-          parts.push({ functionCall: { name: block.name, args: block.input || {} } });
+          const parteLlamada = { functionCall: { name: block.name, args: block.input || {} } };
+          // Los modelos Gemini con "thinking" (como el que usamos) exigen que,
+          // al reenviar una llamada a herramienta que ellos mismos generaron,
+          // se incluya de vuelta la "thoughtSignature" que vino en su
+          // respuesta original — si falta, Gemini rechaza toda la conversación
+          // ("Function call is missing a thought_signature") en cuanto el
+          // asistente intenta una segunda herramienta en el mismo turno (por
+          // ejemplo, crear el cliente y luego registrarle el pago).
+          if (block.thoughtSignature) parteLlamada.thoughtSignature = block.thoughtSignature;
+          parts.push(parteLlamada);
         } else if (block.type === "tool_result") {
           const name = toolIdToName[block.tool_use_id] || "resultado_herramienta";
           const content =
@@ -84,12 +93,16 @@ function fromGeminiResponse(geminiData) {
   const parts = candidate?.content?.parts || [];
   const content = parts.map((part, idx) => {
     if (part.functionCall) {
-      return {
+      const bloque = {
         type: "tool_use",
         id: `call_${Date.now()}_${idx}`,
         name: part.functionCall.name,
         input: part.functionCall.args || {},
       };
+      // Se guarda junto al bloque para poder reenviarla si el asistente
+      // encadena otra herramienta en el mismo turno (ver toGeminiContents).
+      if (part.thoughtSignature) bloque.thoughtSignature = part.thoughtSignature;
+      return bloque;
     }
     return { type: "text", text: part.text || "" };
   });
@@ -188,6 +201,13 @@ export default async function handler(req, res) {
         const detalleReintento = (resultado.data?.error?.details || []).find((d) => d["@type"]?.includes("RetryInfo"));
         const segundos = detalleReintento?.retryDelay ? Math.ceil(parseFloat(detalleReintento.retryDelay)) : 20;
         return res.status(429).json({ error: "El asistente alcanzó el límite de uso gratuito por un momento. Espera unos segundos y vuelve a intentar.", retryAfterSegundos: segundos });
+      }
+      // Red de seguridad: si a pesar de reenviar la thoughtSignature (ver
+      // toGeminiContents) Gemini igual se queja de eso, que el usuario vea un
+      // mensaje claro en vez del texto técnico crudo con el link a la
+      // documentación de Google.
+      if (/thought_signature/i.test(resultado.data?.error?.message || "")) {
+        return res.status(502).json({ error: "El asistente tuvo un problema encadenando varias acciones seguidas. Vuelve a intentar tu solicitud." });
       }
       return res.status(resultado.status).json({ error: resultado.data?.error?.message || "Error del asistente de IA" });
     }

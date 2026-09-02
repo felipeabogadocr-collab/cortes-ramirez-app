@@ -675,6 +675,31 @@ const inputStyle = {
   outline: "none",
 };
 
+// Campo para escribir plata: muestra el separador de miles con puntos
+// (formato colombiano, "500.000") a medida que se escribe, en vez de que
+// cada quien tenga que ponerlo a mano o escribir el número corrido sin
+// poder leerlo de un vistazo. Emite un evento sintético con el valor
+// numérico limpio (sin puntos) en target.value, para que los onChange que
+// ya existían (`(e) => setValor(e.target.value)`) sigan funcionando igual.
+function CampoDinero({ value, onChange, placeholder, style, className }) {
+  const formatear = (v) => {
+    const digitos = String(v ?? "").replace(/\D/g, "");
+    if (!digitos) return "";
+    return Number(digitos).toLocaleString("es-CO");
+  };
+  return (
+    <input
+      type="text"
+      inputMode="numeric"
+      className={className || "drx-input"}
+      style={style}
+      placeholder={placeholder}
+      value={formatear(value)}
+      onChange={(e) => onChange({ target: { value: e.target.value.replace(/\D/g, "") } })}
+    />
+  );
+}
+
 const buttonPrimary = {
   background: COLORS.navy,
   color: "#FFFFFF",
@@ -814,7 +839,7 @@ function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-const APP_VERSION = "1.12.0";
+const APP_VERSION = "1.13.0";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -4093,10 +4118,8 @@ function PlanDePagoIA({ planPago, onChange }) {
               </select>
             </Field>
             <Field label="Valor (COP)">
-              <input
-                className="drx-input"
+              <CampoDinero
                 style={{ ...inputStyle, fontSize: 12.5, padding: "7px 8px" }}
-                type="number"
                 value={planPago.valor || ""}
                 onChange={(e) => onChange({ ...planPago, valor: Number(e.target.value) })}
               />
@@ -4421,13 +4444,11 @@ function ClientesTab({ usuarioActual }) {
               </select>
             </Field>
             <Field label="Valor total acordado (opcional)">
-              <input
-                className="drx-input"
+              <CampoDinero
                 style={inputStyle}
-                type="number"
                 value={form.valorTotal}
                 onChange={(e) => setForm({ ...form, valorTotal: e.target.value })}
-                placeholder="Ej: 3000000"
+                placeholder="Ej: 3.000.000"
               />
             </Field>
             <Field label="Abogado asignado (opcional)">
@@ -4494,10 +4515,8 @@ function ClientesTab({ usuarioActual }) {
                     </select>
                   </Field>
                   <Field label="Valor total acordado (opcional)">
-                    <input
-                      className="drx-input"
+                    <CampoDinero
                       style={inputStyle}
-                      type="number"
                       value={formEdicion.valorTotal || ""}
                       onChange={(e) => setFormEdicion({ ...formEdicion, valorTotal: e.target.value })}
                     />
@@ -5598,7 +5617,7 @@ function FormularioPago({ cliente, onRegistrar }) {
           </select>
         </Field>
         <Field label="Valor pagado (COP)">
-          <input className="drx-input" style={inputStyle} type="number" value={valor} onChange={(e) => setValor(e.target.value)} placeholder="Ej: 500000" />
+          <CampoDinero style={inputStyle} value={valor} onChange={(e) => setValor(e.target.value)} placeholder="Ej: 500.000" />
         </Field>
       </div>
       <div className="drx-grid-form" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
@@ -5614,7 +5633,7 @@ function FormularioPago({ cliente, onRegistrar }) {
           <input type="date" className="drx-input" style={inputStyle} value={fechaProximoPago} onChange={(e) => setFechaProximoPago(e.target.value)} />
         </Field>
         <Field label="Valor esperado del próximo pago (opcional)">
-          <input className="drx-input" style={inputStyle} type="number" value={valorProximoPago} onChange={(e) => setValorProximoPago(e.target.value)} placeholder="Ej: 500000" />
+          <CampoDinero style={inputStyle} value={valorProximoPago} onChange={(e) => setValorProximoPago(e.target.value)} placeholder="Ej: 500.000" />
         </Field>
       </div>
       <button className="drx-btn-primary drx-cta-shine" style={{ ...buttonPrimary, marginTop: 14 }} onClick={registrar} disabled={generando}>
@@ -5692,7 +5711,7 @@ function ReciboCard({ cliente, pago, onEditar, onEliminar }) {
             </select>
           </Field>
           <Field label="Valor (COP)">
-            <input className="drx-input" style={inputStyle} type="number" value={valor} onChange={(e) => setValor(e.target.value)} />
+            <CampoDinero style={inputStyle} value={valor} onChange={(e) => setValor(e.target.value)} />
           </Field>
         </div>
         <div className="drx-grid-form" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
@@ -6271,7 +6290,7 @@ function FormularioEgreso({ onRegistrar }) {
       </div>
       <div className="drx-grid-form" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
         <Field label="Valor (COP)">
-          <input className="drx-input" style={inputStyle} type="number" value={valor} onChange={(e) => setValor(e.target.value)} placeholder="Ej: 800000" />
+          <CampoDinero style={inputStyle} value={valor} onChange={(e) => setValor(e.target.value)} placeholder="Ej: 800.000" />
         </Field>
         <Field label="Fecha">
           <input type="date" className="drx-input" style={inputStyle} value={fecha} onChange={(e) => setFecha(e.target.value)} />
@@ -6324,7 +6343,7 @@ function EgresoCard({ egreso, onEditar, onEliminar }) {
         </div>
         <div className="drx-grid-form" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
           <Field label="Valor (COP)">
-            <input className="drx-input" style={inputStyle} type="number" value={valor} onChange={(e) => setValor(e.target.value)} />
+            <CampoDinero style={inputStyle} value={valor} onChange={(e) => setValor(e.target.value)} />
           </Field>
           <Field label="Fecha">
             <input type="date" className="drx-input" style={inputStyle} value={fecha} onChange={(e) => setFecha(e.target.value)} />
@@ -11487,17 +11506,38 @@ function AvisoErroresAlmacenamiento() {
         zIndex: 4000,
         background: "#B42318",
         color: "#fff",
-        padding: "11px 20px",
+        padding: "11px 16px 11px 20px",
         borderRadius: 10,
         fontFamily: "Inter, sans-serif",
         fontSize: 13,
         fontWeight: 600,
         boxShadow: "0 10px 30px rgba(0,0,0,0.3)",
         maxWidth: "90vw",
-        textAlign: "center",
+        display: "flex",
+        alignItems: "center",
+        gap: 12,
+        flexWrap: "wrap",
+        justifyContent: "center",
       }}
     >
-      ⚠️ {aviso}
+      <span>⚠️ {aviso}</span>
+      <button
+        onClick={() => window.location.reload()}
+        style={{
+          background: "rgba(255,255,255,0.18)",
+          border: "1px solid rgba(255,255,255,0.4)",
+          borderRadius: 7,
+          color: "#fff",
+          fontFamily: "Inter, sans-serif",
+          fontSize: 12.5,
+          fontWeight: 700,
+          padding: "5px 12px",
+          cursor: "pointer",
+          flexShrink: 0,
+        }}
+      >
+        Reintentar
+      </button>
     </div>
   );
 }
