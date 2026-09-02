@@ -11,12 +11,14 @@ import SplitTool from "./components/tools/SplitTool.jsx";
 import SignTool from "./components/tools/SignTool.jsx";
 import ImagesToPdfTool from "./components/tools/ImagesToPdfTool.jsx";
 import CompressTool from "./components/tools/CompressTool.jsx";
+import PdfToImagesTool from "./components/tools/PdfToImagesTool.jsx";
 import {
   IconPaperclip,
   IconFolder,
   IconScissors,
   IconPen,
   IconImage,
+  IconImages,
   IconCompress,
   IconLock,
   IconGlobe,
@@ -30,6 +32,7 @@ const TOOLS = [
   { id: "dividir", label: "Dividir PDF", Icon: IconScissors, Component: SplitTool },
   { id: "firmar", label: "Firmar PDF", Icon: IconPen, Component: SignTool },
   { id: "imagenes", label: "Imágenes a PDF", Icon: IconImage, Component: ImagesToPdfTool },
+  { id: "pdf-a-imagenes", label: "PDF a Imágenes", Icon: IconImages, Component: PdfToImagesTool },
   { id: "comprimir", label: "Comprimir PDF", Icon: IconCompress, Component: CompressTool },
 ];
 

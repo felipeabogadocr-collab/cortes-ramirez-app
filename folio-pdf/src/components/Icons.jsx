@@ -96,6 +96,18 @@ export function IconImage({ size = 26 }) {
   );
 }
 
+export function IconImages({ size = 26 }) {
+  return base(
+    <>
+      <rect x="6.5" y="6.5" width="14" height="13" rx="2" />
+      <circle cx="11.2" cy="11" r="1.4" />
+      <path d="M7.5 16.5l3.5-3.5 2.5 2.5 3-3 3.5 3.5" />
+      <path d="M3.5 15V6a1.5 1.5 0 0 1 1.5-1.5h9" />
+    </>,
+    size
+  );
+}
+
 export function IconCompress({ size = 26 }) {
   return base(
     <>

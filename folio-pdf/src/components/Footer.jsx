@@ -11,6 +11,7 @@ const HERRAMIENTAS = [
   { id: "dividir", label: "Dividir PDF" },
   { id: "firmar", label: "Firmar PDF" },
   { id: "imagenes", label: "Imágenes a PDF" },
+  { id: "pdf-a-imagenes", label: "PDF a Imágenes" },
   { id: "comprimir", label: "Comprimir PDF" },
 ];
 

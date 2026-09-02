@@ -237,21 +237,25 @@ select:focus-visible {
   letter-spacing: 0.5px;
 }
 
+/* Flex en vez de grid a propósito: si la última fila queda incompleta,
+   los elementos sobrantes quedan centrados en vez de pegados a la
+   izquierda con espacio vacío al lado. */
 .tools-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
   gap: 14px;
 }
 
-@media (max-width: 780px) {
-  .tools-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
+.tools-grid > * {
+  flex: 1 1 190px;
+  max-width: 230px;
 }
 
 @media (max-width: 480px) {
-  .tools-grid {
-    grid-template-columns: 1fr;
+  .tools-grid > * {
+    flex-basis: 100%;
+    max-width: none;
   }
 }
 

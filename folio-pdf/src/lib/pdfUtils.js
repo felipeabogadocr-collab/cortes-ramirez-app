@@ -50,6 +50,34 @@ export async function renderThumbnails(bytes, scale = 0.35) {
   return thumbs;
 }
 
+// Renderiza páginas de un PDF como imágenes (PNG o JPG) a buena resolución
+// para exportar, no solo para vista previa. pageIndexes: array de índices
+// (0-based) a exportar; por defecto exporta todas las páginas.
+export async function renderPageImages(bytes, { scale = 2, format = "png", pageIndexes = null } = {}) {
+  const doc = await pdfjsLib.getDocument({ data: bytes.slice() }).promise;
+  const indices = pageIndexes || Array.from({ length: doc.numPages }, (_, i) => i);
+  const mime = format === "jpg" || format === "jpeg" ? "image/jpeg" : "image/png";
+  const out = [];
+  for (const i of indices) {
+    const page = await doc.getPage(i + 1);
+    const viewport = page.getViewport({ scale });
+    const canvas = document.createElement("canvas");
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+    const ctx = canvas.getContext("2d");
+    if (mime === "image/jpeg") {
+      // El JPG no soporta transparencia: fondo blanco para que no salga en negro.
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+    await page.render({ canvasContext: ctx, viewport }).promise;
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, mime, 0.92));
+    out.push({ index: i, bytes: new Uint8Array(await blob.arrayBuffer()) });
+  }
+  await doc.destroy();
+  return out;
+}
+
 export async function getPageCount(bytes) {
   const doc = await PDFDocument.load(bytes);
   return doc.getPageCount();
