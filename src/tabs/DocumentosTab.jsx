@@ -5,6 +5,7 @@ import {
   inputStyle, buttonPrimary, buttonGhost, Card, EncabezadoSeccion, Icono, EstadoVacio,
   EstadoBadge, SelloFirma, DocumentoTextoConFirmas, calcularEstado, sha256Hex,
   archivoDemasiadoGrande, TAMANO_MAX_ARCHIVO_MB, ensureMammoth, ensureJsPDF,
+  registrarAuditoria,
 } from "../App.jsx";
 
 const INDICATIVOS = [
@@ -125,7 +126,7 @@ async function descargarPdfFirmado(doc) {
 
 const FORM_DOC_INICIAL = { titulo: "", cliente: "", whatsappIndicativo: "57", whatsappNumero: "", contenido: "", nombreArchivo: "", tipoDocumento: "texto", archivoPdfBase64: "" };
 
-export default function DocumentosTab() {
+export default function DocumentosTab({ usuarioActual }) {
   const { ids, cargado, addId, removeId } = useIndex("indice-documentos", true);
   const [docs, setDocs] = useState({});
   const [form, setForm] = useState(FORM_DOC_INICIAL);
@@ -217,6 +218,7 @@ export default function DocumentosTab() {
     const id = uid();
     await storageSet(`documento:${id}`, JSON.stringify({ ...form, firmantes: [], creadoEn: new Date().toISOString() }), true);
     await addId(id);
+    registrarAuditoria(usuarioActual, "crear_documento", "documento", id, { nombre: form.titulo });
     setForm(FORM_DOC_INICIAL);
     setShowForm(false);
   };
@@ -244,6 +246,7 @@ export default function DocumentosTab() {
     };
     await storageSet(`documento:${nuevoId}`, JSON.stringify(copia), true);
     await addId(nuevoId);
+    registrarAuditoria(usuarioActual, "duplicar_documento", "documento", nuevoId, { nombre: copia.titulo });
   };
 
   const empezarEdicionDoc = (id) => {
@@ -255,6 +258,7 @@ export default function DocumentosTab() {
     if (!formEdicionDoc.titulo?.trim() || !formEdicionDoc.contenido?.trim()) return;
     await storageSet(`documento:${id}`, JSON.stringify(formEdicionDoc), true);
     setDocs((prev) => ({ ...prev, [id]: formEdicionDoc }));
+    registrarAuditoria(usuarioActual, "editar_documento", "documento", id, { nombre: formEdicionDoc.titulo });
     setEditandoDocId(null);
   };
 
@@ -277,7 +281,7 @@ export default function DocumentosTab() {
     const firmaAbogado = (d.firmantes || []).find((f) => f.rol === "abogado");
     const numero = `${d.whatsappIndicativo || ""}${(d.whatsappNumero || "").replace(/[^0-9]/g, "")}`;
     const fechaCliente = firmaCliente ? new Date(firmaCliente.firmadoEn).toLocaleDateString("es-CO", { dateStyle: "long" }) : "";
-    const mensaje = `Hola ${d.cliente || ""}, tu documento "${d.titulo}" quedó firmado el ${fechaCliente} y también fue firmado por ${firmaAbogado ? firmaAbogado.nombre : "tu abogado"} de ${getNombreDespacho()}. Ya está listo.\n\nTe adjuntamos el PDF firmado.`;
+    const mensaje = `Hola ${d.cliente || ""}, tu documento "${d.titulo}" quedó firmado el ${fechaCliente} y también fue firmado por ${firmaAbogado ? firmaAbogado.nombre : "tu abogado"} de ${getNombreDespacho()}. Ya está listo.\n\nEn un momento te comparto el PDF firmado por este mismo medio.`;
     const url = `https://wa.me/${numero}?text=${encodeURIComponent(mensaje)}`;
     window.open(url, "_blank");
   };
@@ -320,6 +324,7 @@ export default function DocumentosTab() {
     const updated = { ...d, firmantes: [...(d.firmantes || []), nuevaFirma] };
     await storageSet(`documento:${id}`, JSON.stringify(updated), true);
     setDocs((prev) => ({ ...prev, [id]: updated }));
+    registrarAuditoria(usuarioActual, "firmar_documento", "documento", id, { nombre: updated.titulo });
     setFirmandoDocId(null);
     setPreviewAbogado(null);
   };
@@ -713,6 +718,7 @@ export default function DocumentosTab() {
                     onClick={async () => {
                       if (!(await confirmar(`¿Eliminar "${d.titulo}"? Puedes recuperarlo después desde la Papelera.`))) return;
                       removeId(id);
+                      registrarAuditoria(usuarioActual, "eliminar_documento", "documento", id, { nombre: d.titulo });
                     }}
                   >
                     Eliminar

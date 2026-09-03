@@ -34,16 +34,34 @@ export default async function handler(req, res) {
       return res.status(429).json({ error: "Demasiados reportes de error." });
     }
 
-    const { mensaje, pila, infoComponente, url, despachoId, usuarioId, userAgent } = req.body || {};
+    const { mensaje, pila, infoComponente, url, userAgent } = req.body || {};
     if (!mensaje) return res.status(400).json({ error: "Falta 'mensaje'" });
+
+    // despachoId/usuarioId NUNCA se toman del cuerpo del POST (cualquiera
+    // podría mandar el id de otro despacho para ensuciar sus estadísticas de
+    // errores) — se derivan del token de sesión, si vino uno. Un error sí
+    // puede pasar sin sesión activa (justo antes del login, por ejemplo), en
+    // cuyo caso ambos quedan en null.
+    const authHeader = req.headers.authorization || "";
+    const token = authHeader.replace(/^Bearer\s+/i, "");
+    let despachoId = null;
+    let usuarioId = null;
+    if (token) {
+      const { data: userData } = await admin.auth.getUser(token);
+      if (userData?.user) {
+        usuarioId = userData.user.id;
+        const { data: perfil } = await admin.from("perfiles").select("despacho_id").eq("id", userData.user.id).maybeSingle();
+        despachoId = perfil?.despacho_id || null;
+      }
+    }
 
     const { error } = await admin.from("errores_cliente").insert({
       mensaje: recortar(mensaje, 2000),
       pila: recortar(pila, 8000),
       info_componente: recortar(infoComponente, 4000),
       url: recortar(url, 500),
-      despacho_id: despachoId || null,
-      usuario_id: usuarioId || null,
+      despacho_id: despachoId,
+      usuario_id: usuarioId,
       user_agent: recortar(userAgent, 500),
     });
     // Nunca tumbar la interfaz por un fallo al registrar el fallo: se avisa

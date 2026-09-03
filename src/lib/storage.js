@@ -77,13 +77,11 @@ export function getNombreDespacho() {
 // filtra por despacho, porque ese solo se usa autenticado.
 const RECORD_TABLES = {
   cliente: { table: "clientes", filtrarDespacho: true },
-  caso: { table: "casos", filtrarDespacho: true },
 };
 
 const INDEX_TABLES = {
   "indice-clientes": "clientes",
   "indice-documentos": "documentos",
-  "indice-casos": "casos",
 };
 
 function parseRecordKey(key) {
@@ -221,7 +219,7 @@ async function syncIndexTable(table, newIds) {
 // realidad solo se marcan con eliminado_en (ver syncIndexTable arriba).
 // Estas funciones permiten verlos, recuperarlos o borrarlos para siempre.
 
-const TABLAS_PAPELERA = { clientes: "clientes", documentos: "documentos", casos: "casos" };
+const TABLAS_PAPELERA = { clientes: "clientes", documentos: "documentos" };
 
 export async function obtenerPapelera(tipo) {
   const table = TABLAS_PAPELERA[tipo];

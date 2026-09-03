@@ -71,7 +71,7 @@ export const SECCIONES_PERMISOS = [
 export function permisosPorDefecto(rol) {
   const todos = Object.fromEntries(SECCIONES_PERMISOS.map((s) => [s.id, true]));
   if (rol === "Administrador" || rol === "Abogado") return todos;
-  return { resumen: true, agenda: true, clientes: true, casos: true, vigilancia: false, contabilidad: false, contenido: false, documentos: true, reportes: false };
+  return { resumen: true, agenda: true, clientes: true, vigilancia: false, contabilidad: false, contenido: false, documentos: true, reportes: false };
 }
 
 export const NOTIF_CATEGORIAS = [

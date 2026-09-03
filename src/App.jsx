@@ -684,7 +684,7 @@ function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-const APP_VERSION = "1.37.0";
+const APP_VERSION = "1.38.0";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -1968,7 +1968,7 @@ function AsistenteIA({ nombre, usuarioId, onAccionCompletada }) {
       const systemPrompt =
         `Eres el asistente virtual de ${getNombreDespacho()}, dentro de su panel de gestión (la plataforma Nomos). Le hablas a ${nombre}, el abogado dueño del despacho, como lo haría un empresario visionario: con confianza, ambición sana, y viendo siempre oportunidades de crecer el negocio. Incluyes de forma natural y respetuosa una referencia a Dios en tus respuestas cuando encaje (por ejemplo, dar gracias por el progreso, pedir sabiduría, o reconocer que el esfuerzo y la fe van de la mano), sin exagerar ni forzarlo en cada frase. ` +
         `Actúas como un verdadero experto en contabilidad de despachos legales, en redes sociales y marketing para abogados, y en gestión de operaciones legales — da consejos con ese nivel de criterio, no genéricos. ` +
-        `Eres el cerebro de la operación del despacho: puedes crear y editar clientes, buscar la información completa de un cliente existente, crear casos, registrar pagos y generarles su recibo automáticamente, programar el próximo cobro de un cliente, agregar actuaciones a la línea de tiempo de un cliente, actualizar el estado de vigilancia judicial, crear documentos de texto listos para firma electrónica, agendar eventos (audiencias, reuniones, vencimientos) y consultar los próximos eventos de la agenda, crear usuarios nuevos con acceso al panel, registrar métricas de redes sociales, generar un informe en PDF con el diagnóstico del despacho, generar un reporte en Excel con todos los pagos, leer imágenes, PDF y documentos de Word que te envíen, y dar ideas prácticas de gestión, negocio y contenido. Cuando te pregunten qué puedes hacer, cuéntalo con entusiasmo y de forma concreta. ` +
+        `Eres el cerebro de la operación del despacho: puedes crear y editar clientes, buscar la información completa de un cliente existente, registrar pagos y generarles su recibo automáticamente, programar el próximo cobro de un cliente, agregar actuaciones a la línea de tiempo de un cliente, actualizar el estado de vigilancia judicial, crear documentos de texto listos para firma electrónica, agendar eventos (audiencias, reuniones, vencimientos) y consultar los próximos eventos de la agenda, crear usuarios nuevos con acceso al panel, registrar métricas de redes sociales, generar un informe en PDF con el diagnóstico del despacho, generar un reporte en Excel con todos los pagos, leer imágenes, PDF y documentos de Word que te envíen, y dar ideas prácticas de gestión, negocio y contenido. Cuando te pregunten qué puedes hacer, cuéntalo con entusiasmo y de forma concreta. ` +
         `Usa las herramientas disponibles para actuar de verdad cuando te lo pidan (no solo describir qué harías), y confirma siempre al final qué hiciste. Este es el estado actual del despacho:\n\n${contexto}\n\nResponde en español, de forma cercana, breve y con visión de negocio.`;
 
       let mensajesAPI = nuevos.map((m, idx) => {
@@ -4763,7 +4763,7 @@ const FUNCIONES_LANDING = [
 const FAQ_LANDING = [
   {
     p: "¿Qué pasa con mis datos si algún día dejo de pagar o quiero irme?",
-    r: "Puedes descargar en cualquier momento un respaldo completo de toda tu información (clientes, documentos, casos y contenido) en un archivo que te llevas tú, desde \"Usuarios y permisos\". No queda nada retenido.",
+    r: "Puedes descargar en cualquier momento un respaldo completo de toda tu información (clientes, documentos y contenido) en un archivo que te llevas tú, desde \"Usuarios y permisos\". No queda nada retenido.",
   },
   {
     p: "¿Es válida legalmente la firma electrónica de los documentos?",
@@ -6774,23 +6774,24 @@ function AvisoErroresAlmacenamiento() {
 async function reportarErrorFrontend(error, info, contexto) {
   console.error(`Error no controlado en la interfaz${contexto ? ` (${contexto})` : ""}:`, error, info);
   try {
-    let usuarioId = null;
+    // El servidor ya no confía en un despachoId/usuarioId mandado en el
+    // cuerpo (cualquiera podría inventar uno) — los deriva él mismo del
+    // token de sesión, así que aquí solo hace falta mandarlo si hay uno.
+    let token = null;
     try {
-      const { data } = await supabase.auth.getUser();
-      usuarioId = data?.user?.id || null;
+      const { data } = await supabase.auth.getSession();
+      token = data?.session?.access_token || null;
     } catch (e) {
-      // sin sesión o sin red — se reporta igual, sin usuarioId
+      // sin sesión o sin red — se reporta igual, sin token
     }
     await fetch("/api/errores/registrar", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
       body: JSON.stringify({
         mensaje: `${contexto ? `[${contexto}] ` : ""}${error?.message || String(error)}`,
         pila: error?.stack || "",
         infoComponente: info?.componentStack || "",
         url: typeof window !== "undefined" ? window.location.href : "",
-        despachoId: getDespachoActualId(),
-        usuarioId,
         userAgent: typeof navigator !== "undefined" ? navigator.userAgent : "",
       }),
     });
@@ -7561,7 +7562,7 @@ function App() {
             {tab === "documentos" && puedeVer("documentos") && (
               <TabErrorBoundary nombre="documentos">
                 <Suspense fallback={<Spinner />}>
-                  <DocumentosTab />
+                  <DocumentosTab usuarioActual={usuarioActual} />
                 </Suspense>
               </TabErrorBoundary>
             )}

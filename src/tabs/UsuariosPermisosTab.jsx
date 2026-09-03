@@ -300,7 +300,7 @@ export default function UsuariosPermisosTab({ usuarioActual, onDespachoRenombrad
     setRespaldando(true);
     try {
       const despachoId = usuarioActual.despacho_id;
-      const tablas = ["clientes", "documentos", "casos", "chats", "app_settings"];
+      const tablas = ["clientes", "documentos", "chats", "app_settings"];
       const respaldo = { despacho: getNombreDespacho(), generadoEn: new Date().toISOString() };
       for (const tabla of tablas) {
         const { data, error } = await supabase.from(tabla).select("*").eq("despacho_id", despachoId);
@@ -382,7 +382,7 @@ export default function UsuariosPermisosTab({ usuarioActual, onDespachoRenombrad
       <Card style={{ marginBottom: 20, borderLeft: "4px solid #10B981" }}>
         <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, fontWeight: 600, color: COLORS.headingText, marginBottom: 4, display: "flex", alignItems: "center", gap: 5 }}><Icono tipo="escudo" size={14} /> Respaldo de tus datos</p>
         <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, marginBottom: 12 }}>
-          Descarga ahora mismo un archivo con TODA la información de tu despacho (clientes, documentos, casos y contenido) tal
+          Descarga ahora mismo un archivo con TODA la información de tu despacho (clientes, documentos y contenido) tal
           como está en este momento. Guárdalo en tu computador o en la nube (Google Drive, etc.). Recomendado: descárgalo
           cada semana o antes de cualquier cambio grande.
         </p>
@@ -722,29 +722,62 @@ function PapeleraPanel() {
   );
 }
 
+const ETIQUETAS_ACCION = {
+  crear_cliente: { texto: "creó al cliente", color: "#10B981" },
+  eliminar_cliente: { texto: "eliminó al cliente", color: "#B42318" },
+  registrar_pago: { texto: "registró un pago de", color: "#10B981" },
+  editar_pago: { texto: "editó un pago de", color: "#0EA5E9" },
+  eliminar_pago: { texto: "eliminó un pago de", color: "#B42318" },
+  registrar_egreso: { texto: "registró un egreso de", color: "#F43F5E" },
+  eliminar_egreso: { texto: "eliminó un egreso de", color: "#B42318" },
+  registrar_otro_ingreso: { texto: "registró un ingreso de", color: "#10B981" },
+  eliminar_otro_ingreso: { texto: "eliminó un ingreso de", color: "#B42318" },
+  crear_usuario: { texto: "creó al usuario", color: "#10B981" },
+  eliminar_usuario: { texto: "eliminó al usuario", color: "#B42318" },
+  cambiar_permiso: { texto: "cambió un permiso de", color: "#0EA5E9" },
+  inicio_sesion: { texto: "inició sesión", color: "#6B7480" },
+  descargar_respaldo: { texto: "descargó un respaldo completo", color: "#8B5CF6" },
+  crear_documento: { texto: "creó el documento", color: "#10B981" },
+  editar_documento: { texto: "editó el documento", color: "#0EA5E9" },
+  duplicar_documento: { texto: "duplicó el documento", color: "#0EA5E9" },
+  eliminar_documento: { texto: "eliminó el documento", color: "#B42318" },
+  firmar_documento: { texto: "firmó el documento", color: "#10B981" },
+};
+
+const AUDITORIA_POR_PAGINA = 25;
+const AUDITORIA_MAX_REGISTROS = 150;
+
 function PanelAuditoria() {
   const [registros, setRegistros] = useState([]);
   const [cargado, setCargado] = useState(false);
+  const [cargandoPagina, setCargandoPagina] = useState(false);
   const [abierto, setAbierto] = useState(false);
+  const [pagina, setPagina] = useState(0);
+  const [totalRegistros, setTotalRegistros] = useState(0);
 
   useEffect(() => {
-    if (!abierto || cargado) return;
+    if (!abierto) return;
     (async () => {
-      const { data } = await supabase.from("auditoria").select("*").order("creado_en", { ascending: false }).limit(50);
+      setCargandoPagina(true);
+      const desde = pagina * AUDITORIA_POR_PAGINA;
+      const hasta = desde + AUDITORIA_POR_PAGINA - 1;
+      const { data, count } = await supabase
+        .from("auditoria")
+        .select("*", { count: "exact" })
+        .order("creado_en", { ascending: false })
+        .range(desde, hasta);
       setRegistros(data || []);
+      setTotalRegistros(count || 0);
       setCargado(true);
+      setCargandoPagina(false);
     })();
-  }, [abierto, cargado]);
+  }, [abierto, pagina]);
 
-  const ETIQUETAS_ACCION = {
-    crear_cliente: "creó al cliente",
-    eliminar_cliente: "eliminó al cliente",
-    registrar_pago: "registró un pago de",
-    crear_usuario: "creó al usuario",
-    cambiar_permiso: "cambió un permiso de",
-    inicio_sesion: "inició sesión",
-    descargar_respaldo: "descargó un respaldo completo",
-  };
+  // Se acota a los últimos 150 (6 páginas) — suficiente para auditar lo
+  // reciente sin convertir esto en un reporte histórico completo, que
+  // necesitaría su propia pantalla de filtros por fecha/usuario.
+  const totalAcotado = Math.min(totalRegistros, AUDITORIA_MAX_REGISTROS);
+  const totalPaginas = Math.max(1, Math.ceil(totalAcotado / AUDITORIA_POR_PAGINA));
 
   return (
     <Card style={{ marginTop: 24 }}>
@@ -752,26 +785,78 @@ function PanelAuditoria() {
         onClick={() => setAbierto((a) => !a)}
         style={{ background: "none", border: "none", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%", padding: 0 }}
       >
-        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, fontWeight: 700, color: COLORS.ink, margin: 0, display: "flex", alignItems: "center", gap: 6 }}><Icono tipo="portapapeles" size={15} /> Auditoría (últimos 50 registros)</p>
+        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, fontWeight: 700, color: COLORS.ink, margin: 0, display: "flex", alignItems: "center", gap: 6 }}>
+          <Icono tipo="portapapeles" size={15} /> Auditoría {totalRegistros > 0 ? `(${Math.min(totalRegistros, AUDITORIA_MAX_REGISTROS)}${totalRegistros > AUDITORIA_MAX_REGISTROS ? "+" : ""} registros)` : ""}
+        </p>
         <span style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.muted }}>{abierto ? "Ocultar ▲" : "Ver ▼"}</span>
       </button>
 
       {abierto && (
         <div style={{ marginTop: 14 }}>
-          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, marginBottom: 12 }}>
-            Quién hizo qué y cuándo. Por ahora cubre creación/eliminación de clientes, pagos, creación de usuarios y cambios de permisos — se puede ampliar
-            a más acciones cuando quieran.
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, marginBottom: 14 }}>
+            Quién hizo qué y cuándo — clientes, pagos, egresos e ingresos, usuarios y permisos, documentos y respaldos.
           </p>
-          {registros.length === 0 && cargado && <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.muted }}>Sin registros todavía.</p>}
-          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            {registros.map((r) => (
-              <p key={r.id} style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.inkSoft, margin: 0 }}>
-                {new Date(r.creado_en).toLocaleString("es-CO", { dateStyle: "medium", timeStyle: "short" })} — <strong>{r.usuario_nombre || "Alguien"}</strong>{" "}
-                {ETIQUETAS_ACCION[r.accion] || r.accion} {r.detalle?.nombre || r.detalle?.usuario || ""}
-                {r.detalle?.valor ? ` (${formatoCOP(r.detalle.valor)})` : ""}
-              </p>
-            ))}
+          {registros.length === 0 && cargado && !cargandoPagina && (
+            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.muted }}>Sin registros todavía.</p>
+          )}
+          <div style={{ display: "flex", flexDirection: "column", gap: 2, opacity: cargandoPagina ? 0.5 : 1, transition: "opacity 0.15s ease" }}>
+            {registros.map((r) => {
+              const etiqueta = ETIQUETAS_ACCION[r.accion];
+              return (
+                <div
+                  key={r.id}
+                  style={{
+                    display: "flex",
+                    alignItems: "flex-start",
+                    gap: 10,
+                    padding: "9px 10px",
+                    borderRadius: 8,
+                    transition: "background 0.15s ease",
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = COLORS.surfaceSoft)}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                >
+                  <span style={{ width: 7, height: 7, borderRadius: "50%", background: etiqueta?.color || "#6B7480", marginTop: 5, flexShrink: 0 }} />
+                  <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.inkSoft, margin: 0, lineHeight: 1.5 }}>
+                    <span style={{ color: COLORS.muted }}>{new Date(r.creado_en).toLocaleString("es-CO", { dateStyle: "medium", timeStyle: "short" })}</span>
+                    {" — "}
+                    <strong style={{ color: COLORS.headingText }}>{r.usuario_nombre || "Alguien"}</strong>{" "}
+                    {etiqueta?.texto || r.accion} {r.detalle?.nombre || r.detalle?.usuario || ""}
+                    {r.detalle?.valor ? ` (${formatoCOP(r.detalle.valor)})` : ""}
+                  </p>
+                </div>
+              );
+            })}
           </div>
+          {totalRegistros > AUDITORIA_POR_PAGINA && (
+            <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 14, marginTop: 16, paddingTop: 14, borderTop: `1px solid ${COLORS.border}` }}>
+              <button
+                onClick={() => setPagina((p) => Math.max(0, p - 1))}
+                disabled={pagina === 0 || cargandoPagina}
+                style={{
+                  fontFamily: "Inter, sans-serif", fontSize: 12, fontWeight: 600, padding: "6px 14px", borderRadius: 999,
+                  border: `1px solid ${COLORS.border}`, background: "#fff", color: pagina === 0 ? COLORS.muted : COLORS.headingText,
+                  cursor: pagina === 0 || cargandoPagina ? "default" : "pointer", opacity: pagina === 0 ? 0.5 : 1,
+                }}
+              >
+                ← Anterior
+              </button>
+              <span style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, minWidth: 90, textAlign: "center" }}>
+                Página {pagina + 1} de {totalPaginas}
+              </span>
+              <button
+                onClick={() => setPagina((p) => Math.min(totalPaginas - 1, p + 1))}
+                disabled={pagina + 1 >= totalPaginas || cargandoPagina}
+                style={{
+                  fontFamily: "Inter, sans-serif", fontSize: 12, fontWeight: 600, padding: "6px 14px", borderRadius: 999,
+                  border: `1px solid ${COLORS.border}`, background: "#fff", color: pagina + 1 >= totalPaginas ? COLORS.muted : COLORS.headingText,
+                  cursor: pagina + 1 >= totalPaginas || cargandoPagina ? "default" : "pointer", opacity: pagina + 1 >= totalPaginas ? 0.5 : 1,
+                }}
+              >
+                Siguiente →
+              </button>
+            </div>
+          )}
         </div>
       )}
     </Card>
