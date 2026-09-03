@@ -8,6 +8,7 @@
 // función es la única que puede saltarse el aislamiento entre despachos.
 
 import { supabaseAdmin } from "../_lib/supabaseAdmin.js";
+import { dentroDelLimite } from "../_lib/rateLimit.js";
 
 async function verificarSuperadmin(admin, req) {
   const authHeader = req.headers.authorization || "";
@@ -21,6 +22,18 @@ async function verificarSuperadmin(admin, req) {
 
 export default async function handler(req, res) {
   const admin = supabaseAdmin();
+
+  // Este endpoint se salta el aislamiento normal por despacho y puede
+  // borrar despachos completos (incluyendo sus usuarios de Auth) — sin
+  // límite de tasa, un token de superadmin filtrado o robado se podría usar
+  // para automatizar un ataque destructivo a toda la plataforma de una vez.
+  // El límite va por IP, antes incluso de verificar el token, para frenar
+  // también los intentos de fuerza bruta contra la verificación misma.
+  const puedeContinuar = await dentroDelLimite(admin, req, "plataforma_despachos", 40, 10);
+  if (!puedeContinuar) {
+    return res.status(429).json({ error: "Demasiadas solicitudes. Espera un momento e inténtalo de nuevo." });
+  }
+
   const superadminId = await verificarSuperadmin(admin, req);
   if (!superadminId) {
     return res.status(403).json({ error: "Solo el superadministrador de la plataforma puede acceder aquí." });
