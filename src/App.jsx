@@ -684,7 +684,7 @@ function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-const APP_VERSION = "1.34.2";
+const APP_VERSION = "1.35.0";
 
 function SelloVersion({ oscuro }) {
   return (

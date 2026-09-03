@@ -42,6 +42,31 @@ import {
 
 const MEDIOS_PAGO = ["Nequi", "Daviplata", "Nu", "Cuenta bancaria", "Llave"];
 
+// Cuando el cliente que paga es agente retenedor (típicamente una empresa),
+// no transfiere el valor completo de la cuenta de cobro: retiene un
+// porcentaje y se lo entrega directamente a la DIAN a nombre del abogado.
+// Sin esto, lo que quedaba registrado como "pagado" no coincidía con lo que
+// realmente entraba a la cuenta bancaria, y ese dato se perdía a la hora de
+// declarar renta. Los porcentajes son los más comunes para honorarios.
+const OPCIONES_RETENCION = [
+  { valor: "0", etiqueta: "No" },
+  { valor: "4", etiqueta: "4%" },
+  { valor: "6", etiqueta: "6%" },
+  { valor: "10", etiqueta: "10%" },
+  { valor: "11", etiqueta: "11%" },
+  { valor: "otro", etiqueta: "Otro porcentaje" },
+];
+
+function valorRetenido(pago) {
+  const porcentaje = Number(pago?.retencionPorcentaje) || 0;
+  if (porcentaje <= 0) return 0;
+  return Math.round(((Number(pago.valor) || 0) * porcentaje) / 100);
+}
+
+function valorNetoPago(pago) {
+  return (Number(pago?.valor) || 0) - valorRetenido(pago);
+}
+
 // Cuenta de cobro (distinta de la factura electrónica DIAN, que requiere un
 // proveedor tecnológico de pago): el documento tradicional que usan
 // abogados independientes bajo el régimen simplificado para cobrar sus
@@ -196,6 +221,86 @@ function PanelDatosCuentaCobro({ datos, onGuardar }) {
   );
 }
 
+function CampoRetencion({ valor, onChange, valorOtro, onChangeOtro }) {
+  return (
+    <>
+      <Field label="¿El cliente te retuvo en la fuente? (opcional)">
+        <select className="drx-input" style={inputStyle} value={valor} onChange={(e) => onChange(e.target.value)}>
+          {OPCIONES_RETENCION.map((o) => (
+            <option key={o.valor} value={o.valor}>
+              {o.etiqueta}
+            </option>
+          ))}
+        </select>
+      </Field>
+      {valor === "otro" && (
+        <Field label="Porcentaje retenido">
+          <input
+            type="number"
+            className="drx-input"
+            style={inputStyle}
+            value={valorOtro}
+            onChange={(e) => onChangeOtro(e.target.value)}
+            placeholder="Ej: 7"
+            min="0"
+            max="100"
+          />
+        </Field>
+      )}
+    </>
+  );
+}
+
+function PanelPresupuesto({ presupuesto, onGuardar }) {
+  const [abierto, setAbierto] = useState(false);
+  const [valor, setValor] = useState(presupuesto?.valor ? String(presupuesto.valor) : "");
+  const [guardando, setGuardando] = useState(false);
+
+  useEffect(() => {
+    setValor(presupuesto?.valor ? String(presupuesto.valor) : "");
+  }, [presupuesto]);
+
+  const guardar = async () => {
+    setGuardando(true);
+    await onGuardar({ valor: Number(valor) || 0 });
+    setGuardando(false);
+    setAbierto(false);
+  };
+
+  const activo = Number(presupuesto?.valor) > 0;
+
+  return (
+    <Card style={{ marginBottom: 20 }}>
+      <button
+        onClick={() => setAbierto((a) => !a)}
+        style={{ background: "none", border: "none", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%", padding: 0 }}
+      >
+        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 14, fontWeight: 700, color: COLORS.ink, margin: 0, display: "flex", alignItems: "center", gap: 6 }}>
+          <Icono tipo="balanza" size={14} /> Presupuesto mensual de gastos {activo ? "" : "(sin definir)"}
+        </p>
+        <span style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.muted }}>{abierto ? "Ocultar ▲" : "Editar ▼"}</span>
+      </button>
+      {!abierto && (
+        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, marginTop: 6 }}>
+          {activo
+            ? `Tope de gasto: ${formatoCOP(presupuesto.valor)} al mes.`
+            : "Ponle un tope a lo que gastas al mes (arriendo, nómina, servicios...) para que la app te avise cuando te estés acercando."}
+        </p>
+      )}
+      {abierto && (
+        <div style={{ marginTop: 14 }}>
+          <Field label="Tope de gastos al mes (opcional)">
+            <CampoDinero style={{ ...inputStyle, maxWidth: 260 }} value={valor} onChange={(e) => setValor(e.target.value)} placeholder="Ej: 2.000.000" />
+          </Field>
+          <button className="drx-btn-primary" style={{ ...buttonPrimary, marginTop: 12 }} onClick={guardar} disabled={guardando}>
+            {guardando ? "Guardando…" : "Guardar presupuesto"}
+          </button>
+        </div>
+      )}
+    </Card>
+  );
+}
+
 function FormularioPago({ cliente, onRegistrar }) {
   const hoyStr = new Date().toISOString().slice(0, 10);
   const [medioPago, setMedioPago] = useState(MEDIOS_PAGO[0]);
@@ -204,6 +309,8 @@ function FormularioPago({ cliente, onRegistrar }) {
   const [concepto, setConcepto] = useState("");
   const [fechaProximoPago, setFechaProximoPago] = useState("");
   const [valorProximoPago, setValorProximoPago] = useState("");
+  const [retencion, setRetencion] = useState("0");
+  const [retencionOtro, setRetencionOtro] = useState("");
   const [generando, setGenerando] = useState(false);
 
   const registrar = async () => {
@@ -216,12 +323,15 @@ function FormularioPago({ cliente, onRegistrar }) {
       concepto: concepto.trim(),
       fechaProximoPago: fechaProximoPago || null,
       valorProximoPago: valorProximoPago ? Number(valorProximoPago) : null,
+      retencionPorcentaje: retencion === "otro" ? Number(retencionOtro) || 0 : Number(retencion),
     });
     setValor("");
     setFechaPago(hoyStr);
     setConcepto("");
     setFechaProximoPago("");
     setValorProximoPago("");
+    setRetencion("0");
+    setRetencionOtro("");
     setGenerando(false);
   };
 
@@ -257,6 +367,14 @@ function FormularioPago({ cliente, onRegistrar }) {
           <CampoDinero style={inputStyle} value={valorProximoPago} onChange={(e) => setValorProximoPago(e.target.value)} placeholder="Ej: 500.000" />
         </Field>
       </div>
+      <div className="drx-grid-form" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 12 }}>
+        <CampoRetencion valor={retencion} onChange={setRetencion} valorOtro={retencionOtro} onChangeOtro={setRetencionOtro} />
+      </div>
+      {retencion !== "0" && Number(valor) > 0 && (
+        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, marginTop: 8 }}>
+          Neto que realmente vas a recibir: <strong style={{ color: COLORS.headingText }}>{formatoCOP(valorNetoPago({ valor: Number(valor), retencionPorcentaje: retencion === "otro" ? Number(retencionOtro) || 0 : Number(retencion) }))}</strong>
+        </p>
+      )}
       <button className="drx-btn-primary drx-cta-shine" style={{ ...buttonPrimary, marginTop: 14 }} onClick={registrar} disabled={generando}>
         {generando ? "Generando recibo..." : "Registrar pago y generar recibo"}
       </button>
@@ -296,6 +414,9 @@ function ReciboCard({ cliente, pago, onEditar, onEliminar, datosResponsable }) {
   const [valor, setValor] = useState(String(pago.valor ?? ""));
   const [fecha, setFecha] = useState(new Date(pago.fecha).toISOString().slice(0, 10));
   const [concepto, setConcepto] = useState(pago.concepto || "");
+  const retencionInicial = pago.retencionPorcentaje && !OPCIONES_RETENCION.some((o) => o.valor === String(pago.retencionPorcentaje)) ? "otro" : String(pago.retencionPorcentaje || 0);
+  const [retencion, setRetencion] = useState(retencionInicial);
+  const [retencionOtro, setRetencionOtro] = useState(retencionInicial === "otro" ? String(pago.retencionPorcentaje) : "");
   const [guardando, setGuardando] = useState(false);
   const [generandoCuenta, setGenerandoCuenta] = useState(false);
   const numero = numeroWhatsappCliente(cliente.telefono);
@@ -325,6 +446,7 @@ function ReciboCard({ cliente, pago, onEditar, onEliminar, datosResponsable }) {
       valor: Number(valor),
       fecha: new Date(`${fecha}T12:00:00`).toISOString(),
       concepto: concepto.trim(),
+      retencionPorcentaje: retencion === "otro" ? Number(retencionOtro) || 0 : Number(retencion),
     });
     setGuardando(false);
     setEditando(false);
@@ -355,6 +477,9 @@ function ReciboCard({ cliente, pago, onEditar, onEliminar, datosResponsable }) {
             <input className="drx-input" style={inputStyle} value={concepto} onChange={(e) => setConcepto(e.target.value)} />
           </Field>
         </div>
+        <div className="drx-grid-form" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
+          <CampoRetencion valor={retencion} onChange={setRetencion} valorOtro={retencionOtro} onChangeOtro={setRetencionOtro} />
+        </div>
         <div style={{ display: "flex", gap: 8 }}>
           <button className="drx-btn-primary" style={{ ...buttonPrimary, padding: "6px 14px", fontSize: 12 }} onClick={guardarEdicion} disabled={guardando}>
             {guardando ? "Guardando..." : "Guardar cambios"}
@@ -384,6 +509,11 @@ function ReciboCard({ cliente, pago, onEditar, onEliminar, datosResponsable }) {
           {new Date(pago.fecha).toLocaleDateString("es-CO", { dateStyle: "medium" })}
           {pago.concepto ? ` · ${pago.concepto}` : ""}
         </p>
+        {Number(pago.retencionPorcentaje) > 0 && (
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, color: "#7C3AED", background: "#F5F3FF", display: "inline-block", padding: "3px 9px", borderRadius: 20, margin: "0 0 8px" }}>
+            Retención {pago.retencionPorcentaje}% ({formatoCOP(valorRetenido(pago))}) · Neto recibido {formatoCOP(valorNetoPago(pago))}
+          </p>
+        )}
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           {urlRecibo && (
             <a
@@ -736,6 +866,18 @@ export default function ContabilidadTab({ usuarioActual }) {
     setDatosResponsable(actualizado);
   };
 
+  const [presupuesto, setPresupuesto] = useState(null);
+  useEffect(() => {
+    (async () => {
+      const raw = await storageGet("presupuesto-mensual", false);
+      setPresupuesto(raw ? JSON.parse(raw) : {});
+    })();
+  }, []);
+  const guardarPresupuesto = async (datos) => {
+    await storageSet("presupuesto-mensual", JSON.stringify(datos), false);
+    setPresupuesto(datos);
+  };
+
   const registrarEgreso = async (datos) => {
     const nuevo = await crearEgreso(datos);
     registrarAuditoria(usuarioActual, "registrar_egreso", "egreso", nuevo.id, { concepto: nuevo.concepto, valor: nuevo.valor });
@@ -783,6 +925,7 @@ export default function ContabilidadTab({ usuarioActual }) {
       medioPago: datosPago.medioPago,
       valor: datosPago.valor,
       concepto: datosPago.concepto,
+      retencionPorcentaje: datosPago.retencionPorcentaje || 0,
     };
     const reciboImagen = await generarReciboImagen(id, cliente, pago);
     pago.reciboImagen = reciboImagen;
@@ -857,14 +1000,18 @@ export default function ContabilidadTab({ usuarioActual }) {
   const hoy = new Date();
   let recaudadoTotal = 0;
   let recaudadoMes = 0;
+  let retenidoMes = 0;
+  let retenidoTotal = 0;
   const porMedioPagoMes = {};
   ids.forEach((id) => {
     (clientes[id]?.pagos || []).forEach((p) => {
       const valor = Number(p.valor) || 0;
       recaudadoTotal += valor;
+      retenidoTotal += valorRetenido(p);
       const fechaPago = new Date(p.fecha);
       if (fechaPago.getFullYear() === hoy.getFullYear() && fechaPago.getMonth() === hoy.getMonth()) {
         recaudadoMes += valor;
+        retenidoMes += valorRetenido(p);
         const medio = p.medioPago || "Otro";
         porMedioPagoMes[medio] = (porMedioPagoMes[medio] || 0) + valor;
       }
@@ -889,6 +1036,16 @@ export default function ContabilidadTab({ usuarioActual }) {
   });
   const categoriasEgresoOrdenadas = Object.entries(porCategoriaEgresoTotal).sort((a, b) => b[1] - a[1]);
   const categoriaMayorGasto = categoriasEgresoOrdenadas[0] || null;
+
+  const presupuestoValor = Number(presupuesto?.valor) || 0;
+  const porcentajePresupuesto = presupuestoValor > 0 ? (egresoMes / presupuestoValor) * 100 : 0;
+  const colorPresupuesto = porcentajePresupuesto >= 100 ? "#B42318" : porcentajePresupuesto >= 80 ? "#B45309" : "#166534";
+  const mensajePresupuesto =
+    porcentajePresupuesto >= 100
+      ? `¡Superaste tu presupuesto de este mes por ${formatoCOP(egresoMes - presupuestoValor)}!`
+      : porcentajePresupuesto >= 80
+      ? `Vas en el ${Math.round(porcentajePresupuesto)}% — te quedan ${formatoCOP(presupuestoValor - egresoMes)} este mes.`
+      : `Vas en el ${Math.round(porcentajePresupuesto)}% de tu presupuesto — todo tranquilo.`;
   // Ingresos sueltos que no son el pago de ningún cliente puntual
   // (rendimientos, reembolsos, algo administrativo que no se sabe bien
   // dónde clasificar) — sin esto se quedaban fuera de "cuánto entró".
@@ -979,6 +1136,24 @@ export default function ContabilidadTab({ usuarioActual }) {
       <EncabezadoSeccion titulo="Contabilidad" color="#F43F5E" />
 
       <PanelDatosCuentaCobro datos={datosResponsable} onGuardar={guardarDatosResponsable} />
+      <PanelPresupuesto presupuesto={presupuesto} onGuardar={guardarPresupuesto} />
+
+      {presupuestoValor > 0 && (
+        <Card style={{ marginBottom: 20, borderLeft: `4px solid ${colorPresupuesto}` }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: 8, marginBottom: 10 }}>
+            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, fontWeight: 700, color: COLORS.ink, margin: 0 }}>Presupuesto de gastos del mes</p>
+            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, fontWeight: 700, color: colorPresupuesto, margin: 0 }}>
+              {formatoCOP(egresoMes)} de {formatoCOP(presupuestoValor)}
+            </p>
+          </div>
+          <div style={{ height: 10, borderRadius: 6, background: COLORS.surfaceSoft, overflow: "hidden" }}>
+            <div style={{ height: "100%", width: `${Math.min(porcentajePresupuesto, 100)}%`, background: colorPresupuesto, transition: "width 0.3s ease" }} />
+          </div>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: colorPresupuesto, marginTop: 8, marginBottom: 0 }}>
+            {mensajePresupuesto}
+          </p>
+        </Card>
+      )}
 
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 20 }}>
         <button
@@ -1100,6 +1275,17 @@ export default function ContabilidadTab({ usuarioActual }) {
             <p style={{ fontFamily: "Inter, sans-serif", fontSize: 22, fontWeight: 800, color: "#B42318", margin: "4px 0 0" }}>{formatoCOP(carteraTotal)}</p>
             <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11, color: "#B45309", margin: "3px 0 0" }}>
               {clientesConSaldoPendiente} cliente{clientesConSaldoPendiente !== 1 ? "s" : ""} con saldo pendiente
+            </p>
+          </Card>
+        )}
+        {retenidoMes > 0 && (
+          <Card style={{ borderLeft: "4px solid #8B5CF6", background: "#F5F3FF" }}>
+            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, fontWeight: 700, color: "#7C3AED", textTransform: "uppercase", letterSpacing: 0.5, margin: 0 }}>
+              Retenido en la fuente (mes)
+            </p>
+            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 22, fontWeight: 800, color: "#7C3AED", margin: "4px 0 0" }}>{formatoCOP(retenidoMes)}</p>
+            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11, color: "#7C3AED", margin: "3px 0 0" }}>
+              Histórico: {formatoCOP(retenidoTotal)} · guarda tus certificados de retención para la declaración de renta
             </p>
           </Card>
         )}
@@ -1359,7 +1545,9 @@ export default function ContabilidadTab({ usuarioActual }) {
                 { titulo: "Cliente", valor: (f) => f.cliente },
                 { titulo: "Fecha", valor: (f) => new Date(f.pago.fecha).toLocaleDateString("es-CO") },
                 { titulo: "Medio de pago", valor: (f) => f.pago.medioPago },
-                { titulo: "Valor", valor: (f) => f.pago.valor },
+                { titulo: "Valor bruto", valor: (f) => f.pago.valor },
+                { titulo: "Retención %", valor: (f) => f.pago.retencionPorcentaje || 0 },
+                { titulo: "Valor neto recibido", valor: (f) => valorNetoPago(f.pago) },
                 { titulo: "Concepto", valor: (f) => f.pago.concepto },
               ],
               filas
