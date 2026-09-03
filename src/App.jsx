@@ -259,9 +259,11 @@ import {
 
 export function useIndex(key, shared) {
   const [ids, setIds] = useState([]);
+  const [cargado, setCargado] = useState(false);
   const load = useCallback(async () => {
     const raw = await storageGet(key, shared);
     setIds(raw ? JSON.parse(raw) : []);
+    setCargado(true);
   }, [key, shared]);
   useEffect(() => {
     load();
@@ -276,7 +278,7 @@ export function useIndex(key, shared) {
     setIds(next);
     await storageSet(key, JSON.stringify(next), shared);
   };
-  return { ids, addId, removeId, reload: load };
+  return { ids, cargado, addId, removeId, reload: load };
 }
 
 const PDFJS_SRC = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.min.js";
@@ -682,7 +684,7 @@ function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-const APP_VERSION = "1.34.0";
+const APP_VERSION = "1.34.1";
 
 function SelloVersion({ oscuro }) {
   return (

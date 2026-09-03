@@ -126,7 +126,7 @@ async function descargarPdfFirmado(doc) {
 const FORM_DOC_INICIAL = { titulo: "", cliente: "", whatsappIndicativo: "57", whatsappNumero: "", contenido: "", nombreArchivo: "", tipoDocumento: "texto", archivoPdfBase64: "" };
 
 export default function DocumentosTab() {
-  const { ids, addId, removeId } = useIndex("indice-documentos", true);
+  const { ids, cargado, addId, removeId } = useIndex("indice-documentos", true);
   const [docs, setDocs] = useState({});
   const [form, setForm] = useState(FORM_DOC_INICIAL);
   const [showForm, setShowForm] = useState(false);
@@ -722,7 +722,7 @@ export default function DocumentosTab() {
             </Card>
           );
         })}
-        {ids.length === 0 && !showForm && <EstadoVacio icono={<Icono tipo="lapiz" size={26} />} texto="Aún no has creado documentos para firma." />}
+        {cargado && ids.length === 0 && !showForm && <EstadoVacio icono={<Icono tipo="lapiz" size={26} />} texto="Aún no has creado documentos para firma." />}
         {ids.length > 0 && idsFiltrados.length === 0 && (
           <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted, textAlign: "center" }}>Ningún documento coincide con "{filtro}".</p>
         )}

@@ -699,7 +699,7 @@ function OtroIngresoCard({ ingreso, onEditar, onEliminar }) {
 }
 
 export default function ContabilidadTab({ usuarioActual }) {
-  const { ids } = useIndex("indice-clientes", false);
+  const { ids, cargado } = useIndex("indice-clientes", false);
   const [clientes, setClientes] = useState({});
   const [formAbiertoId, setFormAbiertoId] = useState(null);
   const [filtro, setFiltro] = useState("");
@@ -1448,7 +1448,7 @@ export default function ContabilidadTab({ usuarioActual }) {
             </Card>
           );
         })}
-        {ids.length === 0 && <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted }}>Registra clientes primero desde la pestaña Clientes.</p>}
+        {cargado && ids.length === 0 && <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted }}>Registra clientes primero desde la pestaña Clientes.</p>}
         {ids.length > 0 && idsFiltrados.length === 0 && (
           <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted }}>Ningún cliente coincide con "{filtro}".</p>
         )}

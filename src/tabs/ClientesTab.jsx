@@ -171,7 +171,7 @@ function PlanDePagoIA({ planPago, onChange }) {
 }
 
 export default function ClientesTab({ usuarioActual }) {
-  const { ids, addId, removeId } = useIndex("indice-clientes", false);
+  const { ids, cargado, addId, removeId } = useIndex("indice-clientes", false);
   const { usuarios: abogadosDespacho } = useUsuariosDespacho();
   const [clientes, setClientes] = useState({});
   const [form, setForm] = useState(FORM_CLIENTE_INICIAL);
@@ -688,7 +688,7 @@ export default function ClientesTab({ usuarioActual }) {
             </Card>
           );
         })}
-        {ids.length === 0 && !showForm && <EstadoVacio icono={<Icono tipo="persona" size={26} />} texto="Aún no has registrado clientes." />}
+        {cargado && ids.length === 0 && !showForm && <EstadoVacio icono={<Icono tipo="persona" size={26} />} texto="Aún no has registrado clientes." />}
         {ids.length > 0 && idsFiltrados.length === 0 && (
           <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted, textAlign: "center" }}>Ningún cliente coincide con "{filtro}".</p>
         )}
