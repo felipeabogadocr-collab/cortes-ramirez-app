@@ -684,7 +684,7 @@ function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-const APP_VERSION = "1.34.1";
+const APP_VERSION = "1.34.2";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -5037,6 +5037,19 @@ function LandingPage({ onRegistrar, onIniciarSesion }) {
   const [mostrarSubir, setMostrarSubir] = useState(false);
   const [mostrarCtaFlotante, setMostrarCtaFlotante] = useState(false);
   const [menuMovilAbierto, setMenuMovilAbierto] = useState(false);
+  const ctaFlotanteRef = useRef(null);
+  const [ctaFlotanteAltura, setCtaFlotanteAltura] = useState(0);
+  // La barra flotante de abajo puede pasar a dos líneas en pantallas
+  // angostas — sin medir su alto real, el botón de WhatsApp y el de
+  // "volver arriba" (ambos fixed) le quedaban encima tapando el botón de
+  // "Registrar mi despacho" en móvil.
+  useEffect(() => {
+    const elemento = ctaFlotanteRef.current;
+    if (!elemento || typeof ResizeObserver === "undefined") return;
+    const observador = new ResizeObserver(([entrada]) => setCtaFlotanteAltura(entrada.contentRect.height));
+    observador.observe(elemento);
+    return () => observador.disconnect();
+  }, []);
 
   useEffect(() => {
     const alScroll = () => {
@@ -5845,12 +5858,13 @@ function LandingPage({ onRegistrar, onIniciarSesion }) {
         title="Escríbenos por WhatsApp"
         style={{
           position: "fixed",
-          bottom: 22,
+          bottom: mostrarCtaFlotante ? ctaFlotanteAltura + 16 : 22,
           right: 22,
           width: 56,
           height: 56,
           borderRadius: "50%",
           background: "#1DA851",
+          transition: "bottom 0.3s ease",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
@@ -5870,7 +5884,7 @@ function LandingPage({ onRegistrar, onIniciarSesion }) {
         aria-label="Volver arriba"
         style={{
           position: "fixed",
-          bottom: 24,
+          bottom: mostrarCtaFlotante ? ctaFlotanteAltura + 18 : 24,
           left: 24,
           width: 44,
           height: 44,
@@ -5886,7 +5900,7 @@ function LandingPage({ onRegistrar, onIniciarSesion }) {
           opacity: mostrarSubir ? 1 : 0,
           transform: mostrarSubir ? "translateY(0)" : "translateY(12px)",
           pointerEvents: mostrarSubir ? "auto" : "none",
-          transition: "opacity 0.25s ease, transform 0.25s ease",
+          transition: "opacity 0.25s ease, transform 0.25s ease, bottom 0.3s ease",
         }}
       >
         <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -5895,6 +5909,7 @@ function LandingPage({ onRegistrar, onIniciarSesion }) {
       </button>
 
       <div
+        ref={ctaFlotanteRef}
         style={{
           position: "fixed",
           left: 0,

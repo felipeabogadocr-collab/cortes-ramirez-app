@@ -2,11 +2,18 @@
   box-sizing: border-box;
 }
 
+/* "min-height: 100%" solo no basta: para que el porcentaje de un hijo se
+   resuelva contra la altura del contenedor, ese contenedor necesita una
+   altura explícita (no basta con su propio min-height) — sin el
+   "height: 100%" encadenado aquí, pantallas con poco contenido (como
+   iniciar sesión) no llenaban el alto real de la pantalla y dejaban un
+   espacio en blanco debajo de la tarjeta en vez de quedar centradas. */
 html,
 body,
 #root {
   margin: 0;
   padding: 0;
+  height: 100%;
   min-height: 100%;
 }
 
