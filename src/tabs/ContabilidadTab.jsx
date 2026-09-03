@@ -67,6 +67,15 @@ function valorNetoPago(pago) {
   return (Number(pago?.valor) || 0) - valorRetenido(pago);
 }
 
+// El ahorro sugerido se calcula sobre lo que de verdad entra a la cuenta
+// (el neto, después de la retención) — no tendría sentido sugerir apartar
+// plata que ni siquiera llega a estar en la mano.
+function montoAhorro(pago, porcentajeAhorro) {
+  const porcentaje = Number(porcentajeAhorro) || 0;
+  if (porcentaje <= 0) return 0;
+  return Math.round((valorNetoPago(pago) * porcentaje) / 100);
+}
+
 // Cuenta de cobro (distinta de la factura electrónica DIAN, que requiere un
 // proveedor tecnológico de pago): el documento tradicional que usan
 // abogados independientes bajo el régimen simplificado para cobrar sus
@@ -301,6 +310,70 @@ function PanelPresupuesto({ presupuesto, onGuardar }) {
   );
 }
 
+// Idea tipo "Profit First": de cada pago que entra, separar de una vez un
+// % para ahorro (impuestos, imprevistos, colchón) en vez de gastarlo todo y
+// ver qué queda al final. El % se define una sola vez aquí y de ahí en
+// adelante se calcula solo en cada recibo — nadie tiene que hacer la cuenta
+// a mano ni entender nada técnico, solo ver el número.
+function PanelAhorro({ ahorro, onGuardar }) {
+  const [abierto, setAbierto] = useState(false);
+  const [porcentaje, setPorcentaje] = useState(ahorro?.porcentaje ? String(ahorro.porcentaje) : "");
+  const [guardando, setGuardando] = useState(false);
+
+  useEffect(() => {
+    setPorcentaje(ahorro?.porcentaje ? String(ahorro.porcentaje) : "");
+  }, [ahorro]);
+
+  const guardar = async () => {
+    setGuardando(true);
+    await onGuardar({ porcentaje: Math.max(0, Math.min(100, Number(porcentaje) || 0)) });
+    setGuardando(false);
+    setAbierto(false);
+  };
+
+  const activo = Number(ahorro?.porcentaje) > 0;
+
+  return (
+    <Card style={{ marginBottom: 20 }}>
+      <button
+        onClick={() => setAbierto((a) => !a)}
+        style={{ background: "none", border: "none", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%", padding: 0 }}
+      >
+        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 14, fontWeight: 700, color: COLORS.ink, margin: 0, display: "flex", alignItems: "center", gap: 6 }}>
+          <Icono tipo="objetivo" size={14} /> Ahorro de cada pago {activo ? "" : "(sin definir)"}
+        </p>
+        <span style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.muted }}>{abierto ? "Ocultar ▲" : "Editar ▼"}</span>
+      </button>
+      {!abierto && (
+        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, marginTop: 6 }}>
+          {activo
+            ? `Separas el ${ahorro.porcentaje}% de lo que te entra en cada pago.`
+            : "Define qué % de cada pago que te entra deberías apartar para ahorro (imprevistos, impuestos, colchón) — se calcula solo en cada recibo."}
+        </p>
+      )}
+      {abierto && (
+        <div style={{ marginTop: 14 }}>
+          <Field label="Porcentaje a ahorrar de cada pago (opcional)">
+            <input
+              type="number"
+              className="drx-input"
+              style={{ ...inputStyle, maxWidth: 160 }}
+              value={porcentaje}
+              onChange={(e) => setPorcentaje(e.target.value)}
+              placeholder="Ej: 10"
+              min="0"
+              max="100"
+            />
+          </Field>
+          <button className="drx-btn-primary" style={{ ...buttonPrimary, marginTop: 12 }} onClick={guardar} disabled={guardando}>
+            {guardando ? "Guardando…" : "Guardar porcentaje"}
+          </button>
+        </div>
+      )}
+    </Card>
+  );
+}
+
 function FormularioPago({ cliente, onRegistrar }) {
   const hoyStr = new Date().toISOString().slice(0, 10);
   const [medioPago, setMedioPago] = useState(MEDIOS_PAGO[0]);
@@ -407,7 +480,7 @@ function useUrlRecibo(reciboImagen) {
   return url;
 }
 
-function ReciboCard({ cliente, pago, onEditar, onEliminar, datosResponsable }) {
+function ReciboCard({ cliente, pago, onEditar, onEliminar, datosResponsable, porcentajeAhorro }) {
   const [copiado, setCopiado] = useState(false);
   const [editando, setEditando] = useState(false);
   const [medioPago, setMedioPago] = useState(pago.medioPago);
@@ -512,6 +585,11 @@ function ReciboCard({ cliente, pago, onEditar, onEliminar, datosResponsable }) {
         {Number(pago.retencionPorcentaje) > 0 && (
           <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, color: "#7C3AED", background: "#F5F3FF", display: "inline-block", padding: "3px 9px", borderRadius: 20, margin: "0 0 8px" }}>
             Retención {pago.retencionPorcentaje}% ({formatoCOP(valorRetenido(pago))}) · Neto recibido {formatoCOP(valorNetoPago(pago))}
+          </p>
+        )}
+        {porcentajeAhorro > 0 && (
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, color: "#0D9488", background: "#F0FDFA", display: "inline-block", padding: "3px 9px", borderRadius: 20, margin: "0 0 8px", marginLeft: Number(pago.retencionPorcentaje) > 0 ? 6 : 0 }}>
+            💰 Aparta para ahorro ({porcentajeAhorro}%): {formatoCOP(montoAhorro(pago, porcentajeAhorro))}
           </p>
         )}
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -878,6 +956,19 @@ export default function ContabilidadTab({ usuarioActual }) {
     setPresupuesto(datos);
   };
 
+  const [ahorro, setAhorro] = useState(null);
+  useEffect(() => {
+    (async () => {
+      const raw = await storageGet("porcentaje-ahorro", false);
+      setAhorro(raw ? JSON.parse(raw) : {});
+    })();
+  }, []);
+  const guardarAhorro = async (datos) => {
+    await storageSet("porcentaje-ahorro", JSON.stringify(datos), false);
+    setAhorro(datos);
+  };
+  const porcentajeAhorro = Number(ahorro?.porcentaje) || 0;
+
   const registrarEgreso = async (datos) => {
     const nuevo = await crearEgreso(datos);
     registrarAuditoria(usuarioActual, "registrar_egreso", "egreso", nuevo.id, { concepto: nuevo.concepto, valor: nuevo.valor });
@@ -1002,16 +1093,20 @@ export default function ContabilidadTab({ usuarioActual }) {
   let recaudadoMes = 0;
   let retenidoMes = 0;
   let retenidoTotal = 0;
+  let ahorroSugeridoMes = 0;
+  let ahorroSugeridoTotal = 0;
   const porMedioPagoMes = {};
   ids.forEach((id) => {
     (clientes[id]?.pagos || []).forEach((p) => {
       const valor = Number(p.valor) || 0;
       recaudadoTotal += valor;
       retenidoTotal += valorRetenido(p);
+      ahorroSugeridoTotal += montoAhorro(p, porcentajeAhorro);
       const fechaPago = new Date(p.fecha);
       if (fechaPago.getFullYear() === hoy.getFullYear() && fechaPago.getMonth() === hoy.getMonth()) {
         recaudadoMes += valor;
         retenidoMes += valorRetenido(p);
+        ahorroSugeridoMes += montoAhorro(p, porcentajeAhorro);
         const medio = p.medioPago || "Otro";
         porMedioPagoMes[medio] = (porMedioPagoMes[medio] || 0) + valor;
       }
@@ -1137,6 +1232,7 @@ export default function ContabilidadTab({ usuarioActual }) {
 
       <PanelDatosCuentaCobro datos={datosResponsable} onGuardar={guardarDatosResponsable} />
       <PanelPresupuesto presupuesto={presupuesto} onGuardar={guardarPresupuesto} />
+      <PanelAhorro ahorro={ahorro} onGuardar={guardarAhorro} />
 
       {presupuestoValor > 0 && (
         <Card style={{ marginBottom: 20, borderLeft: `4px solid ${colorPresupuesto}` }}>
@@ -1286,6 +1382,17 @@ export default function ContabilidadTab({ usuarioActual }) {
             <p style={{ fontFamily: "Inter, sans-serif", fontSize: 22, fontWeight: 800, color: "#7C3AED", margin: "4px 0 0" }}>{formatoCOP(retenidoMes)}</p>
             <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11, color: "#7C3AED", margin: "3px 0 0" }}>
               Histórico: {formatoCOP(retenidoTotal)} · guarda tus certificados de retención para la declaración de renta
+            </p>
+          </Card>
+        )}
+        {porcentajeAhorro > 0 && (
+          <Card style={{ borderLeft: "4px solid #0D9488", background: "#F0FDFA" }}>
+            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, fontWeight: 700, color: "#0D9488", textTransform: "uppercase", letterSpacing: 0.5, margin: 0 }}>
+              Ahorro sugerido (mes)
+            </p>
+            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 22, fontWeight: 800, color: "#0D9488", margin: "4px 0 0" }}>{formatoCOP(ahorroSugeridoMes)}</p>
+            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11, color: "#0D9488", margin: "3px 0 0" }}>
+              Histórico: {formatoCOP(ahorroSugeridoTotal)} · el {porcentajeAhorro}% de cada pago que te ha entrado
             </p>
           </Card>
         )}
@@ -1548,6 +1655,7 @@ export default function ContabilidadTab({ usuarioActual }) {
                 { titulo: "Valor bruto", valor: (f) => f.pago.valor },
                 { titulo: "Retención %", valor: (f) => f.pago.retencionPorcentaje || 0 },
                 { titulo: "Valor neto recibido", valor: (f) => valorNetoPago(f.pago) },
+                { titulo: "Ahorro sugerido", valor: (f) => montoAhorro(f.pago, porcentajeAhorro) },
                 { titulo: "Concepto", valor: (f) => f.pago.concepto },
               ],
               filas
@@ -1619,6 +1727,7 @@ export default function ContabilidadTab({ usuarioActual }) {
                         onEditar={(cambios) => editarPago(id, p.id, cambios)}
                         onEliminar={() => eliminarPago(id, p.id)}
                         datosResponsable={datosResponsable}
+                        porcentajeAhorro={porcentajeAhorro}
                       />
                     ))}
                     {ordenados.length > 3 && (
