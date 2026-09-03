@@ -395,14 +395,19 @@ const GlobalStyle = () => (
     .drx-btn-primary { transition: transform .15s ease, filter .15s ease, box-shadow .15s ease; }
     .drx-btn-primary:hover { filter: brightness(1.15); transform: translateY(-1px); }
     .drx-btn-primary:active { transform: scale(0.97) translateY(0); filter: brightness(0.95); }
-    .drx-btn-ghost { transition: background .15s ease, border-color .15s ease, transform .15s ease; }
-    .drx-btn-ghost:active { transform: scale(0.97); }
+    .drx-btn-ghost { transition: background .15s ease, border-color .15s ease, transform .15s ease, box-shadow .15s ease; }
+    .drx-btn-ghost:hover { transform: translateY(-1px); box-shadow: 0 4px 10px rgba(16,24,40,0.08); }
+    .drx-btn-ghost:active { transform: scale(0.97); box-shadow: none; }
     .drx-tema-claro .drx-btn-ghost:hover { background: #EEF2F7; border-color: #B9C2CF; }
     .drx-tema-oscuro .drx-btn-ghost:hover { background: #232C39; border-color: #3A4657; }
-    .drx-card { transition: box-shadow .18s ease, border-color .18s ease, transform .18s ease; }
+    .drx-card { transition: box-shadow .18s ease, border-color .18s ease, transform .18s ease; box-shadow: 0 1px 2px rgba(16,24,40,0.04), 0 1px 3px rgba(16,24,40,0.05); }
+    .drx-tema-oscuro .drx-card { box-shadow: 0 1px 3px rgba(0,0,0,0.3); }
     .drx-tema-claro .drx-card:hover { box-shadow: 0 10px 26px rgba(11,61,46,0.1); border-color: #C7D6EA; }
     .drx-tema-oscuro .drx-card:hover { box-shadow: 0 10px 30px rgba(0,0,0,0.5); border-color: #3A4A63; }
-    .drx-tab { transition: background .15s ease, color .15s ease; }
+    .drx-tab { transition: background .15s ease, color .15s ease, filter .15s ease, transform .15s ease; }
+    .drx-tab:hover { filter: brightness(1.45); transform: translateX(2px); }
+    .drx-tab:active { transform: translateX(2px) scale(0.98); }
+    .drx-input { transition: border-color .15s ease, box-shadow .15s ease; }
     .drx-input:focus { border-color: ${COLORS.accentBright} !important; box-shadow: 0 0 0 3px ${COLORS.accentSoft}; }
     .drx-btn-primary:hover { box-shadow: 0 6px 20px rgba(22,163,74,0.35); }
     .drx-glow { position: relative; }
@@ -546,7 +551,7 @@ export function CampoDinero({ value, onChange, placeholder, style, className }) 
 }
 
 export const buttonPrimary = {
-  background: COLORS.navy,
+  background: `linear-gradient(135deg, #0F5540, ${COLORS.navy} 55%, ${COLORS.navyDeep})`,
   color: "#FFFFFF",
   border: "none",
   borderRadius: 10,
@@ -555,7 +560,8 @@ export const buttonPrimary = {
   fontWeight: 600,
   cursor: "pointer",
   fontFamily: "Inter, sans-serif",
-  boxShadow: "0 2px 8px rgba(11,61,46,0.18)",
+  boxShadow: "0 2px 8px rgba(11,61,46,0.22), inset 0 1px 0 rgba(255,255,255,0.08)",
+  letterSpacing: 0.1,
 };
 
 export const buttonGhost = {
@@ -684,7 +690,7 @@ function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-const APP_VERSION = "1.38.0";
+const APP_VERSION = "1.39.0";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -5602,7 +5608,7 @@ function LandingPage({ onRegistrar, onIniciarSesion }) {
               style={{
                 border: p.destacado ? `2px solid ${COLORS.accentBright}` : `1px solid ${COLORS.border}`,
                 borderTop: `4px solid ${p.destacado ? COLORS.accentBright : COLORS.navy}`,
-                boxShadow: p.destacado ? "0 10px 30px rgba(22,163,74,0.18)" : "none",
+                ...(p.destacado ? { boxShadow: "0 10px 30px rgba(22,163,74,0.18)" } : {}),
                 position: "relative",
               }}
             >
