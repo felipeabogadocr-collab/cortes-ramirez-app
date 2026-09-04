@@ -754,7 +754,7 @@ function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-const APP_VERSION = "1.43.0";
+const APP_VERSION = "1.43.1";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -6632,77 +6632,93 @@ function LoginGate({ onIngresar, onCancelar, pantallaInicial }) {
     if (!email.trim() || !contrasena.trim() || segundosBloqueoLogin > 0) return;
     setEnviando(true);
     setError("");
-    const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({ email: email.trim(), password: contrasena });
-    // Las cuentas de prueba creadas desde "Usuarios y permisos" (ver
-    // PanelAccesoPrueba) tienen expira_en — si ya pasó, se corta el acceso
-    // aquí mismo, antes de dejar entrar al panel.
-    if (!loginError && loginData?.user) {
-      const { data: perfilRecienLogueado } = await supabase.from("perfiles").select("expira_en").eq("id", loginData.user.id).maybeSingle();
-      if (perfilRecienLogueado?.expira_en && new Date(perfilRecienLogueado.expira_en).getTime() <= Date.now()) {
-        await supabase.auth.signOut();
-        setError("Este acceso de prueba ya expiró. Pide que te generen uno nuevo.");
-        setEnviando(false);
-        return;
-      }
-    }
-    if (loginError) {
-      const anterior = leerJSONLocal(LLAVE_INTENTOS_LOGIN, { intentos: 0 });
-      const intentos = (anterior.intentos || 0) + 1;
-      // A partir del 5º intento fallido seguido, cada uno duplica la espera
-      // (30s, 60s, 120s…) hasta un tope de 5 minutos — suficiente para
-      // frenar un ataque automatizado sin castigar a alguien que
-      // simplemente se equivocó de contraseña una o dos veces.
-      let nuevoBloqueo = 0;
-      if (intentos >= 5) {
-        nuevoBloqueo = Date.now() + Math.min(30 * 2 ** (intentos - 5), 300) * 1000;
-        setBloqueadoHasta(nuevoBloqueo);
-      }
-      guardarJSONLocal(LLAVE_INTENTOS_LOGIN, { intentos, bloqueadoHasta: nuevoBloqueo });
-      setError("Correo o contraseña incorrectos.");
-      setEnviando(false);
-      return;
-    }
-    guardarJSONLocal(LLAVE_INTENTOS_LOGIN, { intentos: 0, bloqueadoHasta: 0 });
-    setBloqueadoHasta(0);
-
-    // Si el usuario activó verificación en dos pasos (ver PanelSeguridad2FA),
-    // la contraseña sola no basta — Supabase marca que falta subir a "aal2"
-    // y hay que resolver un reto con el código de 6 dígitos antes de dejarlo
-    // entrar, sin importar que la contraseña ya haya sido correcta.
-    const { data: aalData } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
-    if (aalData && aalData.nextLevel === "aal2" && aalData.currentLevel !== "aal2") {
-      const { data: factoresData } = await supabase.auth.mfa.listFactors();
-      const factorVerificado = factoresData?.totp?.find((f) => f.status === "verified");
-      if (factorVerificado) {
-        const { data: challengeData, error: challengeError } = await supabase.auth.mfa.challenge({ factorId: factorVerificado.id });
-        if (!challengeError && challengeData) {
-          setFactorId2FA(factorVerificado.id);
-          setChallengeId2FA(challengeData.id);
-          setEnviando(false);
-          setPantalla("verificacion-2fa");
+    // Todo el proceso de login vive dentro de un try/catch/finally a
+    // propósito: antes, si algo tronaba a mitad de camino (una llamada de
+    // red que fallara distinto a como Supabase normalmente reporta un
+    // error), el botón se quedaba en "Ingresando…" para siempre, sin
+    // mensaje y sin forma de volver a intentar sin recargar la página. El
+    // finally garantiza que setEnviando(false) SIEMPRE corra, pase lo que
+    // pase.
+    try {
+      const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({ email: email.trim(), password: contrasena });
+      // Las cuentas de prueba creadas desde "Usuarios y permisos" (ver
+      // PanelAccesoPrueba) tienen expira_en — si ya pasó, se corta el acceso
+      // aquí mismo, antes de dejar entrar al panel.
+      if (!loginError && loginData?.user) {
+        const { data: perfilRecienLogueado } = await supabase.from("perfiles").select("expira_en").eq("id", loginData.user.id).maybeSingle();
+        if (perfilRecienLogueado?.expira_en && new Date(perfilRecienLogueado.expira_en).getTime() <= Date.now()) {
+          await supabase.auth.signOut();
+          setError("Este acceso de prueba ya expiró. Pide que te generen uno nuevo.");
           return;
         }
       }
-    }
+      if (loginError) {
+        const anterior = leerJSONLocal(LLAVE_INTENTOS_LOGIN, { intentos: 0 });
+        const intentos = (anterior.intentos || 0) + 1;
+        // A partir del 5º intento fallido seguido, cada uno duplica la espera
+        // (30s, 60s, 120s…) hasta un tope de 5 minutos — suficiente para
+        // frenar un ataque automatizado sin castigar a alguien que
+        // simplemente se equivocó de contraseña una o dos veces.
+        let nuevoBloqueo = 0;
+        if (intentos >= 5) {
+          nuevoBloqueo = Date.now() + Math.min(30 * 2 ** (intentos - 5), 300) * 1000;
+          setBloqueadoHasta(nuevoBloqueo);
+        }
+        guardarJSONLocal(LLAVE_INTENTOS_LOGIN, { intentos, bloqueadoHasta: nuevoBloqueo });
+        setError("Correo o contraseña incorrectos.");
+        return;
+      }
+      guardarJSONLocal(LLAVE_INTENTOS_LOGIN, { intentos: 0, bloqueadoHasta: 0 });
+      setBloqueadoHasta(0);
 
-    setEnviando(false);
-    marcarLoginRecienHecho();
-    onIngresar();
+      // Si el usuario activó verificación en dos pasos (ver
+      // PanelSeguridad2FA), la contraseña sola no basta — Supabase marca
+      // que falta subir a "aal2" y hay que resolver un reto con el código
+      // de 6 dígitos antes de dejarlo entrar.
+      const { data: aalData } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+      if (aalData && aalData.nextLevel === "aal2" && aalData.currentLevel !== "aal2") {
+        const { data: factoresData } = await supabase.auth.mfa.listFactors();
+        const factorVerificado = factoresData?.totp?.find((f) => f.status === "verified");
+        if (factorVerificado) {
+          const { data: challengeData, error: challengeError } = await supabase.auth.mfa.challenge({ factorId: factorVerificado.id });
+          if (!challengeError && challengeData) {
+            setFactorId2FA(factorVerificado.id);
+            setChallengeId2FA(challengeData.id);
+            setPantalla("verificacion-2fa");
+            return;
+          }
+        }
+      }
+
+      marcarLoginRecienHecho();
+      onIngresar();
+    } catch (e) {
+      console.error("Error inesperado al iniciar sesión:", e);
+      setError("Algo falló al iniciar sesión. Revisa tu conexión e intenta de nuevo — si sigue pasando, avísanos.");
+    } finally {
+      setEnviando(false);
+    }
   };
 
   const verificarCodigo2FA = async () => {
     if (!codigo2FA.trim() || !factorId2FA || !challengeId2FA) return;
     setEnviando(true);
     setError("");
-    const { error: verifyError } = await supabase.auth.mfa.verify({ factorId: factorId2FA, challengeId: challengeId2FA, code: codigo2FA.trim() });
-    setEnviando(false);
-    if (verifyError) {
-      setError("Código incorrecto o vencido. Revisa la hora de tu teléfono e intenta de nuevo.");
-      return;
+    try {
+      const { error: verifyError } = await supabase.auth.mfa.verify({ factorId: factorId2FA, challengeId: challengeId2FA, code: codigo2FA.trim() });
+      if (verifyError) {
+        setError("Código incorrecto o vencido. Revisa la hora de tu teléfono e intenta de nuevo.");
+        return;
+      }
+      setCodigo2FA("");
+      marcarLoginRecienHecho();
+      onIngresar();
+    } catch (e) {
+      console.error("Error inesperado verificando el código:", e);
+      setError("Algo falló al verificar el código. Intenta de nuevo.");
+    } finally {
+      setEnviando(false);
     }
-    setCodigo2FA("");
-    marcarLoginRecienHecho();
-    onIngresar();
   };
 
   const enviarRecuperacion = async () => {
