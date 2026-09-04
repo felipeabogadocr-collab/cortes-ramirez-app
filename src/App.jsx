@@ -690,7 +690,7 @@ function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-const APP_VERSION = "1.39.0";
+const APP_VERSION = "1.40.0";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -1472,7 +1472,7 @@ function ensureSheetJS() {
   });
 }
 
-async function ejecutarHerramienta(nombreHerramienta, input) {
+async function ejecutarHerramienta(nombreHerramienta, input, usuarioActual) {
   if (nombreHerramienta === "crear_cliente") {
     const id = uid();
     const nuevoCliente = {
@@ -1491,6 +1491,7 @@ async function ejecutarHerramienta(nombreHerramienta, input) {
     const idsRaw = await storageGet("indice-clientes", false);
     const ids = idsRaw ? JSON.parse(idsRaw) : [];
     await storageSet("indice-clientes", JSON.stringify([id, ...ids]), false);
+    registrarAuditoria(usuarioActual, "crear_cliente", "cliente", id, { nombre: nuevoCliente.nombre });
     const otras = nuevoCliente.otrasPersonas.length ? ` junto con ${nuevoCliente.otrasPersonas.map((p) => p.nombre).join(", ")}` : "";
     return { mensaje: `Cliente "${input.nombre}" creado correctamente${otras}.` };
   }
@@ -1503,6 +1504,7 @@ async function ejecutarHerramienta(nombreHerramienta, input) {
     pago.reciboImagen = await generarReciboImagen(id, cliente, pago);
     const actualizado = { ...cliente, pagos: [...(cliente.pagos || []), pago] };
     await storageSet(`cliente:${id}`, JSON.stringify(actualizado), false);
+    registrarAuditoria(usuarioActual, "registrar_pago", "cliente", id, { nombre: cliente.nombre, valor: pago.valor });
     return { mensaje: `Pago de ${formatoCOP(input.valor)} registrado para ${cliente.nombre}, con su recibo generado.` };
   }
 
@@ -1513,6 +1515,7 @@ async function ejecutarHerramienta(nombreHerramienta, input) {
     const nuevaEntrada = { id: uid(), fecha: new Date().toISOString(), nota: input.nota };
     const actualizado = { ...cliente, timeline: [...(cliente.timeline || []), nuevaEntrada], ultimaActuacion: new Date().toISOString() };
     await storageSet(`cliente:${id}`, JSON.stringify(actualizado), false);
+    registrarAuditoria(usuarioActual, "agregar_actuacion", "cliente", id, { nombre: cliente.nombre });
     return { mensaje: `Actuación agregada a la línea de tiempo de ${cliente.nombre}.` };
   }
 
@@ -1522,6 +1525,7 @@ async function ejecutarHerramienta(nombreHerramienta, input) {
     const { id, cliente } = encontrado;
     const actualizado = { ...cliente, estadoVigilancia: input.estado };
     await storageSet(`cliente:${id}`, JSON.stringify(actualizado), false);
+    registrarAuditoria(usuarioActual, "actualizar_vigilancia", "cliente", id, { nombre: cliente.nombre });
     return { mensaje: `Estado de vigilancia judicial de ${cliente.nombre} actualizado a "${input.estado}".` };
   }
 
@@ -1534,6 +1538,7 @@ async function ejecutarHerramienta(nombreHerramienta, input) {
       if (input[campo] !== undefined && input[campo] !== null && input[campo] !== "") actualizado[campo] = input[campo];
     });
     await storageSet(`cliente:${id}`, JSON.stringify(actualizado), false);
+    registrarAuditoria(usuarioActual, "editar_cliente", "cliente", id, { nombre: cliente.nombre });
     return { mensaje: `Datos de ${cliente.nombre} actualizados.` };
   }
 
@@ -1701,6 +1706,7 @@ async function ejecutarHerramienta(nombreHerramienta, input) {
     const idsDocsRaw = await storageGet("indice-documentos", true);
     const idsDocs = idsDocsRaw ? JSON.parse(idsDocsRaw) : [];
     await storageSet("indice-documentos", JSON.stringify([id, ...idsDocs]), true);
+    registrarAuditoria(usuarioActual, "crear_documento", "documento", id, { nombre: input.titulo });
     return { mensaje: `Documento "${input.titulo}" creado y listo para enviar a firma desde la pestaña Firmar documentos.` };
   }
 
@@ -1710,6 +1716,7 @@ async function ejecutarHerramienta(nombreHerramienta, input) {
     const idsAgendaRaw = await storageGet("indice-agenda", true);
     const idsAgenda = idsAgendaRaw ? JSON.parse(idsAgendaRaw) : [];
     await storageSet("indice-agenda", JSON.stringify([id, ...idsAgenda]), true);
+    registrarAuditoria(usuarioActual, "crear_evento", "evento", id, { nombre: input.titulo });
     return { mensaje: `Evento "${input.titulo}" agendado para el ${input.fecha}${input.hora ? ` a las ${input.hora}` : ""}.` };
   }
 
@@ -1739,6 +1746,7 @@ async function ejecutarHerramienta(nombreHerramienta, input) {
     const { id, cliente } = encontrado;
     const actualizado = { ...cliente, proximoPago: { fecha: input.fecha, valorEsperado: Number(input.valor_esperado) } };
     await storageSet(`cliente:${id}`, JSON.stringify(actualizado), false);
+    registrarAuditoria(usuarioActual, "programar_cobro", "cliente", id, { nombre: cliente.nombre, valor: Number(input.valor_esperado) });
     return { mensaje: `Próximo cobro de ${cliente.nombre} programado: ${formatoCOP(input.valor_esperado)} para el ${input.fecha}.` };
   }
 
@@ -1803,7 +1811,7 @@ const SUGERENCIAS_ASISTENTE = [
   "¿Cómo va el despacho este mes?",
 ];
 
-function AsistenteIA({ nombre, usuarioId, onAccionCompletada }) {
+function AsistenteIA({ nombre, usuarioId, usuarioActual, onAccionCompletada }) {
   const claveIndice = `chat-asistente-indice:${usuarioId || "general"}`;
   const claveMensajes = (idConv) => `chat-asistente-conv:${usuarioId || "general"}:${idConv}`;
 
@@ -2030,7 +2038,7 @@ function AsistenteIA({ nombre, usuarioId, onAccionCompletada }) {
 
         const toolResults = [];
         for (const tu of toolUses) {
-          const resultado = await ejecutarHerramienta(tu.name, tu.input);
+          const resultado = await ejecutarHerramienta(tu.name, tu.input, usuarioActual);
           if (resultado.archivo) archivoGenerado = resultado.archivo;
           toolResults.push({ type: "tool_result", tool_use_id: tu.id, content: resultado.mensaje });
         }
@@ -2434,6 +2442,65 @@ function useAgendaRecordatorios() {
   }, []);
 }
 
+// Un término procesal vencido no es "se te olvidó una reunión" — puede ser
+// perder el proceso. Por eso tiene su propia escala de urgencia (roja mucho
+// antes que un evento normal) en vez de tratarse como cualquier otro
+// recordatorio de la agenda.
+export function urgenciaTermino(dias) {
+  if (dias === null) return { etiqueta: "Sin fecha", color: COLORS.muted, bg: COLORS.surfaceSoft };
+  if (dias < 0) return { etiqueta: `Vencido hace ${Math.abs(dias)} día${Math.abs(dias) === 1 ? "" : "s"}`, color: "#B42318", bg: "#FEF2F2" };
+  if (dias === 0) return { etiqueta: "Vence hoy", color: "#B42318", bg: "#FEF2F2" };
+  if (dias <= 5) return { etiqueta: `Vence en ${dias} día${dias === 1 ? "" : "s"}`, color: "#B42318", bg: "#FEF2F2" };
+  if (dias <= 15) return { etiqueta: `Vence en ${dias} días`, color: "#B45309", bg: "#FEF3E2" };
+  return { etiqueta: `Vence en ${dias} días`, color: "#166534", bg: "#F0FDF4" };
+}
+
+function TerminosPorVencerResumen({ onIr }) {
+  const { ids, eventos, cargado } = useEventosAgenda();
+  if (!cargado) return null;
+  const terminos = ids
+    .map((id) => ({ id, ...eventos[id] }))
+    .filter((e) => e?.titulo && e.esTermino && !e.completado)
+    .map((e) => ({ ...e, dias: diasHasta(e.fecha) }))
+    .filter((e) => e.dias !== null && e.dias <= 15)
+    .sort((a, b) => a.dias - b.dias)
+    .slice(0, 5);
+  if (terminos.length === 0) return null;
+  return (
+    <Card style={{ marginBottom: 24, borderLeft: "4px solid #B42318" }}>
+      <p
+        style={{
+          fontFamily: "Inter, sans-serif", fontSize: 11.5, fontWeight: 700, color: "#B42318",
+          textTransform: "uppercase", letterSpacing: 0.5, margin: "0 0 12px", display: "flex", alignItems: "center", gap: 6,
+        }}
+      >
+        <Icono tipo="alerta" size={14} /> Términos procesales por vencer
+      </p>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {terminos.map((t) => {
+          const u = urgenciaTermino(t.dias);
+          return (
+            <div
+              key={t.id}
+              onClick={() => onIr("agenda")}
+              style={{
+                display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10,
+                background: u.bg, border: `1px solid ${u.color}40`, borderRadius: 8, padding: "9px 12px", cursor: "pointer",
+              }}
+            >
+              <div style={{ minWidth: 0 }}>
+                <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, fontWeight: 600, color: COLORS.ink, margin: 0 }}>{t.titulo}</p>
+                {t.clienteRelacionado && <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, color: COLORS.muted, margin: "2px 0 0" }}>{t.clienteRelacionado}</p>}
+              </div>
+              <span style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, fontWeight: 700, color: u.color, whiteSpace: "nowrap", flexShrink: 0 }}>{u.etiqueta}</span>
+            </div>
+          );
+        })}
+      </div>
+    </Card>
+  );
+}
+
 function ProximoEventoResumen({ onIr }) {
   const { ids, eventos, cargado } = useEventosAgenda();
   if (!cargado) return null;
@@ -2461,7 +2528,7 @@ function ProximoEventoResumen({ onIr }) {
   );
 }
 
-function ResumenTab({ nombre, usuarioId, onIr }) {
+function ResumenTab({ nombre, usuarioId, usuarioActual, onIr }) {
   const r = useResumenGeneral();
   const rep = useDatosReportes();
   const versiculo = fraseDelDia(VERSICULOS);
@@ -2524,6 +2591,7 @@ function ResumenTab({ nombre, usuarioId, onIr }) {
       </div>
 
       <ProximoEventoResumen onIr={onIr} />
+      <TerminosPorVencerResumen onIr={onIr} />
 
       {(() => {
         const d = diagnosticoOperacion(r);
@@ -2575,7 +2643,7 @@ function ResumenTab({ nombre, usuarioId, onIr }) {
         );
       })()}
 
-      <AsistenteIA nombre={nombre} usuarioId={usuarioId} onAccionCompletada={r.reload} />
+      <AsistenteIA nombre={nombre} usuarioId={usuarioId} usuarioActual={usuarioActual} onAccionCompletada={r.reload} />
 
       {tareasPendientes > 0 && (
         <div className="drx-fade-in" style={{ marginBottom: 20 }}>
@@ -7527,7 +7595,7 @@ function App() {
           <div key={tab} className="drx-tab-transition" style={{ maxWidth: 760, margin: "0 auto" }}>
             {tab === "resumen" && puedeVer("resumen") && (
               <TabErrorBoundary nombre="resumen">
-                <ResumenTab nombre={usuarioActual.nombre} usuarioId={usuarioActual.id} onIr={setTab} />
+                <ResumenTab nombre={usuarioActual.nombre} usuarioId={usuarioActual.id} usuarioActual={usuarioActual} onIr={setTab} />
               </TabErrorBoundary>
             )}
             {tab === "agenda" && puedeVer("agenda") && (

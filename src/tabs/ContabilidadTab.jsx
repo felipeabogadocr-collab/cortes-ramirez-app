@@ -168,6 +168,96 @@ async function generarCuentaDeCobroPdf({ cliente, pago, datosResponsable, numero
   pdf.save(nombreArchivo);
 }
 
+// Un solo PDF con el año completo (ingresos brutos, retenciones, egresos por
+// categoría y la utilidad neta) — lo que un contador pide de entrada en
+// época de declaración de renta, en vez de tener que armarlo a mano
+// cruzando los CSV de pagos, egresos y otros ingresos por separado.
+async function generarResumenFiscalPdf({ anio, nombreDespacho, ingresosBruto, retenidoTotal, ingresosNeto, egresoTotal, egresosPorCategoria, netoAnio }) {
+  await ensureJsPDF();
+  const { jsPDF } = window.jspdf;
+  const pdf = new jsPDF({ unit: "pt", format: "carta" });
+  const pageWidth = pdf.internal.pageSize.getWidth();
+  const marginX = 56;
+  let y = 60;
+
+  try {
+    const logoSize = 48;
+    pdf.addImage(LOGO_SRC, "PNG", pageWidth / 2 - logoSize / 2, y, logoSize, logoSize);
+    y += logoSize + 20;
+  } catch (e) {
+    // nunca debe bloquear el resumen por esto
+  }
+
+  pdf.setFont("helvetica", "bold");
+  pdf.setFontSize(17);
+  pdf.text(`Resumen fiscal ${anio}`, pageWidth / 2, y, { align: "center" });
+  y += 20;
+  pdf.setFont("helvetica", "normal");
+  pdf.setFontSize(11);
+  pdf.setTextColor(100, 100, 100);
+  pdf.text(nombreDespacho, pageWidth / 2, y, { align: "center" });
+  pdf.setTextColor(11, 18, 32);
+  y += 40;
+
+  const filas = [
+    ["Ingresos brutos (clientes + otros ingresos)", formatoCOP(ingresosBruto)],
+    ["Retenciones en la fuente que te aplicaron", formatoCOP(retenidoTotal)],
+    ["Ingresos netos que de verdad recibiste", formatoCOP(ingresosNeto)],
+    ["Egresos totales del año", formatoCOP(egresoTotal)],
+    ["Utilidad neta del año (ingresos brutos - egresos)", formatoCOP(netoAnio)],
+  ];
+  pdf.setFontSize(11.5);
+  filas.forEach(([etiqueta, valor], idx) => {
+    if (idx % 2 === 0) {
+      pdf.setFillColor(244, 246, 249);
+      pdf.rect(marginX, y - 14, pageWidth - marginX * 2, 22, "F");
+    }
+    pdf.setFont("helvetica", "normal");
+    pdf.setTextColor(75, 85, 99);
+    pdf.text(etiqueta, marginX + 6, y);
+    pdf.setFont("helvetica", "bold");
+    pdf.setTextColor(11, 18, 32);
+    pdf.text(valor, pageWidth - marginX - 6, y, { align: "right" });
+    y += 22;
+  });
+
+  if (egresosPorCategoria.length > 0) {
+    y += 26;
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(12.5);
+    pdf.setTextColor(11, 18, 32);
+    pdf.text("Egresos por categoría", marginX, y);
+    y += 8;
+    pdf.setDrawColor(11, 61, 46);
+    pdf.setLineWidth(1);
+    pdf.line(marginX, y, marginX + 70, y);
+    y += 18;
+    pdf.setFontSize(11);
+    egresosPorCategoria.forEach(([categoria, valor], idx) => {
+      if (idx % 2 === 0) {
+        pdf.setFillColor(244, 246, 249);
+        pdf.rect(marginX, y - 14, pageWidth - marginX * 2, 20, "F");
+      }
+      pdf.setFont("helvetica", "normal");
+      pdf.setTextColor(75, 85, 99);
+      pdf.text(categoria, marginX + 6, y);
+      pdf.setFont("helvetica", "bold");
+      pdf.setTextColor(11, 18, 32);
+      pdf.text(formatoCOP(valor), pageWidth - marginX - 6, y, { align: "right" });
+      y += 20;
+    });
+  }
+
+  pdf.setFont("helvetica", "normal");
+  pdf.setFontSize(9);
+  pdf.setTextColor(148, 163, 184);
+  const pie = `Generado el ${new Date().toLocaleDateString("es-CO", { dateStyle: "long" })} a partir de lo registrado en Nomos — sin validez tributaria oficial, verifícalo con tu contador.`;
+  const lineasPie = pdf.splitTextToSize(pie, pageWidth - marginX * 2);
+  pdf.text(lineasPie, pageWidth / 2, pdf.internal.pageSize.getHeight() - 34, { align: "center" });
+
+  pdf.save(`resumen_fiscal_${anio}.pdf`);
+}
+
 function PanelDatosCuentaCobro({ datos, onGuardar }) {
   const [abierto, setAbierto] = useState(false);
   const [nombre, setNombre] = useState(datos?.nombre || "");
@@ -969,6 +1059,57 @@ export default function ContabilidadTab({ usuarioActual }) {
   };
   const porcentajeAhorro = Number(ahorro?.porcentaje) || 0;
 
+  const [anioFiscal, setAnioFiscal] = useState(new Date().getFullYear());
+  const [generandoFiscal, setGenerandoFiscal] = useState(false);
+  const aniosDisponibles = useMemo(() => {
+    const set = new Set([new Date().getFullYear()]);
+    ids.forEach((id) => (clientes[id]?.pagos || []).forEach((p) => set.add(new Date(p.fecha).getFullYear())));
+    otrosIngresos.forEach((i) => set.add(new Date(i.fecha).getFullYear()));
+    egresos.forEach((e) => set.add(new Date(e.fecha).getFullYear()));
+    return [...set].sort((a, b) => b - a);
+  }, [ids, clientes, otrosIngresos, egresos]);
+
+  const generarResumenFiscal = async () => {
+    setGenerandoFiscal(true);
+    try {
+      let ingresosBruto = 0;
+      let retenidoTotalAnio = 0;
+      ids.forEach((id) => {
+        (clientes[id]?.pagos || []).forEach((p) => {
+          if (new Date(p.fecha).getFullYear() === anioFiscal) {
+            ingresosBruto += Number(p.valor) || 0;
+            retenidoTotalAnio += valorRetenido(p);
+          }
+        });
+      });
+      otrosIngresos.forEach((i) => {
+        if (new Date(i.fecha).getFullYear() === anioFiscal) ingresosBruto += Number(i.valor) || 0;
+      });
+      const porCategoriaAnio = {};
+      let egresoTotalAnio = 0;
+      egresos.forEach((e) => {
+        if (new Date(e.fecha).getFullYear() === anioFiscal) {
+          const valor = Number(e.valor) || 0;
+          egresoTotalAnio += valor;
+          porCategoriaAnio[e.categoria] = (porCategoriaAnio[e.categoria] || 0) + valor;
+        }
+      });
+      await generarResumenFiscalPdf({
+        anio: anioFiscal,
+        nombreDespacho: getNombreDespacho(),
+        ingresosBruto,
+        retenidoTotal: retenidoTotalAnio,
+        ingresosNeto: ingresosBruto - retenidoTotalAnio,
+        egresoTotal: egresoTotalAnio,
+        egresosPorCategoria: Object.entries(porCategoriaAnio).sort((a, b) => b[1] - a[1]),
+        netoAnio: ingresosBruto - egresoTotalAnio,
+      });
+    } catch (e) {
+      console.error("No se pudo generar el resumen fiscal:", e);
+    }
+    setGenerandoFiscal(false);
+  };
+
   const registrarEgreso = async (datos) => {
     const nuevo = await crearEgreso(datos);
     registrarAuditoria(usuarioActual, "registrar_egreso", "egreso", nuevo.id, { concepto: nuevo.concepto, valor: nuevo.valor });
@@ -1411,6 +1552,31 @@ export default function ContabilidadTab({ usuarioActual }) {
           ]}
           formatoValor={formatoCOP}
         />
+      </Card>
+
+      <Card style={{ marginBottom: 20, borderLeft: `4px solid ${COLORS.accentBright}` }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 14 }}>
+          <div>
+            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, fontWeight: 700, color: COLORS.ink, margin: 0, display: "flex", alignItems: "center", gap: 6 }}>
+              <Icono tipo="documento" size={15} /> Resumen fiscal anual
+            </p>
+            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, margin: "4px 0 0" }}>
+              Ingresos, retenciones y gastos por categoría de un año completo, listo para tu contador.
+            </p>
+          </div>
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <select className="drx-input" style={{ ...inputStyle, maxWidth: 110 }} value={anioFiscal} onChange={(e) => setAnioFiscal(Number(e.target.value))}>
+              {aniosDisponibles.map((a) => (
+                <option key={a} value={a}>
+                  {a}
+                </option>
+              ))}
+            </select>
+            <button className="drx-btn-primary drx-cta-shine" style={buttonPrimary} onClick={generarResumenFiscal} disabled={generandoFiscal}>
+              {generandoFiscal ? "Generando…" : "Descargar PDF"}
+            </button>
+          </div>
+        </div>
       </Card>
 
       {categoriasEgresoOrdenadas.length > 0 && (

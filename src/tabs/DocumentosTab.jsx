@@ -126,6 +126,109 @@ async function descargarPdfFirmado(doc) {
 
 const FORM_DOC_INICIAL = { titulo: "", cliente: "", whatsappIndicativo: "57", whatsappNumero: "", contenido: "", nombreArchivo: "", tipoDocumento: "texto", archivoPdfBase64: "" };
 
+// Plantillas de arranque para no partir de una hoja en blanco — con
+// marcadores [ENTRE CORCHETES] para completar caso por caso. Son un punto
+// de partida general, no asesoría lista para usar sin revisión: cada
+// despacho las ajusta a su caso concreto antes de mandarlas a firmar.
+const PLANTILLAS_DOCUMENTO = [
+  {
+    id: "poder",
+    nombre: "Poder especial",
+    titulo: "Poder especial",
+    contenido: `PODER ESPECIAL
+
+Yo, [NOMBRE COMPLETO DEL PODERDANTE], mayor de edad, identificado(a) con cédula de ciudadanía No. [C.C.] expedida en [CIUDAD], obrando en nombre propio, por medio del presente escrito confiero PODER ESPECIAL, amplio y suficiente, al abogado [NOMBRE DEL ABOGADO], portador de la tarjeta profesional No. [T.P.], para que me represente en [DESCRIPCIÓN DEL ASUNTO O PROCESO], ante [AUTORIDAD O DESPACHO JUDICIAL].
+
+El apoderado queda facultado para presentar y contestar demandas, interponer y sustentar recursos, solicitar y aportar pruebas, conciliar, transigir, desistir, recibir notificaciones y, en general, para realizar todas las gestiones necesarias en el trámite del asunto encomendado.
+
+Para constancia se firma en [CIUDAD], a los [DÍA] días del mes de [MES] de [AÑO].
+
+
+_________________________________
+[NOMBRE COMPLETO DEL PODERDANTE]
+C.C. [C.C.]`,
+  },
+  {
+    id: "prestacion_servicios",
+    nombre: "Contrato de prestación de servicios profesionales",
+    titulo: "Contrato de prestación de servicios profesionales",
+    contenido: `CONTRATO DE PRESTACIÓN DE SERVICIOS PROFESIONALES
+
+Entre los suscritos, [NOMBRE DEL ABOGADO O DESPACHO], identificado con C.C./NIT No. [C.C./NIT], quien en adelante se denominará EL CONTRATISTA, y [NOMBRE DEL CLIENTE], identificado con C.C./NIT No. [C.C./NIT], quien en adelante se denominará EL CONTRATANTE, hemos acordado celebrar el presente contrato de prestación de servicios profesionales, regido por las siguientes cláusulas:
+
+PRIMERA. OBJETO: EL CONTRATISTA se compromete a prestar sus servicios profesionales de asesoría y representación jurídica a EL CONTRATANTE en relación con [DESCRIPCIÓN DEL ASUNTO].
+
+SEGUNDA. HONORARIOS: EL CONTRATANTE pagará a EL CONTRATISTA la suma de [VALOR EN PESOS] por concepto de honorarios, pagaderos así: [FORMA DE PAGO — cuota inicial, cuotas mensuales, contra resultado, etc.].
+
+TERCERA. DURACIÓN: El presente contrato tendrá una duración de [PLAZO], contado a partir de la fecha de su firma, o hasta la terminación del asunto encomendado.
+
+CUARTA. OBLIGACIONES DEL CONTRATISTA: Actuar con diligencia, lealtad y reserva profesional, e informar a EL CONTRATANTE sobre el desarrollo del asunto encomendado.
+
+QUINTA. INDEPENDENCIA: El presente contrato no genera relación laboral ni subordinación entre las partes.
+
+Para constancia se firma en [CIUDAD], a los [DÍA] días del mes de [MES] de [AÑO].
+
+
+_________________________________                 _________________________________
+EL CONTRATISTA                                     EL CONTRATANTE
+[NOMBRE]                                           [NOMBRE]`,
+  },
+  {
+    id: "confidencialidad",
+    nombre: "Acuerdo de confidencialidad",
+    titulo: "Acuerdo de confidencialidad",
+    contenido: `ACUERDO DE CONFIDENCIALIDAD
+
+Entre [PARTE 1], identificado con C.C./NIT No. [C.C./NIT], y [PARTE 2], identificado con C.C./NIT No. [C.C./NIT], se celebra el presente acuerdo de confidencialidad, bajo las siguientes cláusulas:
+
+PRIMERA. OBJETO: Las partes se comprometen a mantener bajo estricta reserva toda la información de carácter confidencial que se revelen mutuamente con ocasión de [DESCRIPCIÓN DEL CONTEXTO — negociación, prestación de servicios, etc.].
+
+SEGUNDA. INFORMACIÓN CONFIDENCIAL: Se entiende por información confidencial toda información técnica, comercial, financiera o de cualquier otra naturaleza, escrita, verbal o en cualquier otro medio, que sea entregada o conocida por las partes con ocasión del presente acuerdo.
+
+TERCERA. EXCEPCIONES: No se considerará confidencial la información que sea de dominio público, que la parte receptora ya conociera antes de su divulgación, o cuya divulgación sea requerida por autoridad competente.
+
+CUARTA. DURACIÓN: Las obligaciones de confidencialidad aquí pactadas permanecerán vigentes durante [PLAZO], contado a partir de la firma del presente documento.
+
+QUINTA. INCUMPLIMIENTO: El incumplimiento de lo aquí pactado dará lugar a las acciones legales a que haya lugar y a la indemnización de los perjuicios que se causen.
+
+Para constancia se firma en [CIUDAD], a los [DÍA] días del mes de [MES] de [AÑO].
+
+
+_________________________________                 _________________________________
+[PARTE 1]                                          [PARTE 2]`,
+  },
+  {
+    id: "derecho_peticion",
+    nombre: "Derecho de petición",
+    titulo: "Derecho de petición",
+    contenido: `Señores
+[ENTIDAD DESTINATARIA]
+[CIUDAD]
+
+REFERENCIA: Derecho de petición
+
+[NOMBRE COMPLETO], mayor de edad, identificado(a) con cédula de ciudadanía No. [C.C.], actuando en nombre propio (o como apoderado(a) de [NOMBRE DEL PODERDANTE], según poder adjunto), respetuosamente me dirijo a ustedes con el fin de ejercer el derecho de petición consagrado en el artículo 23 de la Constitución Política y reglamentado por la Ley 1755 de 2015, para solicitar lo siguiente:
+
+HECHOS:
+1. [DESCRIPCIÓN DE LOS HECHOS RELEVANTES]
+2. [...]
+
+PETICIÓN:
+Respetuosamente solicito a esa entidad: [DESCRIPCIÓN CLARA Y CONCRETA DE LO QUE SE PIDE].
+
+FUNDAMENTOS DE DERECHO: Artículo 23 de la Constitución Política de Colombia y Ley 1755 de 2015 (Código de Procedimiento Administrativo y de lo Contencioso Administrativo, Título II).
+
+NOTIFICACIONES: Recibiré notificaciones en [DIRECCIÓN FÍSICA Y/O CORREO ELECTRÓNICO].
+
+Cordialmente,
+
+
+_________________________________
+[NOMBRE COMPLETO]
+C.C. [C.C.]`,
+  },
+];
+
 export default function DocumentosTab({ usuarioActual }) {
   const { ids, cargado, addId, removeId } = useIndex("indice-documentos", true);
   const [docs, setDocs] = useState({});
@@ -209,6 +312,14 @@ export default function DocumentosTab({ usuarioActual }) {
       setErrorArchivo("No pudimos leer ese archivo. Intenta con otro .docx o .txt, o pega el texto manualmente abajo.");
     }
     setCargandoArchivo(false);
+  };
+
+  const usarPlantilla = async (idPlantilla) => {
+    if (!idPlantilla) return;
+    const plantilla = PLANTILLAS_DOCUMENTO.find((p) => p.id === idPlantilla);
+    if (!plantilla) return;
+    if (form.contenido.trim() && !(await confirmar("Ya tienes texto escrito en el documento. ¿Reemplazarlo con la plantilla?"))) return;
+    setForm((f) => ({ ...f, titulo: f.titulo.trim() ? f.titulo : plantilla.titulo, contenido: plantilla.contenido, tipoDocumento: "texto", archivoPdfBase64: "", nombreArchivo: "" }));
   };
 
   const listoParaGuardar = form.titulo.trim() && (form.tipoDocumento === "pdf" ? form.archivoPdfBase64 : form.contenido.trim());
@@ -427,6 +538,22 @@ export default function DocumentosTab({ usuarioActual }) {
             <Field label="Cliente">
               <input className="drx-input" style={inputStyle} value={form.cliente} onChange={(e) => setForm({ ...form, cliente: e.target.value })} />
             </Field>
+          </div>
+
+          <div style={{ marginBottom: 16, background: COLORS.surfaceSoft, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: 12 }}>
+            <Field label="Empezar desde una plantilla (opcional)">
+              <select className="drx-input" style={inputStyle} value="" onChange={(e) => usarPlantilla(e.target.value)}>
+                <option value="">Elegir una plantilla…</option>
+                {PLANTILLAS_DOCUMENTO.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.nombre}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11, color: COLORS.muted, margin: "8px 0 0" }}>
+              Llena los marcadores [ENTRE CORCHETES] con los datos del caso — son un punto de partida, no un documento listo para firmar sin revisarlo.
+            </p>
           </div>
 
           <div style={{ marginBottom: 12 }}>

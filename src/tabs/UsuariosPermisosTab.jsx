@@ -742,6 +742,11 @@ const ETIQUETAS_ACCION = {
   duplicar_documento: { texto: "duplicó el documento", color: "#0EA5E9" },
   eliminar_documento: { texto: "eliminó el documento", color: "#B42318" },
   firmar_documento: { texto: "firmó el documento", color: "#10B981" },
+  editar_cliente: { texto: "editó al cliente", color: "#0EA5E9" },
+  agregar_actuacion: { texto: "agregó una actuación a", color: "#0EA5E9" },
+  actualizar_vigilancia: { texto: "actualizó la vigilancia judicial de", color: "#0EA5E9" },
+  crear_evento: { texto: "agendó el evento", color: "#10B981" },
+  programar_cobro: { texto: "programó un cobro para", color: "#0EA5E9" },
 };
 
 const AUDITORIA_POR_PAGINA = 25;

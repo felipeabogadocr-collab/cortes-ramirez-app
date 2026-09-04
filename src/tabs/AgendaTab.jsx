@@ -1,7 +1,7 @@
 import { useState } from "react";
 import {
   COLORS, EncabezadoSeccion, Card, buttonPrimary, buttonGhost, Field, inputStyle,
-  Icono, IconoCampana, EstadoVacio, useConfirmarDialogo, useEventosAgenda,
+  Icono, IconoCampana, EstadoVacio, useConfirmarDialogo, useEventosAgenda, diasHasta, urgenciaTermino,
 } from "../App.jsx";
 
 function descargarICS(evento) {
@@ -51,8 +51,9 @@ const FILTROS_AGENDA = [
 
 function EventoAgendaCard({ evento, onEliminar, onCompletar, pasado }) {
   const fechaTexto = new Date(`${evento.fecha}T${evento.hora || "00:00"}:00`).toLocaleDateString("es-CO", { weekday: "long", day: "numeric", month: "long" });
+  const urgencia = evento.esTermino && !evento.completado ? urgenciaTermino(diasHasta(evento.fecha)) : null;
   return (
-    <Card style={{ padding: 14, opacity: pasado || evento.completado ? 0.55 : 1 }}>
+    <Card style={{ padding: 14, opacity: pasado || evento.completado ? 0.55 : 1, borderLeft: urgencia ? `4px solid ${urgencia.color}` : undefined }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10, flexWrap: "wrap" }}>
         {onCompletar && (
           <button
@@ -77,10 +78,18 @@ function EventoAgendaCard({ evento, onEliminar, onCompletar, pasado }) {
           </button>
         )}
         <div style={{ flex: 1, minWidth: 180 }}>
-          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 14, fontWeight: 700, color: COLORS.ink, margin: 0, textTransform: "capitalize", textDecoration: evento.completado ? "line-through" : "none" }}>{evento.titulo}</p>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 14, fontWeight: 700, color: COLORS.ink, margin: 0, textTransform: "capitalize", textDecoration: evento.completado ? "line-through" : "none" }}>{evento.titulo}</p>
+            {urgencia && (
+              <span style={{ fontFamily: "Inter, sans-serif", fontSize: 10.5, fontWeight: 700, color: urgencia.color, background: urgencia.bg, border: `1px solid ${urgencia.color}40`, borderRadius: 20, padding: "2px 9px" }}>
+                {urgencia.etiqueta}
+              </span>
+            )}
+          </div>
           <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, margin: "4px 0 0", textTransform: "capitalize" }}>
             {fechaTexto}
             {evento.hora ? ` · ${evento.hora}` : ""}
+            {evento.esTermino && evento.clienteRelacionado ? ` · ${evento.clienteRelacionado}` : ""}
           </p>
           {evento.notas && <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.inkSoft, margin: "6px 0 0" }}>{evento.notas}</p>}
         </div>
@@ -100,9 +109,10 @@ function EventoAgendaCard({ evento, onEliminar, onCompletar, pasado }) {
 export default function AgendaTab() {
   const { ids, eventos, cargado, crear, eliminar, actualizar } = useEventosAgenda();
   const [mostrarForm, setMostrarForm] = useState(false);
-  const [form, setForm] = useState({ titulo: "", fecha: "", hora: "", notas: "" });
+  const [form, setForm] = useState({ titulo: "", fecha: "", hora: "", notas: "", esTermino: false, clienteRelacionado: "" });
   const [permisoNotif, setPermisoNotif] = useState(typeof Notification !== "undefined" ? Notification.permission : "unsupported");
   const [filtroTiempo, setFiltroTiempo] = useState("todos");
+  const [soloTerminos, setSoloTerminos] = useState(false);
   const { confirmar, ConfirmarDialogo } = useConfirmarDialogo();
 
   const pedirPermiso = async () => {
@@ -113,8 +123,15 @@ export default function AgendaTab() {
 
   const guardar = async () => {
     if (!form.titulo.trim() || !form.fecha) return;
-    await crear({ titulo: form.titulo.trim(), fecha: form.fecha, hora: form.hora, notas: form.notas.trim() });
-    setForm({ titulo: "", fecha: "", hora: "", notas: "" });
+    await crear({
+      titulo: form.titulo.trim(),
+      fecha: form.fecha,
+      hora: form.hora,
+      notas: form.notas.trim(),
+      esTermino: form.esTermino,
+      clienteRelacionado: form.esTermino ? form.clienteRelacionado.trim() : "",
+    });
+    setForm({ titulo: "", fecha: "", hora: "", notas: "", esTermino: false, clienteRelacionado: "" });
     setMostrarForm(false);
   };
 
@@ -136,7 +153,11 @@ export default function AgendaTab() {
   let proximos = lista.filter((e) => e.fecha >= hoyISO);
   if (filtroTiempo === "hoy") proximos = proximos.filter((e) => e.fecha === hoyISO);
   else if (filtroTiempo === "semana") proximos = proximos.filter((e) => e.fecha <= finSemanaISO);
-  const pasados = lista.filter((e) => e.fecha < hoyISO);
+  let pasados = lista.filter((e) => e.fecha < hoyISO);
+  if (soloTerminos) {
+    proximos = proximos.filter((e) => e.esTermino);
+    pasados = pasados.filter((e) => e.esTermino);
+  }
 
   return (
     <div>
@@ -174,6 +195,10 @@ export default function AgendaTab() {
               {f.nombre}
             </button>
           ))}
+          <label style={{ display: "flex", alignItems: "center", gap: 6, fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.inkSoft, cursor: "pointer", marginLeft: 4 }}>
+            <input type="checkbox" checked={soloTerminos} onChange={(e) => setSoloTerminos(e.target.checked)} />
+            Solo términos procesales
+          </label>
         </div>
         <button className="drx-btn-primary" style={buttonPrimary} onClick={() => setMostrarForm((v) => !v)}>
           {mostrarForm ? "Cancelar" : "+ Nuevo evento"}
@@ -203,6 +228,21 @@ export default function AgendaTab() {
                 placeholder="Detalles del evento..."
               />
             </Field>
+            <label style={{ display: "flex", alignItems: "center", gap: 8, fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.inkSoft, cursor: "pointer" }}>
+              <input type="checkbox" checked={form.esTermino} onChange={(e) => setForm({ ...form, esTermino: e.target.checked })} />
+              Es un término procesal (vencimiento legal) — recibe alertas más estrictas que un evento normal
+            </label>
+            {form.esTermino && (
+              <Field label="Cliente / proceso relacionado (opcional)">
+                <input
+                  className="drx-input"
+                  style={inputStyle}
+                  value={form.clienteRelacionado}
+                  onChange={(e) => setForm({ ...form, clienteRelacionado: e.target.value })}
+                  placeholder="Ej: Juan Pérez — Proceso 2024-00187"
+                />
+              </Field>
+            )}
             <button className="drx-btn-primary" style={buttonPrimary} onClick={guardar} disabled={!form.titulo.trim() || !form.fecha}>
               Guardar evento
             </button>
