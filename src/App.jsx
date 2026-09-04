@@ -240,6 +240,24 @@ function ensureFonts() {
   document.head.appendChild(link);
 }
 
+// El navegador informa el tipo de archivo (accept="image/*", archivo.type)
+// pero eso es solo lo que el propio archivo DICE ser — un archivo renombrado
+// o con el Content-Type falseado pasa esa verificación igual. Aquí se
+// decodifica de verdad como imagen (createImageBitmap falla si no lo es de
+// verdad) y se rechaza SVG explícitamente, porque a diferencia de un
+// JPG/PNG puede llevar <script> adentro — algo que una foto de perfil
+// nunca necesita.
+async function archivoEsImagenValida(file) {
+  if (!file || !file.type.startsWith("image/") || file.type === "image/svg+xml") return false;
+  try {
+    const bitmap = await createImageBitmap(file);
+    bitmap.close?.();
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
 import {
   storageGet,
   storageSet,
@@ -736,7 +754,7 @@ function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-const APP_VERSION = "1.41.0";
+const APP_VERSION = "1.42.0";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -4453,6 +4471,190 @@ function useNotificacionesPanel(prefs) {
   };
 }
 
+// Verificación en dos pasos (2FA/TOTP) por cuenta, con la API nativa de
+// Supabase Auth (auth.mfa) — gratis, sin librería ni servicio externo. Cada
+// usuario la activa desde aquí para su propia cuenta; al iniciar sesión
+// después de activarla, además de la contraseña se pide el código de 6
+// dígitos (ver iniciarSesion / pantalla "verificacion-2fa" en LoginGate).
+function PanelSeguridad2FA({ onCerrar }) {
+  const [cargando, setCargando] = useState(true);
+  const [factor, setFactor] = useState(null);
+  const [inscribiendo, setInscribiendo] = useState(false);
+  const [qrSvg, setQrSvg] = useState("");
+  const [secreto, setSecreto] = useState("");
+  const [factorIdPendiente, setFactorIdPendiente] = useState(null);
+  const [codigo, setCodigo] = useState("");
+  const [error, setError] = useState("");
+  const [guardando, setGuardando] = useState(false);
+  const panelRef = useRef(null);
+
+  const cargarFactores = useCallback(async () => {
+    setCargando(true);
+    const { data } = await supabase.auth.mfa.listFactors();
+    setFactor(data?.totp?.find((f) => f.status === "verified") || null);
+    setCargando(false);
+  }, []);
+
+  useEffect(() => {
+    cargarFactores();
+  }, [cargarFactores]);
+
+  useEffect(() => {
+    const alPresionarTecla = (e) => {
+      if (e.key === "Escape") onCerrar();
+    };
+    const alHacerClicAfuera = (e) => {
+      if (panelRef.current && !panelRef.current.contains(e.target)) onCerrar();
+    };
+    document.addEventListener("keydown", alPresionarTecla);
+    document.addEventListener("mousedown", alHacerClicAfuera);
+    return () => {
+      document.removeEventListener("keydown", alPresionarTecla);
+      document.removeEventListener("mousedown", alHacerClicAfuera);
+    };
+  }, [onCerrar]);
+
+  const empezarInscripcion = async () => {
+    setError("");
+    // Supabase no deja tener dos factores TOTP sin verificar a la vez — si
+    // quedó uno a medias de un intento anterior, se limpia antes de pedir
+    // uno nuevo.
+    const { data: factoresActuales } = await supabase.auth.mfa.listFactors();
+    for (const f of factoresActuales?.totp || []) {
+      if (f.status !== "verified") await supabase.auth.mfa.unenroll({ factorId: f.id });
+    }
+    const { data, error: enrollError } = await supabase.auth.mfa.enroll({ factorType: "totp" });
+    if (enrollError || !data) {
+      setError("No se pudo iniciar la activación. Intenta de nuevo.");
+      return;
+    }
+    setFactorIdPendiente(data.id);
+    setQrSvg(data.totp.qr_code);
+    setSecreto(data.totp.secret);
+    setInscribiendo(true);
+  };
+
+  const confirmarInscripcion = async () => {
+    if (codigo.length !== 6 || !factorIdPendiente) return;
+    setGuardando(true);
+    setError("");
+    const { data: challengeData, error: challengeError } = await supabase.auth.mfa.challenge({ factorId: factorIdPendiente });
+    if (challengeError || !challengeData) {
+      setError("No se pudo verificar el código. Intenta de nuevo.");
+      setGuardando(false);
+      return;
+    }
+    const { error: verifyError } = await supabase.auth.mfa.verify({ factorId: factorIdPendiente, challengeId: challengeData.id, code: codigo });
+    setGuardando(false);
+    if (verifyError) {
+      setError("Código incorrecto. Revisa que la hora de tu teléfono esté bien ajustada e intenta de nuevo.");
+      return;
+    }
+    setInscribiendo(false);
+    setCodigo("");
+    setQrSvg("");
+    setSecreto("");
+    await cargarFactores();
+  };
+
+  const cancelarInscripcion = async () => {
+    if (factorIdPendiente) await supabase.auth.mfa.unenroll({ factorId: factorIdPendiente });
+    setInscribiendo(false);
+    setCodigo("");
+    setError("");
+  };
+
+  const desactivar = async () => {
+    if (!factor) return;
+    setGuardando(true);
+    await supabase.auth.mfa.unenroll({ factorId: factor.id });
+    setGuardando(false);
+    await cargarFactores();
+  };
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(6,14,28,0.55)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+      <div
+        ref={panelRef}
+        className="drx-dropdown-in"
+        style={{
+          background: COLORS.panel, borderRadius: 16, border: `1px solid ${COLORS.border}`, width: 440, maxWidth: "100%",
+          maxHeight: "85vh", overflowY: "auto", boxShadow: "0 20px 50px rgba(11,61,46,0.25)", padding: 24,
+        }}
+      >
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 17, fontWeight: 800, color: COLORS.headingText, margin: 0, display: "flex", alignItems: "center", gap: 8 }}>
+            <Icono tipo="escudo" size={18} /> Verificación en dos pasos
+          </p>
+          <button onClick={onCerrar} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: COLORS.muted }}>
+            ✕
+          </button>
+        </div>
+
+        {cargando ? (
+          <Spinner texto="Revisando..." />
+        ) : factor && !inscribiendo ? (
+          <>
+            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: "#166534", background: "#F0FDF4", border: "1px solid #BBF7D0", borderRadius: 10, padding: "10px 14px", display: "flex", alignItems: "center", gap: 8, margin: 0 }}>
+              <Icono tipo="check" size={14} /> Activada — cada inicio de sesión pide un código además de tu contraseña.
+            </p>
+            <button className="drx-btn-ghost" style={{ ...buttonGhost, marginTop: 16, width: "100%", color: "#B42318", borderColor: "#F2B8B5" }} onClick={desactivar} disabled={guardando}>
+              {guardando ? "Desactivando..." : "Desactivar verificación en dos pasos"}
+            </button>
+          </>
+        ) : !inscribiendo ? (
+          <>
+            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.inkSoft, lineHeight: 1.6, margin: "0 0 16px" }}>
+              Agrega una capa extra de seguridad a tu cuenta: además de tu contraseña, se pedirá un código de 6 dígitos generado por una app como Google Authenticator, Authy o similar. Aunque alguien más consiga tu contraseña, no podrá entrar sin ese código.
+            </p>
+            {error && <p style={{ color: "#B42318", fontSize: 12.5, marginBottom: 12, fontFamily: "Inter, sans-serif" }}>{error}</p>}
+            <button className="drx-btn-primary drx-cta-shine" style={{ ...buttonPrimary, width: "100%" }} onClick={empezarInscripcion}>
+              Activar verificación en dos pasos
+            </button>
+          </>
+        ) : (
+          <>
+            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.inkSoft, marginBottom: 12 }}>
+              1. Escanea este código con tu app autenticadora (o escribe la clave manualmente si no puedes escanear):
+            </p>
+            {qrSvg && (
+              // El SVG viene directo de la respuesta de Supabase (nunca de
+              // algo que un usuario escribió), por eso es seguro insertarlo
+              // así — es la única vez que se hace esto en toda la app.
+              <div style={{ display: "flex", justifyContent: "center", marginBottom: 12, background: "#FFFFFF", padding: 14, borderRadius: 10 }} dangerouslySetInnerHTML={{ __html: qrSvg }} />
+            )}
+            {secreto && (
+              <p style={{ fontFamily: "monospace", fontSize: 12, textAlign: "center", color: COLORS.muted, wordBreak: "break-all", background: COLORS.surfaceSoft, borderRadius: 8, padding: "8px 12px", marginBottom: 16 }}>
+                {secreto}
+              </p>
+            )}
+            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.inkSoft, marginBottom: 8 }}>2. Ingresa el código de 6 dígitos que te muestra la app:</p>
+            <input
+              className="drx-input"
+              style={{ ...inputStyle, textAlign: "center", fontSize: 20, letterSpacing: 4, marginBottom: 12, width: "100%" }}
+              value={codigo}
+              onChange={(e) => setCodigo(e.target.value.replace(/\D/g, "").slice(0, 6))}
+              placeholder="000000"
+              inputMode="numeric"
+              maxLength={6}
+              autoFocus
+            />
+            {error && <p style={{ color: "#B42318", fontSize: 12.5, marginBottom: 12, fontFamily: "Inter, sans-serif" }}>{error}</p>}
+            <div style={{ display: "flex", gap: 8 }}>
+              <button className="drx-btn-primary" style={{ ...buttonPrimary, flex: 1 }} onClick={confirmarInscripcion} disabled={guardando || codigo.length !== 6}>
+                {guardando ? "Verificando..." : "Confirmar y activar"}
+              </button>
+              <button className="drx-btn-ghost" style={buttonGhost} onClick={cancelarInscripcion} disabled={guardando}>
+                Cancelar
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function ModalNotificaciones({
   firmasNuevas,
   clientesInactivos,
@@ -6241,6 +6443,9 @@ function LoginGate({ onIngresar, onCancelar, pantallaInicial }) {
   const [bloqueadoHasta, setBloqueadoHasta] = useState(() => leerJSONLocal(LLAVE_INTENTOS_LOGIN, {}).bloqueadoHasta || 0);
   const segundosBloqueoLogin = useCuentaRegresiva(bloqueadoHasta);
   const [proximoEnvioRecuperacion, setProximoEnvioRecuperacion] = useState(() => leerJSONLocal(LLAVE_COOLDOWN_RECUPERACION, {}).proximoEnvio || 0);
+  const [codigo2FA, setCodigo2FA] = useState("");
+  const [factorId2FA, setFactorId2FA] = useState(null);
+  const [challengeId2FA, setChallengeId2FA] = useState(null);
   const segundosEsperaRecuperacion = useCuentaRegresiva(proximoEnvioRecuperacion);
 
   useEffect(() => {
@@ -6252,16 +6457,16 @@ function LoginGate({ onIngresar, onCancelar, pantallaInicial }) {
     setError("");
   };
 
-  const elegirFoto = (e) => {
+  const elegirFoto = async (e) => {
     const archivo = e.target.files?.[0];
     e.target.value = "";
     if (!archivo) return;
-    if (!archivo.type.startsWith("image/")) {
-      setError("La foto de perfil debe ser una imagen.");
-      return;
-    }
     if (archivoDemasiadoGrande(archivo)) {
       setError(`La foto no puede pesar más de ${TAMANO_MAX_ARCHIVO_MB} MB.`);
+      return;
+    }
+    if (!(await archivoEsImagenValida(archivo))) {
+      setError("Ese archivo no es una imagen válida (o es un formato no admitido, como SVG). Prueba con un JPG o PNG.");
       return;
     }
     setFotoArchivo(archivo);
@@ -6384,7 +6589,43 @@ function LoginGate({ onIngresar, onCancelar, pantallaInicial }) {
     }
     guardarJSONLocal(LLAVE_INTENTOS_LOGIN, { intentos: 0, bloqueadoHasta: 0 });
     setBloqueadoHasta(0);
+
+    // Si el usuario activó verificación en dos pasos (ver PanelSeguridad2FA),
+    // la contraseña sola no basta — Supabase marca que falta subir a "aal2"
+    // y hay que resolver un reto con el código de 6 dígitos antes de dejarlo
+    // entrar, sin importar que la contraseña ya haya sido correcta.
+    const { data: aalData } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+    if (aalData && aalData.nextLevel === "aal2" && aalData.currentLevel !== "aal2") {
+      const { data: factoresData } = await supabase.auth.mfa.listFactors();
+      const factorVerificado = factoresData?.totp?.find((f) => f.status === "verified");
+      if (factorVerificado) {
+        const { data: challengeData, error: challengeError } = await supabase.auth.mfa.challenge({ factorId: factorVerificado.id });
+        if (!challengeError && challengeData) {
+          setFactorId2FA(factorVerificado.id);
+          setChallengeId2FA(challengeData.id);
+          setEnviando(false);
+          setPantalla("verificacion-2fa");
+          return;
+        }
+      }
+    }
+
     setEnviando(false);
+    marcarLoginRecienHecho();
+    onIngresar();
+  };
+
+  const verificarCodigo2FA = async () => {
+    if (!codigo2FA.trim() || !factorId2FA || !challengeId2FA) return;
+    setEnviando(true);
+    setError("");
+    const { error: verifyError } = await supabase.auth.mfa.verify({ factorId: factorId2FA, challengeId: challengeId2FA, code: codigo2FA.trim() });
+    setEnviando(false);
+    if (verifyError) {
+      setError("Código incorrecto o vencido. Revisa la hora de tu teléfono e intenta de nuevo.");
+      return;
+    }
+    setCodigo2FA("");
     marcarLoginRecienHecho();
     onIngresar();
   };
@@ -6466,7 +6707,17 @@ function LoginGate({ onIngresar, onCancelar, pantallaInicial }) {
         <InsigniaPlataforma grande />
         <p style={{ margin: "0 0 4px", display: "flex", justifyContent: "center", color: COLORS.headingText }}>
           <Icono
-            tipo={pantalla === "registro" ? "edificio" : pantalla === "recuperar" || pantalla === "recuperacion-enviada" ? "sobre" : pantalla === "registro-enviado" ? "bandeja" : "llave"}
+            tipo={
+              pantalla === "registro"
+                ? "edificio"
+                : pantalla === "recuperar" || pantalla === "recuperacion-enviada"
+                ? "sobre"
+                : pantalla === "registro-enviado"
+                ? "bandeja"
+                : pantalla === "verificacion-2fa"
+                ? "escudo"
+                : "llave"
+            }
             size={26}
           />
         </p>
@@ -6624,6 +6875,48 @@ function LoginGate({ onIngresar, onCancelar, pantallaInicial }) {
           </div>
         )}
 
+        {pantalla === "verificacion-2fa" && (
+          <div style={{ textAlign: "left" }}>
+            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted, textAlign: "center", margin: "8px 0 18px" }}>
+              Tu contraseña es correcta — ahora ingresa el código de 6 dígitos de tu app autenticadora.
+            </p>
+            <Field label="Código de verificación">
+              <input
+                className="drx-input"
+                style={{ ...inputStyle, textAlign: "center", fontSize: 22, letterSpacing: 6 }}
+                value={codigo2FA}
+                onChange={(e) => setCodigo2FA(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                onKeyDown={(e) => e.key === "Enter" && verificarCodigo2FA()}
+                placeholder="000000"
+                inputMode="numeric"
+                maxLength={6}
+                autoFocus
+              />
+            </Field>
+            {error && <p style={{ color: "#B42318", fontSize: 12.5, marginTop: 10, fontFamily: "Inter, sans-serif" }}>{error}</p>}
+            <button
+              className="drx-btn-primary drx-cta-shine"
+              style={{ ...buttonPrimary, width: "100%", marginTop: 16 }}
+              onClick={verificarCodigo2FA}
+              disabled={enviando || codigo2FA.length !== 6}
+            >
+              {enviando ? "Verificando…" : "Verificar e ingresar"}
+            </button>
+            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11, color: COLORS.muted, marginTop: 14, textAlign: "center" }}>
+              <button
+                onClick={() => {
+                  setPantalla("login");
+                  setCodigo2FA("");
+                  setError("");
+                }}
+                style={{ background: "none", border: "none", color: COLORS.accentBright, cursor: "pointer", textDecoration: "underline", fontFamily: "Inter, sans-serif", fontSize: 11 }}
+              >
+                Volver
+              </button>
+            </p>
+          </div>
+        )}
+
         {pantalla === "recuperar" && (
           <div style={{ textAlign: "left" }}>
             <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted, margin: "8px 0 16px" }}>
@@ -6699,8 +6992,22 @@ function EstablecerContrasenaNueva({ onListo }) {
 
   const guardar = async () => {
     if (!contrasena.trim() || contrasena !== confirmacion) return;
+    // Mismas 2 verificaciones que al registrar un despacho nuevo (longitud
+    // mínima + combinación, y que no esté en una filtración conocida) — sin
+    // esto, alguien podía sortear ambas simplemente restableciendo su
+    // contraseña en vez de cambiarla al crear la cuenta.
+    const errorContrasena = validarContrasenaCliente(contrasena);
+    if (errorContrasena) {
+      setError(errorContrasena);
+      return;
+    }
     setEnviando(true);
     setError("");
+    if (await contrasenaFiltrada(contrasena)) {
+      setError("Esa contraseña ha aparecido en filtraciones de datos conocidas — cualquiera puede probarla. Usa una distinta.");
+      setEnviando(false);
+      return;
+    }
     const { error: updateError } = await supabase.auth.updateUser({ password: contrasena });
     setEnviando(false);
     if (updateError) {
@@ -6739,6 +7046,7 @@ function EstablecerContrasenaNueva({ onListo }) {
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               <Field label="Contraseña nueva">
                 <CampoContrasena valor={contrasena} onChange={setContrasena} autoFocus />
+                <MedidorFuerzaContrasena valor={contrasena} />
               </Field>
               <Field label="Confirmar contraseña">
                 <CampoContrasena valor={confirmacion} onChange={setConfirmacion} onEnter={guardar} />
@@ -7073,6 +7381,7 @@ function App() {
   const [tab, setTab] = useState("resumen");
   const [mostrarNotificaciones, setMostrarNotificaciones] = useState(false);
   const [sidebarMovilAbierta, setSidebarMovilAbierta] = useState(false);
+  const [mostrarSeguridad2FA, setMostrarSeguridad2FA] = useState(false);
   const [fotoPerfilUrl, setFotoPerfilUrl] = useState("");
   const [subiendoFotoPerfil, setSubiendoFotoPerfil] = useState(false);
   useAgendaRecordatorios();
@@ -7104,9 +7413,12 @@ function App() {
     const archivo = e.target.files?.[0];
     e.target.value = "";
     if (!archivo || !usuarioActual) return;
-    if (!archivo.type.startsWith("image/")) return;
     if (archivoDemasiadoGrande(archivo)) {
       alert(`La foto no puede pesar más de ${TAMANO_MAX_ARCHIVO_MB} MB.`);
+      return;
+    }
+    if (!(await archivoEsImagenValida(archivo))) {
+      alert("Ese archivo no es una imagen válida (o es un formato no admitido, como SVG). Prueba con un JPG o PNG.");
       return;
     }
     setSubiendoFotoPerfil(true);
@@ -7495,12 +7807,18 @@ function App() {
               <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11, color: "#9FB6D6", margin: 0 }}>{usuarioActual.rol}</p>
             </div>
           </div>
-          <div style={{ display: "flex", gap: 12 }}>
+          <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
             <button
               onClick={() => setCambiandoUsuario(true)}
               style={{ background: "none", border: "none", color: "#9FB6D6", fontSize: 11.5, cursor: "pointer", fontFamily: "Inter, sans-serif", textDecoration: "underline" }}
             >
               Cambiar de usuario
+            </button>
+            <button
+              onClick={() => setMostrarSeguridad2FA(true)}
+              style={{ background: "none", border: "none", color: "#9FB6D6", fontSize: 11.5, cursor: "pointer", fontFamily: "Inter, sans-serif", textDecoration: "underline" }}
+            >
+              Seguridad
             </button>
             <button
               onClick={cerrarSesion}
@@ -7511,6 +7829,7 @@ function App() {
           </div>
         </div>
       </div>
+      {mostrarSeguridad2FA && <PanelSeguridad2FA onCerrar={() => setMostrarSeguridad2FA(false)} />}
 
       <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", position: "relative", zIndex: 1 }}>
         <div
