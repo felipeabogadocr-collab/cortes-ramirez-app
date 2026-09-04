@@ -446,6 +446,33 @@ const GlobalStyle = () => (
     }
     .drx-cta-shine:hover::after { left: 130%; }
 
+    @keyframes drx-dropdown-in { from { opacity: 0; transform: translateY(-6px) scale(0.97); } to { opacity: 1; transform: translateY(0) scale(1); } }
+    .drx-dropdown-in { animation: drx-dropdown-in 0.18s cubic-bezier(0.16, 1, 0.3, 1); transform-origin: top right; }
+
+    /* Selección de texto y checkboxes/radios en el color de marca en vez del
+       azul por defecto del navegador — un detalle chico que se nota en toda
+       la app porque aparece en cualquier formulario. */
+    ::selection { background: ${COLORS.accentBright}; color: #FFFFFF; }
+    input[type="checkbox"], input[type="radio"] { accent-color: ${COLORS.accentBright}; }
+
+    /* Anillo de foco consistente por teclado (accesibilidad + terminado) en
+       vez del contorno azul por defecto, distinto en cada navegador. */
+    button:focus-visible, a:focus-visible, input[type="checkbox"]:focus-visible, input[type="radio"]:focus-visible {
+      outline: 2px solid ${COLORS.accentBright};
+      outline-offset: 2px;
+    }
+
+    button:disabled { opacity: 0.55; cursor: not-allowed; filter: none !important; transform: none !important; box-shadow: none !important; }
+
+    /* Scrollbar delgado en el color de marca — el de sistema por defecto es
+       lo primero que rompe la sensación de "app terminada" en pantallas con
+       mucho contenido (Contabilidad, Auditoría, el chat del asistente). */
+    ::-webkit-scrollbar { width: 10px; height: 10px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: ${COLORS.border}; border-radius: 20px; border: 2px solid transparent; background-clip: padding-box; }
+    ::-webkit-scrollbar-thumb:hover { background: ${COLORS.accentBright}; background-clip: padding-box; }
+    * { scrollbar-width: thin; scrollbar-color: ${COLORS.border} transparent; }
+
     /* --- Móvil: la barra lateral pasa de columna fija a cajón deslizable,
        y varias cuadrículas de formulario de 2-3 columnas se apilan en 1 --- */
     .drx-btn-hamburguesa { display: none; }
@@ -618,8 +645,10 @@ export function Spinner({ texto = "Cargando…" }) {
           borderRadius: "50%",
           border: `2.5px solid ${COLORS.border}`,
           borderTopColor: COLORS.accentBright,
+          borderRightColor: "#14B8A6",
           display: "inline-block",
           animation: "drx-spin 0.7s linear infinite",
+          filter: `drop-shadow(0 0 4px ${COLORS.accentBright}40)`,
         }}
       />
       <span style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted }}>{texto}</span>
@@ -638,7 +667,23 @@ export function EstadoVacio({ icono, texto }) {
         background: COLORS.surfaceSoft,
       }}
     >
-      <div style={{ display: "flex", justifyContent: "center", marginBottom: 10, opacity: 0.55, color: COLORS.muted }}>{icono}</div>
+      <div style={{ display: "flex", justifyContent: "center", marginBottom: 14 }}>
+        <div
+          style={{
+            width: 56,
+            height: 56,
+            borderRadius: "50%",
+            background: `radial-gradient(circle, ${COLORS.accentSoft}, transparent 72%)`,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            color: COLORS.muted,
+            opacity: 0.75,
+          }}
+        >
+          {icono}
+        </div>
+      </div>
       <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted, margin: 0 }}>{texto}</p>
     </div>
   );
@@ -658,7 +703,8 @@ function Pill({ children }) {
         fontSize: 12,
         fontWeight: 600,
         color: COLORS.inkSoft,
-        background: COLORS.panel,
+        background: `linear-gradient(180deg, ${COLORS.panel}, ${COLORS.surfaceSoft})`,
+        boxShadow: "0 1px 2px rgba(16,24,40,0.04)",
       }}
     >
       {children}
@@ -690,7 +736,7 @@ function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-const APP_VERSION = "1.40.0";
+const APP_VERSION = "1.41.0";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -771,7 +817,15 @@ export function EstadoBadge({ estado }) {
         border: `1px solid ${config.borde}`,
       }}
     >
-      <span style={{ width: 7, height: 7, borderRadius: "50%", background: config.punto }} />
+      <span
+        style={{
+          width: 7,
+          height: 7,
+          borderRadius: "50%",
+          background: config.punto,
+          animation: estado === "falta_abogado" ? "drx-pulse 1.8s ease-in-out infinite" : "none",
+        }}
+      />
       {config.texto}
     </span>
   );
@@ -4447,7 +4501,7 @@ function ModalNotificaciones({
   return (
     <div
       ref={panelRef}
-      className="drx-fade-in"
+      className="drx-dropdown-in"
       style={{
         position: "absolute",
         top: "calc(100% + 10px)",
