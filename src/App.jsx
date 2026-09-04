@@ -491,6 +491,20 @@ const GlobalStyle = () => (
     ::-webkit-scrollbar-thumb:hover { background: ${COLORS.accentBright}; background-clip: padding-box; }
     * { scrollbar-width: thin; scrollbar-color: ${COLORS.border} transparent; }
 
+    .drx-boton-tema { transition: background .15s ease, border-color .15s ease, transform .15s ease; }
+    .drx-boton-tema:hover { transform: rotate(-12deg); }
+    .drx-boton-tema:active { transform: scale(0.9); }
+    .drx-tema-claro .drx-boton-tema:hover { background: #EEF2F7; border-color: #B9C2CF; }
+    .drx-tema-oscuro .drx-boton-tema:hover { background: #232C39; border-color: #3A4657; }
+    @keyframes drx-icono-tema-in { from { opacity: 0; transform: rotate(-90deg) scale(0.5); } to { opacity: 1; transform: rotate(0) scale(1); } }
+    .drx-boton-tema-icono { display: flex; animation: drx-icono-tema-in 0.35s cubic-bezier(0.16, 1, 0.3, 1); }
+
+    .drx-ojo-contrasena { transition: background .15s ease, color .15s ease; }
+    .drx-ojo-contrasena:hover { color: ${COLORS.accentBright} !important; background: ${COLORS.accentSoft} !important; }
+
+    .drx-tabla-planes tbody tr { transition: background .12s ease; }
+    .drx-tabla-planes tbody tr:hover td { background: ${COLORS.accentSoft} !important; }
+
     /* --- Móvil: la barra lateral pasa de columna fija a cajón deslizable,
        y varias cuadrículas de formulario de 2-3 columnas se apilan en 1 --- */
     .drx-btn-hamburguesa { display: none; }
@@ -754,7 +768,7 @@ function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-const APP_VERSION = "1.43.1";
+const APP_VERSION = "1.44.0";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -1043,6 +1057,7 @@ export function Icono({ tipo, size = 15, style }) {
 function BotonTema({ oscuro, onClick }) {
   return (
     <button
+      className="drx-boton-tema"
       onClick={onClick}
       title={oscuro ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
       style={{
@@ -1058,7 +1073,9 @@ function BotonTema({ oscuro, onClick }) {
         color: COLORS.ink,
       }}
     >
-      {oscuro ? <IconoSol /> : <IconoLuna />}
+      <span key={oscuro ? "sol" : "luna"} className="drx-boton-tema-icono">
+        {oscuro ? <IconoSol /> : <IconoLuna />}
+      </span>
     </button>
   );
 }
@@ -3624,7 +3641,8 @@ function SidebarButton({ active, onClick, children, color, icono }) {
       <span style={{ display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, opacity: active ? 1 : 0.85 }}>
         <IconoTab tipo={icono} />
       </span>
-      {children}
+      <span style={{ flex: 1 }}>{children}</span>
+      {active && <span style={{ width: 6, height: 6, borderRadius: "50%", background: c, flexShrink: 0, boxShadow: `0 0 6px ${c}` }} />}
     </button>
   );
 }
@@ -3706,6 +3724,7 @@ function BuscadorGlobal({ onIr }) {
       />
       {abierto && q.trim().length >= 2 && (
         <div
+          className="drx-dropdown-in"
           style={{
             position: "absolute",
             top: "110%",
@@ -3718,6 +3737,7 @@ function BuscadorGlobal({ onIr }) {
             zIndex: 30,
             maxHeight: 320,
             overflowY: "auto",
+            transformOrigin: "top center",
           }}
         >
           {buscando && (
@@ -3741,6 +3761,7 @@ function BuscadorGlobal({ onIr }) {
                 padding: "10px 12px",
                 cursor: "pointer",
                 fontFamily: "Inter, sans-serif",
+                transition: "background .12s ease",
               }}
             >
               <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: COLORS.ink }}>{r.titulo}</p>
@@ -5006,9 +5027,10 @@ export function CampoContrasena({ valor, onChange, onEnter, autoFocus }) {
       />
       <button
         type="button"
+        className="drx-ojo-contrasena"
         onClick={() => setVisible((v) => !v)}
         title={visible ? "Ocultar contraseña" : "Mostrar contraseña"}
-        style={{ position: "absolute", right: 6, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", fontSize: 16, color: COLORS.muted, padding: 6 }}
+        style={{ position: "absolute", right: 6, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 16, color: COLORS.muted, padding: 6 }}
       >
         <Icono tipo={visible ? "ojoTachado" : "ojo"} size={15} />
       </button>
@@ -6000,7 +6022,7 @@ function LandingPage({ onRegistrar, onIniciarSesion }) {
 
         <AlEntrar>
           <div style={{ overflowX: "auto", marginBottom: 50 }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 460, fontFamily: "Inter, sans-serif" }}>
+            <table className="drx-tabla-planes" style={{ width: "100%", borderCollapse: "collapse", minWidth: 460, fontFamily: "Inter, sans-serif" }}>
               <thead>
                 <tr>
                   <th style={{ textAlign: "left", padding: "10px 14px", fontSize: 12, color: COLORS.muted, fontWeight: 600, borderBottom: `1px solid ${COLORS.border}` }}>Incluye</th>
