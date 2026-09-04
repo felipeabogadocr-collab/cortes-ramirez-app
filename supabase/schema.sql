@@ -463,3 +463,16 @@ create policy "cada despacho actualiza sus propios avatares" on storage.objects
   for update
   using (bucket_id = 'avatares' and (storage.foldername(name))[1] = mi_despacho_id()::text)
   with check (bucket_id = 'avatares' and (storage.foldername(name))[1] = mi_despacho_id()::text);
+
+-- Prueba gratis de 7 días y pago self-service -----------------------------
+-- Antes un despacho nuevo nacía "activo = false" y quedaba bloqueado hasta
+-- que alguien coordinara el pago por WhatsApp y el superadmin lo activara a
+-- mano. Ahora nace ya activo con 7 días de prueba (prueba_hasta) — al
+-- vencer, si nadie lo activó de verdad (pago confirmado, ver
+-- api/plataforma/despachos.js), vuelve a verse como pendiente de activar,
+-- pero ya tuvo la semana de prueba completa. pago_reportado_en se marca
+-- cuando el propio usuario dice "ya pagué" desde la pantalla de activación
+-- (api/despachos/reportar-pago.js) — no confirma el pago por sí solo, solo
+-- le avisa al superadmin que hay que revisar y activar.
+alter table despachos add column if not exists prueba_hasta timestamptz;
+alter table despachos add column if not exists pago_reportado_en timestamptz;

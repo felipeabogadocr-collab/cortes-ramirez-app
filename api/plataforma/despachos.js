@@ -42,7 +42,7 @@ export default async function handler(req, res) {
   if (req.method === "GET") {
     const { data: despachos, error } = await admin
       .from("despachos")
-      .select("id, nombre, activo, creado_en")
+      .select("id, nombre, activo, creado_en, prueba_hasta, pago_reportado_en")
       .order("creado_en", { ascending: false });
     if (error) return res.status(500).json({ error: error.message });
 
@@ -82,7 +82,12 @@ export default async function handler(req, res) {
     if (!despachoId || typeof activo !== "boolean") {
       return res.status(400).json({ error: "Faltan datos" });
     }
-    const { error } = await admin.from("despachos").update({ activo }).eq("id", despachoId);
+    // Al activarlo de verdad (pago confirmado), se limpian la prueba y el
+    // reporte de pago — si no, la próxima vez que prueba_hasta se compare
+    // contra la fecha actual (ver despachoActivo en App.jsx) seguiría
+    // viéndose como vencida aunque ya esté activo de forma permanente.
+    const cambios = activo ? { activo, prueba_hasta: null, pago_reportado_en: null } : { activo };
+    const { error } = await admin.from("despachos").update(cambios).eq("id", despachoId);
     if (error) return res.status(500).json({ error: error.message });
     return res.status(200).json({ ok: true });
   }

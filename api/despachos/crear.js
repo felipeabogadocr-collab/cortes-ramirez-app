@@ -62,12 +62,16 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "Ya existe un despacho para esta cuenta." });
     }
 
-    // Nace inactivo a propósito: queda pendiente de que el superadmin de la
-    // plataforma lo active desde /api/plataforma/despachos.js, tras
-    // coordinar el pago (ver PantallaPendienteActivacion en el frontend).
+    // Nace activo con 7 días de prueba gratis — antes nacía bloqueado hasta
+    // coordinar el pago por WhatsApp y que el superadmin lo activara a
+    // mano, lo cual no dejaba a nadie probar la app antes de pagar. Al
+    // vencer la prueba sin que se confirme un pago de verdad, vuelve a
+    // verse como pendiente de activar (ver despachoActivo en App.jsx y
+    // PantallaPendienteActivacion).
+    const pruebaHasta = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
     const { data: despacho, error: despachoError } = await admin
       .from("despachos")
-      .insert({ nombre: nombreDespacho.trim(), activo: false })
+      .insert({ nombre: nombreDespacho.trim(), activo: true, prueba_hasta: pruebaHasta })
       .select()
       .single();
     if (despachoError) throw despachoError;

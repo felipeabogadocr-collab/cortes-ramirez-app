@@ -754,7 +754,7 @@ function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-const APP_VERSION = "1.42.0";
+const APP_VERSION = "1.43.0";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -6267,9 +6267,42 @@ function LandingPage({ onRegistrar, onIniciarSesion }) {
   );
 }
 
+// Número y titular de la cuenta donde se reciben los pagos de suscripción a
+// Nomos (no confundir con NUMERO_WHATSAPP_DESPACHO, que es solo el canal de
+// chat) — mientras no haya una pasarela real (Wompi/ePayco con PSE), el
+// pago se recibe por transferencia/Nequi y se confirma a mano.
+const CUENTA_PAGO_NOMOS = {
+  nequi: "300 000 0000", // TODO: reemplazar por el número real
+  titular: "Felipe Cortés Ramírez",
+};
+
 function PantallaPendienteActivacion({ usuarioActual, onCerrarSesion }) {
   const { oscuro, alternar } = useTema();
-  const mensaje = `Hola, quiero activar mi cuenta en Nomos.\n\nDespacho: ${usuarioActual.despachoNombre}\nCorreo: ${usuarioActual.email}`;
+  const [reportando, setReportando] = useState(false);
+  const [reportado, setReportado] = useState(!!usuarioActual.pagoReportadoEn);
+  const [errorReporte, setErrorReporte] = useState("");
+  const pruebaVencida = !!usuarioActual.pruebaHasta;
+  const codigoReferencia = (usuarioActual.despacho_id || "").slice(0, 8).toUpperCase();
+  const mensaje = `Hola, quiero activar mi cuenta en Nomos.\n\nDespacho: ${usuarioActual.despachoNombre}\nCorreo: ${usuarioActual.email}\nCódigo: ${codigoReferencia}`;
+
+  const reportarPago = async () => {
+    setReportando(true);
+    setErrorReporte("");
+    try {
+      const { data: sesionData } = await supabase.auth.getSession();
+      const token = sesionData?.session?.access_token;
+      const response = await fetch("/api/despachos/reportar-pago", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      });
+      if (!response.ok) throw new Error();
+      setReportado(true);
+    } catch (e) {
+      setErrorReporte("No se pudo enviar el aviso. Intenta de nuevo o escríbenos por WhatsApp.");
+    }
+    setReportando(false);
+  };
+
   return (
     <div
       className={`${oscuro ? "drx-tema-oscuro" : "drx-tema-claro"} drx-glow`}
@@ -6279,22 +6312,64 @@ function PantallaPendienteActivacion({ usuarioActual, onCerrarSesion }) {
       <div style={{ position: "absolute", top: 20, right: 20 }}>
         <BotonTema oscuro={oscuro} onClick={alternar} />
       </div>
-      <Card style={{ maxWidth: 440, width: "100%", textAlign: "center" }}>
+      <Card style={{ maxWidth: 460, width: "100%", textAlign: "center" }}>
         <InsigniaPlataforma grande />
         <h1 style={{ fontFamily: "Inter, sans-serif", fontSize: 20, fontWeight: 800, color: COLORS.headingText, margin: "0 0 10px" }}>
-          Tu cuenta está casi lista
+          {pruebaVencida ? "Tu prueba gratis de 7 días terminó" : "Tu cuenta está casi lista"}
         </h1>
-        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted, lineHeight: 1.6, marginBottom: 22 }}>
-          Ya confirmamos tu correo y creamos <strong>{usuarioActual.despachoNombre}</strong>. Solo falta coordinar el pago
-          para activar el acceso — escríbenos por WhatsApp y lo dejamos listo.
+        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted, lineHeight: 1.6, marginBottom: 20 }}>
+          {pruebaVencida
+            ? `Esperamos que hayas podido probar de todo en `
+            : `Ya confirmamos tu correo y creamos `}
+          <strong>{usuarioActual.despachoNombre}</strong>
+          {pruebaVencida ? ". Para seguir usándolo, activa tu plan pagando abajo." : ". Solo falta activar tu plan para entrar."}
         </p>
+
+        {reportado ? (
+          <p
+            style={{
+              fontFamily: "Inter, sans-serif", fontSize: 13, color: "#166534", background: "#F0FDF4",
+              border: "1px solid #BBF7D0", borderRadius: 10, padding: "12px 14px", textAlign: "left", lineHeight: 1.6,
+            }}
+          >
+            <Icono tipo="check" size={14} style={{ marginRight: 6, verticalAlign: -2 }} />
+            Avisamos que ya pagaste — en cuanto lo confirmemos, activamos tu acceso (normalmente en menos de 24h). Si tienes afán, también puedes escribirnos por WhatsApp.
+          </p>
+        ) : (
+          <div style={{ textAlign: "left", background: COLORS.surfaceSoft, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: "14px 16px", marginBottom: 16 }}>
+            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, fontWeight: 700, color: COLORS.headingText, textTransform: "uppercase", letterSpacing: 0.4, margin: "0 0 8px" }}>
+              Cómo pagar
+            </p>
+            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.inkSoft, margin: "0 0 4px" }}>
+              Nequi: <strong style={{ color: COLORS.ink }}>{CUENTA_PAGO_NOMOS.nequi}</strong> ({CUENTA_PAGO_NOMOS.titular})
+            </p>
+            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.inkSoft, margin: "0 0 4px" }}>
+              Plan Abogado $35.000/mes · Plan Despacho $89.000/mes
+            </p>
+            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, margin: 0 }}>
+              Pon <strong>{codigoReferencia}</strong> como referencia del pago para que lo identifiquemos rápido.
+            </p>
+          </div>
+        )}
+
+        {!reportado && (
+          <button
+            className="drx-btn-primary drx-cta-shine"
+            style={{ ...buttonPrimary, width: "100%", marginBottom: 10 }}
+            onClick={reportarPago}
+            disabled={reportando}
+          >
+            {reportando ? "Enviando…" : "Ya pagué, avisar al equipo"}
+          </button>
+        )}
+        {errorReporte && <p style={{ color: "#B42318", fontSize: 12.5, marginBottom: 10, fontFamily: "Inter, sans-serif" }}>{errorReporte}</p>}
+
         <a
           href={`https://wa.me/${NUMERO_WHATSAPP_DESPACHO}?text=${encodeURIComponent(mensaje)}`}
           target="_blank"
           rel="noreferrer"
           style={{
-            ...buttonPrimary,
-            background: "#1DA851",
+            ...buttonGhost,
             display: "inline-flex",
             alignItems: "center",
             justifyContent: "center",
@@ -6304,7 +6379,7 @@ function PantallaPendienteActivacion({ usuarioActual, onCerrarSesion }) {
             boxSizing: "border-box",
           }}
         >
-          <Icono tipo="chat" size={14} style={{ marginRight: 5, verticalAlign: -2 }} /> Escribir por WhatsApp para activar
+          <Icono tipo="chat" size={14} style={{ marginRight: 5, verticalAlign: -2 }} /> O escríbenos por WhatsApp
         </a>
         <button
           onClick={onCerrarSesion}
@@ -7129,6 +7204,40 @@ function saludarPorVoz(nombre) {
 // cuenta días después cuando el dato ya no estaba. Este aviso global
 // escucha esos fallos (storage.js los emite como evento) y avisa de una
 // vez, para que el usuario sepa que debe revisar su conexión y reintentar.
+// Recordatorio discreto de cuántos días de prueba gratis quedan — sin esto,
+// alguien podía llegar al día 8 sin ninguna señal previa y encontrarse la
+// pantalla de "actívate" de sorpresa. Se puede cerrar por esta sesión (no
+// para siempre, para que no se olvide del todo).
+function AvisoPruebaGratis({ pruebaHasta }) {
+  const [cerrado, setCerrado] = useState(false);
+  if (!pruebaHasta || cerrado) return null;
+  const diasRestantes = Math.ceil((new Date(pruebaHasta).getTime() - Date.now()) / (24 * 60 * 60 * 1000));
+  if (diasRestantes > 3 || diasRestantes < 0) return null;
+  return (
+    <div
+      style={{
+        position: "sticky", top: 0, zIndex: 50, background: diasRestantes <= 1 ? "#FEF2F2" : "#FEF3E2",
+        borderBottom: `1px solid ${diasRestantes <= 1 ? "#F2B8B5" : "#FCE3B8"}`,
+        padding: "9px 16px", display: "flex", alignItems: "center", justifyContent: "center", gap: 10, flexWrap: "wrap",
+      }}
+    >
+      <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: diasRestantes <= 1 ? "#B42318" : "#92400E", margin: 0, fontWeight: 600 }}>
+        {diasRestantes <= 0
+          ? "Tu prueba gratis termina hoy."
+          : `Te quedan ${diasRestantes} día${diasRestantes === 1 ? "" : "s"} de prueba gratis.`}{" "}
+        Al vencer verás cómo activar tu plan para seguir usándola sin cortes.
+      </p>
+      <button
+        onClick={() => setCerrado(true)}
+        style={{ background: "none", border: "none", cursor: "pointer", color: diasRestantes <= 1 ? "#B42318" : "#92400E", fontSize: 14, lineHeight: 1, padding: 0 }}
+        title="Ocultar por ahora"
+      >
+        ✕
+      </button>
+    </div>
+  );
+}
+
 function AvisoErroresAlmacenamiento() {
   const [aviso, setAviso] = useState("");
   const ultimoRef = useRef(0);
@@ -7489,7 +7598,7 @@ function App() {
       setUsuarioActual(null);
       return;
     }
-    const { data: perfil } = await supabase.from("perfiles").select("*, despachos(nombre, activo)").eq("id", user.id).maybeSingle();
+    const { data: perfil } = await supabase.from("perfiles").select("*, despachos(nombre, activo, prueba_hasta, pago_reportado_en)").eq("id", user.id).maybeSingle();
     // Red de seguridad para una sesión de prueba que sigue abierta cuando
     // vence — el corte "de verdad" (que muestra el mensaje) pasa en
     // iniciarSesion, este solo evita que se quede adentro del panel.
@@ -7500,8 +7609,20 @@ function App() {
       return;
     }
     setDespachoActual(perfil?.despacho_id || null, perfil?.despachos?.nombre || "");
+    // Un despacho nace "activo" con 7 días de prueba (prueba_hasta) — si esa
+    // fecha ya pasó y nadie lo activó de verdad (lo que limpia prueba_hasta,
+    // ver api/plataforma/despachos.js), vuelve a tratarse como pendiente de
+    // activar aunque el flag "activo" siga en true.
+    const pruebaVencida = perfil?.despachos?.prueba_hasta && new Date(perfil.despachos.prueba_hasta).getTime() <= Date.now();
     const usuario = perfil
-      ? { ...perfil, email: user.email, despachoNombre: perfil.despachos?.nombre || "", despachoActivo: perfil.despachos?.activo !== false }
+      ? {
+          ...perfil,
+          email: user.email,
+          despachoNombre: perfil.despachos?.nombre || "",
+          despachoActivo: perfil.despachos?.activo !== false && !pruebaVencida,
+          pruebaHasta: perfil.despachos?.prueba_hasta || null,
+          pagoReportadoEn: perfil.despachos?.pago_reportado_en || null,
+        }
       : null;
     setUsuarioActual(usuario);
     if (registrarLogin && usuario && consumirLoginRecienHecho()) {
@@ -7673,6 +7794,7 @@ function App() {
       <GlobalStyle />
       <TexturaGrano />
       <AvisoErroresAlmacenamiento />
+      <AvisoPruebaGratis pruebaHasta={usuarioActual.pruebaHasta} />
       <div
         className={`drx-sidebar-overlay${sidebarMovilAbierta ? " drx-sidebar-abierta" : ""}`}
         onClick={() => setSidebarMovilAbierta(false)}

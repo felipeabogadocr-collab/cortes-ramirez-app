@@ -119,6 +119,28 @@ export default function PlataformaTab() {
     setCambiando(null);
   };
 
+  // A diferencia de alternarActivo (que invierte el estado), esta SIEMPRE
+  // activa — hace falta porque un despacho en prueba ya tiene activo=true
+  // en la base de datos (ver api/despachos/crear.js), así que invertirlo
+  // lo hubiera desactivado por error en vez de confirmar el pago.
+  const activarDespacho = async (despacho) => {
+    setCambiando(despacho.id);
+    try {
+      const { data: sesionData } = await supabase.auth.getSession();
+      const token = sesionData?.session?.access_token;
+      const response = await fetch("/api/plataforma/despachos", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ despachoId: despacho.id, activo: true }),
+      });
+      if (!response.ok) throw new Error("No se pudo actualizar.");
+      setDespachos((prev) => prev.map((d) => (d.id === despacho.id ? { ...d, activo: true, prueba_hasta: null, pago_reportado_en: null } : d)));
+    } catch (e) {
+      setError(e.message);
+    }
+    setCambiando(null);
+  };
+
   const eliminarDespacho = async (despacho) => {
     if (!(await confirmar(`¿Eliminar por completo "${despacho.nombre}"? Esto borra su registro y la cuenta de quien se registró. No se puede deshacer.`))) {
       return;
@@ -144,8 +166,9 @@ export default function PlataformaTab() {
   const despachosFiltrados = textoFiltro
     ? despachos.filter((d) => d.nombre?.toLowerCase().includes(textoFiltro) || d.adminEmail?.toLowerCase().includes(textoFiltro))
     : despachos;
-  const pendientes = despachosFiltrados.filter((d) => !d.activo);
-  const activos = despachosFiltrados.filter((d) => d.activo);
+  const pruebaVencida = (d) => d.prueba_hasta && new Date(d.prueba_hasta).getTime() <= Date.now();
+  const pendientes = despachosFiltrados.filter((d) => !d.activo || pruebaVencida(d));
+  const activos = despachosFiltrados.filter((d) => d.activo && !pruebaVencida(d));
   const HACE_7_DIAS = Date.now() - 7 * 24 * 60 * 60 * 1000;
   const activosUsandoEstaSemana = activos.filter((d) => d.ultimaActividad && new Date(d.ultimaActividad).getTime() >= HACE_7_DIAS).length;
 
@@ -183,8 +206,8 @@ export default function PlataformaTab() {
           color: "#92400E",
         }}
       >
-        Solo tú ves esta pestaña. Aquí activas el acceso de un despacho nuevo después de coordinar el pago por WhatsApp,
-        o desactivas uno que dejó de pagar.
+        Solo tú ves esta pestaña. Los despachos nuevos entran con 7 días de prueba gratis — aquí activas el acceso cuando
+        confirmes que pagaron (mira si dice "Reportó pago"), o desactivas uno que dejó de pagar.
       </div>
 
       <input
@@ -216,6 +239,18 @@ export default function PlataformaTab() {
                         <span style={{ color: "#B42318", fontWeight: 600 }}> · lleva {diasDesde(d.creado_en)} días esperando</span>
                       )}
                     </p>
+                    <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11, margin: "4px 0 0", display: "flex", gap: 6, flexWrap: "wrap" }}>
+                      {d.prueba_hasta && (
+                        <span style={{ color: pruebaVencida(d) ? "#B42318" : "#166534", fontWeight: 700 }}>
+                          {pruebaVencida(d) ? "Prueba vencida" : "En prueba gratis"}
+                        </span>
+                      )}
+                      {d.pago_reportado_en && (
+                        <span style={{ color: "#0D9488", fontWeight: 700, background: "#F0FDFA", border: "1px solid #99F6E4", borderRadius: 20, padding: "1px 8px" }}>
+                          💳 Reportó pago el {new Date(d.pago_reportado_en).toLocaleDateString("es-CO", { dateStyle: "medium" })}
+                        </span>
+                      )}
+                    </p>
                   </div>
                   <div style={{ display: "flex", gap: 8 }}>
                     <button
@@ -229,7 +264,7 @@ export default function PlataformaTab() {
                     <button
                       className="drx-btn-primary"
                       style={{ ...buttonPrimary, background: "#10B981" }}
-                      onClick={() => alternarActivo(d)}
+                      onClick={() => activarDespacho(d)}
                       disabled={cambiando === d.id}
                     >
                       {cambiando === d.id ? "…" : "✓ Activar acceso"}
