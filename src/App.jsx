@@ -768,7 +768,7 @@ function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-const APP_VERSION = "1.44.0";
+const APP_VERSION = "1.44.1";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -5304,6 +5304,119 @@ function PoliticaPrivacidad() {
   );
 }
 
+// Página de diagnóstico pública (#diagnostico) — sin necesitar iniciar
+// sesión ni salir de Nomos para ir a revisar Supabase/Vercel a mano.
+// Prueba de verdad si el navegador logra hablar con Supabase Auth y con la
+// base de datos, y muestra el motivo exacto si falla — así, si algún día
+// el login se queda pegado sin explicación, esto dice enseguida si es
+// "el proyecto de Supabase está pausado", "faltan las variables de entorno
+// en Vercel" o algo distinto, sin depender de tener acceso a esos paneles.
+function VistaDiagnostico() {
+  const [resultados, setResultados] = useState(null);
+
+  useEffect(() => {
+    (async () => {
+      const url = import.meta.env.VITE_SUPABASE_URL || "";
+      const key = import.meta.env.VITE_SUPABASE_ANON_KEY || "";
+      const pruebas = [];
+
+      if (!url || !key || url.includes("TU-PROYECTO") || url.includes("placeholder")) {
+        setResultados([
+          {
+            nombre: "Variables de entorno",
+            ok: false,
+            detalle:
+              "VITE_SUPABASE_URL o VITE_SUPABASE_ANON_KEY no están configuradas en Vercel (o siguen con el valor de ejemplo). Hay que ponerlas en Project Settings → Environment Variables y volver a desplegar.",
+          },
+        ]);
+        return;
+      }
+
+      pruebas.push({ nombre: "URL configurada", ok: true, detalle: url.replace(/^https:\/\//, "") });
+
+      try {
+        const t0 = Date.now();
+        const resp = await fetch(`${url}/auth/v1/settings`, { headers: { apikey: key } });
+        const ms = Date.now() - t0;
+        if (resp.ok) {
+          pruebas.push({ nombre: "Conexión con Supabase Auth", ok: true, detalle: `Respondió en ${ms} ms.` });
+        } else {
+          pruebas.push({
+            nombre: "Conexión con Supabase Auth",
+            ok: false,
+            detalle: `Respondió con error ${resp.status}. Si el proyecto está pausado en Supabase, esto es justo lo que se ve — entra a supabase.com y busca un botón "Restore project".`,
+          });
+        }
+      } catch (e) {
+        pruebas.push({
+          nombre: "Conexión con Supabase Auth",
+          ok: false,
+          detalle: `No se pudo contactar (${e.message}). Puede ser que el proyecto esté pausado, la URL esté mal, o no haya internet en este momento.`,
+        });
+      }
+
+      try {
+        const { error } = await supabase.from("perfiles").select("id", { count: "exact", head: true }).limit(1);
+        pruebas.push(
+          error
+            ? { nombre: "Conexión con la base de datos", ok: false, detalle: error.message }
+            : { nombre: "Conexión con la base de datos", ok: true, detalle: "Responde con normalidad." }
+        );
+      } catch (e) {
+        pruebas.push({ nombre: "Conexión con la base de datos", ok: false, detalle: e.message });
+      }
+
+      setResultados(pruebas);
+    })();
+  }, []);
+
+  const todoBien = resultados && resultados.every((p) => p.ok);
+
+  return (
+    <div style={{ background: COLORS.bg, minHeight: "100%", padding: 24 }}>
+      <GlobalStyle />
+      <div style={{ maxWidth: 480, margin: "40px auto" }}>
+        <Card>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 16, fontWeight: 800, color: COLORS.headingText, margin: "0 0 4px" }}>
+            Diagnóstico de Nomos
+          </p>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, margin: "0 0 18px" }}>
+            v{APP_VERSION} · {new Date().toLocaleString("es-CO", { dateStyle: "medium", timeStyle: "short" })}
+          </p>
+          {!resultados && <Spinner texto="Revisando la conexión…" />}
+          {resultados && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {resultados.map((p) => (
+                <div
+                  key={p.nombre}
+                  style={{
+                    background: p.ok ? "#F0FDF4" : "#FEF2F2",
+                    border: `1px solid ${p.ok ? "#BBF7D0" : "#F2B8B5"}`,
+                    borderRadius: 10,
+                    padding: "10px 14px",
+                  }}
+                >
+                  <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, fontWeight: 700, color: p.ok ? "#166534" : "#B42318", margin: 0 }}>
+                    {p.ok ? "✓" : "✕"} {p.nombre}
+                  </p>
+                  <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: p.ok ? "#166534" : "#B42318", margin: "4px 0 0", lineHeight: 1.5 }}>
+                    {p.detalle}
+                  </p>
+                </div>
+              ))}
+              {todoBien && (
+                <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.muted, marginTop: 4 }}>
+                  Todo responde bien — si el login sigue sin funcionar, el problema es otra cosa, no la conexión.
+                </p>
+              )}
+            </div>
+          )}
+        </Card>
+      </div>
+    </div>
+  );
+}
+
 function TerminosUso() {
   const { oscuro, alternar } = useTema();
   return (
@@ -7519,6 +7632,7 @@ function App() {
   const isPortalView = typeof window !== "undefined" && window.location.hash.replace("#", "") === "portal";
   const isPrivacidadView = typeof window !== "undefined" && window.location.hash.replace("#", "") === "privacidad";
   const isTerminosView = typeof window !== "undefined" && window.location.hash.replace("#", "") === "terminos";
+  const isDiagnosticoView = typeof window !== "undefined" && window.location.hash.replace("#", "") === "diagnostico";
   const [modoPublico, setModoPublico] = useState(isFirmaView);
   const [modoPortal, setModoPortal] = useState(isPortalView);
   const [usuarioActual, setUsuarioActual] = useState(null);
@@ -7758,6 +7872,10 @@ function App() {
 
   if (isTerminosView) {
     return <TerminosUso />;
+  }
+
+  if (isDiagnosticoView) {
+    return <VistaDiagnostico />;
   }
 
   if (!sesionCargada) {
