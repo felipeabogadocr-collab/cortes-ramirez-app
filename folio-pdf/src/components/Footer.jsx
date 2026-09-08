@@ -16,6 +16,8 @@ const HERRAMIENTAS = [
   { id: "rotar", label: "Rotar PDF" },
   { id: "tachar", label: "Tachar información" },
   { id: "extraer-texto", label: "Extraer texto" },
+  { id: "renombrar", label: "Renombrar PDF" },
+  { id: "recortar", label: "Recortar PDF" },
 ];
 
 function scrollToTop() {

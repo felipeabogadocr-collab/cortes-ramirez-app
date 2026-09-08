@@ -265,3 +265,16 @@ export async function redactPdf(bytes, redacciones) {
   await pdfjsDoc.destroy();
   return out.save();
 }
+
+// Recorta un porcentaje parejo de margen en los 4 bordes de cada página
+// (útil para quitar bordes negros o márgenes de escáner).
+export async function cropPdf(bytes, marginPercent) {
+  const doc = await PDFDocument.load(bytes);
+  doc.getPages().forEach((page) => {
+    const { width, height } = page.getSize();
+    const mx = (width * marginPercent) / 100;
+    const my = (height * marginPercent) / 100;
+    page.setCropBox(mx, my, width - 2 * mx, height - 2 * my);
+  });
+  return doc.save();
+}

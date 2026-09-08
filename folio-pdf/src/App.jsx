@@ -16,6 +16,8 @@ import {
   IconRotate,
   IconRedact,
   IconTextDoc,
+  IconTag,
+  IconCrop,
   IconLock,
   IconGlobe,
   IconCheck,
@@ -36,6 +38,8 @@ const CompressTool = lazy(() => import("./components/tools/CompressTool.jsx"));
 const RotateAllTool = lazy(() => import("./components/tools/RotateAllTool.jsx"));
 const RedactTool = lazy(() => import("./components/tools/RedactTool.jsx"));
 const ExtractTextTool = lazy(() => import("./components/tools/ExtractTextTool.jsx"));
+const RenameTool = lazy(() => import("./components/tools/RenameTool.jsx"));
+const CropTool = lazy(() => import("./components/tools/CropTool.jsx"));
 
 const TOOLS = [
   { id: "unir", label: "Unir PDF", Icon: IconPaperclip, Component: MergeTool },
@@ -48,6 +52,8 @@ const TOOLS = [
   { id: "rotar", label: "Rotar PDF", Icon: IconRotate, Component: RotateAllTool },
   { id: "tachar", label: "Tachar información", Icon: IconRedact, Component: RedactTool },
   { id: "extraer-texto", label: "Extraer texto", Icon: IconTextDoc, Component: ExtractTextTool },
+  { id: "renombrar", label: "Renombrar PDF", Icon: IconTag, Component: RenameTool },
+  { id: "recortar", label: "Recortar PDF", Icon: IconCrop, Component: CropTool },
 ];
 
 export default function App() {

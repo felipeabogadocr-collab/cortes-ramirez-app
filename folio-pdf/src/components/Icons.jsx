@@ -131,6 +131,26 @@ export function IconTextDoc({ size = 26 }) {
   );
 }
 
+export function IconTag({ size = 26 }) {
+  return base(
+    <>
+      <path d="M11.5 3.5H5.5a2 2 0 0 0-2 2v6l9.6 9.6a2 2 0 0 0 2.8 0l5.2-5.2a2 2 0 0 0 0-2.8L11.5 3.5z" />
+      <circle cx="8.5" cy="8.5" r="1.4" fill="currentColor" stroke="none" />
+    </>,
+    size
+  );
+}
+
+export function IconCrop({ size = 26 }) {
+  return base(
+    <>
+      <path d="M6 2v14a2 2 0 0 0 2 2h14" />
+      <path d="M18 22V8a2 2 0 0 0-2-2H2" />
+    </>,
+    size
+  );
+}
+
 export function IconRedact({ size = 26 }) {
   return base(
     <>

@@ -14,7 +14,7 @@ test("un visitante nuevo ve el inicio sin que le pidan registrarse, y el registr
   await page.goto("/");
 
   // La cuadrícula debe verse de una, sin ningún formulario de por medio.
-  await expect(page.locator(".tool-card")).toHaveCount(10);
+  await expect(page.locator(".tool-card")).toHaveCount(12);
   await expect(page.getByText("Bienvenido a Folio")).not.toBeVisible();
 
   await page.locator(".tool-card", { hasText: "UNIR PDF" }).click();
@@ -40,8 +40,29 @@ test.describe("con el registro ya aceptado", () => {
     await page.reload();
   });
 
-  test("la cuadrícula del inicio muestra las 10 herramientas", async ({ page }) => {
-    await expect(page.locator(".tool-card")).toHaveCount(10);
+  test("la cuadrícula del inicio muestra las 12 herramientas", async ({ page }) => {
+    await expect(page.locator(".tool-card")).toHaveCount(12);
+  });
+
+  test("Renombrar PDF: sube un archivo y lo deja descargar con el nombre nuevo", async ({ page }) => {
+    await openTool(page, "RENOMBRAR PDF");
+    await page.setInputFiles('input[type="file"]', SAMPLE_PDF);
+    await expect(page.getByText("Tu archivo está listo")).toBeVisible({ timeout: 10000 });
+    const nameInput = page.locator(".card input").first();
+    await nameInput.fill("contrato-final");
+    const [download] = await Promise.all([
+      page.waitForEvent("download"),
+      page.getByRole("button", { name: /Descargar/ }).click(),
+    ]);
+    expect(download.suggestedFilename()).toBe("contrato-final.pdf");
+  });
+
+  test("Recortar PDF: quita márgenes y descarga", async ({ page }) => {
+    await openTool(page, "RECORTAR PDF");
+    await page.setInputFiles('input[type="file"]', SAMPLE_PDF);
+    await expect(page.getByText("El PDF tiene")).toBeVisible({ timeout: 10000 });
+    await page.getByRole("button", { name: /Recortar 10%/ }).click();
+    await expect(page.getByText("Tu archivo está listo")).toBeVisible({ timeout: 10000 });
   });
 
   test("Unir PDF: sube dos archivos y descarga el resultado", async ({ page }) => {
