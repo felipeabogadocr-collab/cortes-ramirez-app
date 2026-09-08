@@ -768,7 +768,7 @@ function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-const APP_VERSION = "1.44.2";
+const APP_VERSION = "1.44.3";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -6713,7 +6713,7 @@ export function useCuentaRegresiva(hastaCuando) {
   return segundos;
 }
 
-function LoginGate({ onIngresar, onCancelar, pantallaInicial }) {
+function LoginGate({ onIngresar, onCancelar, pantallaInicial, errorExterno }) {
   const { oscuro, alternar } = useTema();
   const [pantalla, setPantalla] = useState(pantallaInicial || "login"); // login | registro
   const [nombreDespacho, setNombreDespacho] = useState("");
@@ -6743,6 +6743,14 @@ function LoginGate({ onIngresar, onCancelar, pantallaInicial }) {
   useEffect(() => {
     ensureFonts();
   }, []);
+
+  // Si la carga del perfil después de un login exitoso falla (p. ej. una
+  // migración de base de datos que no se corrió todavía), App.jsx lo detecta
+  // y lo manda aquí como errorExterno — si no se mostrara, el usuario se
+  // quedaría viendo el formulario sin ninguna pista de qué pasó.
+  useEffect(() => {
+    if (errorExterno) setError(errorExterno);
+  }, [errorExterno]);
 
   const cambiarPantalla = (nueva) => {
     setPantalla(nueva);
@@ -7720,6 +7728,7 @@ function App() {
   const [usuarioActual, setUsuarioActual] = useState(null);
   const [ultimaSesionAnterior, setUltimaSesionAnterior] = useState(null);
   const [sesionCargada, setSesionCargada] = useState(false);
+  const [errorCargaPerfil, setErrorCargaPerfil] = useState(null);
   const [cambiandoUsuario, setCambiandoUsuario] = useState(false);
   const [tab, setTab] = useState("resumen");
   const [mostrarNotificaciones, setMostrarNotificaciones] = useState(false);
@@ -7832,7 +7841,24 @@ function App() {
       setUsuarioActual(null);
       return;
     }
-    const { data: perfil } = await supabase.from("perfiles").select("*, despachos(nombre, activo, prueba_hasta, pago_reportado_en)").eq("id", user.id).maybeSingle();
+    const { data: perfil, error: errorPerfil } = await supabase
+      .from("perfiles")
+      .select("*, despachos(nombre, activo, prueba_hasta, pago_reportado_en)")
+      .eq("id", user.id)
+      .maybeSingle();
+    if (errorPerfil) {
+      // Si esto falla en silencio (p. ej. porque la base de datos no tiene
+      // todavía una columna que el código ya espera, como prueba_hasta /
+      // pago_reportado_en tras una migración que no se corrió), el usuario
+      // se queda viendo la pantalla de login sin ninguna pista de qué pasó.
+      // Mejor mostrar el error real y dejar que reintente, que fallar mudo.
+      console.error("Error cargando el perfil:", errorPerfil);
+      setDespachoActual(null);
+      setUsuarioActual(null);
+      setErrorCargaPerfil(errorPerfil.message || "No se pudo cargar tu perfil.");
+      return;
+    }
+    setErrorCargaPerfil(null);
     // Red de seguridad para una sesión de prueba que sigue abierta cuando
     // vence — el corte "de verdad" (que muestra el mensaje) pasa en
     // iniciarSesion, este solo evita que se quede adentro del panel.
@@ -7996,6 +8022,7 @@ function App() {
         onIngresar={iniciarSesion}
         onCancelar={usuarioActual ? () => setCambiandoUsuario(false) : () => setMostrarLanding(true)}
         pantallaInicial={pantallaLoginInicial}
+        errorExterno={errorCargaPerfil}
       />
     );
   }
