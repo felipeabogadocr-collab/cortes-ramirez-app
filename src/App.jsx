@@ -768,7 +768,7 @@ function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-const APP_VERSION = "1.44.1";
+const APP_VERSION = "1.44.2";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -5313,6 +5313,35 @@ function PoliticaPrivacidad() {
 // en Vercel" o algo distinto, sin depender de tener acceso a esos paneles.
 function VistaDiagnostico() {
   const [resultados, setResultados] = useState(null);
+  const [correoPrueba, setCorreoPrueba] = useState("");
+  const [contrasenaPrueba, setContrasenaPrueba] = useState("");
+  const [probando, setProbando] = useState(false);
+  const [resultadoLogin, setResultadoLogin] = useState(null);
+
+  const probarLogin = async () => {
+    if (!correoPrueba.trim() || !contrasenaPrueba.trim()) return;
+    setProbando(true);
+    setResultadoLogin(null);
+    const t0 = Date.now();
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({ email: correoPrueba.trim(), password: contrasenaPrueba });
+      const ms = Date.now() - t0;
+      if (error) {
+        setResultadoLogin({ ok: false, texto: `Supabase respondió con error después de ${ms} ms:\n"${error.message}" (status ${error.status || "?"})` });
+      } else if (data?.user) {
+        setResultadoLogin({ ok: true, texto: `¡Funcionó! Sesión creada en ${ms} ms para ${data.user.email}. El problema entonces está en la pantalla normal de login, no en la conexión — avísame.` });
+        // Se cierra de una vez para no dejar una sesión de prueba abierta
+        // en esta pantalla, que no está pensada para usarse como panel.
+        await supabase.auth.signOut();
+      } else {
+        setResultadoLogin({ ok: false, texto: `Respuesta rara después de ${ms} ms: no hubo error pero tampoco llegó un usuario.` });
+      }
+    } catch (e) {
+      const ms = Date.now() - t0;
+      setResultadoLogin({ ok: false, texto: `Se rompió con una excepción después de ${ms} ms:\n"${e.message}"` });
+    }
+    setProbando(false);
+  };
 
   useEffect(() => {
     (async () => {
@@ -5411,6 +5440,59 @@ function VistaDiagnostico() {
               )}
             </div>
           )}
+
+          <div style={{ marginTop: 20, paddingTop: 18, borderTop: `1px solid ${COLORS.border}` }}>
+            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, fontWeight: 700, color: COLORS.headingText, margin: "0 0 4px" }}>
+              Probar inicio de sesión aquí mismo
+            </p>
+            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, color: COLORS.muted, margin: "0 0 12px" }}>
+              Esto llama a Supabase directamente y te muestra el error real, sin pasar por el resto de la app.
+            </p>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 10 }}>
+              <input
+                type="email"
+                className="drx-input"
+                style={inputStyle}
+                placeholder="Correo"
+                value={correoPrueba}
+                onChange={(e) => setCorreoPrueba(e.target.value)}
+                autoCapitalize="none"
+              />
+              <input
+                type="password"
+                className="drx-input"
+                style={inputStyle}
+                placeholder="Contraseña"
+                value={contrasenaPrueba}
+                onChange={(e) => setContrasenaPrueba(e.target.value)}
+              />
+            </div>
+            <button
+              className="drx-btn-primary"
+              style={{ ...buttonPrimary, width: "100%" }}
+              onClick={probarLogin}
+              disabled={probando || !correoPrueba.trim() || !contrasenaPrueba.trim()}
+            >
+              {probando ? "Probando…" : "Probar"}
+            </button>
+            {resultadoLogin && (
+              <p
+                style={{
+                  fontFamily: "monospace",
+                  fontSize: 12,
+                  whiteSpace: "pre-wrap",
+                  color: resultadoLogin.ok ? "#166534" : "#B42318",
+                  background: resultadoLogin.ok ? "#F0FDF4" : "#FEF2F2",
+                  border: `1px solid ${resultadoLogin.ok ? "#BBF7D0" : "#F2B8B5"}`,
+                  borderRadius: 8,
+                  padding: "10px 12px",
+                  marginTop: 12,
+                }}
+              >
+                {resultadoLogin.texto}
+              </p>
+            )}
+          </div>
         </Card>
       </div>
     </div>
