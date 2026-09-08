@@ -353,22 +353,20 @@ export function ensureMammoth() {
   });
 }
 
-const JSPDF_SRC = "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js";
-export function ensureJsPDF() {
-  return new Promise((resolve, reject) => {
-    if (window.jspdf) return resolve();
-    const existing = document.getElementById("jspdf-script");
-    if (existing) {
-      existing.addEventListener("load", () => resolve());
-      return;
-    }
-    const script = document.createElement("script");
-    script.id = "jspdf-script";
-    script.src = JSPDF_SRC;
-    script.onload = () => resolve();
-    script.onerror = reject;
-    document.head.appendChild(script);
-  });
+// jsPDF vivía antes cargado desde un CDN externo (cdnjs) con un <script> en
+// tiempo de ejecución — cualquier cosa que bloqueara esa descarga (política
+// de seguridad del navegador, un bloqueador de anuncios, el CDN caído, o
+// simplemente sin internet en ese instante) dejaba los botones de "Descargar
+// PDF" sin funcionar y sin avisar por qué. Ahora jsPDF es una dependencia
+// normal del proyecto: Vite la empaqueta en su propio bloque (se descarga
+// junto con la app, no por separado ni de un tercero), así que no puede
+// fallar por una razón de red aparte. Se mantiene la función async
+// "ensureJsPDF" con el mismo nombre y efecto (dejar jsPDF listo en
+// window.jspdf.jsPDF) para no tener que tocar cada lugar que ya la usa.
+export async function ensureJsPDF() {
+  if (window.jspdf?.jsPDF) return;
+  const mod = await import("jspdf");
+  window.jspdf = { jsPDF: mod.jsPDF || mod.default };
 }
 
 function fileToBase64(file) {
@@ -768,7 +766,7 @@ function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-const APP_VERSION = "1.44.4";
+const APP_VERSION = "1.44.5";
 
 function SelloVersion({ oscuro }) {
   return (
