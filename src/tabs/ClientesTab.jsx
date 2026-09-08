@@ -159,6 +159,17 @@ function PlanDePagoIA({ planPago, onChange }) {
   const [descripcion, setDescripcion] = useState(planPago?.descripcion || "");
   const [procesando, setProcesando] = useState(false);
   const [error, setError] = useState("");
+  const { servicios } = useServicios();
+  const [servicioElegidoId, setServicioElegidoId] = useState("");
+
+  const usarServicio = () => {
+    const servicio = servicios.find((s) => s.id === servicioElegidoId);
+    if (!servicio) return;
+    const proximaFecha = calcularProximaFechaPorFrecuencia(fechaHoyISO(), servicio.frecuencia);
+    onChange({ descripcion: servicio.nombre, frecuencia: servicio.frecuencia, valor: servicio.valor, resumen: servicio.nombre, proximaFecha });
+    setDescripcion(servicio.nombre);
+    setServicioElegidoId("");
+  };
 
   const organizar = async () => {
     if (!descripcion.trim()) return;
@@ -184,6 +195,23 @@ function PlanDePagoIA({ planPago, onChange }) {
       <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, fontWeight: 600, color: COLORS.navy, marginBottom: 8, textAlign: "left" }}>
         ¿Cómo paga este cliente?
       </p>
+      {servicios.length > 0 && (
+        <div style={{ display: "flex", gap: 8, marginBottom: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
+          <Field label="O activa un servicio ya definido (ej: solo vigilancia judicial)">
+            <select className="drx-input" style={{ ...inputStyle, fontSize: 12.5, padding: "7px 8px", minWidth: 220 }} value={servicioElegidoId} onChange={(e) => setServicioElegidoId(e.target.value)}>
+              <option value="">Elige un servicio…</option>
+              {servicios.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.nombre} — {formatoCOP(s.valor)} / {s.frecuencia}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <button className="drx-btn-ghost" style={{ ...buttonGhost, padding: "8px 14px", fontSize: 12.5 }} onClick={usarServicio} disabled={!servicioElegidoId}>
+            Usar este servicio
+          </button>
+        </div>
+      )}
       <textarea
         className="drx-input"
         style={{ ...inputStyle, display: "block", width: "100%", boxSizing: "border-box", minHeight: 110, fontSize: 14, resize: "vertical" }}
