@@ -791,7 +791,7 @@ function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-const APP_VERSION = "1.46.1";
+const APP_VERSION = "1.46.2";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -6375,25 +6375,44 @@ function LandingPage({ onRegistrar, onIniciarSesion }) {
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14 }}>
             {SEGURIDAD_LANDING.map((s, i) => (
               <AlEntrar key={s.titulo} retraso={(i % 4) * 70}>
-                <Card>
+                <Card style={{ position: "relative", overflow: "hidden" }}>
+                  <div
+                    aria-hidden="true"
+                    style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, background: `linear-gradient(90deg, transparent, ${COLORS.accentBright}, transparent)` }}
+                  />
+                  <div
+                    aria-hidden="true"
+                    style={{
+                      position: "absolute",
+                      top: -30,
+                      right: -30,
+                      width: 90,
+                      height: 90,
+                      borderRadius: "50%",
+                      background: `radial-gradient(circle, ${COLORS.accentBright}22 0%, transparent 70%)`,
+                      pointerEvents: "none",
+                    }}
+                  />
                   <div
                     style={{
-                      width: 36,
-                      height: 36,
-                      borderRadius: 9,
-                      background: COLORS.accentSoft,
+                      width: 40,
+                      height: 40,
+                      borderRadius: 11,
+                      background: `linear-gradient(135deg, ${COLORS.accentBright}2E, ${COLORS.accentBright}0F)`,
+                      boxShadow: `0 8px 18px ${COLORS.accentBright}26`,
                       color: COLORS.navy,
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
-                      fontSize: 16,
-                      marginBottom: 10,
+                      fontSize: 17,
+                      marginBottom: 12,
+                      position: "relative",
                     }}
                   >
                     <IconoSeguridad tipo={ICONOS_SEGURIDAD_ORDEN[i % ICONOS_SEGURIDAD_ORDEN.length]} />
                   </div>
-                  <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, fontWeight: 700, color: COLORS.headingText, margin: "0 0 4px" }}>{s.titulo}</p>
-                  <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.inkSoft, lineHeight: 1.5, margin: 0 }}>{s.texto}</p>
+                  <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13.5, fontWeight: 800, color: COLORS.headingText, margin: "0 0 5px", position: "relative" }}>{s.titulo}</p>
+                  <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.inkSoft, lineHeight: 1.55, margin: 0, position: "relative" }}>{s.texto}</p>
                 </Card>
               </AlEntrar>
             ))}
