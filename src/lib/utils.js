@@ -96,6 +96,7 @@ export const NOTIF_CATEGORIAS = [
   { id: "contenido", nombre: "Contenido pendiente o vencido" },
   { id: "vigilancia", nombre: "Novedades judiciales" },
   { id: "radicados", nombre: "Clientes sin radicado" },
+  { id: "sin_pago_configurado", nombre: "Clientes sin plan de pago configurado" },
 ];
 
 export function notificacionesPorDefecto() {

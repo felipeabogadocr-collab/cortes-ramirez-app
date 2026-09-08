@@ -855,7 +855,7 @@ function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-const APP_VERSION = "1.48.4";
+const APP_VERSION = "1.49.0";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -1347,9 +1347,15 @@ function diagnosticoOperacion(r) {
   const sugerencias = [];
   const baseClientes = Math.max(1, r.totalClientes);
 
+  // Los topes y multiplicadores de aquí abajo se suavizaron una vez más: un
+  // despacho recién empezando a cargar datos (pocos clientes, apenas
+  // configurando pagos) se hundía al fondo de inmediato aunque no hubiera
+  // ningún problema real todavía — sigue siendo estricto con problemas de
+  // verdad (varios pagos atrasados, procesos con novedad sin revisar), pero
+  // ya no castiga tan duro por estar recién comenzando.
   if (r.clientesInactivos > 0) {
     const proporcion = r.clientesInactivos / baseClientes;
-    puntaje -= Math.round(Math.min(28, proporcion * 45));
+    puntaje -= Math.round(Math.min(20, proporcion * 32));
     razones.push(`${r.clientesInactivos} cliente${r.clientesInactivos !== 1 ? "s" : ""} sin novedades hace más de ${DIAS_ALERTA_INACTIVIDAD} días`);
     sugerencias.push("Ponte al día con los clientes sin actividad reciente — un mensaje corto ya ayuda.");
   }
@@ -1357,20 +1363,20 @@ function diagnosticoOperacion(r) {
   // (todavía dentro del plazo) es flujo de caja normal, no un problema.
   if (r.pagosAtrasados > 0) {
     const proporcion = r.pagosAtrasados / baseClientes;
-    puntaje -= Math.round(Math.min(26, proporcion * 55));
+    puntaje -= Math.round(Math.min(18, proporcion * 38));
     razones.push(`${r.pagosAtrasados} pago${r.pagosAtrasados !== 1 ? "s" : ""} atrasado${r.pagosAtrasados !== 1 ? "s" : ""}`);
     sugerencias.push("Envía los recordatorios de los pagos atrasados desde Contabilidad.");
   }
   if (r.procesosConNovedad > 0) {
     const proporcion = r.procesosConNovedad / baseClientes;
-    puntaje -= Math.round(Math.min(18, proporcion * 35));
+    puntaje -= Math.round(Math.min(13, proporcion * 24));
     razones.push(`${r.procesosConNovedad} proceso${r.procesosConNovedad !== 1 ? "s" : ""} con novedad en vigilancia judicial`);
     sugerencias.push("Revisa los procesos marcados con novedad en Vigilancia judicial.");
   }
   // Solo cuenta en contra si NUNCA ha entrado plata (no un mes suelto sin
   // pagos, que puede ser perfectamente normal según el ritmo del despacho).
   if (r.recaudadoTotal === 0 && r.totalClientes > 0) {
-    puntaje -= 10;
+    puntaje -= 6;
     razones.push("todavía no hay ningún pago registrado");
     sugerencias.push("Registra los pagos que ya has recibido para llevar el control real de caja.");
   }
@@ -4745,6 +4751,7 @@ function useNotificacionesPanel(prefs) {
   const [contenidoVencido, setContenidoVencido] = useState([]);
   const [novedadesJudiciales, setNovedadesJudiciales] = useState([]);
   const [clientesSinRadicado, setClientesSinRadicado] = useState([]);
+  const [clientesSinPago, setClientesSinPago] = useState([]);
   const notifPrefs = prefs || notificacionesPorDefecto();
 
   const cargar = useCallback(async () => {
@@ -4771,6 +4778,14 @@ function useNotificacionesPanel(prefs) {
     const pendientesPago = [];
     const novedades = [];
     const sinRadicado = [];
+    // Un cliente sin ningún plan de pago ni próximo cobro programado es
+    // plata que nadie está haciendo seguimiento (ni la app ni el abogado
+    // se van a acordar de cobrarla) — antes esto pasaba desapercibido
+    // hasta que alguien se acordaba de entrar a revisar Contabilidad a
+    // mano. Se avisa apenas se crea un cliente así, para que quede
+    // configurado (o se marque a propósito como "sin cobro") desde el
+    // principio.
+    const sinPago = [];
     const clientesNotif = await obtenerClientesPorId(idsClientes);
     for (const id of idsClientes) {
       const c = clientesNotif[id];
@@ -4791,11 +4806,15 @@ function useNotificacionesPanel(prefs) {
       if (!c.radicado?.trim()) {
         sinRadicado.push({ nombre: c.nombre });
       }
+      if (!c.planPago?.valor && !c.proximoPago?.fecha) {
+        sinPago.push({ id, nombre: c.nombre });
+      }
     }
     setClientesInactivos(inactivos);
     setPagosPendientes(pendientesPago.sort((a, b) => a.dias - b.dias));
     setNovedadesJudiciales(novedades);
     setClientesSinRadicado(sinRadicado);
+    setClientesSinPago(sinPago);
 
     const idsContenidoRaw = await storageGet("indice-contenido", true);
     const idsContenido = idsContenidoRaw ? JSON.parse(idsContenidoRaw) : [];
@@ -4830,7 +4849,8 @@ function useNotificacionesPanel(prefs) {
     (notifPrefs.pagos !== false ? pagosPendientes.length : 0) +
     (notifPrefs.contenido !== false ? contenidoPendiente.length + contenidoVencido.length : 0) +
     (notifPrefs.vigilancia !== false ? novedadesJudiciales.length : 0) +
-    (notifPrefs.radicados !== false ? clientesSinRadicado.length : 0);
+    (notifPrefs.radicados !== false ? clientesSinRadicado.length : 0) +
+    (notifPrefs.sin_pago_configurado !== false ? clientesSinPago.length : 0);
 
   return {
     count,
@@ -4841,6 +4861,7 @@ function useNotificacionesPanel(prefs) {
     contenidoVencido: notifPrefs.contenido !== false ? contenidoVencido : [],
     novedadesJudiciales: notifPrefs.vigilancia !== false ? novedadesJudiciales : [],
     clientesSinRadicado: notifPrefs.radicados !== false ? clientesSinRadicado : [],
+    clientesSinPago: notifPrefs.sin_pago_configurado !== false ? clientesSinPago : [],
     marcarFirmasVistas,
     reload: cargar,
   };
@@ -5038,12 +5059,14 @@ function ModalNotificaciones({
   contenidoVencido,
   novedadesJudiciales,
   clientesSinRadicado,
+  clientesSinPago,
   onCerrar,
   onMarcarVistas,
   onIrADocumentos,
   onIrAClientes,
   onIrAContenido,
   onIrAVigilancia,
+  onIrAContabilidad,
 }) {
   const panelRef = useRef(null);
 
@@ -5241,7 +5264,28 @@ function ModalNotificaciones({
               </button>
             </div>
           ) : (
-            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.muted }}>Todos los clientes tienen radicado registrado.</p>
+            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.muted, marginBottom: 18 }}>Todos los clientes tienen radicado registrado.</p>
+          )}
+
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, fontWeight: 700, color: "#B42318", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 10 }}>
+            <Icono tipo="tarjeta" size={14} style={{ marginRight: 4, verticalAlign: -2 }} /> Clientes sin plan de pago
+          </p>
+          {clientesSinPago.length > 0 ? (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {clientesSinPago.map((c, i) => (
+                <div key={i} style={{ background: "#FEF2F2", border: "1px solid #FBD5D5", borderRadius: 8, padding: "10px 12px" }}>
+                  <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, fontWeight: 600, color: "#B42318", margin: 0 }}>{c.nombre}</p>
+                  <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11, color: "#B42318", margin: "2px 0 0" }}>
+                    No tiene plan de pago ni próximo cobro configurado — nadie le está haciendo seguimiento a este cobro.
+                  </p>
+                </div>
+              ))}
+              <button className="drx-btn-ghost" style={{ ...buttonGhost, fontSize: 12, padding: "6px 12px", alignSelf: "flex-start" }} onClick={onIrAContabilidad}>
+                Ir a Contabilidad
+              </button>
+            </div>
+          ) : (
+            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.muted }}>Todos los clientes tienen un plan de pago configurado.</p>
           )}
         </div>
       </div>
@@ -8192,6 +8236,7 @@ function App() {
     contenidoVencido,
     novedadesJudiciales,
     clientesSinRadicado,
+    clientesSinPago,
     marcarFirmasVistas,
   } = useNotificacionesPanel(usuarioActual?.notificaciones);
 
@@ -8421,6 +8466,10 @@ function App() {
   };
   const irAVigilancia = () => {
     setTab("vigilancia");
+    setMostrarNotificaciones(false);
+  };
+  const irAContabilidad = () => {
+    setTab("contabilidad");
     setMostrarNotificaciones(false);
   };
 
@@ -8681,12 +8730,14 @@ function App() {
                 contenidoVencido={contenidoVencido}
                 novedadesJudiciales={novedadesJudiciales}
                 clientesSinRadicado={clientesSinRadicado}
+                clientesSinPago={clientesSinPago}
                 onCerrar={() => setMostrarNotificaciones(false)}
                 onMarcarVistas={marcarFirmasVistas}
                 onIrADocumentos={irADocumentos}
                 onIrAClientes={irAClientes}
                 onIrAContenido={irAContenido}
                 onIrAVigilancia={irAVigilancia}
+                onIrAContabilidad={irAContabilidad}
               />
             )}
             </div>

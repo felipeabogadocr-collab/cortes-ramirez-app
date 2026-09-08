@@ -84,6 +84,35 @@ const INDEX_TABLES = {
   "indice-documentos": "documentos",
 };
 
+// Resumen (y otras pantallas) terminan pidiendo la misma lista completa de
+// clientes/documentos/contenido más de una vez casi al mismo tiempo — cada
+// hook (useDatosReportes, useResumenGeneral, PanelesDeNotificaciones, etc.)
+// no sabe que otro ya está pidiendo exactamente lo mismo. En vez de
+// reescribir cada hook para compartir un solo estado (un cambio mucho más
+// grande y riesgoso), se coalescen aquí: si dos llamadas piden los mismos
+// ids del mismo despacho mientras la primera todavía está en camino,
+// comparten la misma respuesta en vez de mandar dos consultas idénticas a
+// la base de datos. La caché se limpia apenas la consulta termina, así que
+// nunca sirve un dato viejo — solo evita el duplicado cuando de verdad
+// coinciden en el tiempo.
+function coalescePorClave(cache, clave, tarea) {
+  if (cache.clave === clave && cache.promesa) return cache.promesa;
+  const promesa = tarea();
+  cache.clave = clave;
+  cache.promesa = promesa;
+  promesa.finally(() => {
+    if (cache.clave === clave) {
+      cache.clave = null;
+      cache.promesa = null;
+    }
+  });
+  return promesa;
+}
+
+const cacheClientesPorId = { clave: null, promesa: null };
+const cacheDocumentosPorId = { clave: null, promesa: null };
+const cacheValoresPorClaves = { clave: null, promesa: null };
+
 // Trae varios clientes de una sola vez (una sola consulta a la base de
 // datos) en vez de uno por uno — antes, varias pantallas hacían
 // storageGet("cliente:ID") en un ciclo por cada id del índice, y con N
@@ -94,6 +123,11 @@ const INDEX_TABLES = {
 // JSON.parse después, a diferencia de storageGet).
 export async function obtenerClientesPorId(ids) {
   if (!ids || ids.length === 0) return {};
+  const clave = `${despachoActualId}:${[...ids].sort().join(",")}`;
+  return coalescePorClave(cacheClientesPorId, clave, () => obtenerClientesPorIdInterno(ids));
+}
+
+async function obtenerClientesPorIdInterno(ids) {
   try {
     // Un solo IN() con miles de ids sería un problema aparte — se parte en
     // bloques para no mandar una sola consulta gigante si el despacho
@@ -125,6 +159,11 @@ export async function obtenerClientesPorId(ids) {
 // pestaña Documentos, que también traía cada documento uno por uno).
 export async function obtenerDocumentosPorId(ids) {
   if (!ids || ids.length === 0 || !despachoActualId) return {};
+  const clave = `${despachoActualId}:${[...ids].sort().join(",")}`;
+  return coalescePorClave(cacheDocumentosPorId, clave, () => obtenerDocumentosPorIdInterno(ids));
+}
+
+async function obtenerDocumentosPorIdInterno(ids) {
   try {
     const TAMANO_BLOQUE = 300;
     const resultado = {};
@@ -157,6 +196,11 @@ export async function obtenerDocumentosPorId(ids) {
 // lo use siga haciendo JSON.parse si lo necesita).
 export async function obtenerValoresPorClaves(claves) {
   if (!claves || claves.length === 0 || !despachoActualId) return {};
+  const clave = `${despachoActualId}:${[...claves].sort().join(",")}`;
+  return coalescePorClave(cacheValoresPorClaves, clave, () => obtenerValoresPorClavesInterno(claves));
+}
+
+async function obtenerValoresPorClavesInterno(claves) {
   try {
     const TAMANO_BLOQUE = 300;
     const resultado = {};
