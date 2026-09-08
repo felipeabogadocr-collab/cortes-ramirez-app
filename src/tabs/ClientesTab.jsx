@@ -717,7 +717,7 @@ export default function ClientesTab({ usuarioActual }) {
                         }}
                       >
                         <span
-                          title="Copiar radicado"
+                          title="Copiar radicado (para pegarlo en Rama Judicial o en la Fiscalía)"
                           onClick={() => copiar(r, `rad-${id}-${idx}`)}
                           style={{
                             fontFamily: "monospace",
@@ -726,9 +726,18 @@ export default function ClientesTab({ usuarioActual }) {
                             background: copiado === `rad-${id}-${idx}` ? "#E4EEE2" : COLORS.surfaceSoft,
                             color: copiado === `rad-${id}-${idx}` ? "#2F5D3A" : COLORS.inkSoft,
                             cursor: "pointer",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 5,
                           }}
                         >
-                          {copiado === `rad-${id}-${idx}` ? "✓ Copiado" : `Radicado: ${r}`}
+                          {copiado === `rad-${id}-${idx}` ? (
+                            "✓ Copiado"
+                          ) : (
+                            <>
+                              Radicado: {r} <Icono tipo="portapapeles" size={11} />
+                            </>
+                          )}
                         </span>
                         <a
                           href="https://consultaprocesos.ramajudicial.gov.co/procesos"
