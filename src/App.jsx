@@ -465,6 +465,8 @@ const GlobalStyle = () => (
     .drx-tab:active { transform: translateX(2px) scale(0.98); }
     .drx-input { transition: border-color .15s ease, box-shadow .15s ease; }
     .drx-input:focus { border-color: ${COLORS.accentBright} !important; box-shadow: 0 0 0 3px ${COLORS.accentSoft}; }
+    .drx-fila-funcion p:first-child { transition: color .2s ease; }
+    .drx-fila-funcion:hover p:first-child { color: ${COLORS.accentBright} !important; }
     .drx-chip-vigilancia { transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease; }
     .drx-chip-vigilancia:hover { transform: translateY(-1px); border-color: ${COLORS.accentBright} !important; }
     .drx-chip-vigilancia:active { transform: translateY(0) scale(0.97); }
@@ -829,7 +831,7 @@ function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-const APP_VERSION = "1.47.0";
+const APP_VERSION = "1.47.1";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -6191,48 +6193,28 @@ function LandingPage({ onRegistrar, onIniciarSesion }) {
         <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted, textAlign: "center", marginBottom: 30 }}>
           Cada pestaña de la app resuelve una parte real de la operación de un despacho.
         </p>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 18, marginBottom: 60 }}>
+        {/* Lista editorial en dos columnas, no tarjetas de colores — un
+            despacho de abogados se lee más serio con algo cercano a una
+            hoja de especificaciones (número + título + texto) que con un
+            mosaico de íconos pastel tipo plantilla genérica de SaaS. */}
+        <div
+          className="drx-lista-funciones"
+          style={{ columns: typeof window !== "undefined" && window.innerWidth < 720 ? 1 : 2, columnGap: 56, marginBottom: 60 }}
+        >
           {FUNCIONES_LANDING.map((f, i) => (
             <AlEntrar key={f.titulo} retraso={(i % 4) * 60}>
-              <Card style={{ position: "relative", overflow: "hidden", padding: "22px 20px" }}>
-                <div
+              <div className="drx-fila-funcion" style={{ breakInside: "avoid", display: "flex", gap: 18, padding: "24px 0", borderBottom: `1px solid ${COLORS.border}` }}>
+                <p
                   aria-hidden="true"
-                  style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, background: `linear-gradient(90deg, transparent, ${f.color}, transparent)` }}
-                />
-                <div
-                  aria-hidden="true"
-                  style={{
-                    position: "absolute",
-                    top: -30,
-                    right: -30,
-                    width: 90,
-                    height: 90,
-                    borderRadius: "50%",
-                    background: `radial-gradient(circle, ${f.color}22 0%, transparent 70%)`,
-                    pointerEvents: "none",
-                  }}
-                />
-                <div
-                  style={{
-                    width: 46,
-                    height: 46,
-                    borderRadius: 13,
-                    background: `linear-gradient(135deg, ${f.color}2E, ${f.color}0F)`,
-                    boxShadow: `0 8px 18px ${f.color}26`,
-                    color: f.color,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    marginBottom: 14,
-                    fontSize: 20,
-                    position: "relative",
-                  }}
+                  style={{ fontFamily: "Inter, sans-serif", fontSize: 26, fontWeight: 800, color: COLORS.border, margin: 0, lineHeight: 1, flexShrink: 0, minWidth: 38, transition: "color .2s ease" }}
                 >
-                  <IconoTab tipo={f.iconoTab} />
+                  {String(i + 1).padStart(2, "0")}
+                </p>
+                <div>
+                  <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, fontWeight: 800, color: COLORS.headingText, margin: "0 0 6px", letterSpacing: -0.2 }}>{f.titulo}</p>
+                  <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.inkSoft, lineHeight: 1.65, margin: 0 }}>{f.texto}</p>
                 </div>
-                <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, fontWeight: 800, color: f.color, marginBottom: 8, letterSpacing: -0.2, position: "relative" }}>{f.titulo}</p>
-                <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.inkSoft, lineHeight: 1.65, margin: 0, position: "relative" }}>{f.texto}</p>
-              </Card>
+              </div>
             </AlEntrar>
           ))}
         </div>
