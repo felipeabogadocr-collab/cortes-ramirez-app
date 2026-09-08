@@ -83,7 +83,31 @@ const TIPOS_ID = ["Cédula de ciudadanía", "Cédula de extranjería", "Pasaport
 // Número de WhatsApp del despacho (con indicativo, sin espacios ni +), usado en el botón "¿Tienes dudas?"
 const NUMERO_WHATSAPP_DESPACHO = "573192875428";
 
-export const TIPOS_PROCESO = ["Ordinario", "Verbal", "Verbal sumario", "Ejecutivo", "Declarativo", "Tutela", "Arbitraje", "Otro"];
+// "Ordinario / Verbal / Ejecutivo..." es la clasificación de trámites del
+// Código General del Proceso (civil) — no tiene nada que ver con el trámite
+// penal (Ley 906 de 2004, sistema acusatorio: indagación, imputación,
+// acusación, juicio...) ni con el resto de áreas, cada una con su propio
+// procedimiento. Antes un solo listado de tipos se usaba para todas las
+// áreas por igual, lo que obligaba a forzar un caso penal dentro de una
+// categoría civil que no le aplica. Ahora el tipo de proceso depende del
+// área elegida.
+export const TIPOS_PROCESO_POR_AREA = {
+  Civil: ["Ordinario", "Verbal", "Verbal sumario", "Ejecutivo", "Declarativo", "Otro"],
+  Penal: ["Indagación", "Imputación", "Acusación", "Juicio oral", "Ejecución de penas", "Otro"],
+  Laboral: ["Ordinario laboral", "Ejecutivo laboral", "Fuero sindical", "Otro"],
+  Familia: ["Divorcio o cesación de efectos civiles", "Custodia y alimentos", "Sucesión", "Verbal", "Otro"],
+  Comercial: ["Ordinario", "Verbal", "Ejecutivo", "Arbitraje", "Otro"],
+  Administrativo: ["Nulidad y restablecimiento del derecho", "Reparación directa", "Nulidad simple", "Otro"],
+  Constitucional: ["Tutela", "Acción de cumplimiento", "Acción popular", "Habeas corpus", "Otro"],
+  Otro: ["Otro"],
+};
+export function tiposProcesoDeArea(area) {
+  return TIPOS_PROCESO_POR_AREA[area] || TIPOS_PROCESO_POR_AREA.Otro;
+}
+// Se mantiene por compatibilidad con datos existentes y con el asistente de
+// IA (que puede no conocer el área todavía al crear un cliente) — la lista
+// completa de todos los tipos posibles, sin repetir "Otro".
+export const TIPOS_PROCESO = [...new Set(Object.values(TIPOS_PROCESO_POR_AREA).flat())];
 export const AREAS_PROCESO = ["Civil", "Penal", "Laboral", "Familia", "Comercial", "Administrativo", "Constitucional", "Otro"];
 export const COLOR_AREA_PROCESO = {
   Civil: "#2F80ED",
@@ -831,7 +855,7 @@ function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-const APP_VERSION = "1.47.1";
+const APP_VERSION = "1.47.2";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -1439,7 +1463,11 @@ const TOOLS_ASISTENTE = [
         nombre: { type: "string", description: "Nombre completo del cliente" },
         telefono: { type: "string" },
         email: { type: "string" },
-        tipoProceso: { type: "string", description: "Ordinario, Verbal, Verbal sumario, Ejecutivo, Declarativo, Tutela, Arbitraje u Otro" },
+        tipoProceso: {
+          type: "string",
+          description:
+            "El trámite específico, ajustado al área del caso — cada área tiene su propia clasificación, no son intercambiables. Civil/Comercial: Ordinario, Verbal, Verbal sumario, Ejecutivo, Declarativo. Penal: Indagación, Imputación, Acusación, Juicio oral, Ejecución de penas. Laboral: Ordinario laboral, Ejecutivo laboral, Fuero sindical. Familia: Divorcio o cesación de efectos civiles, Custodia y alimentos, Sucesión, Verbal. Administrativo: Nulidad y restablecimiento del derecho, Reparación directa, Nulidad simple. Constitucional: Tutela, Acción de cumplimiento, Acción popular, Habeas corpus. Si no encaja en ninguna, usa Otro.",
+        },
         areaProceso: { type: "string", description: "Civil, Penal, Laboral, Familia, Comercial, Administrativo, Constitucional u Otro" },
         radicado: { type: "string" },
         notas: { type: "string" },

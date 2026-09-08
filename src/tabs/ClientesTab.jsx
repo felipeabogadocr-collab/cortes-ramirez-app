@@ -5,8 +5,8 @@ import {
   COLORS, uid, registrarAuditoria, diasDesde, exportarCSV, useIndex, useConfirmarDialogo,
   useAvisoAntesDeSalir, useUsuariosDespacho, Field, inputStyle, CampoDinero, buttonPrimary,
   buttonGhost, Card, EncabezadoSeccion, Icono, AvatarIniciales, EstadoVacio, LineaDeTiempo,
-  TIPOS_PROCESO, AREAS_PROCESO, COLOR_AREA_PROCESO, DIAS_ALERTA_INACTIVIDAD, numeroWhatsappCliente,
-  radicadosDeCliente,
+  AREAS_PROCESO, COLOR_AREA_PROCESO, DIAS_ALERTA_INACTIVIDAD, numeroWhatsappCliente,
+  radicadosDeCliente, tiposProcesoDeArea,
 } from "../App.jsx";
 
 // Enlace oficial de la Fiscalía para consultar el estado de una denuncia en
@@ -20,7 +20,7 @@ const FORM_CLIENTE_INICIAL = {
   nombre: "",
   telefono: "",
   email: "",
-  tipoProceso: TIPOS_PROCESO[0],
+  tipoProceso: tiposProcesoDeArea(AREAS_PROCESO[0])[0],
   areaProceso: AREAS_PROCESO[0],
   radicados: [""],
   notas: "",
@@ -521,20 +521,28 @@ export default function ClientesTab({ usuarioActual }) {
             <Field label="Número(s) de radicado (opcional)">
               <EditorRadicados radicados={form.radicados} onChange={(radicados) => setForm({ ...form, radicados })} />
             </Field>
-            <Field label="Tipo de proceso">
-              <select className="drx-input" style={inputStyle} value={form.tipoProceso} onChange={(e) => setForm({ ...form, tipoProceso: e.target.value })}>
-                {TIPOS_PROCESO.map((t) => (
-                  <option key={t} value={t}>
-                    {t}
+            <Field label="Área del proceso">
+              <select
+                className="drx-input"
+                style={inputStyle}
+                value={form.areaProceso}
+                onChange={(e) => {
+                  const areaProceso = e.target.value;
+                  setForm({ ...form, areaProceso, tipoProceso: tiposProcesoDeArea(areaProceso)[0] });
+                }}
+              >
+                {AREAS_PROCESO.map((a) => (
+                  <option key={a} value={a}>
+                    {a}
                   </option>
                 ))}
               </select>
             </Field>
-            <Field label="Área del proceso">
-              <select className="drx-input" style={inputStyle} value={form.areaProceso} onChange={(e) => setForm({ ...form, areaProceso: e.target.value })}>
-                {AREAS_PROCESO.map((a) => (
-                  <option key={a} value={a}>
-                    {a}
+            <Field label="Tipo de proceso">
+              <select className="drx-input" style={inputStyle} value={form.tipoProceso} onChange={(e) => setForm({ ...form, tipoProceso: e.target.value })}>
+                {tiposProcesoDeArea(form.areaProceso).map((t) => (
+                  <option key={t} value={t}>
+                    {t}
                   </option>
                 ))}
               </select>
@@ -592,23 +600,42 @@ export default function ClientesTab({ usuarioActual }) {
                   <Field label="Número(s) de radicado (opcional)">
                     <EditorRadicados radicados={formEdicion.radicados} onChange={(radicados) => setFormEdicion({ ...formEdicion, radicados })} />
                   </Field>
-                  <Field label="Tipo de proceso">
-                    <select className="drx-input" style={inputStyle} value={formEdicion.tipoProceso || TIPOS_PROCESO[0]} onChange={(e) => setFormEdicion({ ...formEdicion, tipoProceso: e.target.value })}>
-                      {TIPOS_PROCESO.map((t) => (
-                        <option key={t} value={t}>
-                          {t}
-                        </option>
-                      ))}
-                    </select>
-                  </Field>
                   <Field label="Área del proceso">
-                    <select className="drx-input" style={inputStyle} value={formEdicion.areaProceso || AREAS_PROCESO[0]} onChange={(e) => setFormEdicion({ ...formEdicion, areaProceso: e.target.value })}>
+                    <select
+                      className="drx-input"
+                      style={inputStyle}
+                      value={formEdicion.areaProceso || AREAS_PROCESO[0]}
+                      onChange={(e) => {
+                        const areaProceso = e.target.value;
+                        setFormEdicion({ ...formEdicion, areaProceso, tipoProceso: tiposProcesoDeArea(areaProceso)[0] });
+                      }}
+                    >
                       {AREAS_PROCESO.map((a) => (
                         <option key={a} value={a}>
                           {a}
                         </option>
                       ))}
                     </select>
+                  </Field>
+                  <Field label="Tipo de proceso">
+                    {(() => {
+                      // Un cliente creado antes de que el tipo dependiera del
+                      // área puede tener guardado un tipo que ya no aparece
+                      // en la lista de su área actual — se incluye igual para
+                      // no cambiarle el dato sin que el usuario lo pida.
+                      const opciones = tiposProcesoDeArea(formEdicion.areaProceso || AREAS_PROCESO[0]);
+                      const valorActual = formEdicion.tipoProceso || opciones[0];
+                      const listaCompleta = opciones.includes(valorActual) ? opciones : [valorActual, ...opciones];
+                      return (
+                        <select className="drx-input" style={inputStyle} value={valorActual} onChange={(e) => setFormEdicion({ ...formEdicion, tipoProceso: e.target.value })}>
+                          {listaCompleta.map((t) => (
+                            <option key={t} value={t}>
+                              {t}
+                            </option>
+                          ))}
+                        </select>
+                      );
+                    })()}
                   </Field>
                   <Field label="Valor total acordado (opcional)">
                     <CampoDinero
