@@ -1308,7 +1308,7 @@ export default function ContabilidadTab({ usuarioActual }) {
 
   const proximosPagos = ids
     .map((id) => ({ id, c: clientes[id] }))
-    .filter(({ c }) => c?.proximoPago?.fecha)
+    .filter(({ c }) => c?.proximoPago?.fecha && !c.procesoPausado)
     .map(({ id, c }) => ({ id, c, dias: diasHasta(c.proximoPago.fecha) }))
     .filter(({ dias }) => dias !== null && dias <= DIAS_AVISO_PROXIMO_PAGO)
     .sort((a, b) => a.dias - b.dias);

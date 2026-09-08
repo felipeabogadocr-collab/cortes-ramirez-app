@@ -301,9 +301,6 @@ export default function ClientesTab({ usuarioActual }) {
   const [soloInactivos, setSoloInactivos] = useState(false);
   const [toastGuardado, setToastGuardado] = useState("");
   const { confirmar, ConfirmarDialogo } = useConfirmarDialogo();
-  const { servicios } = useServicios();
-  const [activandoServicioId, setActivandoServicioId] = useState(null);
-  const [servicioElegidoId, setServicioElegidoId] = useState("");
 
   useEffect(() => {
     (async () => {
@@ -424,25 +421,17 @@ export default function ClientesTab({ usuarioActual }) {
     setClientes((prev) => ({ ...prev, [id]: actualizado }));
   };
 
-  // "Activar" un servicio del catálogo (definido en Administración) sobre
-  // un cliente sin contrato formal — deja programado el próximo cobro con
-  // el valor y la frecuencia del servicio, igual que si se hubiera armado
-  // el plan de pago a mano, pero sin tener que volver a escribir el precio
-  // cada vez. No obliga a nada a futuro: si el cliente deja de necesitarlo,
-  // el plan se edita o se borra igual que cualquier otro.
-  const activarServicio = async (id, servicio) => {
+  // Pausar un proceso: el caso sigue existiendo pero deja de contar como
+  // "inactivo" o de generar avisos de pago atrasado/pendiente mientras está
+  // en pausa — útil cuando el proceso está detenido por algo externo (a la
+  // espera de un trámite, el cliente pidió un receso, etc.) y no tiene
+  // sentido que el sistema siga insistiendo con recordatorios.
+  const pausarProceso = async (id) => {
     const c = clientes[id];
-    const proximaFecha = calcularProximaFechaPorFrecuencia(fechaHoyISO(), servicio.frecuencia);
-    const actualizado = {
-      ...c,
-      planPago: { descripcion: servicio.nombre, frecuencia: servicio.frecuencia, valor: servicio.valor, resumen: servicio.nombre },
-      proximoPago: { fecha: proximaFecha, valorEsperado: servicio.valor },
-    };
+    const actualizado = { ...c, procesoPausado: !c.procesoPausado };
     await storageSet(`cliente:${id}`, JSON.stringify(actualizado), false);
     setClientes((prev) => ({ ...prev, [id]: actualizado }));
-    registrarAuditoria(usuarioActual, "activar_servicio", "cliente", id, { nombre: c.nombre, servicio: servicio.nombre, valor: servicio.valor });
-    setActivandoServicioId(null);
-    setServicioElegidoId("");
+    registrarAuditoria(usuarioActual, actualizado.procesoPausado ? "pausar_proceso" : "reanudar_proceso", "cliente", id, { nombre: c.nombre });
   };
 
   // Ordenar + filtrar recorre TODOS los clientes — se memoiza para que no se
@@ -478,7 +467,7 @@ export default function ClientesTab({ usuarioActual }) {
     if (soloInactivos) {
       resultado = resultado.filter((id) => {
         const dias = diasDesde(clientes[id]?.ultimaActuacion);
-        return dias !== null && dias >= DIAS_ALERTA_INACTIVIDAD;
+        return dias !== null && dias >= DIAS_ALERTA_INACTIVIDAD && !clientes[id]?.procesoPausado;
       });
     }
     return resultado;
@@ -798,7 +787,7 @@ export default function ClientesTab({ usuarioActual }) {
           }
 
           const dias = diasDesde(c.ultimaActuacion);
-          const inactivo = dias !== null && dias >= DIAS_ALERTA_INACTIVIDAD;
+          const inactivo = dias !== null && dias >= DIAS_ALERTA_INACTIVIDAD && !c.procesoPausado;
 
           return (
             <Card key={id} style={{ borderLeft: `4px solid ${COLOR_AREA_PROCESO[c.areaProceso] || "#14B8A6"}` }}>
@@ -968,6 +957,22 @@ export default function ClientesTab({ usuarioActual }) {
                     >
                       {dias === null ? "Sin actuaciones" : dias === 0 ? "Actuación hoy" : `Hace ${dias} día${dias !== 1 ? "s" : ""}`}
                     </span>
+                    {c.procesoPausado && (
+                      <span
+                        style={{
+                          fontFamily: "Inter, sans-serif",
+                          fontSize: 11,
+                          fontWeight: 600,
+                          padding: "3px 9px",
+                          borderRadius: 20,
+                          background: "#F1F0FF",
+                          color: "#5B21B6",
+                          border: "1px solid #DCD6FF",
+                        }}
+                      >
+                        En pausa
+                      </span>
+                    )}
                   </div>
                   {c.notas && <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.inkSoft, margin: "8px 0 0" }}>{c.notas}</p>}
                   </div>
@@ -1009,11 +1014,14 @@ export default function ClientesTab({ usuarioActual }) {
                   >
                     {copiado === `todo-${id}` ? "✓ Copiado" : "Copiar datos"}
                   </button>
-                  {servicios.length > 0 && (
-                    <button className="drx-btn-ghost" style={buttonGhost} onClick={() => setActivandoServicioId(activandoServicioId === id ? null : id)}>
-                      Activar servicio
-                    </button>
-                  )}
+                  <button
+                    className="drx-btn-ghost"
+                    style={{ ...buttonGhost, ...(c.procesoPausado ? { background: "#FEF3E2", color: "#B45309", borderColor: "#FCE3B8" } : {}) }}
+                    title={c.procesoPausado ? "Reanudar seguimiento de avisos e inactividad" : "Pausar avisos de inactividad y de pago mientras el proceso está detenido"}
+                    onClick={() => pausarProceso(id)}
+                  >
+                    {c.procesoPausado ? "Reanudar proceso" : "Pausar proceso"}
+                  </button>
                   <button className="drx-btn-ghost" style={buttonGhost} onClick={() => empezarEdicion(id)}>
                     Editar
                   </button>
@@ -1030,50 +1038,6 @@ export default function ClientesTab({ usuarioActual }) {
                   </button>
                 </div>
               </div>
-              {activandoServicioId === id && (
-                <div
-                  className="drx-fade-in"
-                  style={{ background: COLORS.surfaceSoft, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: 14, marginTop: 10, display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap" }}
-                >
-                  <Field label="Servicio a activar">
-                    <select className="drx-input" style={{ ...inputStyle, minWidth: 240 }} value={servicioElegidoId} onChange={(e) => setServicioElegidoId(e.target.value)}>
-                      <option value="">Elige un servicio…</option>
-                      {servicios.map((s) => (
-                        <option key={s.id} value={s.id}>
-                          {s.nombre} — {formatoCOP(s.valor)} / {s.frecuencia}
-                        </option>
-                      ))}
-                    </select>
-                  </Field>
-                  <button
-                    className="drx-btn-primary"
-                    style={{ ...buttonPrimary, padding: "9px 16px" }}
-                    disabled={!servicioElegidoId}
-                    onClick={() => {
-                      const servicio = servicios.find((s) => s.id === servicioElegidoId);
-                      if (servicio) activarServicio(id, servicio);
-                    }}
-                  >
-                    Activar
-                  </button>
-                  <button
-                    className="drx-btn-ghost"
-                    style={buttonGhost}
-                    onClick={() => {
-                      setActivandoServicioId(null);
-                      setServicioElegidoId("");
-                    }}
-                  >
-                    Cancelar
-                  </button>
-                  {c.proximoPago?.fecha && (
-                    <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, color: COLORS.muted, margin: 0, width: "100%" }}>
-                      Ya tiene un próximo pago programado ({formatoCOP(c.proximoPago.valorEsperado || 0)} el{" "}
-                      {new Date(`${c.proximoPago.fecha}T12:00:00`).toLocaleDateString("es-CO", { dateStyle: "medium" })}) — activar un servicio lo reemplaza.
-                    </p>
-                  )}
-                </div>
-              )}
               <LineaDeTiempo
                 cliente={c}
                 onAgregar={(nota, fecha) => agregarActuacion(id, nota, fecha)}

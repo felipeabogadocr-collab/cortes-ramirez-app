@@ -855,7 +855,7 @@ function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-const APP_VERSION = "1.49.1";
+const APP_VERSION = "1.50.0";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -1200,9 +1200,12 @@ async function calcularResumenOperacion() {
     // Un caso ya Finalizado sin movimiento reciente es normal (terminó, no
     // hay nada más que hacer) — no debería contar como "cliente descuidado"
     // igual que uno en trámite que lleva semanas sin que nadie lo revise.
-    if (dias !== null && dias >= DIAS_ALERTA_INACTIVIDAD && c.estadoVigilancia !== "Finalizado") clientesInactivos++;
+    // Un proceso en pausa (el cliente decidió detenerlo, está a la espera de
+    // algo externo, etc.) tampoco debería sumar como descuidado ni generar
+    // avisos de pago — el abogado lo pausó a propósito.
+    if (dias !== null && dias >= DIAS_ALERTA_INACTIVIDAD && c.estadoVigilancia !== "Finalizado" && !c.procesoPausado) clientesInactivos++;
     else clientesActivos++;
-    if (c.proximoPago?.fecha) {
+    if (c.proximoPago?.fecha && !c.procesoPausado) {
       const diasPago = diasHasta(c.proximoPago.fecha);
       if (diasPago !== null && diasPago <= DIAS_AVISO_PROXIMO_PAGO) pagosPendientes++;
       if (diasPago !== null && diasPago < 0) pagosAtrasados++;
@@ -4791,10 +4794,10 @@ function useNotificacionesPanel(prefs) {
       const c = clientesNotif[id];
       if (!c) continue;
       const dias = diasDesde(c.ultimaActuacion);
-      if (dias !== null && dias >= DIAS_ALERTA_INACTIVIDAD) {
+      if (dias !== null && dias >= DIAS_ALERTA_INACTIVIDAD && !c.procesoPausado) {
         inactivos.push({ nombre: c.nombre, dias });
       }
-      if (c.proximoPago?.fecha) {
+      if (c.proximoPago?.fecha && !c.procesoPausado) {
         const diasPago = diasHasta(c.proximoPago.fecha);
         if (diasPago !== null && diasPago <= DIAS_AVISO_PROXIMO_PAGO) {
           pendientesPago.push({ cliente: c, dias: diasPago });
@@ -4806,7 +4809,7 @@ function useNotificacionesPanel(prefs) {
       if (!c.radicado?.trim()) {
         sinRadicado.push({ nombre: c.nombre });
       }
-      if (!c.planPago?.valor && !c.proximoPago?.fecha) {
+      if (!c.planPago?.valor && !c.proximoPago?.fecha && !c.procesoPausado) {
         sinPago.push({ id, nombre: c.nombre });
       }
     }

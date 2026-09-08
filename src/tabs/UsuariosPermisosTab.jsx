@@ -859,6 +859,8 @@ const ETIQUETAS_ACCION = {
   crear_servicio: { texto: "creó el servicio", color: "#10B981" },
   eliminar_servicio: { texto: "eliminó el servicio", color: "#B42318" },
   activar_servicio: { texto: "activó un servicio para", color: "#10B981" },
+  pausar_proceso: { texto: "pausó el proceso de", color: "#B45309" },
+  reanudar_proceso: { texto: "reanudó el proceso de", color: "#10B981" },
 };
 
 const AUDITORIA_POR_PAGINA = 25;
