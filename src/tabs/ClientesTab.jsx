@@ -6,7 +6,15 @@ import {
   useAvisoAntesDeSalir, useUsuariosDespacho, Field, inputStyle, CampoDinero, buttonPrimary,
   buttonGhost, Card, EncabezadoSeccion, Icono, AvatarIniciales, EstadoVacio, LineaDeTiempo,
   TIPOS_PROCESO, AREAS_PROCESO, COLOR_AREA_PROCESO, DIAS_ALERTA_INACTIVIDAD, numeroWhatsappCliente,
+  radicadosDeCliente,
 } from "../App.jsx";
+
+// Enlace oficial de la Fiscalía para consultar el estado de una denuncia en
+// el SPOA. No se puede automatizar esta consulta: el propio portal exige un
+// reCAPTCHA en cada búsqueda, precisamente para impedir consultas masivas o
+// por robot — así que esto es un acceso directo para que el abogado la haga
+// a mano en un clic, no una consulta automática como la de la Rama Judicial.
+const URL_CONSULTA_SPOA = "https://www.fiscalia.gov.co/servicios-de-informacion-al-ciudadano/consultas/";
 
 const FORM_CLIENTE_INICIAL = {
   nombre: "",
@@ -14,7 +22,7 @@ const FORM_CLIENTE_INICIAL = {
   email: "",
   tipoProceso: TIPOS_PROCESO[0],
   areaProceso: AREAS_PROCESO[0],
-  radicado: "",
+  radicados: [""],
   notas: "",
   planPago: null,
   valorTotal: "",
@@ -53,6 +61,46 @@ function EditorOtrasPersonas({ personas, onChange }) {
           </button>
         </div>
       ))}
+    </div>
+  );
+}
+
+// Un cliente puede tener más de un proceso o más de un recurso del mismo
+// proceso — cada radicado que se agregue aquí se vigila por separado en
+// Vigilancia judicial (todos consultados contra la Rama Judicial, no solo
+// el primero).
+function EditorRadicados({ radicados, onChange }) {
+  const lista = radicados && radicados.length > 0 ? radicados : [""];
+
+  const agregar = () => onChange([...lista, ""]);
+  const quitar = (idx) => onChange(lista.length > 1 ? lista.filter((_, i) => i !== idx) : [""]);
+  const actualizar = (idx, valor) => onChange(lista.map((r, i) => (i === idx ? valor : r)));
+
+  return (
+    <div>
+      {lista.map((r, idx) => (
+        <div key={idx} style={{ display: "flex", gap: 8, marginBottom: idx < lista.length - 1 ? 8 : 0 }}>
+          <input
+            className="drx-input"
+            style={inputStyle}
+            value={r}
+            onChange={(e) => actualizar(idx, e.target.value)}
+            placeholder="Ej: 11001310300120240012300"
+          />
+          {(lista.length > 1 || r) && (
+            <button
+              onClick={() => quitar(idx)}
+              style={{ background: "none", border: "none", cursor: "pointer", color: COLORS.muted, display: "flex", flexShrink: 0 }}
+              title="Quitar este radicado"
+            >
+              <Icono tipo="check" size={14} style={{ transform: "rotate(45deg)" }} />
+            </button>
+          )}
+        </div>
+      ))}
+      <button className="drx-btn-ghost" style={{ ...buttonGhost, marginTop: 8, padding: "5px 10px", fontSize: 12 }} onClick={agregar}>
+        + Agregar otro radicado
+      </button>
     </div>
   );
 }
@@ -224,7 +272,16 @@ export default function ClientesTab({ usuarioActual }) {
     if (!form.nombre.trim()) return;
     const id = uid();
     const proximoPago = form.planPago?.proximaFecha ? { fecha: form.planPago.proximaFecha, valorEsperado: form.planPago.valor } : null;
-    await storageSet(`cliente:${id}`, JSON.stringify({ ...form, timeline: [], ultimaActuacion: new Date().toISOString(), proximoPago }), false);
+    // "radicado" (el primero) se mantiene además de "radicados" (la lista
+    // completa) para que todo el código viejo que solo conoce "radicado"
+    // (el portal del cliente, el asistente de IA, etc.) siga funcionando
+    // igual sin tener que tocarlo.
+    const radicados = (form.radicados || []).map((r) => r.trim()).filter(Boolean);
+    await storageSet(
+      `cliente:${id}`,
+      JSON.stringify({ ...form, radicados, radicado: radicados[0] || "", timeline: [], ultimaActuacion: new Date().toISOString(), proximoPago }),
+      false
+    );
     await addId(id);
     registrarAuditoria(usuarioActual, "crear_cliente", "cliente", id, { nombre: form.nombre });
     setToastGuardado(`"${form.nombre}" se guardó correctamente`);
@@ -235,7 +292,11 @@ export default function ClientesTab({ usuarioActual }) {
 
   const empezarEdicion = (id) => {
     setEditandoId(id);
-    setFormEdicion(clientes[id]);
+    // Los clientes creados antes de que existiera "radicados" solo tienen
+    // "radicado" (un único valor) — radicadosDeCliente lo convierte en una
+    // lista de un elemento para que el editor de radicados tenga algo con
+    // qué trabajar sin importar cuándo se creó el cliente.
+    setFormEdicion({ ...clientes[id], radicados: radicadosDeCliente(clientes[id]) });
   };
 
   const guardarEdicion = async (id) => {
@@ -243,7 +304,8 @@ export default function ClientesTab({ usuarioActual }) {
     const proximoPago = formEdicion.planPago?.proximaFecha
       ? { fecha: formEdicion.planPago.proximaFecha, valorEsperado: formEdicion.planPago.valor }
       : formEdicion.proximoPago || null;
-    const actualizado = { ...formEdicion, proximoPago };
+    const radicados = (formEdicion.radicados || []).map((r) => r.trim()).filter(Boolean);
+    const actualizado = { ...formEdicion, radicados, radicado: radicados[0] || "", proximoPago };
     await storageSet(`cliente:${id}`, JSON.stringify(actualizado), false);
     setClientes((prev) => ({ ...prev, [id]: actualizado }));
     setEditandoId(null);
@@ -323,12 +385,12 @@ export default function ClientesTab({ usuarioActual }) {
           if (!c) return false;
           return (
             c.nombre?.toLowerCase().includes(textoFiltro) ||
-            c.radicado?.toLowerCase().includes(textoFiltro) ||
+            radicadosDeCliente(c).some((r) => r.toLowerCase().includes(textoFiltro)) ||
             c.telefono?.toLowerCase().includes(textoFiltro)
           );
         })
       : idsOrdenados;
-    if (soloSinRadicado) resultado = resultado.filter((id) => !clientes[id]?.radicado?.trim());
+    if (soloSinRadicado) resultado = resultado.filter((id) => radicadosDeCliente(clientes[id]).length === 0);
     if (soloInactivos) {
       resultado = resultado.filter((id) => {
         const dias = diasDesde(clientes[id]?.ultimaActuacion);
@@ -427,7 +489,7 @@ export default function ClientesTab({ usuarioActual }) {
                   { titulo: "Nombre", valor: (id) => clientes[id]?.nombre },
                   { titulo: "Teléfono", valor: (id) => clientes[id]?.telefono },
                   { titulo: "Correo", valor: (id) => clientes[id]?.email },
-                  { titulo: "Radicado", valor: (id) => clientes[id]?.radicado },
+                  { titulo: "Radicado(s)", valor: (id) => radicadosDeCliente(clientes[id]).join(" / ") },
                   { titulo: "Tipo de proceso", valor: (id) => clientes[id]?.tipoProceso },
                   { titulo: "Área", valor: (id) => clientes[id]?.areaProceso },
                   { titulo: "Valor total acordado", valor: (id) => clientes[id]?.valorTotal },
@@ -457,8 +519,8 @@ export default function ClientesTab({ usuarioActual }) {
             <Field label="Correo">
               <input className="drx-input" style={inputStyle} value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
             </Field>
-            <Field label="Número de radicado (opcional)">
-              <input className="drx-input" style={inputStyle} value={form.radicado} onChange={(e) => setForm({ ...form, radicado: e.target.value })} placeholder="Ej: 11001310300120240012300" />
+            <Field label="Número(s) de radicado (opcional)">
+              <EditorRadicados radicados={form.radicados} onChange={(radicados) => setForm({ ...form, radicados })} />
             </Field>
             <Field label="Tipo de proceso">
               <select className="drx-input" style={inputStyle} value={form.tipoProceso} onChange={(e) => setForm({ ...form, tipoProceso: e.target.value })}>
@@ -528,8 +590,8 @@ export default function ClientesTab({ usuarioActual }) {
                   <Field label="Correo">
                     <input className="drx-input" style={inputStyle} value={formEdicion.email || ""} onChange={(e) => setFormEdicion({ ...formEdicion, email: e.target.value })} />
                   </Field>
-                  <Field label="Número de radicado (opcional)">
-                    <input className="drx-input" style={inputStyle} value={formEdicion.radicado || ""} onChange={(e) => setFormEdicion({ ...formEdicion, radicado: e.target.value })} />
+                  <Field label="Número(s) de radicado (opcional)">
+                    <EditorRadicados radicados={formEdicion.radicados} onChange={(radicados) => setFormEdicion({ ...formEdicion, radicados })} />
                   </Field>
                   <Field label="Tipo de proceso">
                     <select className="drx-input" style={inputStyle} value={formEdicion.tipoProceso || TIPOS_PROCESO[0]} onChange={(e) => setFormEdicion({ ...formEdicion, tipoProceso: e.target.value })}>
@@ -643,23 +705,45 @@ export default function ClientesTab({ usuarioActual }) {
                         {c.areaProceso}
                       </span>
                     )}
-                    {c.radicado && (
+                    {radicadosDeCliente(c).map((r, idx) => (
                       <span
+                        key={r}
                         title="Copiar radicado"
-                        onClick={() => copiar(c.radicado, `rad-${id}`)}
+                        onClick={() => copiar(r, `rad-${id}-${idx}`)}
                         style={{
                           fontFamily: "monospace",
                           fontSize: 11,
                           padding: "3px 9px",
                           borderRadius: 20,
-                          background: copiado === `rad-${id}` ? "#E4EEE2" : COLORS.surfaceSoft,
-                          color: copiado === `rad-${id}` ? "#2F5D3A" : COLORS.inkSoft,
-                          border: `1px solid ${copiado === `rad-${id}` ? "#C9E0C4" : COLORS.border}`,
+                          background: copiado === `rad-${id}-${idx}` ? "#E4EEE2" : COLORS.surfaceSoft,
+                          color: copiado === `rad-${id}-${idx}` ? "#2F5D3A" : COLORS.inkSoft,
+                          border: `1px solid ${copiado === `rad-${id}-${idx}` ? "#C9E0C4" : COLORS.border}`,
                           cursor: "pointer",
                         }}
                       >
-                        {copiado === `rad-${id}` ? "✓ Copiado" : `Radicado: ${c.radicado}`}
+                        {copiado === `rad-${id}-${idx}` ? "✓ Copiado" : `Radicado: ${r}`}
                       </span>
+                    ))}
+                    {c.areaProceso === "Penal" && (
+                      <a
+                        href={URL_CONSULTA_SPOA}
+                        target="_blank"
+                        rel="noreferrer"
+                        title="Abre la consulta pública de la Fiscalía — hay que resolver el captcha a mano, no se puede automatizar"
+                        style={{
+                          fontFamily: "Inter, sans-serif",
+                          fontSize: 11,
+                          fontWeight: 600,
+                          padding: "3px 9px",
+                          borderRadius: 20,
+                          background: "#FEF2F2",
+                          color: "#B91C1C",
+                          border: "1px solid #FBD5D5",
+                          textDecoration: "none",
+                        }}
+                      >
+                        Consultar en SPOA (Fiscalía) ↗
+                      </a>
                     )}
                     {c.proximoPago?.fecha && (
                       <span
@@ -713,11 +797,12 @@ export default function ClientesTab({ usuarioActual }) {
                     style={buttonGhost}
                     title="Copiar nombre, teléfono, correo y radicado"
                     onClick={() => {
+                      const radicados = radicadosDeCliente(c);
                       const datos = [
                         c.nombre,
                         c.telefono ? `Tel: ${c.telefono}` : null,
                         c.email ? `Correo: ${c.email}` : null,
-                        c.radicado ? `Radicado: ${c.radicado}` : null,
+                        radicados.length > 0 ? `Radicado${radicados.length > 1 ? "s" : ""}: ${radicados.join(", ")}` : null,
                       ]
                         .filter(Boolean)
                         .join("\n");

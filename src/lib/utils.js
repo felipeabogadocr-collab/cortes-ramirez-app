@@ -47,6 +47,21 @@ export function textoEstadoPago(dias) {
   return `Debe pagar en ${dias} día${dias !== 1 ? "s" : ""}`;
 }
 
+// Un cliente puede tener varios radicados (varios procesos, o varias
+// instancias/recursos del mismo caso) — "radicados" es la lista completa;
+// "radicado" se mantiene por compatibilidad con clientes creados antes de
+// que existiera esto (siempre el primero de la lista). Cualquier código que
+// necesite TODOS los radicados de un cliente debe pasar por esta función en
+// vez de leer "cliente.radicado" directo, para no quedarse solo con el
+// primero.
+export function radicadosDeCliente(cliente) {
+  if (Array.isArray(cliente?.radicados)) {
+    const limpios = cliente.radicados.map((r) => (r || "").trim()).filter(Boolean);
+    if (limpios.length > 0) return limpios;
+  }
+  return cliente?.radicado?.trim() ? [cliente.radicado.trim()] : [];
+}
+
 // Tope de tamaño para cualquier archivo que el navegador procese (subida de
 // documentos, adjuntos al asistente con IA): protege contra que un archivo
 // enorme (a propósito o por error) trabe la pestaña convirtiéndolo a base64,

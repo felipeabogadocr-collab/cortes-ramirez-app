@@ -19,11 +19,13 @@ import {
   diasDesde, diasHasta, calcularProximaFechaPorFrecuencia, formatoCOP, calcularEstado,
   numeroWhatsappCliente, textoEstadoPago, TAMANO_MAX_ARCHIVO_MB, archivoDemasiadoGrande,
   SECCIONES_PERMISOS, permisosPorDefecto, NOTIF_CATEGORIAS, notificacionesPorDefecto,
+  radicadosDeCliente,
 } from "./lib/utils.js";
 export {
   diasDesde, diasHasta, calcularProximaFechaPorFrecuencia, formatoCOP, calcularEstado,
   numeroWhatsappCliente, textoEstadoPago, TAMANO_MAX_ARCHIVO_MB, archivoDemasiadoGrande,
   SECCIONES_PERMISOS, permisosPorDefecto, NOTIF_CATEGORIAS, notificacionesPorDefecto,
+  radicadosDeCliente,
 };
 
 export const uid = () => Math.random().toString(36).slice(2, 10).toUpperCase();
@@ -766,7 +768,7 @@ function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-const APP_VERSION = "1.44.9";
+const APP_VERSION = "1.45.0";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -1569,6 +1571,7 @@ async function ejecutarHerramienta(nombreHerramienta, input, usuarioActual) {
       tipoProceso: input.tipoProceso || TIPOS_PROCESO[0],
       areaProceso: input.areaProceso || AREAS_PROCESO[0],
       radicado: input.radicado || "",
+      radicados: input.radicado ? [input.radicado] : [],
       notas: input.notas || "",
       otrasPersonas: (input.otras_personas || []).map((p) => ({ id: uid(), nombre: p.nombre, telefono: p.telefono || "", rol: p.rol || "" })),
       timeline: [],
@@ -1624,6 +1627,12 @@ async function ejecutarHerramienta(nombreHerramienta, input, usuarioActual) {
     ["telefono", "email", "tipoProceso", "areaProceso", "radicado", "notas"].forEach((campo) => {
       if (input[campo] !== undefined && input[campo] !== null && input[campo] !== "") actualizado[campo] = input[campo];
     });
+    if (input.radicado) {
+      // Reemplaza solo el radicado principal (el primero de la lista) —
+      // conserva los demás que el cliente ya tuviera, si tiene más de uno.
+      const resto = radicadosDeCliente(cliente).slice(1);
+      actualizado.radicados = [input.radicado, ...resto];
+    }
     await storageSet(`cliente:${id}`, JSON.stringify(actualizado), false);
     registrarAuditoria(usuarioActual, "editar_cliente", "cliente", id, { nombre: cliente.nombre });
     return { mensaje: `Datos de ${cliente.nombre} actualizados.` };
