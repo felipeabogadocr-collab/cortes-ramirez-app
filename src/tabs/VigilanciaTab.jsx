@@ -187,7 +187,10 @@ export default function VigilanciaTab() {
     const texto = `Rama Judicial (radicado ${radicado}, ${data.proceso?.despacho || "despacho no informado"}) — ${data.ultimaActuacion.actuacion || "Actuación"}${
       data.ultimaActuacion.anotacion ? `: ${data.ultimaActuacion.anotacion}` : ""
     }`;
-    await agregarNovedad(id, texto);
+    // La fecha de la entrada es la de la actuación real que reporta la Rama
+    // Judicial, no la de hoy — si no, un proceso viejo recién agregado
+    // quedaría con toda su línea de tiempo marcada como "hoy".
+    await agregarNovedad(id, texto, data.ultimaActuacion.fecha.slice(0, 10));
     await guardarComoVista(id, radicado, data);
     await cambiarEstadoVigilancia(id, "Con novedad");
   };
@@ -266,7 +269,10 @@ export default function VigilanciaTab() {
           const texto = `Rama Judicial (radicado ${radicado}, ${data.proceso?.despacho || "despacho no informado"}) — ${data.ultimaActuacion.actuacion || "Actuación"}${
             data.ultimaActuacion.anotacion ? `: ${data.ultimaActuacion.anotacion}` : ""
           }`;
-          const nuevaEntrada = { id: uid(), fecha: new Date().toISOString(), nota: texto };
+          // La fecha de la entrada es la de la actuación real, no la de hoy
+          // (cuándo se detectó) — si no, un proceso de hace años quedaría
+          // con toda su línea de tiempo marcada como "hoy".
+          const nuevaEntrada = { id: uid(), fecha: fechaNueva, nota: texto };
           actualizado = { ...actualizado, timeline: [...(c.timeline || []), nuevaEntrada], ultimaActuacion: new Date().toISOString(), estadoVigilancia: "Con novedad" };
         }
         await storageSet(`cliente:${id}`, JSON.stringify(actualizado), false);

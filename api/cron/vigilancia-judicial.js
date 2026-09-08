@@ -95,7 +95,12 @@ export default async function handler(req, res) {
         const texto = `Rama Judicial (radicado ${radicado}, ${resultado.proceso?.despacho || "despacho no informado"}) — ${resultado.ultimaActuacion.actuacion || "Actuación"}${
           resultado.ultimaActuacion.anotacion ? `: ${resultado.ultimaActuacion.anotacion}` : ""
         }`;
-        const nuevaEntradaTimeline = { id: uid(), fecha: new Date().toISOString(), nota: `[Detectado automáticamente] ${texto}` };
+        // La fecha de la entrada es la de la actuación real (la que reporta
+        // la Rama Judicial), no la de hoy (cuándo el cron la detectó) — si
+        // no, un cliente nuevo con un proceso de hace 3 años quedaría con
+        // toda su línea de tiempo marcada como "hoy", que es simplemente
+        // falso.
+        const nuevaEntradaTimeline = { id: uid(), fecha: resultado.ultimaActuacion.fecha, nota: `[Detectado automáticamente] ${texto}` };
         c = { ...c, timeline: [...(c.timeline || []), nuevaEntradaTimeline], ultimaActuacion: new Date().toISOString(), estadoVigilancia: "Con novedad" };
         conNovedad++;
       } catch (e) {

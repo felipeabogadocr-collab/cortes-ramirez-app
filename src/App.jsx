@@ -427,6 +427,26 @@ const GlobalStyle = () => (
     .drx-tab:active { transform: translateX(2px) scale(0.98); }
     .drx-input { transition: border-color .15s ease, box-shadow .15s ease; }
     .drx-input:focus { border-color: ${COLORS.accentBright} !important; box-shadow: 0 0 0 3px ${COLORS.accentSoft}; }
+    /* El calendario que se despliega al hacer clic es del navegador — eso no
+       se puede re-diseñar (por seguridad, ningún navegador deja tocar ese
+       popup con CSS). Lo que sí se puede vestir es el campo cerrado: el
+       ícono de calendario se recolorea al verde de marca, y al pasar el
+       mouse o enfocarlo se resalta como el resto de los campos "premium". */
+    input[type="date"].drx-input, input[type="date"] { color-scheme: light; }
+    .drx-tema-oscuro input[type="date"] { color-scheme: dark; }
+    input[type="date"]::-webkit-calendar-picker-indicator {
+      cursor: pointer;
+      border-radius: 6px;
+      padding: 3px;
+      filter: invert(38%) sepia(90%) saturate(400%) hue-rotate(100deg) brightness(95%);
+      transition: background .15s ease, filter .15s ease;
+    }
+    input[type="date"]::-webkit-calendar-picker-indicator:hover {
+      background: ${COLORS.accentSoft};
+    }
+    .drx-tema-oscuro input[type="date"]::-webkit-calendar-picker-indicator {
+      filter: invert(70%) sepia(60%) saturate(400%) hue-rotate(70deg) brightness(1.1);
+    }
     .drx-btn-primary:hover { box-shadow: 0 6px 20px rgba(22,163,74,0.35); }
     .drx-glow { position: relative; }
     .drx-glow > * { position: relative; z-index: 1; }
@@ -768,7 +788,7 @@ function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-const APP_VERSION = "1.45.0";
+const APP_VERSION = "1.45.1";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -3821,8 +3841,10 @@ export function LineaDeTiempo({ cliente, onAgregar, onEditarFecha, onEditarNota,
   const [editandoNotaId, setEditandoNotaId] = useState(null);
   const [borradorNota, setBorradorNota] = useState("");
   const [entradaDeshacer, setEntradaDeshacer] = useState(null);
+  const [expandida, setExpandida] = useState(false);
   const deshacerTimeoutRef = useRef(null);
   const timeline = cliente.timeline || [];
+  const CANTIDAD_COLAPSADA = 2;
 
   useEffect(() => () => clearTimeout(deshacerTimeoutRef.current), []);
 
@@ -3904,8 +3926,13 @@ export function LineaDeTiempo({ cliente, onAgregar, onEditarFecha, onEditarNota,
         <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 10 }}>
           {[...timeline]
             .sort((a, b) => new Date(b.fecha) - new Date(a.fecha))
-            .map((t) => (
-              <div key={t.id} style={{ display: "flex", gap: 8, fontSize: 12.5, fontFamily: "Inter, sans-serif", alignItems: "flex-start" }}>
+            .slice(0, expandida ? undefined : CANTIDAD_COLAPSADA)
+            .map((t, idx) => (
+              <div
+                key={t.id}
+                className={idx >= CANTIDAD_COLAPSADA ? "drx-fade-in" : undefined}
+                style={{ display: "flex", gap: 8, fontSize: 12.5, fontFamily: "Inter, sans-serif", alignItems: "flex-start" }}
+              >
                 {editandoFechaId === t.id ? (
                   <input
                     type="date"
@@ -3986,6 +4013,29 @@ export function LineaDeTiempo({ cliente, onAgregar, onEditarFecha, onEditarNota,
                 )}
               </div>
             ))}
+          {timeline.length > CANTIDAD_COLAPSADA && (
+            <button
+              onClick={() => setExpandida((v) => !v)}
+              className="drx-btn-ghost"
+              style={{
+                ...buttonGhost,
+                alignSelf: "flex-start",
+                marginTop: 2,
+                padding: "5px 12px",
+                fontSize: 12,
+                display: "flex",
+                alignItems: "center",
+                gap: 5,
+              }}
+            >
+              <Icono
+                tipo="cursorArriba"
+                size={11}
+                style={{ transform: expandida ? "rotate(0deg)" : "rotate(180deg)", transition: "transform .2s ease" }}
+              />
+              {expandida ? "Ver menos" : `Ver ${timeline.length - CANTIDAD_COLAPSADA} más`}
+            </button>
+          )}
         </div>
       ) : (
         <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.muted, marginBottom: 10 }}>Sin actuaciones registradas todavía.</p>
