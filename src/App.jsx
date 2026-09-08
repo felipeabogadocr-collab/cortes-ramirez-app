@@ -855,7 +855,7 @@ function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-const APP_VERSION = "1.47.2";
+const APP_VERSION = "1.48.0";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -4630,6 +4630,57 @@ export function useEgresos() {
   };
 
   return { egresos, cargado, crear, editar, eliminar };
+}
+
+export const FRECUENCIAS_SERVICIO = ["Mensual", "Quincenal", "Semanal", "Pago único"];
+
+// Catálogo de servicios de precio fijo del despacho (ej: "Vigilancia
+// judicial sin contrato" a $90.000/mes) — se define UNA vez desde
+// Administración y de ahí se "activa" en un cliente cuantas veces haga
+// falta (ver activarServicioParaCliente en ClientesTab), sin tener que
+// escribir el mismo valor y la misma frecuencia a mano cada vez. Es un
+// catálogo del despacho completo, no de un cliente puntual — por eso vive
+// aparte, igual que egresos u otros ingresos.
+export function useServicios() {
+  const [servicios, setServiciosState] = useState([]);
+  const [cargado, setCargado] = useState(false);
+
+  const cargar = useCallback(async () => {
+    const raw = await storageGet("servicios-despacho", false);
+    setServiciosState(raw ? JSON.parse(raw) : []);
+    setCargado(true);
+  }, []);
+
+  useEffect(() => {
+    cargar();
+  }, [cargar]);
+
+  const crear = async (datos) => {
+    const nuevo = {
+      id: uid(),
+      nombre: datos.nombre.trim(),
+      valor: Number(datos.valor) || 0,
+      frecuencia: datos.frecuencia || FRECUENCIAS_SERVICIO[0],
+    };
+    const actualizados = [...servicios, nuevo];
+    await storageSet("servicios-despacho", JSON.stringify(actualizados), false);
+    setServiciosState(actualizados);
+    return nuevo;
+  };
+
+  const editar = async (id, cambios) => {
+    const actualizados = servicios.map((s) => (s.id === id ? { ...s, ...cambios } : s));
+    await storageSet("servicios-despacho", JSON.stringify(actualizados), false);
+    setServiciosState(actualizados);
+  };
+
+  const eliminar = async (id) => {
+    const actualizados = servicios.filter((s) => s.id !== id);
+    await storageSet("servicios-despacho", JSON.stringify(actualizados), false);
+    setServiciosState(actualizados);
+  };
+
+  return { servicios, cargado, crear, editar, eliminar };
 }
 
 export const CATEGORIAS_OTRO_INGRESO = ["Ingreso administrativo", "Rendimientos financieros", "Reembolso", "Asesoría o consulta puntual", "Otro / no identificado"];

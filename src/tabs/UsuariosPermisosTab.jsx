@@ -7,7 +7,8 @@ import {
   COLORS, formatoCOP, registrarAuditoria, useConfirmarDialogo, useUsuariosDespacho, Field,
   inputStyle, buttonPrimary, buttonGhost, Card, EncabezadoSeccion, Icono, IconoCampana,
   CampoContrasena, useCuentaRegresiva, leerJSONLocal, guardarJSONLocal, permisosPorDefecto,
-  notificacionesPorDefecto, SECCIONES_PERMISOS, NOTIF_CATEGORIAS,
+  notificacionesPorDefecto, SECCIONES_PERMISOS, NOTIF_CATEGORIAS, CampoDinero,
+  useServicios, FRECUENCIAS_SERVICIO,
 } from "../App.jsx";
 
 // Los administradores ya pueden leer toda la auditoría de su despacho (ver
@@ -173,6 +174,112 @@ function PanelAccesoPrueba() {
         </div>
       )}
       {error && <p style={{ color: "#B42318", fontSize: 12.5, marginTop: 10, fontFamily: "Inter, sans-serif" }}>{error}</p>}
+    </Card>
+  );
+}
+
+// Catálogo de servicios de precio fijo del despacho (ej: "Vigilancia
+// judicial sin contrato" a $90.000/mes) — se define aquí una sola vez y
+// desde Clientes se "activa" en el cliente que lo pida, sin tener que
+// volver a escribir el mismo valor y la misma frecuencia a mano cada vez.
+// No implica un contrato ni una obligación a futuro: activar un servicio
+// solo dejar programado el próximo cobro, igual que cualquier plan de pago
+// normal — si el cliente deja de necesitarlo, se edita o se borra igual
+// que cualquier otro cobro pendiente.
+function PanelServicios({ usuarioActual }) {
+  const { servicios, crear, eliminar } = useServicios();
+  const [mostrarForm, setMostrarForm] = useState(false);
+  const [nombre, setNombre] = useState("");
+  const [valor, setValor] = useState("");
+  const [frecuencia, setFrecuencia] = useState(FRECUENCIAS_SERVICIO[0]);
+  const [guardando, setGuardando] = useState(false);
+  const { confirmar, ConfirmarDialogo } = useConfirmarDialogo();
+
+  const guardar = async () => {
+    if (!nombre.trim() || !valor) return;
+    setGuardando(true);
+    const nuevo = await crear({ nombre, valor, frecuencia });
+    registrarAuditoria(usuarioActual, "crear_servicio", "servicio", nuevo.id, { nombre: nuevo.nombre, valor: nuevo.valor });
+    setNombre("");
+    setValor("");
+    setFrecuencia(FRECUENCIAS_SERVICIO[0]);
+    setMostrarForm(false);
+    setGuardando(false);
+  };
+
+  const eliminarClick = async (s) => {
+    if (!(await confirmar(`¿Eliminar el servicio "${s.nombre}"? Los clientes que ya lo tengan activo no se ven afectados — esto solo lo quita del catálogo para nuevas activaciones.`))) return;
+    await eliminar(s.id);
+    registrarAuditoria(usuarioActual, "eliminar_servicio", "servicio", s.id, { nombre: s.nombre });
+  };
+
+  return (
+    <Card style={{ marginBottom: 20 }}>
+      {ConfirmarDialogo}
+      <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, fontWeight: 700, color: COLORS.ink, marginBottom: 4 }}>
+        <Icono tipo="tarjeta" size={15} style={{ marginRight: 6, verticalAlign: -2 }} /> Servicios y precios
+      </p>
+      <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, marginBottom: 14 }}>
+        Servicios de precio fijo que ofreces sin necesidad de un contrato formal (ej: solo vigilar un proceso judicial
+        a solicitud del cliente). Desde la ficha de un cliente, cualquiera con permiso sobre Clientes puede
+        "activarle" uno de estos servicios, y queda programado el próximo cobro automáticamente.
+      </p>
+
+      {servicios.length > 0 && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 14 }}>
+          {servicios.map((s) => (
+            <div
+              key={s.id}
+              style={{
+                display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10,
+                background: COLORS.surfaceSoft, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "10px 14px",
+              }}
+            >
+              <div>
+                <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, fontWeight: 700, color: COLORS.ink, margin: 0 }}>{s.nombre}</p>
+                <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, margin: "2px 0 0" }}>
+                  {formatoCOP(s.valor)} · {s.frecuencia}
+                </p>
+              </div>
+              <button className="drx-btn-ghost" style={{ ...buttonGhost, padding: "5px 10px", fontSize: 11.5, color: "#B42318", borderColor: "#F2B8B5" }} onClick={() => eliminarClick(s)}>
+                Eliminar
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {mostrarForm ? (
+        <div className="drx-grid-form" style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr", gap: 10, alignItems: "flex-end" }}>
+          <Field label="Nombre del servicio">
+            <input className="drx-input" style={inputStyle} value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Ej: Vigilancia judicial (sin contrato)" />
+          </Field>
+          <Field label="Valor (COP)">
+            <CampoDinero style={inputStyle} value={valor} onChange={(e) => setValor(e.target.value)} placeholder="Ej: 90.000" />
+          </Field>
+          <Field label="Frecuencia">
+            <select className="drx-input" style={inputStyle} value={frecuencia} onChange={(e) => setFrecuencia(e.target.value)}>
+              {FRECUENCIAS_SERVICIO.map((f) => (
+                <option key={f} value={f}>
+                  {f}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <div style={{ display: "flex", gap: 8, gridColumn: "1 / -1" }}>
+            <button className="drx-btn-primary" style={buttonPrimary} onClick={guardar} disabled={guardando || !nombre.trim() || !valor}>
+              {guardando ? "Guardando…" : "Guardar servicio"}
+            </button>
+            <button className="drx-btn-ghost" style={buttonGhost} onClick={() => setMostrarForm(false)}>
+              Cancelar
+            </button>
+          </div>
+        </div>
+      ) : (
+        <button className="drx-btn-ghost" style={buttonGhost} onClick={() => setMostrarForm(true)}>
+          + Nuevo servicio
+        </button>
+      )}
     </Card>
   );
 }
@@ -432,6 +539,8 @@ export default function UsuariosPermisosTab({ usuarioActual, onDespachoRenombrad
       </Card>
 
       <PanelAccesoPrueba />
+
+      <PanelServicios usuarioActual={usuarioActual} />
 
       <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 16 }}>
         <button className="drx-btn-primary" style={buttonPrimary} onClick={() => setMostrarForm((s) => !s)}>
@@ -747,6 +856,9 @@ const ETIQUETAS_ACCION = {
   actualizar_vigilancia: { texto: "actualizó la vigilancia judicial de", color: "#0EA5E9" },
   crear_evento: { texto: "agendó el evento", color: "#10B981" },
   programar_cobro: { texto: "programó un cobro para", color: "#0EA5E9" },
+  crear_servicio: { texto: "creó el servicio", color: "#10B981" },
+  eliminar_servicio: { texto: "eliminó el servicio", color: "#B42318" },
+  activar_servicio: { texto: "activó un servicio para", color: "#10B981" },
 };
 
 const AUDITORIA_POR_PAGINA = 25;

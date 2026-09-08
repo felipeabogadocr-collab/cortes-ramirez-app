@@ -6,7 +6,8 @@ import {
   useAvisoAntesDeSalir, useUsuariosDespacho, Field, inputStyle, CampoDinero, buttonPrimary,
   buttonGhost, Card, EncabezadoSeccion, Icono, AvatarIniciales, EstadoVacio, LineaDeTiempo,
   AREAS_PROCESO, COLOR_AREA_PROCESO, DIAS_ALERTA_INACTIVIDAD, numeroWhatsappCliente,
-  radicadosDeCliente, tiposProcesoDeArea,
+  radicadosDeCliente, tiposProcesoDeArea, useServicios, calcularProximaFechaPorFrecuencia,
+  fechaHoyISO, formatoCOP,
 } from "../App.jsx";
 
 // Enlace oficial de la Fiscalía para consultar el estado de una denuncia en
@@ -253,6 +254,9 @@ export default function ClientesTab({ usuarioActual }) {
   const [soloInactivos, setSoloInactivos] = useState(false);
   const [toastGuardado, setToastGuardado] = useState("");
   const { confirmar, ConfirmarDialogo } = useConfirmarDialogo();
+  const { servicios } = useServicios();
+  const [activandoServicioId, setActivandoServicioId] = useState(null);
+  const [servicioElegidoId, setServicioElegidoId] = useState("");
 
   useEffect(() => {
     (async () => {
@@ -358,6 +362,27 @@ export default function ClientesTab({ usuarioActual }) {
     const actualizado = { ...c, timeline: [...(c.timeline || []), entrada] };
     await storageSet(`cliente:${id}`, JSON.stringify(actualizado), false);
     setClientes((prev) => ({ ...prev, [id]: actualizado }));
+  };
+
+  // "Activar" un servicio del catálogo (definido en Administración) sobre
+  // un cliente sin contrato formal — deja programado el próximo cobro con
+  // el valor y la frecuencia del servicio, igual que si se hubiera armado
+  // el plan de pago a mano, pero sin tener que volver a escribir el precio
+  // cada vez. No obliga a nada a futuro: si el cliente deja de necesitarlo,
+  // el plan se edita o se borra igual que cualquier otro.
+  const activarServicio = async (id, servicio) => {
+    const c = clientes[id];
+    const proximaFecha = calcularProximaFechaPorFrecuencia(fechaHoyISO(), servicio.frecuencia);
+    const actualizado = {
+      ...c,
+      planPago: { descripcion: servicio.nombre, frecuencia: servicio.frecuencia, valor: servicio.valor, resumen: servicio.nombre },
+      proximoPago: { fecha: proximaFecha, valorEsperado: servicio.valor },
+    };
+    await storageSet(`cliente:${id}`, JSON.stringify(actualizado), false);
+    setClientes((prev) => ({ ...prev, [id]: actualizado }));
+    registrarAuditoria(usuarioActual, "activar_servicio", "cliente", id, { nombre: c.nombre, servicio: servicio.nombre, valor: servicio.valor });
+    setActivandoServicioId(null);
+    setServicioElegidoId("");
   };
 
   // Ordenar + filtrar recorre TODOS los clientes — se memoiza para que no se
@@ -882,6 +907,11 @@ export default function ClientesTab({ usuarioActual }) {
                   >
                     {copiado === `todo-${id}` ? "✓ Copiado" : "Copiar datos"}
                   </button>
+                  {servicios.length > 0 && (
+                    <button className="drx-btn-ghost" style={buttonGhost} onClick={() => setActivandoServicioId(activandoServicioId === id ? null : id)}>
+                      Activar servicio
+                    </button>
+                  )}
                   <button className="drx-btn-ghost" style={buttonGhost} onClick={() => empezarEdicion(id)}>
                     Editar
                   </button>
@@ -898,6 +928,50 @@ export default function ClientesTab({ usuarioActual }) {
                   </button>
                 </div>
               </div>
+              {activandoServicioId === id && (
+                <div
+                  className="drx-fade-in"
+                  style={{ background: COLORS.surfaceSoft, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: 14, marginTop: 10, display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap" }}
+                >
+                  <Field label="Servicio a activar">
+                    <select className="drx-input" style={{ ...inputStyle, minWidth: 240 }} value={servicioElegidoId} onChange={(e) => setServicioElegidoId(e.target.value)}>
+                      <option value="">Elige un servicio…</option>
+                      {servicios.map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.nombre} — {formatoCOP(s.valor)} / {s.frecuencia}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                  <button
+                    className="drx-btn-primary"
+                    style={{ ...buttonPrimary, padding: "9px 16px" }}
+                    disabled={!servicioElegidoId}
+                    onClick={() => {
+                      const servicio = servicios.find((s) => s.id === servicioElegidoId);
+                      if (servicio) activarServicio(id, servicio);
+                    }}
+                  >
+                    Activar
+                  </button>
+                  <button
+                    className="drx-btn-ghost"
+                    style={buttonGhost}
+                    onClick={() => {
+                      setActivandoServicioId(null);
+                      setServicioElegidoId("");
+                    }}
+                  >
+                    Cancelar
+                  </button>
+                  {c.proximoPago?.fecha && (
+                    <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, color: COLORS.muted, margin: 0, width: "100%" }}>
+                      Ya tiene un próximo pago programado ({formatoCOP(c.proximoPago.valorEsperado || 0)} el{" "}
+                      {new Date(`${c.proximoPago.fecha}T12:00:00`).toLocaleDateString("es-CO", { dateStyle: "medium" })}) — activar un servicio lo reemplaza.
+                    </p>
+                  )}
+                </div>
+              )}
               <LineaDeTiempo
                 cliente={c}
                 onAgregar={(nota, fecha) => agregarActuacion(id, nota, fecha)}
