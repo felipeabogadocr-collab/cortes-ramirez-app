@@ -36,7 +36,11 @@ async function explicarActuacion(actuacion, anotacion) {
     },
     body: JSON.stringify({
       model: "claude-sonnet-4-6",
-      max_tokens: 300,
+      // 300 se quedaba corto y la respuesta salía cortada a la mitad — el
+      // modelo que usa /api/assistant "piensa" antes de responder, y ese
+      // pensamiento interno también consume el límite de tokens aunque no
+      // se vea, dejando poco espacio real para el texto visible.
+      max_tokens: 800,
       system:
         `Eres un asistente para un abogado colombiano. Te doy el nombre de una actuación judicial y su anotación tal como aparecen en la Rama Judicial. ` +
         `Responde en máximo 3 frases cortas, en español sencillo (sin tecnicismos innecesarios): primero explica qué significa esta actuación en términos prácticos, ` +
@@ -47,7 +51,8 @@ async function explicarActuacion(actuacion, anotacion) {
   });
   const data = await response.json();
   if (!response.ok || data.error) throw new Error(data.error || "No se pudo contactar al asistente de IA");
-  return (data.content || []).map((b) => b.text || "").join("").trim();
+  const texto = (data.content || []).map((b) => b.text || "").join("").trim();
+  return data.truncado ? `${texto}\n\n(La respuesta se cortó por límite de espacio — vuelve a intentar si falta algo importante.)` : texto;
 }
 
 export default function VigilanciaTab() {

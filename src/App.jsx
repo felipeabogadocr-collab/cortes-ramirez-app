@@ -788,7 +788,7 @@ function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-const APP_VERSION = "1.45.3";
+const APP_VERSION = "1.45.4";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -3818,7 +3818,11 @@ async function redactarActuacionConIA(textoOriginal) {
     },
     body: JSON.stringify({
       model: "claude-sonnet-4-6",
-      max_tokens: 400,
+      // El modelo que usa /api/assistant "piensa" antes de responder, y ese
+      // pensamiento interno también consume el límite de tokens aunque no
+      // se vea — con poco margen la respuesta visible sale cortada a la
+      // mitad.
+      max_tokens: 700,
       system:
         "Eres un asistente que ayuda a un abogado colombiano a redactar la línea de tiempo de un caso. Te dan un texto pegado tal cual (puede venir con errores de forma, muy informal, o mal organizado) sobre una actuación o novedad del proceso. " +
         "Reescríbelo como una nota clara, profesional y concisa para el expediente, en español, sin inventar ni agregar ningún dato que no esté explícito en el texto original. Responde ÚNICAMENTE con el texto final de la nota, sin comillas, sin explicaciones ni texto adicional antes o después.",
@@ -3829,7 +3833,7 @@ async function redactarActuacionConIA(textoOriginal) {
   if (!response.ok || data.error) throw new Error(data.error || "No se pudo contactar al asistente de IA");
   const texto = (data.content || []).map((b) => b.text || "").join("").trim();
   if (!texto) throw new Error("El asistente no devolvió ningún texto");
-  return texto;
+  return data.truncado ? `${texto}\n\n(Se cortó por límite de espacio — revísalo antes de guardarlo.)` : texto;
 }
 
 export function LineaDeTiempo({ cliente, onAgregar, onEditarFecha, onEditarNota, onEliminar, onRestaurar, confirmar }) {

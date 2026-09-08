@@ -129,7 +129,13 @@ function fromGeminiResponse(geminiData) {
     const razon = RAZONES_SIN_RESPUESTA[candidate.finishReason] || `Gemini terminó sin generar texto (${candidate.finishReason}).`;
     return { content: [], error: razon };
   }
-  return { content };
+  // Si SÍ alcanzó a generar algo de texto pero se quedó sin espacio antes de
+  // terminar la idea (respuesta cortada a la mitad), se avisa con una
+  // bandera en vez de devolver el texto incompleto como si fuera la
+  // respuesta completa — quien lo use decide si lo muestra igual con un
+  // aviso o si reintenta.
+  const truncado = content.length > 0 && candidate?.finishReason === "MAX_TOKENS";
+  return { content, ...(truncado ? { truncado: true } : {}) };
 }
 
 export default async function handler(req, res) {

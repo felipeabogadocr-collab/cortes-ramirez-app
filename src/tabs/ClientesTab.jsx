@@ -119,7 +119,10 @@ async function organizarPagoConIA(descripcion) {
     },
     body: JSON.stringify({
       model: "claude-sonnet-4-6",
-      max_tokens: 300,
+      // 300 se quedaba corto y cortaba el JSON a la mitad — el modelo que
+      // usa /api/assistant "piensa" antes de responder, y ese pensamiento
+      // interno también consume el límite de tokens aunque no se vea.
+      max_tokens: 800,
       system:
         `Eres un asistente que organiza la forma de pago de un cliente de un despacho de abogados en Colombia. Hoy es ${hoy}. ` +
         `A partir de la descripción en lenguaje natural que te da el abogado, responde ÚNICAMENTE con un objeto JSON válido, sin texto adicional, sin comillas de bloque de código, con exactamente estos campos: ` +
