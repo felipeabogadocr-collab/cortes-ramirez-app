@@ -274,6 +274,31 @@ export default function ClientesTab({ usuarioActual }) {
     setClientes((prev) => ({ ...prev, [id]: actualizado }));
   };
 
+  const editarNotaActuacion = async (id, entradaId, nota) => {
+    const c = clientes[id];
+    const timeline = (c.timeline || []).map((t) => (t.id === entradaId ? { ...t, nota } : t));
+    const actualizado = { ...c, timeline };
+    await storageSet(`cliente:${id}`, JSON.stringify(actualizado), false);
+    setClientes((prev) => ({ ...prev, [id]: actualizado }));
+  };
+
+  const eliminarActuacion = async (id, entradaId) => {
+    const c = clientes[id];
+    const timeline = (c.timeline || []).filter((t) => t.id !== entradaId);
+    const actualizado = { ...c, timeline };
+    await storageSet(`cliente:${id}`, JSON.stringify(actualizado), false);
+    setClientes((prev) => ({ ...prev, [id]: actualizado }));
+  };
+
+  // Vuelve a agregar exactamente la misma entrada (mismo id, fecha y nota)
+  // que se acaba de eliminar — es lo que usa el botón "Deshacer".
+  const restaurarActuacion = async (id, entrada) => {
+    const c = clientes[id];
+    const actualizado = { ...c, timeline: [...(c.timeline || []), entrada] };
+    await storageSet(`cliente:${id}`, JSON.stringify(actualizado), false);
+    setClientes((prev) => ({ ...prev, [id]: actualizado }));
+  };
+
   // Ordenar + filtrar recorre TODOS los clientes — se memoiza para que no se
   // repita en cada render (por ejemplo, cada tecla escrita en el formulario
   // de un cliente que ni siquiera está en la lista filtrada), que en
@@ -721,6 +746,10 @@ export default function ClientesTab({ usuarioActual }) {
                 cliente={c}
                 onAgregar={(nota, fecha) => agregarActuacion(id, nota, fecha)}
                 onEditarFecha={(entradaId, fecha) => editarFechaActuacion(id, entradaId, fecha)}
+                onEditarNota={(entradaId, nota) => editarNotaActuacion(id, entradaId, nota)}
+                onEliminar={(entradaId) => eliminarActuacion(id, entradaId)}
+                onRestaurar={(entrada) => restaurarActuacion(id, entrada)}
+                confirmar={confirmar}
               />
             </Card>
           );

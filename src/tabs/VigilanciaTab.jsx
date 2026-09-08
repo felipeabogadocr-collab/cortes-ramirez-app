@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { storageGet, storageSet } from "../lib/storage";
 import {
-  COLORS, uid, diasDesde, useIndex, inputStyle, buttonPrimary, buttonGhost, Card,
+  COLORS, uid, diasDesde, useIndex, useConfirmarDialogo, inputStyle, buttonPrimary, buttonGhost, Card,
   EncabezadoSeccion, Icono, AvatarIniciales, EstadoVacio, LineaDeTiempo, COLOR_AREA_PROCESO,
   ESTADOS_VIGILANCIA, consultarRamaJudicial,
 } from "../App.jsx";
@@ -44,6 +44,7 @@ export default function VigilanciaTab() {
   const [filtroEstado, setFiltroEstado] = useState("Todos");
   const [radicadoCopiado, setRadicadoCopiado] = useState("");
   const [explicacionCopiada, setExplicacionCopiada] = useState("");
+  const { confirmar, ConfirmarDialogo } = useConfirmarDialogo();
 
   const copiarRadicado = (radicado, id) => {
     navigator.clipboard?.writeText(radicado);
@@ -92,6 +93,31 @@ export default function VigilanciaTab() {
     const fechaISO = new Date(`${fecha}T12:00:00`).toISOString();
     const timeline = (c.timeline || []).map((t) => (t.id === entradaId ? { ...t, fecha: fechaISO } : t));
     const actualizado = { ...c, timeline };
+    await storageSet(`cliente:${id}`, JSON.stringify(actualizado), false);
+    setClientes((prev) => ({ ...prev, [id]: actualizado }));
+  };
+
+  const editarNotaNovedad = async (id, entradaId, nota) => {
+    const c = clientes[id];
+    const timeline = (c.timeline || []).map((t) => (t.id === entradaId ? { ...t, nota } : t));
+    const actualizado = { ...c, timeline };
+    await storageSet(`cliente:${id}`, JSON.stringify(actualizado), false);
+    setClientes((prev) => ({ ...prev, [id]: actualizado }));
+  };
+
+  const eliminarNovedad = async (id, entradaId) => {
+    const c = clientes[id];
+    const timeline = (c.timeline || []).filter((t) => t.id !== entradaId);
+    const actualizado = { ...c, timeline };
+    await storageSet(`cliente:${id}`, JSON.stringify(actualizado), false);
+    setClientes((prev) => ({ ...prev, [id]: actualizado }));
+  };
+
+  // Vuelve a agregar exactamente la misma entrada (mismo id, fecha y nota)
+  // que se acaba de eliminar — es lo que usa el botón "Deshacer".
+  const restaurarNovedad = async (id, entrada) => {
+    const c = clientes[id];
+    const actualizado = { ...c, timeline: [...(c.timeline || []), entrada] };
     await storageSet(`cliente:${id}`, JSON.stringify(actualizado), false);
     setClientes((prev) => ({ ...prev, [id]: actualizado }));
   };
@@ -209,6 +235,7 @@ export default function VigilanciaTab() {
 
   return (
     <div>
+      {ConfirmarDialogo}
       <EncabezadoSeccion titulo="Vigilancia judicial" color="#F5A524" />
       <div
         style={{
@@ -448,6 +475,10 @@ export default function VigilanciaTab() {
                 cliente={c}
                 onAgregar={(nota, fecha) => agregarNovedad(id, nota, fecha)}
                 onEditarFecha={(entradaId, fecha) => editarFechaNovedad(id, entradaId, fecha)}
+                onEditarNota={(entradaId, nota) => editarNotaNovedad(id, entradaId, nota)}
+                onEliminar={(entradaId) => eliminarNovedad(id, entradaId)}
+                onRestaurar={(entrada) => restaurarNovedad(id, entrada)}
+                confirmar={confirmar}
               />
             </Card>
           );

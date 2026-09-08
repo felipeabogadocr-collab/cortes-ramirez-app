@@ -766,7 +766,7 @@ function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-const APP_VERSION = "1.44.8";
+const APP_VERSION = "1.44.9";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -3803,13 +3803,19 @@ async function redactarActuacionConIA(textoOriginal) {
   return texto;
 }
 
-export function LineaDeTiempo({ cliente, onAgregar, onEditarFecha }) {
+export function LineaDeTiempo({ cliente, onAgregar, onEditarFecha, onEditarNota, onEliminar, onRestaurar, confirmar }) {
   const [nota, setNota] = useState("");
   const [fecha, setFecha] = useState(() => fechaHoyISO());
   const [redactando, setRedactando] = useState(false);
   const [errorIA, setErrorIA] = useState("");
   const [editandoFechaId, setEditandoFechaId] = useState(null);
+  const [editandoNotaId, setEditandoNotaId] = useState(null);
+  const [borradorNota, setBorradorNota] = useState("");
+  const [entradaDeshacer, setEntradaDeshacer] = useState(null);
+  const deshacerTimeoutRef = useRef(null);
   const timeline = cliente.timeline || [];
+
+  useEffect(() => () => clearTimeout(deshacerTimeoutRef.current), []);
 
   const agregar = () => {
     if (!nota.trim()) return;
@@ -3831,9 +3837,60 @@ export function LineaDeTiempo({ cliente, onAgregar, onEditarFecha }) {
     setRedactando(false);
   };
 
+  const guardarNotaEditada = () => {
+    if (borradorNota.trim()) onEditarNota(editandoNotaId, borradorNota.trim());
+    setEditandoNotaId(null);
+  };
+
+  // El botón "Deshacer" solo funciona mientras la entrada eliminada sigue
+  // guardada aquí — pasado el tiempo (8s) se olvida, para no dejar la
+  // sensación de que "todavía se puede deshacer" indefinidamente.
+  const eliminar = async (entrada) => {
+    const extracto = entrada.nota.length > 80 ? `${entrada.nota.slice(0, 80)}...` : entrada.nota;
+    const fechaTexto = new Date(entrada.fecha).toLocaleDateString("es-CO", { day: "2-digit", month: "short", year: "numeric" });
+    const ok = await confirmar(`¿Eliminar esta actuación del ${fechaTexto}?\n"${extracto}"`);
+    if (!ok) return;
+    await onEliminar(entrada.id);
+    setEntradaDeshacer(entrada);
+    clearTimeout(deshacerTimeoutRef.current);
+    deshacerTimeoutRef.current = setTimeout(() => setEntradaDeshacer(null), 8000);
+  };
+
+  const deshacerEliminacion = async () => {
+    if (!entradaDeshacer) return;
+    clearTimeout(deshacerTimeoutRef.current);
+    await onRestaurar(entradaDeshacer);
+    setEntradaDeshacer(null);
+  };
+
   return (
     <div style={{ marginTop: 12, borderTop: `1px solid ${COLORS.border}`, paddingTop: 12 }}>
       <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, fontWeight: 600, color: COLORS.headingText, marginBottom: 8 }}>Línea de tiempo</p>
+      {entradaDeshacer && (
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            gap: 10,
+            background: COLORS.accentSoft,
+            border: `1px solid ${COLORS.border}`,
+            borderRadius: 8,
+            padding: "7px 10px",
+            marginBottom: 8,
+            fontSize: 12,
+            fontFamily: "Inter, sans-serif",
+          }}
+        >
+          <span style={{ color: COLORS.inkSoft }}>Actuación eliminada.</span>
+          <button
+            onClick={deshacerEliminacion}
+            style={{ background: "none", border: "none", cursor: "pointer", color: COLORS.accentBright, fontWeight: 700, fontFamily: "Inter, sans-serif", fontSize: 12, padding: 0 }}
+          >
+            Deshacer
+          </button>
+        </div>
+      )}
       {timeline.length > 0 ? (
         <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 10 }}>
           {[...timeline]
@@ -3875,7 +3932,49 @@ export function LineaDeTiempo({ cliente, onAgregar, onEditarFecha }) {
                     {new Date(t.fecha).toLocaleDateString("es-CO", { day: "2-digit", month: "short", year: "numeric" })}
                   </button>
                 )}
-                <span style={{ color: COLORS.inkSoft }}>{t.nota}</span>
+                {editandoNotaId === t.id ? (
+                  <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 4 }}>
+                    <textarea
+                      autoFocus
+                      className="drx-input"
+                      style={{ ...inputStyle, fontSize: 12.5, padding: "5px 8px", minHeight: 32, resize: "vertical" }}
+                      value={borradorNota}
+                      onChange={(e) => setBorradorNota(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && !e.shiftKey) {
+                          e.preventDefault();
+                          guardarNotaEditada();
+                        }
+                        if (e.key === "Escape") setEditandoNotaId(null);
+                      }}
+                    />
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <button className="drx-btn-primary" style={{ ...buttonPrimary, padding: "3px 10px", fontSize: 11.5 }} onClick={guardarNotaEditada}>
+                        Guardar
+                      </button>
+                      <button className="drx-btn-ghost" style={{ ...buttonGhost, padding: "3px 10px", fontSize: 11.5 }} onClick={() => setEditandoNotaId(null)}>
+                        Cancelar
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <span style={{ color: COLORS.inkSoft, flex: 1 }}>{t.nota}</span>
+                    <button
+                      onClick={() => {
+                        setEditandoNotaId(t.id);
+                        setBorradorNota(t.nota);
+                      }}
+                      title="Editar esta nota"
+                      style={{ background: "none", border: "none", cursor: "pointer", color: COLORS.muted, padding: 0, flexShrink: 0 }}
+                    >
+                      <Icono tipo="lapiz" size={13} />
+                    </button>
+                    <button onClick={() => eliminar(t)} title="Eliminar esta actuación" style={{ background: "none", border: "none", cursor: "pointer", color: COLORS.muted, padding: 0, flexShrink: 0 }}>
+                      <Icono tipo="check" size={13} style={{ transform: "rotate(45deg)" }} />
+                    </button>
+                  </>
+                )}
               </div>
             ))}
         </div>
