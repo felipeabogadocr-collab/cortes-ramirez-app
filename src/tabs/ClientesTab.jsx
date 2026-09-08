@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { supabase } from "../lib/supabaseClient";
-import { storageGet, storageSet, getNombreDespacho } from "../lib/storage";
+import { storageSet, getNombreDespacho, obtenerClientesPorId } from "../lib/storage";
 import {
   COLORS, uid, registrarAuditoria, diasDesde, exportarCSV, useIndex, useConfirmarDialogo,
   useAvisoAntesDeSalir, useUsuariosDespacho, Field, inputStyle, CampoDinero, buttonPrimary,
@@ -256,11 +256,7 @@ export default function ClientesTab({ usuarioActual }) {
 
   useEffect(() => {
     (async () => {
-      const entries = {};
-      for (const id of ids) {
-        const raw = await storageGet(`cliente:${id}`, false);
-        if (raw) entries[id] = JSON.parse(raw);
-      }
+      const entries = await obtenerClientesPorId(ids);
       setClientes(entries);
     })();
   }, [ids]);
@@ -502,7 +498,7 @@ export default function ClientesTab({ usuarioActual }) {
               )
             }
           >
-            Exportar CSV
+            Exportar Excel
           </button>
           <button className="drx-btn-primary drx-cta-shine" style={buttonPrimary} onClick={() => setShowForm((s) => !s)}>
             {showForm ? "Cancelar" : "+ Nuevo cliente"}

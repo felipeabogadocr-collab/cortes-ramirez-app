@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "../lib/supabaseClient";
-import { storageGet, storageSet, getNombreDespacho } from "../lib/storage";
+import { storageGet, storageSet, getNombreDespacho, obtenerValoresPorClaves } from "../lib/storage";
 import {
   COLORS, uid, useIndex, useUsuariosDespacho, Field, inputStyle, buttonPrimary, buttonGhost,
   Card, EncabezadoSeccion, Icono, fechaHoyISO,
@@ -81,11 +81,12 @@ function useContenido() {
   const [items, setItems] = useState({});
 
   const cargar = useCallback(async () => {
+    const valores = await obtenerValoresPorClaves(ids.map((id) => `contenido:${id}`));
     const entries = {};
-    for (const id of ids) {
-      const raw = await storageGet(`contenido:${id}`, true);
+    ids.forEach((id) => {
+      const raw = valores[`contenido:${id}`];
       if (raw) entries[id] = JSON.parse(raw);
-    }
+    });
     setItems(entries);
   }, [ids]);
 

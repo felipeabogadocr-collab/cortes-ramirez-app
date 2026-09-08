@@ -99,16 +99,51 @@ export const DIAS_ALERTA_INACTIVIDAD = 8;
 
 export const DIAS_AVISO_PROXIMO_PAGO = 3;
 
-export function exportarCSV(nombreArchivo, columnas, filas) {
-  const escapar = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
-  const encabezado = columnas.map((c) => escapar(c.titulo)).join(",");
-  const lineas = filas.map((f) => columnas.map((c) => escapar(c.valor(f))).join(","));
-  const csv = [encabezado, ...lineas].join("\n");
-  const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
+// Igual que jsPDF (ver ensureJsPDF más abajo), xlsx viene empaquetado con la
+// app en vez de cargado en el momento desde un CDN — así no depende de una
+// descarga externa justo cuando alguien le da a "Exportar".
+async function ensureXLSX() {
+  if (window.XLSX) return;
+  const mod = await import("xlsx");
+  window.XLSX = mod;
+}
+
+// Ancho de columna calculado a partir del contenido real (el texto más
+// largo de esa columna, con un mínimo y un máximo razonables) — sin esto,
+// Excel abre el archivo con todas las columnas del mismo ancho angosto por
+// defecto, y hay que agrandarlas una por una a mano antes de poder leer
+// nada. Esta es la diferencia real entre un archivo "que se ve bien" y uno
+// que se ve como texto plano desorganizado.
+function anchosDeColumnas(columnas, filas) {
+  return columnas.map((c) => {
+    const maxContenido = filas.reduce((max, f) => Math.max(max, String(c.valor(f) ?? "").length), c.titulo.length);
+    return { wch: Math.min(Math.max(maxContenido + 2, 10), 45) };
+  });
+}
+
+// Reemplaza el CSV plano de antes por un .xlsx real, con columnas de ancho
+// automático en vez del ancho angosto por defecto de Excel. Nota honesta:
+// la librería gratuita (SheetJS community) no permite guardar estilos de
+// celda (negrita, color de fondo del encabezado, etc.) — eso solo lo
+// habilita la versión paga (SheetJS Pro), así que no se incluyó, para no
+// meter un costo recurrente por algo puramente estético. El ancho de
+// columna automático sí es gratis y es la diferencia real entre un
+// archivo legible y uno "de texto desorganizado".
+export async function exportarCSV(nombreArchivo, columnas, filas) {
+  await ensureXLSX();
+  const encabezados = columnas.map((c) => c.titulo);
+  const datos = filas.map((f) => columnas.map((c) => c.valor(f) ?? ""));
+  const hoja = window.XLSX.utils.aoa_to_sheet([encabezados, ...datos]);
+  hoja["!cols"] = anchosDeColumnas(columnas, filas);
+  const libro = window.XLSX.utils.book_new();
+  window.XLSX.utils.book_append_sheet(libro, hoja, "Datos");
+  const salida = window.XLSX.write(libro, { bookType: "xlsx", type: "array" });
+  const blob = new Blob([salida], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
   const url = URL.createObjectURL(blob);
+  const nombreXlsx = nombreArchivo.replace(/\.csv$/i, ".xlsx");
   const a = document.createElement("a");
   a.href = url;
-  a.download = nombreArchivo;
+  a.download = nombreXlsx;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
@@ -275,6 +310,9 @@ import {
   obtenerUrlReciboImagen,
   subirFotoPerfil,
   obtenerUrlFotoPerfil,
+  obtenerClientesPorId,
+  obtenerValoresPorClaves,
+  obtenerDocumentosPorId,
 } from "./lib/storage";
 
 export function useIndex(key, shared) {
@@ -791,7 +829,7 @@ function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-const APP_VERSION = "1.46.2";
+const APP_VERSION = "1.47.0";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -1128,10 +1166,10 @@ async function calcularResumenOperacion() {
   inicioSemana.setDate(inicioHoy.getDate() - 6);
   const inicioMes = new Date(ahora.getFullYear(), ahora.getMonth(), 1);
 
+  const clientesResumen = await obtenerClientesPorId(idsClientes);
   for (const id of idsClientes) {
-    const raw = await storageGet(`cliente:${id}`, false);
-    if (!raw) continue;
-    const c = JSON.parse(raw);
+    const c = clientesResumen[id];
+    if (!c) continue;
     const dias = diasDesde(c.ultimaActuacion);
     // Un caso ya Finalizado sin movimiento reciente es normal (terminó, no
     // hay nada más que hacer) — no debería contar como "cliente descuidado"
@@ -1166,10 +1204,10 @@ async function calcularResumenOperacion() {
   let docsPendientes = 0;
   let docsFaltaAbogado = 0;
   let docsListos = 0;
+  const docsResumen = await obtenerDocumentosPorId(idsDocs);
   for (const id of idsDocs) {
-    const raw = await storageGet(`documento:${id}`, true);
-    if (!raw) continue;
-    const d = JSON.parse(raw);
+    const d = docsResumen[id];
+    if (!d) continue;
     const estado = calcularEstado(d.firmantes);
     if (estado === "pendiente") docsPendientes++;
     else if (estado === "falta_abogado") docsFaltaAbogado++;
@@ -1181,8 +1219,9 @@ async function calcularResumenOperacion() {
   const hoyISO = fechaHoyISO();
   let contenidoPendienteHoy = 0;
   let contenidoVencido = 0;
+  const contenidoResumenValores = await obtenerValoresPorClaves(idsContenido.map((id) => `contenido:${id}`));
   for (const id of idsContenido) {
-    const raw = await storageGet(`contenido:${id}`, true);
+    const raw = contenidoResumenValores[`contenido:${id}`];
     if (!raw) continue;
     const it = JSON.parse(raw);
     if (it.estado === "Publicado" || !it.fecha) continue;
@@ -1357,19 +1396,13 @@ function TarjetaResumen({ titulo, valor, detalle, onClick, color, alerta }) {
 async function construirContextoOperacion() {
   const idsClientesRaw = await storageGet("indice-clientes", false);
   const idsClientes = idsClientesRaw ? JSON.parse(idsClientesRaw) : [];
-  const clientes = [];
-  for (const id of idsClientes) {
-    const raw = await storageGet(`cliente:${id}`, false);
-    if (raw) clientes.push(JSON.parse(raw));
-  }
+  const clientesContexto = await obtenerClientesPorId(idsClientes);
+  const clientes = idsClientes.map((id) => clientesContexto[id]).filter(Boolean);
 
   const idsDocsRaw = await storageGet("indice-documentos", true);
   const idsDocs = idsDocsRaw ? JSON.parse(idsDocsRaw) : [];
-  const documentos = [];
-  for (const id of idsDocs) {
-    const raw = await storageGet(`documento:${id}`, true);
-    if (raw) documentos.push(JSON.parse(raw));
-  }
+  const docsContexto = await obtenerDocumentosPorId(idsDocs);
+  const documentos = idsDocs.map((id) => docsContexto[id]).filter(Boolean);
 
   const inactivos = clientes.filter((c) => {
     const d = diasDesde(c.ultimaActuacion);
@@ -1556,32 +1589,14 @@ async function buscarClientePorNombre(nombreBuscado) {
   const idsRaw = await storageGet("indice-clientes", false);
   const ids = idsRaw ? JSON.parse(idsRaw) : [];
   const buscado = (nombreBuscado || "").trim().toLowerCase();
+  const clientes = await obtenerClientesPorId(ids);
   for (const id of ids) {
-    const raw = await storageGet(`cliente:${id}`, false);
-    if (!raw) continue;
-    const c = JSON.parse(raw);
+    const c = clientes[id];
+    if (!c) continue;
     const nombreC = (c.nombre || "").toLowerCase();
     if (nombreC.includes(buscado) || buscado.includes(nombreC)) return { id, cliente: c };
   }
   return null;
-}
-
-const SHEETJS_SRC = "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js";
-function ensureSheetJS() {
-  return new Promise((resolve, reject) => {
-    if (window.XLSX) return resolve();
-    const existing = document.getElementById("sheetjs-script");
-    if (existing) {
-      existing.addEventListener("load", () => resolve());
-      return;
-    }
-    const script = document.createElement("script");
-    script.id = "sheetjs-script";
-    script.src = SHEETJS_SRC;
-    script.onload = () => resolve();
-    script.onerror = reject;
-    document.head.appendChild(script);
-  });
 }
 
 async function ejecutarHerramienta(nombreHerramienta, input, usuarioActual) {
@@ -1751,14 +1766,14 @@ async function ejecutarHerramienta(nombreHerramienta, input, usuarioActual) {
   }
 
   if (nombreHerramienta === "generar_reporte_excel") {
-    await ensureSheetJS();
+    await ensureXLSX();
     const idsRaw = await storageGet("indice-clientes", false);
     const ids = idsRaw ? JSON.parse(idsRaw) : [];
+    const clientesPago = await obtenerClientesPorId(ids);
     const filas = [];
-    for (const id of ids) {
-      const raw = await storageGet(`cliente:${id}`, false);
-      if (!raw) continue;
-      const c = JSON.parse(raw);
+    ids.forEach((id) => {
+      const c = clientesPago[id];
+      if (!c) return;
       const pagos = c.pagos || [];
       if (pagos.length === 0) {
         filas.push({ Cliente: c.nombre, Fecha: "", "Medio de pago": "", Valor: "", Concepto: "Sin pagos registrados" });
@@ -1773,12 +1788,19 @@ async function ejecutarHerramienta(nombreHerramienta, input, usuarioActual) {
           });
         });
       }
-    }
+    });
     const hoja = window.XLSX.utils.json_to_sheet(filas);
+    // Ancho de columna automático — sin esto el Excel sale con todo apretado
+    // en columnas angostas por defecto.
+    const columnasReporte = filas.length > 0 ? Object.keys(filas[0]) : ["Cliente", "Fecha", "Medio de pago", "Valor", "Concepto"];
+    hoja["!cols"] = columnasReporte.map((col) => {
+      const maxContenido = filas.reduce((max, f) => Math.max(max, String(f[col] ?? "").length), col.length);
+      return { wch: Math.min(Math.max(maxContenido + 2, 10), 45) };
+    });
     const libro = window.XLSX.utils.book_new();
     window.XLSX.utils.book_append_sheet(libro, hoja, "Pagos");
     const salida = window.XLSX.write(libro, { bookType: "xlsx", type: "array" });
-    const blob = new Blob([salida], { type: "application/octet-stream" });
+    const blob = new Blob([salida], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
     const url = URL.createObjectURL(blob);
     return { mensaje: "Reporte en Excel generado con todos los clientes y sus pagos.", archivo: { url, nombre: "reporte_pagos.xlsx" } };
   }
@@ -1844,8 +1866,9 @@ async function ejecutarHerramienta(nombreHerramienta, input, usuarioActual) {
     const idsAgenda = idsAgendaRaw ? JSON.parse(idsAgendaRaw) : [];
     const hoyISO = new Date().toISOString().slice(0, 10);
     const eventos = [];
+    const valoresAgenda = await obtenerValoresPorClaves(idsAgenda.map((id) => `evento:${id}`));
     for (const id of idsAgenda) {
-      const raw = await storageGet(`evento:${id}`, true);
+      const raw = valoresAgenda[`evento:${id}`];
       if (!raw) continue;
       const e = JSON.parse(raw);
       if (e.fecha >= hoyISO) eventos.push(e);
@@ -2455,11 +2478,12 @@ export function useEventosAgenda() {
   const [cargado, setCargado] = useState(false);
 
   const cargar = useCallback(async () => {
+    const valores = await obtenerValoresPorClaves(ids.map((id) => `evento:${id}`));
     const mapa = {};
-    for (const id of ids) {
-      const raw = await storageGet(`evento:${id}`, true);
+    ids.forEach((id) => {
+      const raw = valores[`evento:${id}`];
       if (raw) mapa[id] = JSON.parse(raw);
-    }
+    });
     setEventos(mapa);
     setCargado(true);
   }, [ids]);
@@ -2530,11 +2554,11 @@ function useAgendaRecordatorios() {
     const revisar = async () => {
       if (cancelado) return;
       const idsRaw = await storageGet("indice-agenda", true);
-      const ids = idsRaw ? JSON.parse(idsRaw) : [];
+      const ids = (idsRaw ? JSON.parse(idsRaw) : []).filter((id) => !yaNotificados.has(id));
       const ahora = Date.now();
+      const valores = await obtenerValoresPorClaves(ids.map((id) => `evento:${id}`));
       for (const id of ids) {
-        if (yaNotificados.has(id)) continue;
-        const raw = await storageGet(`evento:${id}`, true);
+        const raw = valores[`evento:${id}`];
         if (!raw) continue;
         const evento = JSON.parse(raw);
         const momento = new Date(`${evento.fecha}T${evento.hora || "08:00"}:00`).getTime();
@@ -4276,7 +4300,10 @@ export function enviarRecordatorioPago(cliente) {
   const numero = numeroWhatsappCliente(cliente.telefono);
   const fechaTexto = new Date(cliente.proximoPago.fecha).toLocaleDateString("es-CO", { dateStyle: "long" });
   const valorTexto = cliente.proximoPago.valorEsperado ? ` por un valor de ${formatoCOP(cliente.proximoPago.valorEsperado)}` : "";
-  const mensaje = `Hola ${cliente.nombre || ""} 👋\n\nEspero te encuentres muy bien. Te escribimos de parte de *${getNombreDespacho()}* para recordarte, de la manera más cordial, que tu próximo pago está programado para el ${fechaTexto}${valorTexto}.\n\nSi ya realizaste el pago, no te preocupes por este mensaje y quedamos atentos a la confirmación. Cualquier duda, con gusto te ayudamos.\n\n¡Gracias por tu confianza y que tengas un excelente día!`;
+  // Sin emojis a propósito (ver comentario en ClientesTab sobre el mensaje
+  // del portal): no se ven bien en todos los WhatsApp/dispositivos, y un
+  // mensaje de despacho de abogados se lee más serio en texto plano.
+  const mensaje = `*${getNombreDespacho()}*\n\nHola ${cliente.nombre || ""}, te recordamos que tu próximo pago está programado para el ${fechaTexto}${valorTexto}.\n\nSi ya realizaste el pago, ignora este mensaje — quedamos atentos a la confirmación. Cualquier duda, con gusto te ayudamos.`;
   window.open(`https://wa.me/${numero}?text=${encodeURIComponent(mensaje)}`, "_blank");
 }
 
@@ -4400,11 +4427,7 @@ export function useDatosReportes() {
 
   useEffect(() => {
     (async () => {
-      const entries = {};
-      for (const id of ids) {
-        const raw = await storageGet(`cliente:${id}`, false);
-        if (raw) entries[id] = JSON.parse(raw);
-      }
+      const entries = await obtenerClientesPorId(ids);
       setClientes(entries);
       setCargando(false);
     })();
@@ -4649,10 +4672,10 @@ function useNotificacionesPanel(prefs) {
     const idsDocsRaw = await storageGet("indice-documentos", true);
     const idsDocs = idsDocsRaw ? JSON.parse(idsDocsRaw) : [];
     const nuevasFirmas = [];
+    const docsNotif = await obtenerDocumentosPorId(idsDocs);
     for (const id of idsDocs) {
-      const raw = await storageGet(`documento:${id}`, true);
-      if (!raw) continue;
-      const d = JSON.parse(raw);
+      const d = docsNotif[id];
+      if (!d) continue;
       (d.firmantes || []).forEach((f) => {
         if (f.rol !== "abogado" && f.firmadoEn > revision) {
           nuevasFirmas.push({ titulo: d.titulo, nombre: f.nombre, fecha: f.firmadoEn });
@@ -4667,10 +4690,10 @@ function useNotificacionesPanel(prefs) {
     const pendientesPago = [];
     const novedades = [];
     const sinRadicado = [];
+    const clientesNotif = await obtenerClientesPorId(idsClientes);
     for (const id of idsClientes) {
-      const raw = await storageGet(`cliente:${id}`, false);
-      if (!raw) continue;
-      const c = JSON.parse(raw);
+      const c = clientesNotif[id];
+      if (!c) continue;
       const dias = diasDesde(c.ultimaActuacion);
       if (dias !== null && dias >= DIAS_ALERTA_INACTIVIDAD) {
         inactivos.push({ nombre: c.nombre, dias });
@@ -4698,8 +4721,9 @@ function useNotificacionesPanel(prefs) {
     const hoyISO = fechaHoyISO();
     const pendientesHoy = [];
     const vencidos = [];
+    const contenidoNotifValores = await obtenerValoresPorClaves(idsContenido.map((id) => `contenido:${id}`));
     for (const id of idsContenido) {
-      const raw = await storageGet(`contenido:${id}`, true);
+      const raw = contenidoNotifValores[`contenido:${id}`];
       if (!raw) continue;
       const it = JSON.parse(raw);
       if (it.estado === "Publicado" || !it.fecha) continue;
@@ -6776,7 +6800,8 @@ function LandingPage({ onRegistrar, onIniciarSesion }) {
 // chat) — mientras no haya una pasarela real (Wompi/ePayco con PSE), el
 // pago se recibe por transferencia/Nequi y se confirma a mano.
 const CUENTA_PAGO_NOMOS = {
-  nequi: "300 000 0000", // TODO: reemplazar por el número real
+  nequiDaviplata: "319 287 5428",
+  llave: "1010040978",
   titular: "Felipe Cortés Ramírez",
 };
 
@@ -6845,7 +6870,10 @@ function PantallaPendienteActivacion({ usuarioActual, onCerrarSesion }) {
               Cómo pagar
             </p>
             <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.inkSoft, margin: "0 0 4px" }}>
-              Nequi: <strong style={{ color: COLORS.ink }}>{CUENTA_PAGO_NOMOS.nequi}</strong> ({CUENTA_PAGO_NOMOS.titular})
+              Nequi / Daviplata: <strong style={{ color: COLORS.ink }}>{CUENTA_PAGO_NOMOS.nequiDaviplata}</strong>
+            </p>
+            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.inkSoft, margin: "0 0 4px" }}>
+              Llave Bancolombia: <strong style={{ color: COLORS.ink }}>{CUENTA_PAGO_NOMOS.llave}</strong> ({CUENTA_PAGO_NOMOS.titular})
             </p>
             <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.inkSoft, margin: "0 0 4px" }}>
               Plan Abogado $35.000/mes · Plan Despacho $89.000/mes

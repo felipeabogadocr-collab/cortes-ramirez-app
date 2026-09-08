@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { storageGet, storageSet, getNombreDespacho } from "../lib/storage";
+import { storageGet, storageSet, getNombreDespacho, obtenerDocumentosPorId } from "../lib/storage";
 import {
   COLORS, uid, diasDesde, useAvisoAntesDeSalir, useConfirmarDialogo, useIndex, Field,
   inputStyle, buttonPrimary, buttonGhost, Card, EncabezadoSeccion, Icono, EstadoVacio,
@@ -246,11 +246,7 @@ export default function DocumentosTab({ usuarioActual }) {
   const { confirmar, ConfirmarDialogo } = useConfirmarDialogo();
 
   const cargar = useCallback(async () => {
-    const entries = {};
-    for (const id of ids) {
-      const raw = await storageGet(`documento:${id}`, true);
-      if (raw) entries[id] = JSON.parse(raw);
-    }
+    const entries = await obtenerDocumentosPorId(ids);
     setDocs(entries);
   }, [ids]);
 
@@ -377,12 +373,17 @@ export default function DocumentosTab({ usuarioActual }) {
   // solo clic en vez de tener que abrir la app y buscar dónde escribir el código.
   const ENLACE_FIRMA = typeof window !== "undefined" ? `${window.location.origin}/#firmar` : "";
 
+  // Sin emojis a propósito, ni siquiera los números con recuadro (1️⃣2️⃣3️⃣):
+  // son una secuencia de varios caracteres combinados que en algunos
+  // WhatsApp/dispositivos se ve como "�" en vez del número — con una lista
+  // numerada normal se lee igual de claro y no depende de la fuente de
+  // emojis del teléfono de cada cliente.
   const enviarPorWhatsapp = (d, id) => {
     const numero = `${d.whatsappIndicativo || ""}${(d.whatsappNumero || "").replace(/[^0-9]/g, "")}`;
     const pasos = ENLACE_FIRMA
-      ? `1️⃣ Haz clic aquí: ${ENLACE_FIRMA}\n2️⃣ Cuando te lo pida, escribe este código: *${id}*\n3️⃣ Sigue los pasos en pantalla para firmar`
-      : `1️⃣ Ingresa al aplicativo de firmas\n2️⃣ Escribe este código: *${id}*\n3️⃣ Sigue los pasos en pantalla para firmar`;
-    const mensaje = `Hola ${d.cliente || ""} 👋\n\n*${getNombreDespacho()}* te comparte el documento *"${d.titulo}"* para tu firma electrónica.\n\n${pasos}\n\nCualquier duda, escríbenos por este mismo medio.`;
+      ? `1. Haz clic aquí: ${ENLACE_FIRMA}\n2. Cuando te lo pida, escribe este código: *${id}*\n3. Sigue los pasos en pantalla para firmar`
+      : `1. Ingresa al aplicativo de firmas\n2. Escribe este código: *${id}*\n3. Sigue los pasos en pantalla para firmar`;
+    const mensaje = `*${getNombreDespacho()}*\n\nHola ${d.cliente || ""}, te compartimos el documento *"${d.titulo}"* para tu firma electrónica.\n\n${pasos}\n\nCualquier duda, escríbenos por este mismo medio.`;
     const url = `https://wa.me/${numero}?text=${encodeURIComponent(mensaje)}`;
     window.open(url, "_blank");
   };
@@ -392,7 +393,7 @@ export default function DocumentosTab({ usuarioActual }) {
     const firmaAbogado = (d.firmantes || []).find((f) => f.rol === "abogado");
     const numero = `${d.whatsappIndicativo || ""}${(d.whatsappNumero || "").replace(/[^0-9]/g, "")}`;
     const fechaCliente = firmaCliente ? new Date(firmaCliente.firmadoEn).toLocaleDateString("es-CO", { dateStyle: "long" }) : "";
-    const mensaje = `Hola ${d.cliente || ""}, tu documento "${d.titulo}" quedó firmado el ${fechaCliente} y también fue firmado por ${firmaAbogado ? firmaAbogado.nombre : "tu abogado"} de ${getNombreDespacho()}. Ya está listo.\n\nEn un momento te comparto el PDF firmado por este mismo medio.`;
+    const mensaje = `*${getNombreDespacho()}*\n\nHola ${d.cliente || ""}, tu documento "${d.titulo}" quedó firmado el ${fechaCliente}, también por ${firmaAbogado ? firmaAbogado.nombre : "tu abogado"}. Ya está listo.\n\nEn un momento te comparto el PDF firmado por este mismo medio.`;
     const url = `https://wa.me/${numero}?text=${encodeURIComponent(mensaje)}`;
     window.open(url, "_blank");
   };

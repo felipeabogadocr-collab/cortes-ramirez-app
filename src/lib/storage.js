@@ -84,6 +84,102 @@ const INDEX_TABLES = {
   "indice-documentos": "documentos",
 };
 
+// Trae varios clientes de una sola vez (una sola consulta a la base de
+// datos) en vez de uno por uno — antes, varias pantallas hacían
+// storageGet("cliente:ID") en un ciclo por cada id del índice, y con N
+// clientes eso eran N viajes de ida y vuelta al servidor, uno detrás de
+// otro: con pocos clientes casi no se nota, pero entre más crece la lista
+// del despacho, más lento se siente entrar a cada pestaña. Devuelve un
+// objeto { [id]: datosDelCliente }, ya parseado (no hay que hacer
+// JSON.parse después, a diferencia de storageGet).
+export async function obtenerClientesPorId(ids) {
+  if (!ids || ids.length === 0) return {};
+  try {
+    // Un solo IN() con miles de ids sería un problema aparte — se parte en
+    // bloques para no mandar una sola consulta gigante si el despacho
+    // llegara a tener una lista muy larga.
+    const TAMANO_BLOQUE = 300;
+    const resultado = {};
+    for (let i = 0; i < ids.length; i += TAMANO_BLOQUE) {
+      const bloque = ids.slice(i, i + TAMANO_BLOQUE);
+      const { data, error } = await supabase
+        .from("clientes")
+        .select("id, data")
+        .eq("despacho_id", despachoActualId)
+        .in("id", bloque)
+        .is("eliminado_en", null);
+      if (error) throw error;
+      (data || []).forEach((fila) => {
+        resultado[fila.id] = fila.data;
+      });
+    }
+    return resultado;
+  } catch (e) {
+    console.warn("obtenerClientesPorId falló:", e);
+    avisarErrorAlmacenamiento("get", "clientes (varios)", e);
+    return {};
+  }
+}
+
+// Mismo problema, misma solución, pero para documentos (usado en la
+// pestaña Documentos, que también traía cada documento uno por uno).
+export async function obtenerDocumentosPorId(ids) {
+  if (!ids || ids.length === 0 || !despachoActualId) return {};
+  try {
+    const TAMANO_BLOQUE = 300;
+    const resultado = {};
+    for (let i = 0; i < ids.length; i += TAMANO_BLOQUE) {
+      const bloque = ids.slice(i, i + TAMANO_BLOQUE);
+      const { data, error } = await supabase
+        .from("documentos")
+        .select("id, data")
+        .eq("despacho_id", despachoActualId)
+        .in("id", bloque)
+        .is("eliminado_en", null);
+      if (error) throw error;
+      (data || []).forEach((fila) => {
+        resultado[fila.id] = fila.data;
+      });
+    }
+    return resultado;
+  } catch (e) {
+    console.warn("obtenerDocumentosPorId falló:", e);
+    avisarErrorAlmacenamiento("get", "documentos (varios)", e);
+    return {};
+  }
+}
+
+// Para claves genéricas de una sola tabla (app_settings) que se guardan una
+// por elemento, como "contenido:ID" en el calendario de contenido — mismo
+// problema (una consulta por elemento en un ciclo) resuelto igual, pero
+// contra la tabla genérica en vez de "clientes"/"documentos". Devuelve un
+// objeto { [clave]: valorSinParsear } (igual que storageGet, para que quien
+// lo use siga haciendo JSON.parse si lo necesita).
+export async function obtenerValoresPorClaves(claves) {
+  if (!claves || claves.length === 0 || !despachoActualId) return {};
+  try {
+    const TAMANO_BLOQUE = 300;
+    const resultado = {};
+    for (let i = 0; i < claves.length; i += TAMANO_BLOQUE) {
+      const bloque = claves.slice(i, i + TAMANO_BLOQUE);
+      const { data, error } = await supabase
+        .from("app_settings")
+        .select("key, value")
+        .eq("despacho_id", despachoActualId)
+        .in("key", bloque);
+      if (error) throw error;
+      (data || []).forEach((fila) => {
+        resultado[fila.key] = fila.value;
+      });
+    }
+    return resultado;
+  } catch (e) {
+    console.warn("obtenerValoresPorClaves falló:", e);
+    avisarErrorAlmacenamiento("get", "app_settings (varios)", e);
+    return {};
+  }
+}
+
 function parseRecordKey(key) {
   const idx = key.indexOf(":");
   if (idx === -1) return null;

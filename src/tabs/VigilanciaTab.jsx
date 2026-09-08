@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "../lib/supabaseClient";
-import { storageGet, storageSet } from "../lib/storage";
+import { storageSet, obtenerClientesPorId } from "../lib/storage";
 import {
   COLORS, uid, diasDesde, useIndex, useConfirmarDialogo, inputStyle, buttonPrimary, buttonGhost, Card,
   EncabezadoSeccion, Icono, AvatarIniciales, EstadoVacio, LineaDeTiempo, COLOR_AREA_PROCESO,
@@ -82,11 +82,7 @@ export default function VigilanciaTab() {
   };
 
   const cargar = useCallback(async () => {
-    const entries = {};
-    for (const id of ids) {
-      const raw = await storageGet(`cliente:${id}`, false);
-      if (raw) entries[id] = JSON.parse(raw);
-    }
+    const entries = await obtenerClientesPorId(ids);
     setClientes(entries);
   }, [ids]);
 

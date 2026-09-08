@@ -3,7 +3,7 @@
 // tenía toda la app — separarla en su propio chunk hace que quien no abre
 // Contabilidad no tenga que descargar/parsear todo este código de entrada.
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { storageGet, storageSet, obtenerUrlReciboImagen, getNombreDespacho } from "../lib/storage";
+import { storageGet, storageSet, obtenerUrlReciboImagen, getNombreDespacho, obtenerClientesPorId } from "../lib/storage";
 import { numeroEnLetras } from "../lib/numeroEnLetras.js";
 import {
   COLORS,
@@ -657,7 +657,10 @@ function ReciboCard({ cliente, pago, onEditar, onEliminar, datosResponsable, por
   const urlRecibo = useUrlRecibo(pago.reciboImagen);
 
   const enviarPorWhatsapp = () => {
-    const mensaje = `Hola ${cliente.nombre || ""} 👋\n\n*${getNombreDespacho()}* te confirma la recepción de tu pago:\n\n💳 Medio: ${pago.medioPago}\n💰 Valor: ${formatoCOP(pago.valor)}\n📅 Fecha: ${new Date(pago.fecha).toLocaleDateString("es-CO", { dateStyle: "long" })}${pago.concepto ? `\n📝 Concepto: ${pago.concepto}` : ""}\n\nEn un momento te comparto el recibo por este mismo medio. ¡Gracias por tu confianza!`;
+    // Sin emojis a propósito: no se ven bien en todos los WhatsApp/
+    // dispositivos, y un mensaje de despacho de abogados se lee más serio
+    // en texto plano.
+    const mensaje = `*${getNombreDespacho()}*\n\nHola ${cliente.nombre || ""}, confirmamos la recepción de tu pago:\n\nMedio: ${pago.medioPago}\nValor: ${formatoCOP(pago.valor)}\nFecha: ${new Date(pago.fecha).toLocaleDateString("es-CO", { dateStyle: "long" })}${pago.concepto ? `\nConcepto: ${pago.concepto}` : ""}\n\nEn un momento te comparto el recibo por este mismo medio. ¡Gracias por tu confianza!`;
     window.open(`https://wa.me/${numero}?text=${encodeURIComponent(mensaje)}`, "_blank");
   };
 
@@ -1215,11 +1218,7 @@ export default function ContabilidadTab({ usuarioActual }) {
   };
 
   const cargar = useCallback(async () => {
-    const entries = {};
-    for (const id of ids) {
-      const raw = await storageGet(`cliente:${id}`, false);
-      if (raw) entries[id] = JSON.parse(raw);
-    }
+    const entries = await obtenerClientesPorId(ids);
     setClientes(entries);
   }, [ids]);
 
@@ -1693,7 +1692,7 @@ export default function ContabilidadTab({ usuarioActual }) {
                 )
               }
             >
-              Exportar CSV
+              Exportar Excel
             </button>
           )}
         </div>
@@ -1754,7 +1753,7 @@ export default function ContabilidadTab({ usuarioActual }) {
                 )
               }
             >
-              Exportar CSV
+              Exportar Excel
             </button>
           )}
         </div>
@@ -1909,7 +1908,7 @@ export default function ContabilidadTab({ usuarioActual }) {
             );
           }}
         >
-          Exportar CSV
+          Exportar Excel
         </button>
       </div>
 

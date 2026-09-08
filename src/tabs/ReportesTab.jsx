@@ -59,7 +59,7 @@ export default function ReportesTab() {
             )
           }
         >
-          Exportar CSV
+          Exportar Excel
         </button>
       </div>
 
