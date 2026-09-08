@@ -83,7 +83,18 @@ async function organizarPagoConIA(descripcion) {
   if (!response.ok || data.error) throw new Error(data.error || "No se pudo contactar al asistente de IA");
   const texto = (data.content || []).map((b) => b.text || "").join("");
   const limpio = texto.replace(/```json|```/g, "").trim();
-  return JSON.parse(limpio);
+  // El modelo a veces agrega algo de texto alrededor del JSON aunque se le
+  // pida que no lo haga (una aclaración, un salto de línea de más) —
+  // JSON.parse(limpio) a secas fallaba con cualquier cosa que no fuera el
+  // objeto puro. Se busca el primer "{...}" dentro del texto en vez de
+  // asumir que el texto completo ya es JSON válido.
+  const coincidencia = limpio.match(/\{[\s\S]*\}/);
+  const jsonTexto = coincidencia ? coincidencia[0] : limpio;
+  try {
+    return JSON.parse(jsonTexto);
+  } catch (e) {
+    throw new Error(`El asistente respondió algo que no se pudo interpretar: "${texto.slice(0, 180)}"`);
+  }
 }
 
 function PlanDePagoIA({ planPago, onChange }) {
@@ -99,7 +110,12 @@ function PlanDePagoIA({ planPago, onChange }) {
       const resultado = await organizarPagoConIA(descripcion.trim());
       onChange({ descripcion: descripcion.trim(), ...resultado });
     } catch (e) {
-      setError("No pudimos organizarlo automáticamente. Completa los campos manualmente abajo.");
+      console.error("No se pudo organizar el pago con IA:", e);
+      // Antes siempre mostraba el mismo mensaje genérico sin importar la
+      // causa real (límite de cuota, respuesta mal formada, etc.) — con el
+      // motivo real es mucho más fácil saber si vale la pena reintentar o
+      // si hay que llenar los campos a mano de una vez.
+      setError(`No pudimos organizarlo automáticamente (${e?.message || "error desconocido"}). Completa los campos manualmente abajo.`);
       onChange({ descripcion: descripcion.trim(), frecuencia: FRECUENCIAS_PAGO[0], valor: null, proximaFecha: "", resumen: "" });
     }
     setProcesando(false);
