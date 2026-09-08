@@ -94,7 +94,7 @@ async function siguienteConsecutivoCuentaCobro() {
 async function generarCuentaDeCobroPdf({ cliente, pago, datosResponsable, numero }) {
   await ensureJsPDF();
   const { jsPDF } = window.jspdf;
-  const pdf = new jsPDF({ unit: "pt", format: "carta" });
+  const pdf = new jsPDF({ unit: "pt", format: "letter" });
   const pageWidth = pdf.internal.pageSize.getWidth();
   const marginX = 64;
   let y = 66;
@@ -219,7 +219,7 @@ function dibujarBarraHorizontal(pdf, { x, y, anchoTotal, etiqueta, valor, valorM
 async function generarResumenFiscalPdf({ anio, nombreDespacho, ingresosBruto, retenidoTotal, ingresosNeto, egresoTotal, egresosPorCategoria, netoAnio }) {
   await ensureJsPDF();
   const { jsPDF } = window.jspdf;
-  const pdf = new jsPDF({ unit: "pt", format: "carta" });
+  const pdf = new jsPDF({ unit: "pt", format: "letter" });
   const pageWidth = pdf.internal.pageSize.getWidth();
   const pageHeight = pdf.internal.pageSize.getHeight();
   const marginX = 56;
@@ -260,7 +260,7 @@ async function generarResumenFiscalPdf({ anio, nombreDespacho, ingresosBruto, re
     pdf.setFillColor(...c.bg);
     pdf.roundedRect(x, y, cardWidth, cardHeight, 6, 6, "F");
     pdf.setFillColor(...c.color);
-    pdf.roundedRect(x, y, 5, cardHeight, "F");
+    pdf.rect(x, y, 5, cardHeight, "F");
     pdf.setFont("helvetica", "normal");
     pdf.setFontSize(8.6);
     pdf.setTextColor(100, 100, 100);
@@ -1179,11 +1179,11 @@ export default function ContabilidadTab({ usuarioActual }) {
       });
     } catch (e) {
       console.error("No se pudo generar el resumen fiscal:", e);
-      // Sin esto, si falla la descarga (p. ej. el navegador bloqueó el
-      // script de jsPDF que se carga desde un CDN externo), el botón
-      // simplemente vuelve a "Descargar PDF" sin decir nada — parece que no
-      // pasó nada, cuando en realidad sí falló algo puntual.
-      setErrorFiscal("No se pudo generar el PDF. Revisa tu conexión a internet (el generador de PDF se carga desde internet la primera vez) e inténtalo de nuevo.");
+      // Sin esto, si algo falla generando el PDF, el botón simplemente
+      // vuelve a "Descargar PDF" sin decir nada — parece que no pasó nada,
+      // cuando en realidad sí falló algo puntual. Se muestra el mensaje real
+      // del error (no uno genérico) para no tener que adivinar la causa.
+      setErrorFiscal(`No se pudo generar el PDF: ${e?.message || "error desconocido"}. Inténtalo de nuevo o avísale a soporte con este mensaje.`);
     }
     setGenerandoFiscal(false);
   };
