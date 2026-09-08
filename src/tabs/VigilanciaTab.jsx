@@ -420,12 +420,15 @@ export default function VigilanciaTab() {
                     <div key={radicado} style={{ background: COLORS.surfaceSoft, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: 10 }}>
                       <div style={{ margin: "0 0 8px" }}>
                         <span
+                          className="drx-pastilla-radicado"
                           style={{
                             display: "inline-flex",
                             alignItems: "stretch",
-                            borderRadius: 20,
-                            border: `1px solid ${radicadoCopiado === clave ? "#C9E0C4" : COLORS.border}`,
+                            flexShrink: 0,
+                            borderRadius: 10,
+                            border: `1px solid ${radicadoCopiado === clave ? "#B7D9C4" : COLORS.border}`,
                             overflow: "hidden",
+                            boxShadow: "0 1px 2px rgba(16,24,40,0.04)",
                           }}
                         >
                           <button
@@ -433,23 +436,27 @@ export default function VigilanciaTab() {
                             title="Copiar radicado (para pegarlo en Rama Judicial o en la Fiscalía)"
                             onClick={() => copiarRadicado(radicado, clave)}
                             style={{
-                              fontFamily: "monospace",
+                              fontFamily: "'JetBrains Mono', ui-monospace, monospace",
                               fontSize: 11.5,
-                              padding: "3px 9px",
+                              letterSpacing: 0.2,
+                              whiteSpace: "nowrap",
+                              padding: "6px 12px",
                               background: radicadoCopiado === clave ? "#E4EEE2" : "#fff",
-                              color: radicadoCopiado === clave ? "#2F5D3A" : COLORS.inkSoft,
+                              color: radicadoCopiado === clave ? "#1F6B3A" : COLORS.inkSoft,
                               cursor: "pointer",
                               border: "none",
                               display: "flex",
                               alignItems: "center",
-                              gap: 5,
+                              gap: 7,
                             }}
                           >
                             {radicadoCopiado === clave ? (
                               "✓ Copiado"
                             ) : (
                               <>
-                                Radicado: {radicado} <Icono tipo="portapapeles" size={11} />
+                                <span style={{ color: COLORS.muted, fontFamily: "Inter, sans-serif", fontWeight: 600, fontSize: 10.5 }}>RADICADO</span>
+                                {radicado}
+                                <Icono tipo="portapapeles" size={11} />
                               </>
                             )}
                           </button>
@@ -459,11 +466,12 @@ export default function VigilanciaTab() {
                             rel="noreferrer"
                             style={{
                               fontFamily: "Inter, sans-serif",
-                              fontSize: 11.5,
-                              fontWeight: 600,
-                              padding: "3px 9px",
+                              fontSize: 11,
+                              fontWeight: 700,
+                              whiteSpace: "nowrap",
+                              padding: "6px 12px",
                               background: "#EEF6EF",
-                              color: "#2F5D3A",
+                              color: "#1F6B3A",
                               textDecoration: "none",
                               borderLeft: `1px solid ${COLORS.border}`,
                               display: "flex",
@@ -480,9 +488,10 @@ export default function VigilanciaTab() {
                               title="Abre la consulta pública de la Fiscalía — hay que resolver el captcha a mano, no se puede automatizar"
                               style={{
                                 fontFamily: "Inter, sans-serif",
-                                fontSize: 11.5,
-                                fontWeight: 600,
-                                padding: "3px 9px",
+                                fontSize: 11,
+                                fontWeight: 700,
+                                whiteSpace: "nowrap",
+                                padding: "6px 12px",
                                 background: "#FEF2F2",
                                 color: "#B91C1C",
                                 textDecoration: "none",

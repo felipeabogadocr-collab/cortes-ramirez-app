@@ -824,12 +824,15 @@ export default function ClientesTab({ usuarioActual }) {
                     {radicadosDeCliente(c).map((r, idx) => (
                       <span
                         key={r}
+                        className="drx-pastilla-radicado"
                         style={{
                           display: "inline-flex",
                           alignItems: "stretch",
-                          borderRadius: 20,
-                          border: `1px solid ${copiado === `rad-${id}-${idx}` ? "#C9E0C4" : COLORS.border}`,
+                          flexShrink: 0,
+                          borderRadius: 10,
+                          border: `1px solid ${copiado === `rad-${id}-${idx}` ? "#B7D9C4" : COLORS.border}`,
                           overflow: "hidden",
+                          boxShadow: "0 1px 2px rgba(16,24,40,0.04)",
                         }}
                       >
                         <button
@@ -837,23 +840,27 @@ export default function ClientesTab({ usuarioActual }) {
                           title="Copiar radicado (para pegarlo en Rama Judicial o en la Fiscalía)"
                           onClick={() => copiar(r, `rad-${id}-${idx}`)}
                           style={{
-                            fontFamily: "monospace",
-                            fontSize: 11,
-                            padding: "3px 9px",
+                            fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+                            fontSize: 11.5,
+                            letterSpacing: 0.2,
+                            whiteSpace: "nowrap",
+                            padding: "6px 12px",
                             background: copiado === `rad-${id}-${idx}` ? "#E4EEE2" : COLORS.surfaceSoft,
-                            color: copiado === `rad-${id}-${idx}` ? "#2F5D3A" : COLORS.inkSoft,
+                            color: copiado === `rad-${id}-${idx}` ? "#1F6B3A" : COLORS.inkSoft,
                             cursor: "pointer",
                             border: "none",
                             display: "flex",
                             alignItems: "center",
-                            gap: 5,
+                            gap: 7,
                           }}
                         >
                           {copiado === `rad-${id}-${idx}` ? (
                             "✓ Copiado"
                           ) : (
                             <>
-                              Radicado: {r} <Icono tipo="portapapeles" size={11} />
+                              <span style={{ color: COLORS.muted, fontFamily: "Inter, sans-serif", fontWeight: 600, fontSize: 10.5 }}>RADICADO</span>
+                              {r}
+                              <Icono tipo="portapapeles" size={11} />
                             </>
                           )}
                         </button>
@@ -864,10 +871,11 @@ export default function ClientesTab({ usuarioActual }) {
                           style={{
                             fontFamily: "Inter, sans-serif",
                             fontSize: 11,
-                            fontWeight: 600,
-                            padding: "3px 9px",
+                            fontWeight: 700,
+                            whiteSpace: "nowrap",
+                            padding: "6px 12px",
                             background: "#EEF6EF",
-                            color: "#2F5D3A",
+                            color: "#1F6B3A",
                             textDecoration: "none",
                             borderLeft: `1px solid ${COLORS.border}`,
                             display: "flex",
@@ -885,8 +893,9 @@ export default function ClientesTab({ usuarioActual }) {
                             style={{
                               fontFamily: "Inter, sans-serif",
                               fontSize: 11,
-                              fontWeight: 600,
-                              padding: "3px 9px",
+                              fontWeight: 700,
+                              whiteSpace: "nowrap",
+                              padding: "6px 12px",
                               background: "#FEF2F2",
                               color: "#B91C1C",
                               textDecoration: "none",
