@@ -168,83 +168,154 @@ async function generarCuentaDeCobroPdf({ cliente, pago, datosResponsable, numero
   pdf.save(nombreArchivo);
 }
 
+// Paleta compartida entre el gráfico de barras por categoría y las tarjetas
+// resumen del PDF fiscal, para que se vea igual de "de un solo sistema" que
+// el resto de la app (misma idea que COLORS pero en RGB, porque jsPDF pide
+// los colores como componentes r/g/b separados, no en hexadecimal).
+const PALETA_PDF = [
+  [16, 185, 129], // verde (igual al de ingresos en la app)
+  [244, 63, 94], // rosado/rojo (egresos)
+  [139, 92, 246], // violeta
+  [245, 165, 36], // ámbar
+  [13, 148, 136], // teal
+  [59, 130, 246], // azul
+  [217, 70, 239], // magenta
+  [107, 114, 128], // gris, para cuando se acaban los demás colores
+];
+
+// Barra horizontal simple (etiqueta a la izquierda, barra proporcional al
+// valor máximo del grupo, valor en COP a la derecha) — reemplaza las filas
+// de puro texto que tenía antes el resumen fiscal, para que de un vistazo
+// se note qué categoría/rubro pesa más sin tener que leer cada número.
+function dibujarBarraHorizontal(pdf, { x, y, anchoTotal, etiqueta, valor, valorMax, color, formatoValor }) {
+  const anchoEtiqueta = 168;
+  const anchoValor = 82;
+  const anchoBarra = anchoTotal - anchoEtiqueta - anchoValor;
+  pdf.setFont("helvetica", "normal");
+  pdf.setFontSize(10.5);
+  pdf.setTextColor(55, 65, 81);
+  const lineasEtiqueta = pdf.splitTextToSize(etiqueta, anchoEtiqueta - 6);
+  pdf.text(lineasEtiqueta[0], x, y);
+
+  const anchoRelleno = Math.max(2, Math.round((Math.abs(valor) / valorMax) * anchoBarra));
+  const barX = x + anchoEtiqueta;
+  pdf.setFillColor(244, 246, 249);
+  pdf.roundedRect(barX, y - 9, anchoBarra, 12, 3, 3, "F");
+  pdf.setFillColor(...color);
+  pdf.roundedRect(barX, y - 9, anchoRelleno, 12, 3, 3, "F");
+
+  pdf.setFont("helvetica", "bold");
+  pdf.setFontSize(10.5);
+  pdf.setTextColor(11, 18, 32);
+  pdf.text(formatoValor(valor), x + anchoTotal, y, { align: "right" });
+}
+
 // Un solo PDF con el año completo (ingresos brutos, retenciones, egresos por
 // categoría y la utilidad neta) — lo que un contador pide de entrada en
 // época de declaración de renta, en vez de tener que armarlo a mano
-// cruzando los CSV de pagos, egresos y otros ingresos por separado.
+// cruzando los CSV de pagos, egresos y otros ingresos por separado. Se
+// presenta con tarjetas y barras (como el resto de la app), no solo texto,
+// para que se entienda de un vistazo sin tener que leer fila por fila.
 async function generarResumenFiscalPdf({ anio, nombreDespacho, ingresosBruto, retenidoTotal, ingresosNeto, egresoTotal, egresosPorCategoria, netoAnio }) {
   await ensureJsPDF();
   const { jsPDF } = window.jspdf;
   const pdf = new jsPDF({ unit: "pt", format: "carta" });
   const pageWidth = pdf.internal.pageSize.getWidth();
+  const pageHeight = pdf.internal.pageSize.getHeight();
   const marginX = 56;
-  let y = 60;
+  const contentWidth = pageWidth - marginX * 2;
+  let y = 56;
 
   try {
-    const logoSize = 48;
+    const logoSize = 44;
     pdf.addImage(LOGO_SRC, "PNG", pageWidth / 2 - logoSize / 2, y, logoSize, logoSize);
-    y += logoSize + 20;
+    y += logoSize + 18;
   } catch (e) {
     // nunca debe bloquear el resumen por esto
   }
 
   pdf.setFont("helvetica", "bold");
   pdf.setFontSize(17);
+  pdf.setTextColor(11, 18, 32);
   pdf.text(`Resumen fiscal ${anio}`, pageWidth / 2, y, { align: "center" });
-  y += 20;
+  y += 19;
   pdf.setFont("helvetica", "normal");
   pdf.setFontSize(11);
   pdf.setTextColor(100, 100, 100);
   pdf.text(nombreDespacho, pageWidth / 2, y, { align: "center" });
-  pdf.setTextColor(11, 18, 32);
-  y += 40;
+  y += 34;
 
-  const filas = [
-    ["Ingresos brutos (clientes + otros ingresos)", formatoCOP(ingresosBruto)],
-    ["Retenciones en la fuente que te aplicaron", formatoCOP(retenidoTotal)],
-    ["Ingresos netos que de verdad recibiste", formatoCOP(ingresosNeto)],
-    ["Egresos totales del año", formatoCOP(egresoTotal)],
-    ["Utilidad neta del año (ingresos brutos - egresos)", formatoCOP(netoAnio)],
+  // Tarjetas resumen (igual que las de la pestaña Contabilidad en la app):
+  // lo primero que un contador quiere ver, sin tener que sumar nada.
+  const cardGap = 14;
+  const cardWidth = (contentWidth - cardGap * 2) / 3;
+  const cardHeight = 62;
+  const tarjetas = [
+    { etiqueta: "INGRESOS NETOS", valor: ingresosNeto, color: [16, 185, 129], bg: [236, 253, 245] },
+    { etiqueta: "EGRESOS TOTALES", valor: egresoTotal, color: [244, 63, 94], bg: [255, 241, 242] },
+    { etiqueta: "UTILIDAD NETA", valor: netoAnio, color: netoAnio >= 0 ? [13, 61, 46] : [180, 35, 24], bg: netoAnio >= 0 ? [240, 253, 244] : [254, 242, 242] },
   ];
-  pdf.setFontSize(11.5);
-  filas.forEach(([etiqueta, valor], idx) => {
-    if (idx % 2 === 0) {
-      pdf.setFillColor(244, 246, 249);
-      pdf.rect(marginX, y - 14, pageWidth - marginX * 2, 22, "F");
-    }
+  tarjetas.forEach((c, i) => {
+    const x = marginX + i * (cardWidth + cardGap);
+    pdf.setFillColor(...c.bg);
+    pdf.roundedRect(x, y, cardWidth, cardHeight, 6, 6, "F");
+    pdf.setFillColor(...c.color);
+    pdf.roundedRect(x, y, 5, cardHeight, "F");
     pdf.setFont("helvetica", "normal");
-    pdf.setTextColor(75, 85, 99);
-    pdf.text(etiqueta, marginX + 6, y);
+    pdf.setFontSize(8.6);
+    pdf.setTextColor(100, 100, 100);
+    pdf.text(c.etiqueta, x + 15, y + 20);
     pdf.setFont("helvetica", "bold");
-    pdf.setTextColor(11, 18, 32);
-    pdf.text(valor, pageWidth - marginX - 6, y, { align: "right" });
-    y += 22;
+    pdf.setFontSize(14);
+    pdf.setTextColor(...c.color);
+    const valorTexto = pdf.splitTextToSize(formatoCOP(c.valor), cardWidth - 22);
+    pdf.text(valorTexto[0], x + 15, y + 42);
+  });
+  y += cardHeight + 36;
+
+  // Barras: de dónde vino la plata y para dónde se fue, en un solo golpe de
+  // vista — mucho más rápido de leer que una tabla con cinco filas iguales.
+  pdf.setFont("helvetica", "bold");
+  pdf.setFontSize(12.5);
+  pdf.setTextColor(11, 18, 32);
+  pdf.text("Resumen del año", marginX, y);
+  y += 22;
+  const filasResumen = [
+    { etiqueta: "Ingresos brutos", valor: ingresosBruto, color: [16, 185, 129] },
+    { etiqueta: "Retenciones aplicadas", valor: retenidoTotal, color: [139, 92, 246] },
+    { etiqueta: "Ingresos netos recibidos", valor: ingresosNeto, color: [5, 150, 105] },
+    { etiqueta: "Egresos totales", valor: egresoTotal, color: [244, 63, 94] },
+  ];
+  const maxResumen = Math.max(1, ...filasResumen.map((f) => Math.abs(f.valor)));
+  filasResumen.forEach((f) => {
+    dibujarBarraHorizontal(pdf, { x: marginX, y, anchoTotal: contentWidth, etiqueta: f.etiqueta, valor: f.valor, valorMax: maxResumen, color: f.color, formatoValor: formatoCOP });
+    y += 25;
   });
 
   if (egresosPorCategoria.length > 0) {
-    y += 26;
+    y += 20;
     pdf.setFont("helvetica", "bold");
     pdf.setFontSize(12.5);
     pdf.setTextColor(11, 18, 32);
     pdf.text("Egresos por categoría", marginX, y);
-    y += 8;
-    pdf.setDrawColor(11, 61, 46);
-    pdf.setLineWidth(1);
-    pdf.line(marginX, y, marginX + 70, y);
-    y += 18;
-    pdf.setFontSize(11);
+    y += 22;
+    const maxCategoria = Math.max(1, ...egresosPorCategoria.map(([, valor]) => Math.abs(valor)));
     egresosPorCategoria.forEach(([categoria, valor], idx) => {
-      if (idx % 2 === 0) {
-        pdf.setFillColor(244, 246, 249);
-        pdf.rect(marginX, y - 14, pageWidth - marginX * 2, 20, "F");
+      if (y > pageHeight - 90) {
+        pdf.addPage();
+        y = 60;
       }
-      pdf.setFont("helvetica", "normal");
-      pdf.setTextColor(75, 85, 99);
-      pdf.text(categoria, marginX + 6, y);
-      pdf.setFont("helvetica", "bold");
-      pdf.setTextColor(11, 18, 32);
-      pdf.text(formatoCOP(valor), pageWidth - marginX - 6, y, { align: "right" });
-      y += 20;
+      dibujarBarraHorizontal(pdf, {
+        x: marginX,
+        y,
+        anchoTotal: contentWidth,
+        etiqueta: categoria,
+        valor,
+        valorMax: maxCategoria,
+        color: PALETA_PDF[idx % PALETA_PDF.length],
+        formatoValor: formatoCOP,
+      });
+      y += 25;
     });
   }
 
@@ -252,8 +323,8 @@ async function generarResumenFiscalPdf({ anio, nombreDespacho, ingresosBruto, re
   pdf.setFontSize(9);
   pdf.setTextColor(148, 163, 184);
   const pie = `Generado el ${new Date().toLocaleDateString("es-CO", { dateStyle: "long" })} a partir de lo registrado en Nomos — sin validez tributaria oficial, verifícalo con tu contador.`;
-  const lineasPie = pdf.splitTextToSize(pie, pageWidth - marginX * 2);
-  pdf.text(lineasPie, pageWidth / 2, pdf.internal.pageSize.getHeight() - 34, { align: "center" });
+  const lineasPie = pdf.splitTextToSize(pie, contentWidth);
+  pdf.text(lineasPie, pageWidth / 2, pageHeight - 34, { align: "center" });
 
   pdf.save(`resumen_fiscal_${anio}.pdf`);
 }
@@ -1061,6 +1132,7 @@ export default function ContabilidadTab({ usuarioActual }) {
 
   const [anioFiscal, setAnioFiscal] = useState(new Date().getFullYear());
   const [generandoFiscal, setGenerandoFiscal] = useState(false);
+  const [errorFiscal, setErrorFiscal] = useState("");
   const aniosDisponibles = useMemo(() => {
     const set = new Set([new Date().getFullYear()]);
     ids.forEach((id) => (clientes[id]?.pagos || []).forEach((p) => set.add(new Date(p.fecha).getFullYear())));
@@ -1071,6 +1143,7 @@ export default function ContabilidadTab({ usuarioActual }) {
 
   const generarResumenFiscal = async () => {
     setGenerandoFiscal(true);
+    setErrorFiscal("");
     try {
       let ingresosBruto = 0;
       let retenidoTotalAnio = 0;
@@ -1106,6 +1179,11 @@ export default function ContabilidadTab({ usuarioActual }) {
       });
     } catch (e) {
       console.error("No se pudo generar el resumen fiscal:", e);
+      // Sin esto, si falla la descarga (p. ej. el navegador bloqueó el
+      // script de jsPDF que se carga desde un CDN externo), el botón
+      // simplemente vuelve a "Descargar PDF" sin decir nada — parece que no
+      // pasó nada, cuando en realidad sí falló algo puntual.
+      setErrorFiscal("No se pudo generar el PDF. Revisa tu conexión a internet (el generador de PDF se carga desde internet la primera vez) e inténtalo de nuevo.");
     }
     setGenerandoFiscal(false);
   };
@@ -1577,6 +1655,9 @@ export default function ContabilidadTab({ usuarioActual }) {
             </button>
           </div>
         </div>
+        {errorFiscal && (
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: "#B42318", margin: "10px 0 0" }}>{errorFiscal}</p>
+        )}
       </Card>
 
       {categoriasEgresoOrdenadas.length > 0 && (
