@@ -791,7 +791,7 @@ function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-const APP_VERSION = "1.46.0";
+const APP_VERSION = "1.46.1";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -6167,28 +6167,47 @@ function LandingPage({ onRegistrar, onIniciarSesion }) {
         <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted, textAlign: "center", marginBottom: 30 }}>
           Cada pestaña de la app resuelve una parte real de la operación de un despacho.
         </p>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 16, marginBottom: 60 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 18, marginBottom: 60 }}>
           {FUNCIONES_LANDING.map((f, i) => (
             <AlEntrar key={f.titulo} retraso={(i % 4) * 60}>
-              <Card style={{ borderTop: `3px solid ${f.color}` }}>
+              <Card style={{ position: "relative", overflow: "hidden", padding: "22px 20px" }}>
+                <div
+                  aria-hidden="true"
+                  style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, background: `linear-gradient(90deg, transparent, ${f.color}, transparent)` }}
+                />
+                <div
+                  aria-hidden="true"
+                  style={{
+                    position: "absolute",
+                    top: -30,
+                    right: -30,
+                    width: 90,
+                    height: 90,
+                    borderRadius: "50%",
+                    background: `radial-gradient(circle, ${f.color}22 0%, transparent 70%)`,
+                    pointerEvents: "none",
+                  }}
+                />
                 <div
                   style={{
-                    width: 38,
-                    height: 38,
-                    borderRadius: 10,
-                    background: `${f.color}1A`,
+                    width: 46,
+                    height: 46,
+                    borderRadius: 13,
+                    background: `linear-gradient(135deg, ${f.color}2E, ${f.color}0F)`,
+                    boxShadow: `0 8px 18px ${f.color}26`,
                     color: f.color,
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
-                    marginBottom: 12,
-                    fontSize: 18,
+                    marginBottom: 14,
+                    fontSize: 20,
+                    position: "relative",
                   }}
                 >
                   <IconoTab tipo={f.iconoTab} />
                 </div>
-                <p style={{ fontFamily: "Inter, sans-serif", fontSize: 14.5, fontWeight: 700, color: f.color, marginBottom: 8 }}>{f.titulo}</p>
-                <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.inkSoft, lineHeight: 1.6, margin: 0 }}>{f.texto}</p>
+                <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, fontWeight: 800, color: f.color, marginBottom: 8, letterSpacing: -0.2, position: "relative" }}>{f.titulo}</p>
+                <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.inkSoft, lineHeight: 1.65, margin: 0, position: "relative" }}>{f.texto}</p>
               </Card>
             </AlEntrar>
           ))}
