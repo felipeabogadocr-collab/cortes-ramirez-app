@@ -547,6 +547,14 @@ function FormularioPago({ cliente, onRegistrar }) {
   const [retencionOtro, setRetencionOtro] = useState("");
   const [generando, setGenerando] = useState(false);
 
+  // Si el cliente tiene un plan de pago recurrente (frecuencia distinta de
+  // "Pago único"/"Otro"), la próxima fecha se calcula sola al registrar el
+  // pago (ver registrarPago) — sin mostrar esto, quien llena el formulario
+  // no tenía cómo saber que eso iba a pasar, y terminaba llenando la fecha
+  // a mano cada vez "por si acaso".
+  const frecuenciaRecurrente = cliente.planPago?.frecuencia && cliente.planPago.frecuencia !== "Pago único" && cliente.planPago.frecuencia !== "Otro" ? cliente.planPago.frecuencia : null;
+  const proximaFechaAutomatica = frecuenciaRecurrente && fechaPago ? calcularProximaFechaPorFrecuencia(fechaPago, frecuenciaRecurrente) : null;
+
   const registrar = async () => {
     if (!valor || Number(valor) <= 0) return;
     setGenerando(true);
@@ -601,6 +609,22 @@ function FormularioPago({ cliente, onRegistrar }) {
           <CampoDinero style={inputStyle} value={valorProximoPago} onChange={(e) => setValorProximoPago(e.target.value)} placeholder="Ej: 500.000" />
         </Field>
       </div>
+      {!fechaProximoPago && (
+        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, color: proximaFechaAutomatica ? "#166534" : COLORS.muted, marginTop: 8 }}>
+          {proximaFechaAutomatica ? (
+            <>
+              <Icono tipo="check" size={11} style={{ marginRight: 4, verticalAlign: -1 }} />
+              No hace falta que la llenes: como el plan de pago de {cliente.nombre} es <strong>{frecuenciaRecurrente}</strong>, el próximo pago va a quedar programado solo para el{" "}
+              <strong>{new Date(`${proximaFechaAutomatica}T12:00:00`).toLocaleDateString("es-CO", { dateStyle: "long" })}</strong>.
+            </>
+          ) : (
+            <>
+              Este cliente no tiene un plan de pago con frecuencia definida, así que la próxima fecha no se calcula sola — indícala aquí si aplica, o
+              configúrale un plan recurrente (Editar cliente, o "Activar servicio") para que se calcule automáticamente la próxima vez.
+            </>
+          )}
+        </p>
+      )}
       <div className="drx-grid-form" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 12 }}>
         <CampoRetencion valor={retencion} onChange={setRetencion} valorOtro={retencionOtro} onChangeOtro={setRetencionOtro} />
       </div>
