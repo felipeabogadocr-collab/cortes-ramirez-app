@@ -393,17 +393,6 @@ export default function VigilanciaTab() {
                   <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, margin: "3px 0 0" }}>
                     {c.tipoProceso} · {c.areaProceso} {dias !== null && `· última novedad hace ${dias} día${dias !== 1 ? "s" : ""}`}
                   </p>
-                  {c.areaProceso === "Penal" && (
-                    <a
-                      href={URL_CONSULTA_SPOA}
-                      target="_blank"
-                      rel="noreferrer"
-                      title="Abre la consulta pública de la Fiscalía — hay que resolver el captcha a mano, no se puede automatizar"
-                      style={{ display: "inline-block", marginTop: 4, color: "#B91C1C", fontSize: 11.5, fontWeight: 600, textDecoration: "none" }}
-                    >
-                      Consultar en SPOA (Fiscalía) ↗
-                    </a>
-                  )}
                   </div>
                 </div>
                 <select
@@ -428,23 +417,73 @@ export default function VigilanciaTab() {
                   const estadoRama = estadoRamaPorRadicado(c, radicado);
                   return (
                     <div key={radicado} style={{ background: COLORS.surfaceSoft, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: 10 }}>
-                      <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.inkSoft, margin: "0 0 4px", display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                      <div style={{ margin: "0 0 8px" }}>
                         <span
-                          title="Copiar radicado"
-                          onClick={() => copiarRadicado(radicado, clave)}
-                          style={{ fontFamily: "monospace", cursor: "pointer", color: radicadoCopiado === clave ? "#1DA851" : COLORS.inkSoft, textDecoration: radicadoCopiado === clave ? "none" : "underline dotted" }}
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "stretch",
+                            borderRadius: 20,
+                            border: `1px solid ${radicadoCopiado === clave ? "#C9E0C4" : COLORS.border}`,
+                            overflow: "hidden",
+                          }}
                         >
-                          {radicadoCopiado === clave ? "✓ Copiado" : `Radicado: ${radicado}`}
+                          <span
+                            title="Copiar radicado"
+                            onClick={() => copiarRadicado(radicado, clave)}
+                            style={{
+                              fontFamily: "monospace",
+                              fontSize: 11.5,
+                              padding: "3px 9px",
+                              background: radicadoCopiado === clave ? "#E4EEE2" : "#fff",
+                              color: radicadoCopiado === clave ? "#2F5D3A" : COLORS.inkSoft,
+                              cursor: "pointer",
+                            }}
+                          >
+                            {radicadoCopiado === clave ? "✓ Copiado" : `Radicado: ${radicado}`}
+                          </span>
+                          <a
+                            href="https://consultaprocesos.ramajudicial.gov.co/procesos"
+                            target="_blank"
+                            rel="noreferrer"
+                            style={{
+                              fontFamily: "Inter, sans-serif",
+                              fontSize: 11.5,
+                              fontWeight: 600,
+                              padding: "3px 9px",
+                              background: "#EEF6EF",
+                              color: "#2F5D3A",
+                              textDecoration: "none",
+                              borderLeft: `1px solid ${COLORS.border}`,
+                              display: "flex",
+                              alignItems: "center",
+                            }}
+                          >
+                            Rama ↗
+                          </a>
+                          {c.areaProceso === "Penal" && (
+                            <a
+                              href={URL_CONSULTA_SPOA}
+                              target="_blank"
+                              rel="noreferrer"
+                              title="Abre la consulta pública de la Fiscalía — hay que resolver el captcha a mano, no se puede automatizar"
+                              style={{
+                                fontFamily: "Inter, sans-serif",
+                                fontSize: 11.5,
+                                fontWeight: 600,
+                                padding: "3px 9px",
+                                background: "#FEF2F2",
+                                color: "#B91C1C",
+                                textDecoration: "none",
+                                borderLeft: `1px solid ${COLORS.border}`,
+                                display: "flex",
+                                alignItems: "center",
+                              }}
+                            >
+                              Fiscalía ↗
+                            </a>
+                          )}
                         </span>
-                        <a
-                          href="https://consultaprocesos.ramajudicial.gov.co/procesos"
-                          target="_blank"
-                          rel="noreferrer"
-                          style={{ color: COLORS.accentBright, fontSize: 11.5, fontWeight: 600, textDecoration: "none" }}
-                        >
-                          Ver en Rama Judicial ↗
-                        </a>
-                      </p>
+                      </div>
                       {estadoRama?.consultadoEn ? (
                         <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11, color: COLORS.muted, margin: "0 0 8px" }}>
                           Última consulta: {new Date(estadoRama.consultadoEn).toLocaleString("es-CO", { dateStyle: "medium", timeStyle: "short" })}

@@ -708,43 +708,71 @@ export default function ClientesTab({ usuarioActual }) {
                     {radicadosDeCliente(c).map((r, idx) => (
                       <span
                         key={r}
-                        title="Copiar radicado"
-                        onClick={() => copiar(r, `rad-${id}-${idx}`)}
                         style={{
-                          fontFamily: "monospace",
-                          fontSize: 11,
-                          padding: "3px 9px",
+                          display: "inline-flex",
+                          alignItems: "stretch",
                           borderRadius: 20,
-                          background: copiado === `rad-${id}-${idx}` ? "#E4EEE2" : COLORS.surfaceSoft,
-                          color: copiado === `rad-${id}-${idx}` ? "#2F5D3A" : COLORS.inkSoft,
                           border: `1px solid ${copiado === `rad-${id}-${idx}` ? "#C9E0C4" : COLORS.border}`,
-                          cursor: "pointer",
+                          overflow: "hidden",
                         }}
                       >
-                        {copiado === `rad-${id}-${idx}` ? "✓ Copiado" : `Radicado: ${r}`}
+                        <span
+                          title="Copiar radicado"
+                          onClick={() => copiar(r, `rad-${id}-${idx}`)}
+                          style={{
+                            fontFamily: "monospace",
+                            fontSize: 11,
+                            padding: "3px 9px",
+                            background: copiado === `rad-${id}-${idx}` ? "#E4EEE2" : COLORS.surfaceSoft,
+                            color: copiado === `rad-${id}-${idx}` ? "#2F5D3A" : COLORS.inkSoft,
+                            cursor: "pointer",
+                          }}
+                        >
+                          {copiado === `rad-${id}-${idx}` ? "✓ Copiado" : `Radicado: ${r}`}
+                        </span>
+                        <a
+                          href="https://consultaprocesos.ramajudicial.gov.co/procesos"
+                          target="_blank"
+                          rel="noreferrer"
+                          style={{
+                            fontFamily: "Inter, sans-serif",
+                            fontSize: 11,
+                            fontWeight: 600,
+                            padding: "3px 9px",
+                            background: "#EEF6EF",
+                            color: "#2F5D3A",
+                            textDecoration: "none",
+                            borderLeft: `1px solid ${COLORS.border}`,
+                            display: "flex",
+                            alignItems: "center",
+                          }}
+                        >
+                          Rama ↗
+                        </a>
+                        {c.areaProceso === "Penal" && (
+                          <a
+                            href={URL_CONSULTA_SPOA}
+                            target="_blank"
+                            rel="noreferrer"
+                            title="Abre la consulta pública de la Fiscalía — hay que resolver el captcha a mano, no se puede automatizar"
+                            style={{
+                              fontFamily: "Inter, sans-serif",
+                              fontSize: 11,
+                              fontWeight: 600,
+                              padding: "3px 9px",
+                              background: "#FEF2F2",
+                              color: "#B91C1C",
+                              textDecoration: "none",
+                              borderLeft: `1px solid ${COLORS.border}`,
+                              display: "flex",
+                              alignItems: "center",
+                            }}
+                          >
+                            Fiscalía ↗
+                          </a>
+                        )}
                       </span>
                     ))}
-                    {c.areaProceso === "Penal" && (
-                      <a
-                        href={URL_CONSULTA_SPOA}
-                        target="_blank"
-                        rel="noreferrer"
-                        title="Abre la consulta pública de la Fiscalía — hay que resolver el captcha a mano, no se puede automatizar"
-                        style={{
-                          fontFamily: "Inter, sans-serif",
-                          fontSize: 11,
-                          fontWeight: 600,
-                          padding: "3px 9px",
-                          borderRadius: 20,
-                          background: "#FEF2F2",
-                          color: "#B91C1C",
-                          border: "1px solid #FBD5D5",
-                          textDecoration: "none",
-                        }}
-                      >
-                        Consultar en SPOA (Fiscalía) ↗
-                      </a>
-                    )}
                     {c.proximoPago?.fecha && (
                       <span
                         style={{
