@@ -802,8 +802,8 @@ export default function ClientesTab({ usuarioActual }) {
 
           return (
             <Card key={id} style={{ borderLeft: `4px solid ${COLOR_AREA_PROCESO[c.areaProceso] || "#14B8A6"}` }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                <div style={{ flex: 1, display: "flex", gap: 12 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 12 }}>
+                <div style={{ flex: 1, minWidth: 260, display: "flex", gap: 12 }}>
                   <AvatarIniciales nombre={c.nombre} />
                   <div style={{ flex: 1 }}>
                   <p style={{ fontFamily: "Inter, sans-serif", fontSize: 17, fontWeight: 700, margin: 0, color: COLORS.ink }}>{c.nombre}</p>
