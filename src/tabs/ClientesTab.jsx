@@ -7,7 +7,7 @@ import {
   buttonGhost, Card, EncabezadoSeccion, Icono, AvatarIniciales, EstadoVacio, LineaDeTiempo,
   AREAS_PROCESO, COLOR_AREA_PROCESO, DIAS_ALERTA_INACTIVIDAD, numeroWhatsappCliente,
   radicadosDeCliente, tiposProcesoDeArea, useServicios, calcularProximaFechaPorFrecuencia,
-  fechaHoyISO, formatoCOP,
+  fechaHoyISO, formatoCOP, leerJSONLocal, guardarJSONLocal,
 } from "../App.jsx";
 
 // Enlace oficial de la Fiscalía para consultar el estado de una denuncia en
@@ -16,6 +16,12 @@ import {
 // por robot — así que esto es un acceso directo para que el abogado la haga
 // a mano en un clic, no una consulta automática como la de la Rama Judicial.
 const URL_CONSULTA_SPOA = "https://www.fiscalia.gov.co/servicios-de-informacion-al-ciudadano/consultas/";
+
+// Solo en este navegador/dispositivo (no en la base de datos) — a
+// propósito: es un borrador a medio llenar, no un cliente real todavía,
+// así que no tiene sentido sincronizarlo entre dispositivos ni que otro
+// usuario del despacho lo vea.
+const LLAVE_BORRADOR_CLIENTE = "borrador-cliente-nuevo";
 
 const FORM_CLIENTE_INICIAL = {
   nombre: "",
@@ -250,6 +256,19 @@ export default function ClientesTab({ usuarioActual }) {
   const [copiado, setCopiado] = useState("");
   const [orden, setOrden] = useState("recientes");
   useAvisoAntesDeSalir(showForm && !!form.nombre.trim());
+  // Si cierran la pestaña (o la app) a medio llenar el formulario de un
+  // cliente nuevo, sin esto ese trabajo se perdía por completo. Se guarda
+  // solo, cada vez que hay algo escrito, y al volver a entrar se ofrece
+  // continuarlo o descartarlo — no se carga automático para no pisar sin
+  // avisar un formulario en blanco que el usuario abrió a propósito.
+  const [borradorDisponible, setBorradorDisponible] = useState(null);
+  useEffect(() => {
+    const guardado = leerJSONLocal(LLAVE_BORRADOR_CLIENTE, null);
+    if (guardado?.nombre?.trim()) setBorradorDisponible(guardado);
+  }, []);
+  useEffect(() => {
+    if (showForm && form.nombre.trim()) guardarJSONLocal(LLAVE_BORRADOR_CLIENTE, form);
+  }, [form, showForm]);
   const [soloSinRadicado, setSoloSinRadicado] = useState(false);
   const [soloInactivos, setSoloInactivos] = useState(false);
   const [toastGuardado, setToastGuardado] = useState("");
@@ -289,8 +308,21 @@ export default function ClientesTab({ usuarioActual }) {
     registrarAuditoria(usuarioActual, "crear_cliente", "cliente", id, { nombre: form.nombre });
     setToastGuardado(`"${form.nombre}" se guardó correctamente`);
     setTimeout(() => setToastGuardado(""), 2800);
+    guardarJSONLocal(LLAVE_BORRADOR_CLIENTE, null);
+    setBorradorDisponible(null);
     setForm(FORM_CLIENTE_INICIAL);
     setShowForm(false);
+  };
+
+  const continuarBorrador = () => {
+    setForm(borradorDisponible);
+    setShowForm(true);
+    setBorradorDisponible(null);
+  };
+
+  const descartarBorrador = () => {
+    guardarJSONLocal(LLAVE_BORRADOR_CLIENTE, null);
+    setBorradorDisponible(null);
   };
 
   const empezarEdicion = (id) => {
@@ -427,6 +459,28 @@ export default function ClientesTab({ usuarioActual }) {
   return (
     <div>
       <EncabezadoSeccion titulo="Clientes" color="#14B8A6" />
+      {borradorDisponible && (
+        <div
+          className="drx-fade-in"
+          style={{
+            display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap",
+            background: "#FEF3E2", border: "1px solid #FCE3B8", borderRadius: 10, padding: "12px 16px", marginBottom: 14,
+          }}
+        >
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: "#92400E", margin: 0 }}>
+            <Icono tipo="alerta" size={13} style={{ marginRight: 5, verticalAlign: -2 }} />
+            Tienes un cliente sin terminar de guardar: <strong>"{borradorDisponible.nombre}"</strong>.
+          </p>
+          <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+            <button className="drx-btn-primary" style={{ ...buttonPrimary, padding: "6px 14px", fontSize: 12.5 }} onClick={continuarBorrador}>
+              Continuar
+            </button>
+            <button className="drx-btn-ghost" style={{ ...buttonGhost, padding: "6px 14px", fontSize: 12.5 }} onClick={descartarBorrador}>
+              Descartar
+            </button>
+          </div>
+        </div>
+      )}
       <div style={{ marginBottom: 14, display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
         <input
           className="drx-input"
@@ -525,7 +579,18 @@ export default function ClientesTab({ usuarioActual }) {
           >
             Exportar Excel
           </button>
-          <button className="drx-btn-primary drx-cta-shine" style={buttonPrimary} onClick={() => setShowForm((s) => !s)}>
+          <button
+            className="drx-btn-primary drx-cta-shine"
+            style={buttonPrimary}
+            onClick={() => {
+              // Si abren el formulario a mano (no con "Continuar" del aviso
+              // de borrador), se oculta ese aviso — si no, seguiría
+              // ofreciendo "Continuar" con datos viejos mientras ya están
+              // escribiendo uno nuevo encima.
+              setBorradorDisponible(null);
+              setShowForm((s) => !s);
+            }}
+          >
             {showForm ? "Cancelar" : "+ Nuevo cliente"}
           </button>
         </div>
