@@ -8,6 +8,18 @@
     <link rel="icon" type="image/png" href="/favicon-32.png" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="manifest" href="/manifest.webmanifest" />
+
+    <!-- Adelanta la conexión (DNS + TLS) a los dominios que la app va a
+         necesitar apenas carga — Supabase para el login/sesión, Google
+         Fonts para la tipografía — en vez de esperar a que el navegador
+         los descubra cuando ya está armando la página. No cambia qué se
+         carga, solo hace que lo inevitable empiece antes. "%VITE_SUPABASE_URL%"
+         lo reemplaza Vite en el build con el valor real de la variable de
+         entorno (ver vite.config.js / .env), así que no hay que hardcodear
+         el dominio del proyecto aquí. -->
+    <link rel="preconnect" href="%VITE_SUPABASE_URL%" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Nomos" />

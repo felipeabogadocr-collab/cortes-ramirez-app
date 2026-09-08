@@ -427,6 +427,9 @@ const GlobalStyle = () => (
     .drx-tab:active { transform: translateX(2px) scale(0.98); }
     .drx-input { transition: border-color .15s ease, box-shadow .15s ease; }
     .drx-input:focus { border-color: ${COLORS.accentBright} !important; box-shadow: 0 0 0 3px ${COLORS.accentSoft}; }
+    .drx-chip-vigilancia { transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease; }
+    .drx-chip-vigilancia:hover { transform: translateY(-1px); border-color: ${COLORS.accentBright} !important; }
+    .drx-chip-vigilancia:active { transform: translateY(0) scale(0.97); }
     /* El calendario que se despliega al hacer clic es del navegador — eso no
        se puede re-diseñar (por seguridad, ningún navegador deja tocar ese
        popup con CSS). Lo que sí se puede vestir es el campo cerrado: el
@@ -788,7 +791,7 @@ function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-const APP_VERSION = "1.45.6";
+const APP_VERSION = "1.46.0";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -1002,8 +1005,8 @@ export function IconoCampana({ size = 17 }) {
 // Ícono de línea genérico para reemplazar los emojis sueltos por toda la
 // app — mismo lenguaje visual (trazo fino, sin relleno) que IconoCampana e
 // IconoSeguridad, para que se vea consistente y no "barato".
-export function Icono({ tipo, size = 15, style }) {
-  const p = { width: size, height: size, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 1.8, strokeLinecap: "round", strokeLinejoin: "round", style: { flexShrink: 0, ...style } };
+export function Icono({ tipo, size = 15, style, className }) {
+  const p = { width: size, height: size, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 1.8, strokeLinecap: "round", strokeLinejoin: "round", className, style: { flexShrink: 0, ...style } };
   switch (tipo) {
     case "clip":
       return <svg {...p}><path d="M8 12.5V7a3 3 0 0 1 6 0v8a5 5 0 0 1-10 0V8" /></svg>;

@@ -345,14 +345,9 @@ export default function VigilanciaTab() {
           )}
         </p>
         {conRadicado.length > 0 && (
-          <button className="drx-btn-primary" style={buttonPrimary} onClick={consultarTodos} disabled={consultandoTodos}>
-            {consultandoTodos ? (
-              "Consultando todos…"
-            ) : (
-              <>
-                <Icono tipo="refrescar" size={13} style={{ marginRight: 4, verticalAlign: -2 }} /> Consultar Rama Judicial (todos)
-              </>
-            )}
+          <button className="drx-btn-primary drx-cta-shine" style={buttonPrimary} onClick={consultarTodos} disabled={consultandoTodos}>
+            <Icono tipo="refrescar" size={13} className={consultandoTodos ? "drx-spin" : undefined} style={{ marginRight: 4, verticalAlign: -2, display: "inline-block" }} />
+            {consultandoTodos ? "Consultando todos…" : "Consultar Rama Judicial (todos)"}
           </button>
         )}
       </div>
@@ -366,6 +361,7 @@ export default function VigilanciaTab() {
             return (
               <button
                 key={estado}
+                className="drx-chip-vigilancia"
                 onClick={() => setFiltroEstado(estado)}
                 style={{
                   fontFamily: "Inter, sans-serif",
@@ -376,6 +372,7 @@ export default function VigilanciaTab() {
                   border: `1px solid ${activo ? COLORS.navy : COLORS.border}`,
                   background: activo ? COLORS.navy : "#fff",
                   color: activo ? "#fff" : COLORS.inkSoft,
+                  boxShadow: activo ? "0 4px 14px rgba(11,18,32,0.22)" : "none",
                   cursor: "pointer",
                 }}
               >
@@ -525,13 +522,8 @@ export default function VigilanciaTab() {
                         onClick={() => consultarUno(id, radicado)}
                         disabled={consultando === clave}
                       >
-                        {consultando === clave ? (
-                          "Consultando…"
-                        ) : (
-                          <>
-                            <Icono tipo="refrescar" size={13} style={{ marginRight: 4, verticalAlign: -2 }} /> Consultar Rama Judicial
-                          </>
-                        )}
+                        <Icono tipo="refrescar" size={13} className={consultando === clave ? "drx-spin" : undefined} style={{ marginRight: 4, verticalAlign: -2, display: "inline-block" }} />
+                        {consultando === clave ? "Consultando…" : "Consultar Rama Judicial"}
                       </button>
 
                       {errorConsulta && <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: "#B42318", margin: 0 }}>{errorConsulta}</p>}
@@ -543,7 +535,7 @@ export default function VigilanciaTab() {
                       )}
 
                       {resultado?.encontrado && resultado.ultimaActuacion && (
-                        <div style={{ background: "#fff", border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: 12 }}>
+                        <div className="drx-fade-in" style={{ background: "#fff", border: `1px solid ${COLORS.border}`, borderLeft: `3px solid ${COLORS.accentBright}`, borderRadius: 8, padding: 12 }}>
                           <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, fontWeight: 600, color: COLORS.muted, marginBottom: 4 }}>
                             Última actuación en Rama Judicial ({resultado.proceso?.despacho || "despacho no informado"})
                           </p>
@@ -557,7 +549,7 @@ export default function VigilanciaTab() {
                             </p>
                           )}
                           <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
-                            <button className="drx-btn-primary" style={{ ...buttonPrimary, fontSize: 12, padding: "6px 12px" }} onClick={() => agregarComoNovedad(id, radicado)}>
+                            <button className="drx-btn-primary drx-cta-shine" style={{ ...buttonPrimary, fontSize: 12, padding: "6px 12px" }} onClick={() => agregarComoNovedad(id, radicado)}>
                               + Agregar a la línea de tiempo
                             </button>
                             <button
