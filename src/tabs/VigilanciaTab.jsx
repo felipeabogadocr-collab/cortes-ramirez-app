@@ -162,30 +162,17 @@ export default function VigilanciaTab() {
     setConsultando(null);
   };
 
-  // "Marcar visto en Rama Judicial" para ESE radicado en concreto — guarda
-  // cuál fue la última actuación que ya se revisó, para poder comparar en
-  // la próxima consulta y avisar solo de lo nuevo. Si es el radicado
-  // principal (el primero de la lista) también se guarda en "ramaJudicial"
-  // por compatibilidad con el resto de la app.
-  const guardarComoVista = async (id, radicado, data) => {
-    const c = clientes[id];
-    const entradaEstado = {
-      idProceso: data.idProceso,
-      despacho: data.proceso?.despacho || null,
-      ultimaActuacionVistaFecha: data.ultimaActuacion?.fecha || null,
-      consultadoEn: data.consultadoEn,
-    };
-    const ramaJudicialPorRadicado = { ...(c.ramaJudicialPorRadicado || {}), [radicado]: entradaEstado };
-    const esPrimario = radicadosDeCliente(c)[0] === radicado;
-    const actualizado = { ...c, ramaJudicialPorRadicado, ...(esPrimario ? { ramaJudicial: entradaEstado } : {}) };
-    await storageSet(`cliente:${id}`, JSON.stringify(actualizado), false);
-    setClientes((prev) => ({ ...prev, [id]: actualizado }));
-    return actualizado;
-  };
-
+  // Arma UNA sola actualización combinada (nota nueva + estado de "última
+  // consulta" + "Con novedad") y la guarda de una vez — antes esto llamaba
+  // por separado a agregarNovedad, guardarComoVista y cambiarEstadoVigilancia,
+  // y cada una leía "clientes[id]" del estado de React, que todavía no se
+  // había refrescado con lo que acababa de guardar la anterior: la segunda
+  // llamada sobrescribía el storage con una copia vieja (sin la nota que se
+  // acababa de agregar), por lo que el botón parecía no hacer nada.
   const agregarComoNovedad = async (id, radicado) => {
     const data = resultados[`${id}:${radicado}`];
     if (!data?.ultimaActuacion) return;
+    const c = clientes[id];
     // Con varios radicados por cliente, la nota tiene que decir de cuál
     // proceso viene — si no, en la línea de tiempo se mezclan sin poder
     // distinguirlas.
@@ -195,9 +182,25 @@ export default function VigilanciaTab() {
     // La fecha de la entrada es la de la actuación real que reporta la Rama
     // Judicial, no la de hoy — si no, un proceso viejo recién agregado
     // quedaría con toda su línea de tiempo marcada como "hoy".
-    await agregarNovedad(id, texto, data.ultimaActuacion.fecha.slice(0, 10));
-    await guardarComoVista(id, radicado, data);
-    await cambiarEstadoVigilancia(id, "Con novedad");
+    const nuevaEntrada = { id: uid(), fecha: data.ultimaActuacion.fecha, nota: texto };
+    const entradaEstado = {
+      idProceso: data.idProceso,
+      despacho: data.proceso?.despacho || null,
+      ultimaActuacionVistaFecha: data.ultimaActuacion?.fecha || null,
+      consultadoEn: data.consultadoEn,
+    };
+    const ramaJudicialPorRadicado = { ...(c.ramaJudicialPorRadicado || {}), [radicado]: entradaEstado };
+    const esPrimario = radicadosDeCliente(c)[0] === radicado;
+    const actualizado = {
+      ...c,
+      timeline: [...(c.timeline || []), nuevaEntrada],
+      ultimaActuacion: new Date().toISOString(),
+      estadoVigilancia: "Con novedad",
+      ramaJudicialPorRadicado,
+      ...(esPrimario ? { ramaJudicial: entradaEstado } : {}),
+    };
+    await storageSet(`cliente:${id}`, JSON.stringify(actualizado), false);
+    setClientes((prev) => ({ ...prev, [id]: actualizado }));
   };
 
   const pedirExplicacion = async (id, radicado) => {
