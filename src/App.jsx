@@ -189,72 +189,120 @@ export async function sha256Hex(texto) {
   }
 }
 
+// Constantes de layout del recibo, compartidas entre la función que mide el
+// alto necesario y la que dibuja — así nunca se desincronizan (un lienzo más
+// corto que el contenido real cortaría el pie de página; uno más largo
+// volvería a dejar espacio en blanco de sobra, que era justo el problema
+// original con el lienzo fijo de 920px).
+const RECIBO_LAYOUT = {
+  width: 640,
+  margen: 44,
+  header: 112,
+  offsetTitulo: 44,
+  offsetPrimeraFila: 46,
+  altoFila: 29,
+  gapAntesCaja: 8,
+  altoCaja: 100,
+  gapDespuesCaja: 30,
+  pieLinea1: 24,
+  pieLinea2: 40,
+  margenInferior: 24,
+};
+
+function filasRecibo(pago) {
+  return 3 + (pago.concepto ? 1 : 0);
+}
+
+function medirAltoRecibo(pago) {
+  const L = RECIBO_LAYOUT;
+  const yTitulo = L.header + L.offsetTitulo;
+  const yPrimeraFila = yTitulo + L.offsetPrimeraFila;
+  const yDespuesFilas = yPrimeraFila + filasRecibo(pago) * L.altoFila;
+  const yCaja = yDespuesFilas + L.gapAntesCaja;
+  const yDespuesCaja = yCaja + L.altoCaja + L.gapDespuesCaja;
+  return yDespuesCaja + L.pieLinea2 + L.margenInferior;
+}
+
 export function generarReciboImagen(clienteId, cliente, pago) {
   return new Promise((resolve) => {
-    const width = 720;
-    const height = 920;
+    const L = RECIBO_LAYOUT;
+    const width = L.width;
+    const HEADER = L.header;
+    const height = medirAltoRecibo(pago);
     const canvas = document.createElement("canvas");
     canvas.width = width;
     canvas.height = height;
     const ctx = canvas.getContext("2d");
+    const SERIF = "'Playfair Display', Georgia, serif";
+    const SANS = "'Inter', Arial, sans-serif";
+    const VERDE = "#0B3D2E";
 
     ctx.fillStyle = "#FFFFFF";
     ctx.fillRect(0, 0, width, height);
 
-    ctx.fillStyle = "#0B3D2E";
-    ctx.fillRect(0, 0, width, 160);
+    ctx.fillStyle = VERDE;
+    ctx.fillRect(0, 0, width, HEADER);
 
     const dibujarResto = () => {
       ctx.fillStyle = "#FFFFFF";
-      ctx.font = "700 27px Georgia";
-      ctx.fillText(getNombreDespacho(), 165, 78);
-      ctx.font = "italic 16px Georgia";
-      ctx.fillStyle = "#B9CBE5";
-      ctx.fillText("Recibo de pago", 165, 104);
+      ctx.font = `700 20px ${SERIF}`;
+      ctx.fillText(getNombreDespacho(), 116, 54);
+      ctx.fillStyle = "#9DBEAE";
+      ctx.font = `italic 13px ${SERIF}`;
+      ctx.fillText("Recibo de pago", 116, 74);
 
-      ctx.fillStyle = "#0B3D2E";
-      ctx.font = "700 25px Georgia";
-      ctx.fillText("RECIBO DE PAGO", 44, 218);
-      ctx.strokeStyle = "#0B3D2E";
-      ctx.lineWidth = 2;
+      const margen = L.margen;
+
+      let y = HEADER + L.offsetTitulo;
+      ctx.fillStyle = VERDE;
+      ctx.font = `700 17px ${SANS}`;
+      ctx.fillText("RECIBO DE PAGO", margen, y);
+      ctx.strokeStyle = "#DCE3DD";
+      ctx.lineWidth = 1;
       ctx.beginPath();
-      ctx.moveTo(44, 234);
-      ctx.lineTo(width - 44, 234);
+      ctx.moveTo(margen, y + 14);
+      ctx.lineTo(width - margen, y + 14);
       ctx.stroke();
 
-      let y = 272;
+      y += L.offsetPrimeraFila;
       const fila = (etiqueta, valor) => {
-        ctx.font = "400 15px Arial";
-        ctx.fillStyle = "#3B4657";
-        ctx.fillText(etiqueta, 44, y);
-        ctx.font = "700 16px Arial";
-        ctx.fillStyle = "#0B1220";
-        ctx.fillText(valor, 210, y);
-        y += 34;
+        ctx.font = `400 12.5px ${SANS}`;
+        ctx.fillStyle = "#7A8478";
+        ctx.fillText(etiqueta.toUpperCase(), margen, y);
+        ctx.font = `600 14.5px ${SANS}`;
+        ctx.fillStyle = "#1A2420";
+        ctx.fillText(valor, margen + 118, y);
+        y += L.altoFila;
       };
 
-      fila("Cliente:", cliente.nombre || "");
-      fila("Fecha:", new Date(pago.fecha).toLocaleDateString("es-CO", { dateStyle: "long" }));
-      fila("Medio de pago:", pago.medioPago || "");
-      if (pago.concepto) fila("Concepto:", pago.concepto);
+      fila("Cliente", cliente.nombre || "");
+      fila("Fecha", new Date(pago.fecha).toLocaleDateString("es-CO", { dateStyle: "long" }));
+      fila("Medio de pago", pago.medioPago || "");
+      if (pago.concepto) fila("Concepto", pago.concepto);
 
-      y += 20;
-      ctx.fillStyle = "#E3F5EA";
-      ctx.fillRect(44, y, width - 88, 118);
-      ctx.strokeStyle = "#C7D6EA";
-      ctx.lineWidth = 1.5;
-      ctx.strokeRect(44, y, width - 88, 118);
-      ctx.fillStyle = "#6B7480";
-      ctx.font = "700 13px Arial";
-      ctx.fillText("VALOR PAGADO", 66, y + 34);
-      ctx.fillStyle = "#0B3D2E";
-      ctx.font = "700 42px Georgia";
-      ctx.fillText(formatoCOP(pago.valor), 66, y + 88);
+      y += L.gapAntesCaja;
+      ctx.fillStyle = "#EEF6F1";
+      ctx.fillRect(margen, y, width - margen * 2, L.altoCaja);
+      ctx.fillStyle = VERDE;
+      ctx.fillRect(margen, y, 4, L.altoCaja);
+      ctx.fillStyle = "#5C6B60";
+      ctx.font = `700 11px ${SANS}`;
+      ctx.fillText("VALOR PAGADO", margen + 24, y + 32);
+      ctx.fillStyle = VERDE;
+      ctx.font = `700 34px ${SERIF}`;
+      ctx.fillText(formatoCOP(pago.valor), margen + 24, y + 74);
 
-      ctx.fillStyle = "#8B8577";
-      ctx.font = "400 12px Arial";
-      ctx.fillText(`Recibo N.º ${pago.id}`, 44, height - 86);
-      ctx.fillText(`Comprobante generado electrónicamente · ${getNombreDespacho()}`, 44, height - 62);
+      y += L.altoCaja + L.gapDespuesCaja;
+      ctx.strokeStyle = "#E7EAE6";
+      ctx.beginPath();
+      ctx.moveTo(margen, y);
+      ctx.lineTo(width - margen, y);
+      ctx.stroke();
+
+      ctx.fillStyle = "#9AA39B";
+      ctx.font = `400 10.5px ${SANS}`;
+      ctx.fillText(`Recibo N.º ${pago.id} · Comprobante generado electrónicamente`, margen, y + L.pieLinea1);
+      ctx.fillText(getNombreDespacho(), margen, y + L.pieLinea2);
 
       // Se sube al bucket "recibos" (privado, aislado por despacho) en vez
       // de guardar la imagen completa dentro de la fila del cliente — así
@@ -278,10 +326,10 @@ export function generarReciboImagen(clienteId, cliente, pago) {
     logoImg.onload = () => {
       ctx.save();
       ctx.beginPath();
-      ctx.arc(90, 80, 50, 0, Math.PI * 2);
+      ctx.arc(64, 56, 34, 0, Math.PI * 2);
       ctx.closePath();
       ctx.clip();
-      ctx.drawImage(logoImg, 40, 30, 100, 100);
+      ctx.drawImage(logoImg, 30, 22, 68, 68);
       ctx.restore();
       dibujarResto();
     };
@@ -855,7 +903,7 @@ function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-const APP_VERSION = "1.50.0";
+const APP_VERSION = "1.50.1";
 
 function SelloVersion({ oscuro }) {
   return (
