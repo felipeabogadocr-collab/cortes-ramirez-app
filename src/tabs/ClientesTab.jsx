@@ -719,7 +719,8 @@ export default function ClientesTab({ usuarioActual }) {
                           overflow: "hidden",
                         }}
                       >
-                        <span
+                        <button
+                          type="button"
                           title="Copiar radicado (para pegarlo en Rama Judicial o en la Fiscalía)"
                           onClick={() => copiar(r, `rad-${id}-${idx}`)}
                           style={{
@@ -729,6 +730,7 @@ export default function ClientesTab({ usuarioActual }) {
                             background: copiado === `rad-${id}-${idx}` ? "#E4EEE2" : COLORS.surfaceSoft,
                             color: copiado === `rad-${id}-${idx}` ? "#2F5D3A" : COLORS.inkSoft,
                             cursor: "pointer",
+                            border: "none",
                             display: "flex",
                             alignItems: "center",
                             gap: 5,
@@ -741,7 +743,7 @@ export default function ClientesTab({ usuarioActual }) {
                               Radicado: {r} <Icono tipo="portapapeles" size={11} />
                             </>
                           )}
-                        </span>
+                        </button>
                         <a
                           href="https://consultaprocesos.ramajudicial.gov.co/procesos"
                           target="_blank"
@@ -826,7 +828,13 @@ export default function ClientesTab({ usuarioActual }) {
                     style={{ ...buttonGhost, background: "#1DA851", color: "#FFFFFF", border: "none" }}
                     onClick={() => {
                       const numero = numeroWhatsappCliente(c.telefono);
-                      const mensaje = `Hola ${c.nombre || ""} 👋\n\n*${getNombreDespacho()}* te comparte acceso a tu portal personal, donde puedes ver el estado de tu proceso y tu estado de cuenta cuando quieras.\n\n1️⃣ Ingresa aquí: ${window.location.origin}/#portal\n2️⃣ Escribe este código: *${id}*`;
+                      // Sin emojis a propósito: los de secuencia compuesta
+                      // (como los números con recuadro 1️⃣2️⃣) no se ven bien
+                      // en todos los WhatsApp/dispositivos y salían como
+                      // "�" — con texto plano se ve más serio para un
+                      // mensaje de despacho de abogados, y no depende de que
+                      // el teléfono de cada cliente tenga esas fuentes.
+                      const mensaje = `*${getNombreDespacho()}*\n\nHola ${c.nombre || ""}, te compartimos acceso a tu portal personal. Ahí puedes consultar el estado de tu proceso y tu estado de cuenta cuando quieras.\n\nIngresa aquí: ${window.location.origin}/#portal\nCódigo de acceso: *${id}*`;
                       window.open(`https://wa.me/${numero}?text=${encodeURIComponent(mensaje)}`, "_blank");
                     }}
                   >
