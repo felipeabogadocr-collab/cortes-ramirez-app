@@ -249,10 +249,27 @@ export default function ClientesTab({ usuarioActual }) {
     setEditandoId(null);
   };
 
-  const agregarActuacion = async (id, nota) => {
+  const agregarActuacion = async (id, nota, fecha) => {
     const c = clientes[id];
-    const nuevaEntrada = { id: uid(), fecha: new Date().toISOString(), nota };
+    // "fecha" es la del hecho (puede ser de días atrás, cuando se registra
+    // tarde una audiencia ya pasada) — no la de hoy, que es cuándo se está
+    // escribiendo la nota. Si no llega (p. ej. desde el asistente de IA),
+    // se usa hoy como antes.
+    const fechaISO = fecha ? new Date(`${fecha}T12:00:00`).toISOString() : new Date().toISOString();
+    const nuevaEntrada = { id: uid(), fecha: fechaISO, nota };
     const actualizado = { ...c, timeline: [...(c.timeline || []), nuevaEntrada], ultimaActuacion: new Date().toISOString() };
+    await storageSet(`cliente:${id}`, JSON.stringify(actualizado), false);
+    setClientes((prev) => ({ ...prev, [id]: actualizado }));
+  };
+
+  // Deja corregir la fecha de una actuación ya registrada (p. ej. si se
+  // guardó con la fecha de hoy en vez de la fecha real del hecho) sin tener
+  // que borrarla y volver a escribirla.
+  const editarFechaActuacion = async (id, entradaId, fecha) => {
+    const c = clientes[id];
+    const fechaISO = new Date(`${fecha}T12:00:00`).toISOString();
+    const timeline = (c.timeline || []).map((t) => (t.id === entradaId ? { ...t, fecha: fechaISO } : t));
+    const actualizado = { ...c, timeline };
     await storageSet(`cliente:${id}`, JSON.stringify(actualizado), false);
     setClientes((prev) => ({ ...prev, [id]: actualizado }));
   };
@@ -700,7 +717,11 @@ export default function ClientesTab({ usuarioActual }) {
                   </button>
                 </div>
               </div>
-              <LineaDeTiempo cliente={c} onAgregar={(nota) => agregarActuacion(id, nota)} />
+              <LineaDeTiempo
+                cliente={c}
+                onAgregar={(nota, fecha) => agregarActuacion(id, nota, fecha)}
+                onEditarFecha={(entradaId, fecha) => editarFechaActuacion(id, entradaId, fecha)}
+              />
             </Card>
           );
         })}

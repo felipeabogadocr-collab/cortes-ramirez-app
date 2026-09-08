@@ -77,13 +77,23 @@ export default function VigilanciaTab() {
     setClientes((prev) => ({ ...prev, [id]: actualizado }));
   };
 
-  const agregarNovedad = async (id, nota) => {
+  const agregarNovedad = async (id, nota, fecha) => {
     const c = clientes[id];
-    const nuevaEntrada = { id: uid(), fecha: new Date().toISOString(), nota };
+    const fechaISO = fecha ? new Date(`${fecha}T12:00:00`).toISOString() : new Date().toISOString();
+    const nuevaEntrada = { id: uid(), fecha: fechaISO, nota };
     const actualizado = { ...c, timeline: [...(c.timeline || []), nuevaEntrada], ultimaActuacion: new Date().toISOString() };
     await storageSet(`cliente:${id}`, JSON.stringify(actualizado), false);
     setClientes((prev) => ({ ...prev, [id]: actualizado }));
     return actualizado;
+  };
+
+  const editarFechaNovedad = async (id, entradaId, fecha) => {
+    const c = clientes[id];
+    const fechaISO = new Date(`${fecha}T12:00:00`).toISOString();
+    const timeline = (c.timeline || []).map((t) => (t.id === entradaId ? { ...t, fecha: fechaISO } : t));
+    const actualizado = { ...c, timeline };
+    await storageSet(`cliente:${id}`, JSON.stringify(actualizado), false);
+    setClientes((prev) => ({ ...prev, [id]: actualizado }));
   };
 
   // Consulta un cliente puntual y solo muestra el resultado (no toca nada
@@ -434,7 +444,11 @@ export default function VigilanciaTab() {
                 </div>
               )}
 
-              <LineaDeTiempo cliente={c} onAgregar={(nota) => agregarNovedad(id, nota)} />
+              <LineaDeTiempo
+                cliente={c}
+                onAgregar={(nota, fecha) => agregarNovedad(id, nota, fecha)}
+                onEditarFecha={(entradaId, fecha) => editarFechaNovedad(id, entradaId, fecha)}
+              />
             </Card>
           );
         })}

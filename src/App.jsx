@@ -766,7 +766,7 @@ function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-const APP_VERSION = "1.44.7";
+const APP_VERSION = "1.44.8";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -3772,9 +3772,65 @@ function BuscadorGlobal({ onIr }) {
   );
 }
 
-export function LineaDeTiempo({ cliente, onAgregar }) {
+// Reescribe una nota de actuación pegada (a veces copiada tal cual de un acta
+// o de un mensaje, con errores de forma o de más rodeos) como un párrafo
+// claro y profesional para el expediente — sin inventar datos que no estén
+// en el texto original, solo mejorando la redacción. Responde en texto
+// plano (no JSON): es una sola nota, no hay nada que parsear ni que se
+// pueda romper por un formato inesperado.
+async function redactarActuacionConIA(textoOriginal) {
+  const { data: sesionData } = await supabase.auth.getSession();
+  const token = sesionData?.session?.access_token;
+  const response = await fetch("/api/assistant", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({
+      model: "claude-sonnet-4-6",
+      max_tokens: 400,
+      system:
+        "Eres un asistente que ayuda a un abogado colombiano a redactar la línea de tiempo de un caso. Te dan un texto pegado tal cual (puede venir con errores de forma, muy informal, o mal organizado) sobre una actuación o novedad del proceso. " +
+        "Reescríbelo como una nota clara, profesional y concisa para el expediente, en español, sin inventar ni agregar ningún dato que no esté explícito en el texto original. Responde ÚNICAMENTE con el texto final de la nota, sin comillas, sin explicaciones ni texto adicional antes o después.",
+      messages: [{ role: "user", content: textoOriginal }],
+    }),
+  });
+  const data = await response.json();
+  if (!response.ok || data.error) throw new Error(data.error || "No se pudo contactar al asistente de IA");
+  const texto = (data.content || []).map((b) => b.text || "").join("").trim();
+  if (!texto) throw new Error("El asistente no devolvió ningún texto");
+  return texto;
+}
+
+export function LineaDeTiempo({ cliente, onAgregar, onEditarFecha }) {
   const [nota, setNota] = useState("");
+  const [fecha, setFecha] = useState(() => fechaHoyISO());
+  const [redactando, setRedactando] = useState(false);
+  const [errorIA, setErrorIA] = useState("");
+  const [editandoFechaId, setEditandoFechaId] = useState(null);
   const timeline = cliente.timeline || [];
+
+  const agregar = () => {
+    if (!nota.trim()) return;
+    onAgregar(nota.trim(), fecha);
+    setNota("");
+    setFecha(fechaHoyISO());
+  };
+
+  const redactarConIA = async () => {
+    if (!nota.trim()) return;
+    setRedactando(true);
+    setErrorIA("");
+    try {
+      const mejorado = await redactarActuacionConIA(nota.trim());
+      setNota(mejorado);
+    } catch (e) {
+      setErrorIA(`No se pudo mejorar la redacción (${e?.message || "error desconocido"}). Puedes agregar la nota tal como está.`);
+    }
+    setRedactando(false);
+  };
+
   return (
     <div style={{ marginTop: 12, borderTop: `1px solid ${COLORS.border}`, paddingTop: 12 }}>
       <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, fontWeight: 600, color: COLORS.headingText, marginBottom: 8 }}>Línea de tiempo</p>
@@ -3783,10 +3839,42 @@ export function LineaDeTiempo({ cliente, onAgregar }) {
           {[...timeline]
             .sort((a, b) => new Date(b.fecha) - new Date(a.fecha))
             .map((t) => (
-              <div key={t.id} style={{ display: "flex", gap: 8, fontSize: 12.5, fontFamily: "Inter, sans-serif" }}>
-                <span style={{ color: COLORS.muted, whiteSpace: "nowrap" }}>
-                  {new Date(t.fecha).toLocaleDateString("es-CO", { day: "2-digit", month: "short", year: "numeric" })}
-                </span>
+              <div key={t.id} style={{ display: "flex", gap: 8, fontSize: 12.5, fontFamily: "Inter, sans-serif", alignItems: "flex-start" }}>
+                {editandoFechaId === t.id ? (
+                  <input
+                    type="date"
+                    autoFocus
+                    className="drx-input"
+                    style={{ ...inputStyle, fontSize: 11.5, padding: "2px 6px", width: 132 }}
+                    defaultValue={new Date(t.fecha).toISOString().slice(0, 10)}
+                    onBlur={(e) => {
+                      if (e.target.value) onEditarFecha(t.id, e.target.value);
+                      setEditandoFechaId(null);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") e.target.blur();
+                      if (e.key === "Escape") setEditandoFechaId(null);
+                    }}
+                  />
+                ) : (
+                  <button
+                    onClick={() => setEditandoFechaId(t.id)}
+                    title="Clic para corregir la fecha"
+                    style={{
+                      background: "none",
+                      border: "none",
+                      cursor: "pointer",
+                      padding: 0,
+                      color: COLORS.muted,
+                      whiteSpace: "nowrap",
+                      fontFamily: "Inter, sans-serif",
+                      fontSize: 12.5,
+                      borderBottom: `1px dashed ${COLORS.border}`,
+                    }}
+                  >
+                    {new Date(t.fecha).toLocaleDateString("es-CO", { day: "2-digit", month: "short", year: "numeric" })}
+                  </button>
+                )}
                 <span style={{ color: COLORS.inkSoft }}>{t.nota}</span>
               </div>
             ))}
@@ -3794,33 +3882,31 @@ export function LineaDeTiempo({ cliente, onAgregar }) {
       ) : (
         <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.muted, marginBottom: 10 }}>Sin actuaciones registradas todavía.</p>
       )}
-      <div style={{ display: "flex", gap: 8 }}>
+      <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
         <input
+          type="date"
           className="drx-input"
-          style={{ ...inputStyle, flex: 1, fontSize: 13, padding: "7px 10px" }}
-          placeholder="Agregar novedad o actuación..."
+          style={{ ...inputStyle, fontSize: 12.5, padding: "7px 8px", width: 132, flexShrink: 0 }}
+          value={fecha}
+          onChange={(e) => setFecha(e.target.value)}
+        />
+        <textarea
+          className="drx-input"
+          style={{ ...inputStyle, flex: 1, fontSize: 13, padding: "7px 10px", minHeight: 34, resize: "vertical" }}
+          placeholder="Agregar novedad o actuación... (puedes pegar el texto tal cual y usar 'Redactar con IA')"
           value={nota}
           onChange={(e) => setNota(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && nota.trim()) {
-              onAgregar(nota.trim());
-              setNota("");
-            }
-          }}
         />
-        <button
-          className="drx-btn-ghost"
-          style={{ ...buttonGhost, padding: "6px 12px", fontSize: 12.5 }}
-          onClick={() => {
-            if (nota.trim()) {
-              onAgregar(nota.trim());
-              setNota("");
-            }
-          }}
-        >
-          Agregar
-        </button>
+        <div style={{ display: "flex", flexDirection: "column", gap: 6, flexShrink: 0 }}>
+          <button className="drx-btn-ghost" style={{ ...buttonGhost, padding: "6px 12px", fontSize: 12.5 }} onClick={redactarConIA} disabled={redactando || !nota.trim()}>
+            {redactando ? "Redactando..." : "Redactar con IA"}
+          </button>
+          <button className="drx-btn-primary" style={{ ...buttonPrimary, padding: "6px 12px", fontSize: 12.5 }} onClick={agregar} disabled={!nota.trim()}>
+            Agregar
+          </button>
+        </div>
       </div>
+      {errorIA && <p style={{ color: "#B45309", fontSize: 11.5, marginTop: 6, fontFamily: "Inter, sans-serif" }}>{errorIA}</p>}
     </div>
   );
 }
