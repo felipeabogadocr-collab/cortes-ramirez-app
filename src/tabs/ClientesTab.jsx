@@ -35,7 +35,63 @@ const FORM_CLIENTE_INICIAL = {
   valorTotal: "",
   abogadoAsignado: "",
   otrasPersonas: [],
+  pagador: null,
 };
+
+// A veces quien paga no es el cliente: el proceso es de Pepito, pero Juan
+// (un familiar, un socio) es quien hace el pago. Cuando eso pasa, los
+// recordatorios de pago y la confirmación/recibo deben llegarle a quien
+// realmente paga (Juan), no al cliente (Pepito) — este selector deja
+// registrar a esa persona sin mezclarla con el cliente ni con "otras
+// personas del proceso" (que es solo informativo, no cambia a dónde se
+// manda nada).
+function SelectorPagador({ pagador, onChange }) {
+  const esOtraPersona = !!pagador;
+
+  return (
+    <div style={{ marginTop: 12 }}>
+      <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, fontWeight: 600, color: COLORS.inkSoft, marginBottom: 8 }}>
+        ¿Quién paga las cuentas de este proceso?
+      </p>
+      <div style={{ display: "flex", gap: 8, marginBottom: esOtraPersona ? 10 : 0 }}>
+        <button
+          type="button"
+          className={esOtraPersona ? "drx-btn-ghost" : "drx-btn-primary"}
+          style={esOtraPersona ? { ...buttonGhost, padding: "7px 14px", fontSize: 12.5 } : { ...buttonPrimary, padding: "7px 14px", fontSize: 12.5 }}
+          onClick={() => onChange(null)}
+        >
+          El mismo cliente
+        </button>
+        <button
+          type="button"
+          className={esOtraPersona ? "drx-btn-primary" : "drx-btn-ghost"}
+          style={esOtraPersona ? { ...buttonPrimary, padding: "7px 14px", fontSize: 12.5 } : { ...buttonGhost, padding: "7px 14px", fontSize: 12.5 }}
+          onClick={() => onChange(pagador || { nombre: "", telefono: "" })}
+        >
+          Otra persona paga
+        </button>
+      </div>
+      {esOtraPersona && (
+        <div className="drx-grid-form" style={{ display: "grid", gridTemplateColumns: "1.3fr 1fr", gap: 8 }}>
+          <input
+            className="drx-input"
+            style={{ ...inputStyle, padding: "8px 10px", fontSize: 13 }}
+            value={pagador.nombre}
+            onChange={(e) => onChange({ ...pagador, nombre: e.target.value })}
+            placeholder="Nombre de quien paga"
+          />
+          <input
+            className="drx-input"
+            style={{ ...inputStyle, padding: "8px 10px", fontSize: 13 }}
+            value={pagador.telefono}
+            onChange={(e) => onChange({ ...pagador, telefono: e.target.value })}
+            placeholder="Teléfono de quien paga"
+          />
+        </div>
+      )}
+    </div>
+  );
+}
 
 // Un contrato o proceso muchas veces no es con una sola persona — un
 // arriendo con dos arrendatarios, una sucesión entre varios herederos, una
@@ -610,6 +666,7 @@ export default function ClientesTab({ usuarioActual, onIrARegistrarPago }) {
                   { titulo: "Área", valor: (id) => clientes[id]?.areaProceso },
                   { titulo: "Valor total acordado", valor: (id) => clientes[id]?.valorTotal },
                   { titulo: "Notas", valor: (id) => clientes[id]?.notas },
+                  { titulo: "Paga (si es distinto al cliente)", valor: (id) => clientes[id]?.pagador?.nombre || "" },
                 ],
                 idsOrdenados
               )
@@ -700,6 +757,7 @@ export default function ClientesTab({ usuarioActual, onIrARegistrarPago }) {
             </Field>
           </div>
           <EditorOtrasPersonas personas={form.otrasPersonas} onChange={(otrasPersonas) => setForm({ ...form, otrasPersonas })} />
+          <SelectorPagador pagador={form.pagador} onChange={(pagador) => setForm({ ...form, pagador })} />
           <PlanDePagoIA planPago={form.planPago} onChange={(planPago) => setForm({ ...form, planPago })} />
           <button className="drx-btn-primary" style={{ ...buttonPrimary, marginTop: 14 }} onClick={guardar}>
             Guardar cliente
@@ -794,6 +852,7 @@ export default function ClientesTab({ usuarioActual, onIrARegistrarPago }) {
                   </Field>
                 </div>
                 <EditorOtrasPersonas personas={formEdicion.otrasPersonas} onChange={(otrasPersonas) => setFormEdicion({ ...formEdicion, otrasPersonas })} />
+                <SelectorPagador pagador={formEdicion.pagador} onChange={(pagador) => setFormEdicion({ ...formEdicion, pagador })} />
                 <PlanDePagoIA planPago={formEdicion.planPago} onChange={(planPago) => setFormEdicion({ ...formEdicion, planPago })} />
                 <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
                   <button className="drx-btn-ghost" style={buttonGhost} onClick={() => setEditandoId(null)}>
@@ -995,6 +1054,13 @@ export default function ClientesTab({ usuarioActual, onIrARegistrarPago }) {
                       </span>
                     )}
                   </div>
+                  {c.pagador?.nombre && (
+                    <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.inkSoft, margin: "8px 0 0" }}>
+                      <Icono tipo="tarjeta" size={12} style={{ marginRight: 4, verticalAlign: -2 }} />
+                      Paga: <strong>{c.pagador.nombre}</strong>
+                      {c.pagador.telefono ? ` · ${c.pagador.telefono}` : ""}
+                    </p>
+                  )}
                   {c.notas && <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.inkSoft, margin: "8px 0 0" }}>{c.notas}</p>}
                   </div>
                 </div>

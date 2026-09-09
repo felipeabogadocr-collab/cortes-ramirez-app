@@ -677,14 +677,19 @@ function ReciboCard({ cliente, pago, onEditar, onEliminar, datosResponsable, por
   const [retencionOtro, setRetencionOtro] = useState(retencionInicial === "otro" ? String(pago.retencionPorcentaje) : "");
   const [guardando, setGuardando] = useState(false);
   const [generandoCuenta, setGenerandoCuenta] = useState(false);
-  const numero = numeroWhatsappCliente(cliente.telefono);
+  // Si alguien más paga las cuentas de este cliente (cliente.pagador), la
+  // confirmación y el recibo le llegan a esa persona, no al cliente.
+  const pagadorTiene = !!cliente.pagador?.telefono;
+  const nombreDestinatario = pagadorTiene ? cliente.pagador.nombre : cliente.nombre;
+  const numero = numeroWhatsappCliente(pagadorTiene ? cliente.pagador.telefono : cliente.telefono);
   const urlRecibo = useUrlRecibo(pago.reciboImagen);
 
   const enviarPorWhatsapp = () => {
     // Sin emojis a propósito: no se ven bien en todos los WhatsApp/
     // dispositivos, y un mensaje de despacho de abogados se lee más serio
     // en texto plano.
-    const mensaje = `*${getNombreDespacho()}*\n\nHola ${cliente.nombre || ""}, confirmamos la recepción de tu pago:\n\nMedio: ${pago.medioPago}\nValor: ${formatoCOP(pago.valor)}\nFecha: ${new Date(pago.fecha).toLocaleDateString("es-CO", { dateStyle: "long" })}${pago.concepto ? `\nConcepto: ${pago.concepto}` : ""}\n\nEn un momento te comparto el recibo por este mismo medio. ¡Gracias por tu confianza!`;
+    const refCliente = pagadorTiene ? ` de ${cliente.nombre}` : "";
+    const mensaje = `*${getNombreDespacho()}*\n\nHola ${nombreDestinatario || ""}, confirmamos la recepción del pago${refCliente}:\n\nMedio: ${pago.medioPago}\nValor: ${formatoCOP(pago.valor)}\nFecha: ${new Date(pago.fecha).toLocaleDateString("es-CO", { dateStyle: "long" })}${pago.concepto ? `\nConcepto: ${pago.concepto}` : ""}\n\nEn un momento te comparto el recibo por este mismo medio. ¡Gracias por tu confianza!`;
     window.open(`https://wa.me/${numero}?text=${encodeURIComponent(mensaje)}`, "_blank");
   };
 

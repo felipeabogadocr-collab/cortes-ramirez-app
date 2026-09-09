@@ -1077,7 +1077,7 @@ function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-const APP_VERSION = "1.52.2";
+const APP_VERSION = "1.53.0";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -4558,13 +4558,18 @@ function VistaPortalCliente() {
 export const ESTADOS_VIGILANCIA = ["En trámite", "Con novedad", "Pendiente de revisión", "Finalizado"];
 
 export function enviarRecordatorioPago(cliente) {
-  const numero = numeroWhatsappCliente(cliente.telefono);
+  // Si alguien más paga las cuentas de este proceso (cliente.pagador), el
+  // recordatorio le llega a esa persona y no al cliente — pedirle el pago
+  // al cliente cuando quien paga es otro solo genera confusión.
+  const destinatario = cliente.pagador?.telefono ? { nombre: cliente.pagador.nombre, telefono: cliente.pagador.telefono } : { nombre: cliente.nombre, telefono: cliente.telefono };
+  const numero = numeroWhatsappCliente(destinatario.telefono);
   const fechaTexto = new Date(cliente.proximoPago.fecha).toLocaleDateString("es-CO", { dateStyle: "long" });
   const valorTexto = cliente.proximoPago.valorEsperado ? ` por un valor de ${formatoCOP(cliente.proximoPago.valorEsperado)}` : "";
+  const refCliente = cliente.pagador?.telefono ? ` de ${cliente.nombre}` : "";
   // Sin emojis a propósito (ver comentario en ClientesTab sobre el mensaje
   // del portal): no se ven bien en todos los WhatsApp/dispositivos, y un
   // mensaje de despacho de abogados se lee más serio en texto plano.
-  const mensaje = `*${getNombreDespacho()}*\n\nHola ${cliente.nombre || ""}, te recordamos que tu próximo pago está programado para el ${fechaTexto}${valorTexto}.\n\nSi ya realizaste el pago, ignora este mensaje — quedamos atentos a la confirmación. Cualquier duda, con gusto te ayudamos.`;
+  const mensaje = `*${getNombreDespacho()}*\n\nHola ${destinatario.nombre || ""}, te recordamos que el próximo pago${refCliente} está programado para el ${fechaTexto}${valorTexto}.\n\nSi ya realizaste el pago, ignora este mensaje — quedamos atentos a la confirmación. Cualquier duda, con gusto te ayudamos.`;
   window.open(`https://wa.me/${numero}?text=${encodeURIComponent(mensaje)}`, "_blank");
 }
 
