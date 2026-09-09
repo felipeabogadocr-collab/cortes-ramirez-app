@@ -551,6 +551,9 @@ export default function ClientesTab({ usuarioActual, onIrARegistrarPago }) {
     const actualizado = { ...formEdicion, radicados, radicado: radicados[0] || "", proximoPago };
     await storageSet(`cliente:${id}`, JSON.stringify(actualizado), false);
     setClientes((prev) => ({ ...prev, [id]: actualizado }));
+    if (!!actualizado.procesoPausado !== !!clientes[id]?.procesoPausado) {
+      registrarAuditoria(usuarioActual, actualizado.procesoPausado ? "pausar_proceso" : "reanudar_proceso", "cliente", id, { nombre: actualizado.nombre });
+    }
     setEditandoId(null);
   };
 
@@ -602,19 +605,6 @@ export default function ClientesTab({ usuarioActual, onIrARegistrarPago }) {
     const actualizado = { ...c, timeline: [...(c.timeline || []), entrada] };
     await storageSet(`cliente:${id}`, JSON.stringify(actualizado), false);
     setClientes((prev) => ({ ...prev, [id]: actualizado }));
-  };
-
-  // Pausar un proceso: el caso sigue existiendo pero deja de contar como
-  // "inactivo" o de generar avisos de pago atrasado/pendiente mientras está
-  // en pausa — útil cuando el proceso está detenido por algo externo (a la
-  // espera de un trámite, el cliente pidió un receso, etc.) y no tiene
-  // sentido que el sistema siga insistiendo con recordatorios.
-  const pausarProceso = async (id) => {
-    const c = clientes[id];
-    const actualizado = { ...c, procesoPausado: !c.procesoPausado };
-    await storageSet(`cliente:${id}`, JSON.stringify(actualizado), false);
-    setClientes((prev) => ({ ...prev, [id]: actualizado }));
-    registrarAuditoria(usuarioActual, actualizado.procesoPausado ? "pausar_proceso" : "reanudar_proceso", "cliente", id, { nombre: c.nombre });
   };
 
   // Ordenar + filtrar recorre TODOS los clientes — se memoiza para que no se
@@ -988,6 +978,20 @@ export default function ClientesTab({ usuarioActual, onIrARegistrarPago }) {
                   onChange={(abogadoAsociado) => setFormEdicion({ ...formEdicion, abogadoAsociado })}
                   placeholderNombre="Nombre del abogado"
                 />
+                <label
+                  style={{
+                    display: "flex", alignItems: "center", gap: 8, marginTop: 14, cursor: "pointer",
+                    fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.inkSoft,
+                  }}
+                  title="Detiene los avisos de inactividad y de pago mientras el proceso está parado por algo externo, sin borrar nada."
+                >
+                  <input
+                    type="checkbox"
+                    checked={!!formEdicion.procesoPausado}
+                    onChange={(e) => setFormEdicion({ ...formEdicion, procesoPausado: e.target.checked })}
+                  />
+                  Proceso en pausa (no generar avisos de inactividad ni de pago para este cliente)
+                </label>
                 <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
                   <button className="drx-btn-ghost" style={buttonGhost} onClick={() => setEditandoId(null)}>
                     Cancelar
@@ -1212,7 +1216,7 @@ export default function ClientesTab({ usuarioActual, onIrARegistrarPago }) {
                   {c.notas && <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.inkSoft, margin: "8px 0 0" }}>{c.notas}</p>}
                   </div>
                 </div>
-                <div style={{ display: "flex", gap: 8, flexShrink: 0, flexWrap: "wrap" }}>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", maxWidth: "100%" }}>
                   <button
                     className="drx-btn-ghost"
                     style={{ ...buttonGhost, background: "#1DA851", color: "#FFFFFF", border: "none" }}
@@ -1259,14 +1263,6 @@ export default function ClientesTab({ usuarioActual, onIrARegistrarPago }) {
                       Registrar pago ↗
                     </button>
                   )}
-                  <button
-                    className="drx-btn-ghost"
-                    style={{ ...buttonGhost, ...(c.procesoPausado ? { background: "#FEF3E2", color: "#B45309", borderColor: "#FCE3B8" } : {}) }}
-                    title={c.procesoPausado ? "Reanudar seguimiento de avisos e inactividad" : "Pausar avisos de inactividad y de pago mientras el proceso está detenido"}
-                    onClick={() => pausarProceso(id)}
-                  >
-                    {c.procesoPausado ? "Reanudar proceso" : "Pausar proceso"}
-                  </button>
                   <button className="drx-btn-ghost" style={buttonGhost} onClick={() => empezarEdicion(id)}>
                     Editar
                   </button>
