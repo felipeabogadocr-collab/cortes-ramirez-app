@@ -1077,7 +1077,7 @@ function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-const APP_VERSION = "1.52.0";
+const APP_VERSION = "1.52.1";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -8247,6 +8247,16 @@ export class TabErrorBoundary extends Component {
 
   componentDidCatch(error, info) {
     reportarErrorFrontend(error, info, this.props.nombre);
+    // Esta es la ruta más probable por la que llega un chunk viejo después
+    // de un despliegue: cada pestaña se carga en su propio "import()"
+    // dinámico, así que si falla, quien lo atrapa primero es esta burbuja
+    // (no la de toda la app). El botón "Reintentar" normal no serviría de
+    // nada aquí — el archivo viejo sigue sin existir hasta que la página
+    // completa se recargue y traiga el índice de archivos actualizado.
+    if (esErrorDeChunkViejo(error) && !sessionStorage.getItem(LLAVE_RECARGA_CHUNK)) {
+      sessionStorage.setItem(LLAVE_RECARGA_CHUNK, "1");
+      window.location.reload();
+    }
   }
 
   render() {
@@ -8290,6 +8300,17 @@ export class TabErrorBoundary extends Component {
   }
 }
 
+// Mismo patrón que en main.jsx para "vite:preloadError", pero aquí como red
+// de respaldo: si una falla de carga de un chunk viejo después de un
+// despliegue llega como una excepción de React en vez de disparar ese
+// evento de Vite (pasa en algunos navegadores/casos), igual se recarga
+// sola una vez en lugar de mostrarle al usuario la pantalla de error.
+const LLAVE_RECARGA_CHUNK = "nomos-recarga-por-chunk";
+function esErrorDeChunkViejo(error) {
+  const msg = String(error?.message || "");
+  return /dynamically imported module|Failed to fetch dynamically|Loading chunk|loading dynamically imported module|Importing a module script failed/i.test(msg);
+}
+
 class ErrorBoundary extends Component {
   constructor(props) {
     super(props);
@@ -8302,6 +8323,10 @@ class ErrorBoundary extends Component {
 
   componentDidCatch(error, info) {
     reportarErrorFrontend(error, info, "");
+    if (esErrorDeChunkViejo(error) && !sessionStorage.getItem(LLAVE_RECARGA_CHUNK)) {
+      sessionStorage.setItem(LLAVE_RECARGA_CHUNK, "1");
+      window.location.reload();
+    }
   }
 
   render() {

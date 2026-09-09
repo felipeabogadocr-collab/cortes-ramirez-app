@@ -18,6 +18,28 @@ registerSW({
   },
 });
 
+// Lo de arriba cubre "hay versión nueva disponible" — esto cubre el caso
+// más molesto en la práctica: alguien ya tenía Nomos abierto ANTES de un
+// despliegue, y en algún momento (sin recargar) hace clic en una pestaña
+// que todavía no había visitado en esta sesión (Vigilancia, Contabilidad,
+// etc.). Esa pestaña se carga con "import() dinámico" pidiendo un archivo
+// con el nombre de ESTA versión — pero el servidor ya solo tiene los
+// archivos de la versión nueva, así que la descarga falla. Vite dispara el
+// evento "vite:preloadError" exactamente en ese caso; antes nada lo
+// escuchaba y el usuario se quedaba viendo "Algo salió mal" sin saber que
+// bastaba con recargar. Ahora se recarga sola, una sola vez (el
+// sessionStorage evita un bucle infinito si el problema fuera otro y
+// persistiera después de recargar).
+const LLAVE_RECARGA_CHUNK = "nomos-recarga-por-chunk";
+window.addEventListener("vite:preloadError", () => {
+  if (sessionStorage.getItem(LLAVE_RECARGA_CHUNK)) return;
+  sessionStorage.setItem(LLAVE_RECARGA_CHUNK, "1");
+  window.location.reload();
+});
+// Si la app carga bien y sigue corriendo sin problema, se limpia el
+// candado para que un despliegue futuro también pueda recargarse solo.
+setTimeout(() => sessionStorage.removeItem(LLAVE_RECARGA_CHUNK), 10000);
+
 createRoot(document.getElementById("root")).render(
   <StrictMode>
     <App />
