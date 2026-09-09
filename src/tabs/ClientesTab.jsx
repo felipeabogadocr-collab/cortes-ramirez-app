@@ -1,5 +1,4 @@
 import { useState, useEffect, useMemo } from "react";
-import { supabase } from "../lib/supabaseClient";
 import { storageSet, getNombreDespacho, obtenerClientesPorId } from "../lib/storage";
 import {
   COLORS, uid, registrarAuditoria, diasDesde, exportarCSV, useIndex, useConfirmarDialogo,
@@ -170,80 +169,37 @@ function EditorRadicados({ radicados, onChange }) {
 
 const FRECUENCIAS_PAGO = ["Semanal", "Quincenal", "Mensual", "Pago único", "Otro"];
 
-async function organizarPagoConIA(descripcion) {
-  const hoy = new Date().toISOString().slice(0, 10);
-  const { data: sesionData } = await supabase.auth.getSession();
-  const token = sesionData?.session?.access_token;
-  const response = await fetch("/api/assistant", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-    body: JSON.stringify({
-      model: "claude-sonnet-4-6",
-      // 300 se quedaba corto y cortaba el JSON a la mitad — el modelo que
-      // usa /api/assistant "piensa" antes de responder, y ese pensamiento
-      // interno también consume el límite de tokens aunque no se vea.
-      max_tokens: 800,
-      system:
-        `Eres un asistente que organiza la forma de pago de un cliente de un despacho de abogados en Colombia. Hoy es ${hoy}. ` +
-        `A partir de la descripción en lenguaje natural que te da el abogado, responde ÚNICAMENTE con un objeto JSON válido, sin texto adicional, sin comillas de bloque de código, con exactamente estos campos: ` +
-        `{"frecuencia": uno de "Semanal", "Quincenal", "Mensual", "Pago único" u "Otro"; "valor": número entero en pesos colombianos sin puntos ni símbolos; "proximaFecha": fecha en formato YYYY-MM-DD de la próxima vez que el cliente debe pagar, calculada a partir de hoy y de la descripción; "resumen": una frase corta en español resumiendo el acuerdo de pago}.`,
-      messages: [{ role: "user", content: descripcion }],
-    }),
-  });
-  const data = await response.json();
-  if (!response.ok || data.error) throw new Error(data.error || "No se pudo contactar al asistente de IA");
-  const texto = (data.content || []).map((b) => b.text || "").join("");
-  const limpio = texto.replace(/```json|```/g, "").trim();
-  // El modelo a veces agrega algo de texto alrededor del JSON aunque se le
-  // pida que no lo haga (una aclaración, un salto de línea de más) —
-  // JSON.parse(limpio) a secas fallaba con cualquier cosa que no fuera el
-  // objeto puro. Se busca el primer "{...}" dentro del texto en vez de
-  // asumir que el texto completo ya es JSON válido.
-  const coincidencia = limpio.match(/\{[\s\S]*\}/);
-  const jsonTexto = coincidencia ? coincidencia[0] : limpio;
-  try {
-    return JSON.parse(jsonTexto);
-  } catch (e) {
-    throw new Error(`El asistente respondió algo que no se pudo interpretar: "${texto.slice(0, 180)}"`);
-  }
-}
-
-function PlanDePagoIA({ planPago, onChange }) {
-  const [descripcion, setDescripcion] = useState(planPago?.descripcion || "");
-  const [procesando, setProcesando] = useState(false);
-  const [error, setError] = useState("");
+// Antes esto se armaba pidiéndole a una IA que interpretara una frase en
+// lenguaje libre ("Paga $500.000 mensual...") y devolviera un JSON — cuando
+// el modelo respondía algo mal formado (pasaba con cierta frecuencia), el
+// plan de pago quedaba a medio llenar y tocaba reintentar sin entender por
+// qué. Un formulario directo de "cuántas cuotas, de cuánto, cada cuánto" no
+// tiene nada que interpretar ni que le pueda salir mal.
+function PlanDePago({ planPago, onChange }) {
   const { servicios } = useServicios();
   const [servicioElegidoId, setServicioElegidoId] = useState("");
+  const plan = planPago || {};
 
   const usarServicio = () => {
     const servicio = servicios.find((s) => s.id === servicioElegidoId);
     if (!servicio) return;
     const proximaFecha = calcularProximaFechaPorFrecuencia(fechaHoyISO(), servicio.frecuencia);
-    onChange({ descripcion: servicio.nombre, frecuencia: servicio.frecuencia, valor: servicio.valor, resumen: servicio.nombre, proximaFecha });
-    setDescripcion(servicio.nombre);
+    onChange({ descripcion: servicio.nombre, frecuencia: servicio.frecuencia, valor: servicio.valor, resumen: servicio.nombre, proximaFecha, numCuotas: 1 });
     setServicioElegidoId("");
   };
 
-  const organizar = async () => {
-    if (!descripcion.trim()) return;
-    setProcesando(true);
-    setError("");
-    try {
-      const resultado = await organizarPagoConIA(descripcion.trim());
-      onChange({ descripcion: descripcion.trim(), ...resultado });
-    } catch (e) {
-      console.error("No se pudo organizar el pago con IA:", e);
-      // Antes siempre mostraba el mismo mensaje genérico sin importar la
-      // causa real (límite de cuota, respuesta mal formada, etc.) — con el
-      // motivo real es mucho más fácil saber si vale la pena reintentar o
-      // si hay que llenar los campos a mano de una vez.
-      setError(`No pudimos organizarlo automáticamente (${e?.message || "error desconocido"}). Completa los campos manualmente abajo.`);
-      onChange({ descripcion: descripcion.trim(), frecuencia: FRECUENCIAS_PAGO[0], valor: null, proximaFecha: "", resumen: "" });
-    }
-    setProcesando(false);
+  // Cada campo se guarda apenas se edita (nada de un botón "Organizar" aparte
+  // que haya que recordar pulsar) — y el resumen se arma solo, en vez de
+  // pedírselo a un modelo, así que siempre coincide con lo que hay en los
+  // campos.
+  const actualizar = (campos) => {
+    const combinado = { ...plan, ...campos };
+    const numCuotas = combinado.frecuencia === "Pago único" ? 1 : Number(combinado.numCuotas) || 1;
+    const cuotasTexto = numCuotas > 1 ? ` en ${numCuotas} cuotas` : "";
+    const resumen = combinado.valor
+      ? `${formatoCOP(combinado.valor)} ${(combinado.frecuencia || "").toLowerCase()}${cuotasTexto}`.trim()
+      : "";
+    onChange({ ...combinado, numCuotas, descripcion: resumen, resumen });
   };
 
   return (
@@ -252,7 +208,7 @@ function PlanDePagoIA({ planPago, onChange }) {
         ¿Cómo paga este cliente?
       </p>
       {servicios.length > 0 && (
-        <div style={{ display: "flex", gap: 8, marginBottom: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
+        <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap", alignItems: "flex-end" }}>
           <Field label="O activa un servicio ya definido (ej: solo vigilancia judicial)">
             <select className="drx-input" style={{ ...inputStyle, fontSize: 12.5, padding: "7px 8px", minWidth: 220 }} value={servicioElegidoId} onChange={(e) => setServicioElegidoId(e.target.value)}>
               <option value="">Elige un servicio…</option>
@@ -268,61 +224,53 @@ function PlanDePagoIA({ planPago, onChange }) {
           </button>
         </div>
       )}
-      <textarea
-        className="drx-input"
-        style={{ ...inputStyle, display: "block", width: "100%", boxSizing: "border-box", minHeight: 110, fontSize: 14, resize: "vertical" }}
-        placeholder='Descríbelo con tus palabras, ej: "Paga $500.000 mensual, siempre el día 5" o "Cuota única de 2 millones el 15 de septiembre"'
-        value={descripcion}
-        onChange={(e) => setDescripcion(e.target.value)}
-      />
-      <button
-        className="drx-btn-ghost"
-        style={{ ...buttonGhost, display: "block", marginTop: 10, fontSize: 12.5, padding: "8px 16px", textAlign: "left" }}
-        onClick={organizar}
-        disabled={procesando || !descripcion.trim()}
-      >
-        {procesando ? "Organizando..." : "Organizar con IA"}
-      </button>
-      {error && <p style={{ color: "#B45309", fontSize: 12, marginTop: 8, fontFamily: "Inter, sans-serif", textAlign: "left" }}>{error}</p>}
-
-      {planPago && (
-        <div style={{ marginTop: 12, borderTop: `1px solid ${COLORS.border}`, paddingTop: 12, textAlign: "left" }}>
-          {planPago.resumen && (
-            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.inkSoft, marginBottom: 10, fontStyle: "italic" }}>"{planPago.resumen}"</p>
-          )}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
-            <Field label="Frecuencia">
-              <select
-                className="drx-input"
-                style={{ ...inputStyle, fontSize: 12.5, padding: "7px 8px" }}
-                value={planPago.frecuencia || FRECUENCIAS_PAGO[0]}
-                onChange={(e) => onChange({ ...planPago, frecuencia: e.target.value })}
-              >
-                {FRECUENCIAS_PAGO.map((f) => (
-                  <option key={f} value={f}>
-                    {f}
-                  </option>
-                ))}
-              </select>
-            </Field>
-            <Field label="Valor (COP)">
-              <CampoDinero
-                style={{ ...inputStyle, fontSize: 12.5, padding: "7px 8px" }}
-                value={planPago.valor || ""}
-                onChange={(e) => onChange({ ...planPago, valor: Number(e.target.value) })}
-              />
-            </Field>
-            <Field label="Próxima fecha">
-              <input
-                type="date"
-                className="drx-input"
-                style={{ ...inputStyle, fontSize: 12.5, padding: "7px 8px" }}
-                value={planPago.proximaFecha || ""}
-                onChange={(e) => onChange({ ...planPago, proximaFecha: e.target.value })}
-              />
-            </Field>
-          </div>
-        </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, textAlign: "left" }}>
+        <Field label="Valor por cuota (COP)">
+          <CampoDinero
+            style={{ ...inputStyle, fontSize: 12.5, padding: "7px 8px" }}
+            value={plan.valor || ""}
+            onChange={(e) => actualizar({ valor: Number(e.target.value) })}
+            placeholder="Ej: 500.000"
+          />
+        </Field>
+        <Field label="Frecuencia">
+          <select
+            className="drx-input"
+            style={{ ...inputStyle, fontSize: 12.5, padding: "7px 8px" }}
+            value={plan.frecuencia || FRECUENCIAS_PAGO[2]}
+            onChange={(e) => actualizar({ frecuencia: e.target.value })}
+          >
+            {FRECUENCIAS_PAGO.map((f) => (
+              <option key={f} value={f}>
+                {f}
+              </option>
+            ))}
+          </select>
+        </Field>
+        {plan.frecuencia !== "Pago único" && (
+          <Field label="Número de cuotas">
+            <input
+              type="number"
+              min="1"
+              className="drx-input"
+              style={{ ...inputStyle, fontSize: 12.5, padding: "7px 8px" }}
+              value={plan.numCuotas || 1}
+              onChange={(e) => actualizar({ numCuotas: e.target.value })}
+            />
+          </Field>
+        )}
+        <Field label={plan.frecuencia === "Pago único" ? "Fecha de pago" : "Fecha de la primera cuota"}>
+          <input
+            type="date"
+            className="drx-input"
+            style={{ ...inputStyle, fontSize: 12.5, padding: "7px 8px" }}
+            value={plan.proximaFecha || ""}
+            onChange={(e) => actualizar({ proximaFecha: e.target.value })}
+          />
+        </Field>
+      </div>
+      {plan.resumen && (
+        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.inkSoft, marginTop: 10, fontStyle: "italic", textAlign: "left" }}>"{plan.resumen}"</p>
       )}
     </div>
   );
@@ -373,14 +321,13 @@ export default function ClientesTab({ usuarioActual, onIrARegistrarPago }) {
 
   const guardar = async () => {
     if (!form.nombre.trim()) return;
-    // Error clásico: escribir cómo paga el cliente en el cuadro de texto y
-    // olvidar darle clic a "Organizar con IA" (o "Usar este servicio") —
-    // sin esto, el cliente se guardaba con la descripción ahí escrita pero
-    // sin frecuencia, valor ni próxima fecha, y nadie se daba cuenta hasta
-    // que el cobro nunca llegó.
-    if (form.planPago?.descripcion?.trim() && !form.planPago?.proximaFecha) {
+    // Se empezó a llenar el plan de pago (hay un valor) pero falta la fecha
+    // — sin esto, el cliente se guardaba con un valor puesto pero sin
+    // próximo cobro programado, y nadie se daba cuenta hasta que el cobro
+    // nunca llegó.
+    if (form.planPago?.valor && !form.planPago?.proximaFecha) {
       const seguir = await confirmar(
-        `Escribiste cómo paga ${form.nombre || "el cliente"} pero no se organizó el plan de pago (falta darle clic a "Organizar con IA" o "Usar este servicio"). Si guardas así, el cliente va a quedar sin próximo cobro programado. ¿Guardar de todas formas?`
+        `Le pusiste un valor al plan de pago de ${form.nombre || "el cliente"} pero falta la fecha. Si guardas así, el cliente va a quedar sin próximo cobro programado. ¿Guardar de todas formas?`
       );
       if (!seguir) return;
     }
@@ -435,9 +382,9 @@ export default function ClientesTab({ usuarioActual, onIrARegistrarPago }) {
     const proximoPago = formEdicion.planPago?.proximaFecha
       ? { fecha: formEdicion.planPago.proximaFecha, valorEsperado: formEdicion.planPago.valor }
       : formEdicion.proximoPago || null;
-    if (formEdicion.planPago?.descripcion?.trim() && !formEdicion.planPago?.proximaFecha && !proximoPago) {
+    if (formEdicion.planPago?.valor && !formEdicion.planPago?.proximaFecha && !proximoPago) {
       const seguir = await confirmar(
-        `Escribiste cómo paga ${formEdicion.nombre || "el cliente"} pero no se organizó el plan de pago (falta darle clic a "Organizar con IA" o "Usar este servicio"). Si guardas así, va a quedar sin próximo cobro programado. ¿Guardar de todas formas?`
+        `Le pusiste un valor al plan de pago de ${formEdicion.nombre || "el cliente"} pero falta la fecha. Si guardas así, va a quedar sin próximo cobro programado. ¿Guardar de todas formas?`
       );
       if (!seguir) return;
     }
@@ -758,7 +705,7 @@ export default function ClientesTab({ usuarioActual, onIrARegistrarPago }) {
           </div>
           <EditorOtrasPersonas personas={form.otrasPersonas} onChange={(otrasPersonas) => setForm({ ...form, otrasPersonas })} />
           <SelectorPagador pagador={form.pagador} onChange={(pagador) => setForm({ ...form, pagador })} />
-          <PlanDePagoIA planPago={form.planPago} onChange={(planPago) => setForm({ ...form, planPago })} />
+          <PlanDePago planPago={form.planPago} onChange={(planPago) => setForm({ ...form, planPago })} />
           <button className="drx-btn-primary" style={{ ...buttonPrimary, marginTop: 14 }} onClick={guardar}>
             Guardar cliente
           </button>
@@ -853,7 +800,7 @@ export default function ClientesTab({ usuarioActual, onIrARegistrarPago }) {
                 </div>
                 <EditorOtrasPersonas personas={formEdicion.otrasPersonas} onChange={(otrasPersonas) => setFormEdicion({ ...formEdicion, otrasPersonas })} />
                 <SelectorPagador pagador={formEdicion.pagador} onChange={(pagador) => setFormEdicion({ ...formEdicion, pagador })} />
-                <PlanDePagoIA planPago={formEdicion.planPago} onChange={(planPago) => setFormEdicion({ ...formEdicion, planPago })} />
+                <PlanDePago planPago={formEdicion.planPago} onChange={(planPago) => setFormEdicion({ ...formEdicion, planPago })} />
                 <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
                   <button className="drx-btn-ghost" style={buttonGhost} onClick={() => setEditandoId(null)}>
                     Cancelar
