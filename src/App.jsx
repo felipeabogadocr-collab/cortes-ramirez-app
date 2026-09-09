@@ -1077,7 +1077,7 @@ function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-const APP_VERSION = "1.52.1";
+const APP_VERSION = "1.52.2";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -8406,6 +8406,16 @@ function App() {
   const [mostrarSeguridad2FA, setMostrarSeguridad2FA] = useState(false);
   const [fotoPerfilUrl, setFotoPerfilUrl] = useState("");
   const [subiendoFotoPerfil, setSubiendoFotoPerfil] = useState(false);
+  // Atajo directo desde la tarjeta de un cliente en Clientes hasta el
+  // formulario de "Registrar pago" en Contabilidad, con ese cliente ya
+  // elegido — sin esto había que memorizar el nombre, cambiar de pestaña y
+  // volver a buscarlo en el desplegable. Declarado aquí arriba (no más abajo,
+  // junto a irARegistrarPago) porque después de esta sección hay un "return"
+  // condicional (despacho pendiente de activar) — un hook declarado después
+  // de ese return se salta en esa rama y React pierde la cuenta de hooks
+  // entre un render y otro, lo que tumba toda la app justo al terminar de
+  // cargar el perfil tras el login.
+  const [clienteParaPago, setClienteParaPago] = useState(null);
   useAgendaRecordatorios();
 
   // La ruta del archivo se guarda en perfiles.foto_url; el bucket es
@@ -8722,11 +8732,6 @@ function App() {
     setTab("contabilidad");
     setMostrarNotificaciones(false);
   };
-  // Atajo directo desde la tarjeta de un cliente en Clientes hasta el
-  // formulario de "Registrar pago" en Contabilidad, con ese cliente ya
-  // elegido — sin esto había que memorizar el nombre, cambiar de pestaña y
-  // volver a buscarlo en el desplegable.
-  const [clienteParaPago, setClienteParaPago] = useState(null);
   const irARegistrarPago = (clienteId) => {
     setClienteParaPago(clienteId);
     setTab("contabilidad");
