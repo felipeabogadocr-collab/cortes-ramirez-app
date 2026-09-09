@@ -792,10 +792,17 @@ function ReciboCard({ cliente, pago, onEditar, onEliminar, datosResponsable, por
             // del pago — es información interna, para saber cuánto queda de
             // utilidad real, y nunca aparece en el recibo ni en la cuenta de
             // cobro que ve el cliente.
+            //
+            // No son dos porcentajes independientes sobre el mismo total:
+            // primero se le paga al referenciador su comisión sobre el neto
+            // completo, y SOLO DESPUÉS el abogado asociado recibe su
+            // porcentaje sobre lo que queda (no sobre el neto original) —
+            // en cascada, como se reparte de verdad.
             const netoPago = valorNetoPago(pago);
             const comisionReferenciador = Number(cliente.referenciador?.porcentaje) > 0 ? Math.round((netoPago * Number(cliente.referenciador.porcentaje)) / 100) : 0;
-            const honorariosAsociado = Number(cliente.abogadoAsociado?.porcentaje) > 0 ? Math.round((netoPago * Number(cliente.abogadoAsociado.porcentaje)) / 100) : 0;
-            const utilidadDespacho = netoPago - comisionReferenciador - honorariosAsociado;
+            const remanenteTrasReferenciador = netoPago - comisionReferenciador;
+            const honorariosAsociado = Number(cliente.abogadoAsociado?.porcentaje) > 0 ? Math.round((remanenteTrasReferenciador * Number(cliente.abogadoAsociado.porcentaje)) / 100) : 0;
+            const utilidadDespacho = remanenteTrasReferenciador - honorariosAsociado;
             return (
               <div style={{ background: "#FFFBEB", border: "1px solid #FDE68A", borderRadius: 8, padding: "8px 11px", margin: "0 0 8px", fontFamily: "Inter, sans-serif", fontSize: 11.5, color: "#92400E" }}>
                 <p style={{ fontWeight: 700, margin: "0 0 3px" }}>Reparto de este pago (interno, no va en el recibo)</p>
@@ -806,7 +813,7 @@ function ReciboCard({ cliente, pago, onEditar, onEliminar, datosResponsable, por
                 )}
                 {honorariosAsociado > 0 && (
                   <p style={{ margin: "1px 0" }}>
-                    Honorarios {cliente.abogadoAsociado.nombre} ({cliente.abogadoAsociado.porcentaje}%): {formatoCOP(honorariosAsociado)}
+                    Honorarios {cliente.abogadoAsociado.nombre} ({cliente.abogadoAsociado.porcentaje}% de lo que queda tras la comisión): {formatoCOP(honorariosAsociado)}
                   </p>
                 )}
                 <p style={{ margin: "3px 0 0", fontWeight: 700 }}>Utilidad neta del despacho: {formatoCOP(utilidadDespacho)}</p>
