@@ -620,7 +620,7 @@ function FormularioPago({ cliente, onRegistrar }) {
           ) : (
             <>
               Este cliente no tiene un plan de pago con frecuencia definida, así que la próxima fecha no se calcula sola — indícala aquí si aplica, o
-              configúrale un plan recurrente (Editar cliente, o "Activar servicio") para que se calcule automáticamente la próxima vez.
+              ve a Clientes → Editar y configúrale un plan de pago recurrente para que se calcule automáticamente la próxima vez.
             </>
           )}
         </p>
