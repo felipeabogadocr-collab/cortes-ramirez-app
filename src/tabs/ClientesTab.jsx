@@ -184,14 +184,42 @@ function PlanDePago({ planPago, onChange }) {
     const servicio = servicios.find((s) => s.id === servicioElegidoId);
     if (!servicio) return;
     const proximaFecha = calcularProximaFechaPorFrecuencia(fechaHoyISO(), servicio.frecuencia);
-    onChange({ descripcion: servicio.nombre, frecuencia: servicio.frecuencia, valor: servicio.valor, resumen: servicio.nombre, proximaFecha, numCuotas: 1 });
+    onChange({
+      descripcion: servicio.nombre,
+      frecuencia: servicio.frecuencia,
+      valor: servicio.valor,
+      resumen: servicio.nombre,
+      proximaFecha,
+      numCuotas: 1,
+      cuotas: [{ fecha: proximaFecha, valor: servicio.valor }],
+    });
     setServicioElegidoId("");
+  };
+
+  // Calcula la fecha de cada cuota siguiente a partir de la primera,
+  // encadenando la frecuencia — la misma cuenta que ya usa el resto de la
+  // app para "próximo pago", solo que aquí se muestra completa de una vez
+  // en vez de una fecha a la vez.
+  const generarCuotas = (base) => {
+    const numCuotas = base.frecuencia === "Pago único" ? 1 : Number(base.numCuotas) || 1;
+    const cuotas = [];
+    let fecha = base.proximaFecha || "";
+    for (let i = 0; i < numCuotas; i++) {
+      cuotas.push({ fecha, valor: base.valor || 0 });
+      if (fecha && base.frecuencia && base.frecuencia !== "Pago único" && base.frecuencia !== "Otro") {
+        fecha = calcularProximaFechaPorFrecuencia(fecha, base.frecuencia);
+      }
+    }
+    return cuotas;
   };
 
   // Cada campo se guarda apenas se edita (nada de un botón "Organizar" aparte
   // que haya que recordar pulsar) — y el resumen se arma solo, en vez de
   // pedírselo a un modelo, así que siempre coincide con lo que hay en los
-  // campos.
+  // campos. Cambiar valor, frecuencia, número de cuotas o la fecha de la
+  // primera vuelve a generar todo el calendario de cuotas; editar una cuota
+  // puntual más abajo (actualizarCuota) solo toca esa, sin recalcular las
+  // demás.
   const actualizar = (campos) => {
     const combinado = { ...plan, ...campos };
     const numCuotas = combinado.frecuencia === "Pago único" ? 1 : Number(combinado.numCuotas) || 1;
@@ -199,7 +227,13 @@ function PlanDePago({ planPago, onChange }) {
     const resumen = combinado.valor
       ? `${formatoCOP(combinado.valor)} ${(combinado.frecuencia || "").toLowerCase()}${cuotasTexto}`.trim()
       : "";
-    onChange({ ...combinado, numCuotas, descripcion: resumen, resumen });
+    const cuotas = generarCuotas({ ...combinado, numCuotas });
+    onChange({ ...combinado, numCuotas, cuotas, descripcion: resumen, resumen });
+  };
+
+  const actualizarCuota = (idx, campo, valor) => {
+    const cuotas = (plan.cuotas || []).map((c, i) => (i === idx ? { ...c, [campo]: valor } : c));
+    onChange({ ...plan, cuotas });
   };
 
   return (
@@ -269,6 +303,32 @@ function PlanDePago({ planPago, onChange }) {
           />
         </Field>
       </div>
+      {plan.cuotas?.length > 1 && (
+        <div style={{ marginTop: 12, borderTop: `1px solid ${COLORS.border}`, paddingTop: 12, textAlign: "left" }}>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, fontWeight: 600, color: COLORS.inkSoft, marginBottom: 8 }}>
+            Calendario de cuotas — ajusta la fecha o el valor de una en particular si no es igual a las demás
+          </p>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {plan.cuotas.map((c, idx) => (
+              <div key={idx} className="drx-grid-form" style={{ display: "grid", gridTemplateColumns: "70px 1fr 1fr", gap: 8, alignItems: "center" }}>
+                <span style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted }}>Cuota {idx + 1}</span>
+                <input
+                  type="date"
+                  className="drx-input"
+                  style={{ ...inputStyle, padding: "7px 9px", fontSize: 12.5 }}
+                  value={c.fecha || ""}
+                  onChange={(e) => actualizarCuota(idx, "fecha", e.target.value)}
+                />
+                <CampoDinero
+                  style={{ ...inputStyle, padding: "7px 9px", fontSize: 12.5 }}
+                  value={c.valor || ""}
+                  onChange={(e) => actualizarCuota(idx, "valor", Number(e.target.value))}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
       {plan.resumen && (
         <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.inkSoft, marginTop: 10, fontStyle: "italic", textAlign: "left" }}>"{plan.resumen}"</p>
       )}
