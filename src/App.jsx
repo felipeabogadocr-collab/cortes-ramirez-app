@@ -233,7 +233,9 @@ export function generarReciboImagen(clienteId, cliente, pago) {
     canvas.width = width;
     canvas.height = height;
     const ctx = canvas.getContext("2d");
-    const SERIF = "'Playfair Display', Georgia, serif";
+    // Misma familia que usa el resto de la app para el nombre del despacho
+    // (la barra lateral, "Nomos" en el login, etc.) — un serif decorativo
+    // aparte solo desentonaba con la marca real.
     const SANS = "'Inter', Arial, sans-serif";
     const VERDE = "#0B3D2E";
 
@@ -243,20 +245,42 @@ export function generarReciboImagen(clienteId, cliente, pago) {
     ctx.fillStyle = VERDE;
     ctx.fillRect(0, 0, width, HEADER);
 
-    const dibujarResto = () => {
+    // Marca de agua: el logo, muy tenue y en blanco y negro, detrás del
+    // cuerpo del recibo — el mismo recurso que usan los comprobantes
+    // "oficiales" de verdad, y evita que el cuerpo blanco se sienta vacío o
+    // genérico sin recargarlo con más texto o color.
+    const dibujarMarcaDeAgua = (logoImg) => {
+      if (!logoImg) return;
+      const lado = (height - HEADER) * 0.82;
+      const cx = width - lado * 0.32;
+      const cy = HEADER + (height - HEADER) / 2;
+      ctx.save();
+      ctx.globalAlpha = 0.05;
+      ctx.filter = "grayscale(1)";
+      ctx.beginPath();
+      ctx.arc(cx, cy, lado / 2, 0, Math.PI * 2);
+      ctx.closePath();
+      ctx.clip();
+      ctx.drawImage(logoImg, cx - lado / 2, cy - lado / 2, lado, lado);
+      ctx.restore();
+    };
+
+    const dibujarResto = (logoImg) => {
+      dibujarMarcaDeAgua(logoImg);
+
       ctx.fillStyle = "#FFFFFF";
-      ctx.font = `700 20px ${SERIF}`;
-      ctx.fillText(getNombreDespacho(), 116, 54);
+      ctx.font = `800 21px ${SANS}`;
+      ctx.fillText(getNombreDespacho(), 116, 52);
       ctx.fillStyle = "#9DBEAE";
-      ctx.font = `italic 13px ${SERIF}`;
-      ctx.fillText("Recibo de pago", 116, 74);
+      ctx.font = `600 11.5px ${SANS}`;
+      ctx.fillText("RECIBO DE PAGO", 116, 72);
 
       const margen = L.margen;
 
       let y = HEADER + L.offsetTitulo;
       ctx.fillStyle = VERDE;
       ctx.font = `700 17px ${SANS}`;
-      ctx.fillText("RECIBO DE PAGO", margen, y);
+      ctx.fillText("Detalle del pago", margen, y);
       ctx.strokeStyle = "#DCE3DD";
       ctx.lineWidth = 1;
       ctx.beginPath();
@@ -289,8 +313,8 @@ export function generarReciboImagen(clienteId, cliente, pago) {
       ctx.font = `700 11px ${SANS}`;
       ctx.fillText("VALOR PAGADO", margen + 24, y + 32);
       ctx.fillStyle = VERDE;
-      ctx.font = `700 34px ${SERIF}`;
-      ctx.fillText(formatoCOP(pago.valor), margen + 24, y + 74);
+      ctx.font = `800 32px ${SANS}`;
+      ctx.fillText(formatoCOP(pago.valor), margen + 24, y + 73);
 
       y += L.altoCaja + L.gapDespuesCaja;
       ctx.strokeStyle = "#E7EAE6";
@@ -331,9 +355,9 @@ export function generarReciboImagen(clienteId, cliente, pago) {
       ctx.clip();
       ctx.drawImage(logoImg, 30, 22, 68, 68);
       ctx.restore();
-      dibujarResto();
+      dibujarResto(logoImg);
     };
-    logoImg.onerror = dibujarResto;
+    logoImg.onerror = () => dibujarResto(null);
     logoImg.src = LOGO_SRC;
   });
 }
@@ -903,7 +927,7 @@ function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-const APP_VERSION = "1.50.1";
+const APP_VERSION = "1.50.2";
 
 function SelloVersion({ oscuro }) {
   return (
