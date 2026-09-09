@@ -222,13 +222,19 @@ function PlanDePago({ planPago, onChange }) {
   // demás.
   const actualizar = (campos) => {
     const combinado = { ...plan, ...campos };
-    const numCuotas = combinado.frecuencia === "Pago único" ? 1 : Number(combinado.numCuotas) || 1;
-    const cuotasTexto = numCuotas > 1 ? ` en ${numCuotas} cuotas` : "";
+    // combinado.numCuotas se guarda TAL CUAL se escribió (puede quedar en ""
+    // un instante mientras se borra para escribir otro número) — solo se
+    // redondea a un mínimo de 1 aquí, para generar el calendario y el
+    // resumen, sin pisar lo que la persona todavía está escribiendo en el
+    // campo. Si se sobrescribiera con el valor ya corregido, el campo
+    // "saltaba" de vuelta a 1 apenas se intentaba borrar para cambiarlo.
+    const numCuotasEfectivo = combinado.frecuencia === "Pago único" ? 1 : Math.max(1, Number(combinado.numCuotas) || 1);
+    const cuotasTexto = numCuotasEfectivo > 1 ? ` en ${numCuotasEfectivo} cuotas` : "";
     const resumen = combinado.valor
       ? `${formatoCOP(combinado.valor)} ${(combinado.frecuencia || "").toLowerCase()}${cuotasTexto}`.trim()
       : "";
-    const cuotas = generarCuotas({ ...combinado, numCuotas });
-    onChange({ ...combinado, numCuotas, cuotas, descripcion: resumen, resumen });
+    const cuotas = generarCuotas({ ...combinado, numCuotas: numCuotasEfectivo });
+    onChange({ ...combinado, cuotas, descripcion: resumen, resumen });
   };
 
   const actualizarCuota = (idx, campo, valor) => {
@@ -288,7 +294,7 @@ function PlanDePago({ planPago, onChange }) {
               min="1"
               className="drx-input"
               style={{ ...inputStyle, fontSize: 12.5, padding: "7px 8px" }}
-              value={plan.numCuotas || 1}
+              value={plan.numCuotas === undefined || plan.numCuotas === null ? 1 : plan.numCuotas}
               onChange={(e) => actualizar({ numCuotas: e.target.value })}
             />
           </Field>
@@ -702,7 +708,7 @@ export default function ClientesTab({ usuarioActual, onIrARegistrarPago }) {
         <Card style={{ marginBottom: 16 }}>
           <div className="drx-grid-form" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <Field label="Nombre principal (contacto)">
-              <input className="drx-input" style={inputStyle} value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} />
+              <input className="drx-input" style={inputStyle} value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value.toUpperCase() })} />
             </Field>
             <Field label="Teléfono">
               <input className="drx-input" style={inputStyle} value={form.telefono} onChange={(e) => setForm({ ...form, telefono: e.target.value })} />
@@ -782,7 +788,7 @@ export default function ClientesTab({ usuarioActual, onIrARegistrarPago }) {
               <Card key={id}>
                 <div className="drx-grid-form" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                   <Field label="Nombre principal (contacto)">
-                    <input className="drx-input" style={inputStyle} value={formEdicion.nombre || ""} onChange={(e) => setFormEdicion({ ...formEdicion, nombre: e.target.value })} />
+                    <input className="drx-input" style={inputStyle} value={formEdicion.nombre || ""} onChange={(e) => setFormEdicion({ ...formEdicion, nombre: e.target.value.toUpperCase() })} />
                   </Field>
                   <Field label="Teléfono">
                     <input className="drx-input" style={inputStyle} value={formEdicion.telefono || ""} onChange={(e) => setFormEdicion({ ...formEdicion, telefono: e.target.value })} />
