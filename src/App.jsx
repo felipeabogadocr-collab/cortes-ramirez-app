@@ -223,14 +223,40 @@ function medirAltoRecibo(pago) {
   return yDespuesCaja + L.pieLinea2 + L.margenInferior;
 }
 
+// Ruta de un rectángulo con esquinas redondeadas dibujada a mano (arcTo) en
+// vez de ctx.roundRect(): el método nativo es reciente y en un navegador
+// viejo simplemente no existe — con arcTo funciona igual en cualquier
+// versión, sin tener que detectar soporte.
+function trazarRectRedondeado(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.arcTo(x + w, y, x + w, y + r, r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
+  ctx.lineTo(x + r, y + h);
+  ctx.arcTo(x, y + h, x, y + h - r, r);
+  ctx.lineTo(x, y + r);
+  ctx.arcTo(x, y, x + r, y, r);
+  ctx.closePath();
+}
+
 export function generarReciboImagen(clienteId, cliente, pago) {
   return new Promise((resolve) => {
     const L = RECIBO_LAYOUT;
     const width = L.width;
     const HEADER = L.header;
-    const height = medirAltoRecibo(pago);
+    const alto = medirAltoRecibo(pago);
+    // Margen exterior transparente alrededor de la tarjeta: así, al
+    // compartir la imagen (WhatsApp, portal del cliente), el recibo se ve
+    // como una tarjeta flotando con sombra propia en vez de un rectángulo
+    // pegado a los bordes de la imagen.
+    const FUERA = 28;
+    const RADIO = 18;
+    const width2 = width + FUERA * 2;
+    const height = alto + FUERA * 2;
     const canvas = document.createElement("canvas");
-    canvas.width = width;
+    canvas.width = width2;
     canvas.height = height;
     const ctx = canvas.getContext("2d");
     // Misma familia que usa el resto de la app para el nombre del despacho
@@ -238,12 +264,39 @@ export function generarReciboImagen(clienteId, cliente, pago) {
     // aparte solo desentonaba con la marca real.
     const SANS = "'Inter', Arial, sans-serif";
     const VERDE = "#0B3D2E";
+    const DORADO = "#B8912F";
 
+    // Sombra suave debajo de la tarjeta, como si flotara sobre el fondo.
+    ctx.save();
+    ctx.shadowColor = "rgba(11,61,46,0.22)";
+    ctx.shadowBlur = 26;
+    ctx.shadowOffsetY = 10;
+    trazarRectRedondeado(ctx, FUERA, FUERA, width, alto, RADIO);
     ctx.fillStyle = "#FFFFFF";
-    ctx.fillRect(0, 0, width, height);
+    ctx.fill();
+    ctx.restore();
 
-    ctx.fillStyle = VERDE;
+    // Todo lo demás se dibuja recortado a la silueta redondeada de la
+    // tarjeta y desplazado por el margen exterior — así el resto del código
+    // sigue usando coordenadas "de tarjeta" (0,0 = esquina de la tarjeta)
+    // sin tener que sumar FUERA en cada línea.
+    ctx.save();
+    trazarRectRedondeado(ctx, FUERA, FUERA, width, alto, RADIO);
+    ctx.clip();
+    ctx.translate(FUERA, FUERA);
+
+    const height2 = alto;
+
+    const degradadoHeader = ctx.createLinearGradient(0, 0, 0, HEADER);
+    degradadoHeader.addColorStop(0, "#0F4A38");
+    degradadoHeader.addColorStop(1, VERDE);
+    ctx.fillStyle = degradadoHeader;
     ctx.fillRect(0, 0, width, HEADER);
+
+    // Filete dorado en el borde superior — el detalle que separa un
+    // encabezado plano de uno con acabado de papelería fina.
+    ctx.fillStyle = DORADO;
+    ctx.fillRect(0, 0, width, 3);
 
     // Marca de agua: el logo, muy tenue y en blanco y negro, detrás del
     // cuerpo del recibo — el mismo recurso que usan los comprobantes
@@ -251,9 +304,9 @@ export function generarReciboImagen(clienteId, cliente, pago) {
     // genérico sin recargarlo con más texto o color.
     const dibujarMarcaDeAgua = (logoImg) => {
       if (!logoImg) return;
-      const lado = (height - HEADER) * 0.82;
+      const lado = (height2 - HEADER) * 0.82;
       const cx = width - lado * 0.32;
-      const cy = HEADER + (height - HEADER) / 2;
+      const cy = HEADER + (height2 - HEADER) / 2;
       ctx.save();
       ctx.globalAlpha = 0.05;
       ctx.filter = "grayscale(1)";
@@ -265,23 +318,75 @@ export function generarReciboImagen(clienteId, cliente, pago) {
       ctx.restore();
     };
 
+    // Sello circular tipo "PAGADO", ligeramente rotado, como el sello de
+    // tinta que se usaría en un recibo físico — el remate premium del
+    // recibo, en la esquina inferior derecha del cuerpo.
+    const dibujarSello = () => {
+      const cx = width - 78;
+      const cy = height2 - 58;
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate((-11 * Math.PI) / 180);
+      ctx.globalAlpha = 0.85;
+      ctx.strokeStyle = DORADO;
+      ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      ctx.arc(0, 0, 34, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(0, 0, 28, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.fillStyle = DORADO;
+      ctx.font = `800 11px ${SANS}`;
+      ctx.textAlign = "center";
+      ctx.fillText("PAGADO", 0, -1);
+      ctx.font = `600 8px ${SANS}`;
+      ctx.fillText("✓ CONFIRMADO", 0, 11);
+      ctx.textAlign = "left";
+      ctx.restore();
+    };
+
     const dibujarResto = (logoImg) => {
       dibujarMarcaDeAgua(logoImg);
+
+      // Anillo dorado fino alrededor del logo, sobre el clip del círculo.
+      ctx.strokeStyle = DORADO;
+      ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      ctx.arc(64, 56, 34, 0, Math.PI * 2);
+      ctx.stroke();
 
       ctx.fillStyle = "#FFFFFF";
       ctx.font = `800 21px ${SANS}`;
       ctx.fillText(getNombreDespacho(), 116, 52);
-      ctx.fillStyle = "#9DBEAE";
-      ctx.font = `600 11.5px ${SANS}`;
-      ctx.fillText("RECIBO DE PAGO", 116, 72);
+      ctx.fillStyle = "#D9C084";
+      ctx.font = `600 11px ${SANS}`;
+      if ("letterSpacing" in ctx) ctx.letterSpacing = "1.5px";
+      ctx.fillText("RECIBO DE PAGO", 116, 73);
+      if ("letterSpacing" in ctx) ctx.letterSpacing = "0px";
+      // Marca de verificación junto al subtítulo, como en un comprobante de
+      // pago confirmado digitalmente.
+      ctx.fillStyle = "#3E7A5D";
+      ctx.beginPath();
+      ctx.arc(238, 69, 6, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = "#FFFFFF";
+      ctx.lineWidth = 1.3;
+      ctx.beginPath();
+      ctx.moveTo(235.5, 69);
+      ctx.lineTo(237.3, 71);
+      ctx.lineTo(240.5, 66.5);
+      ctx.stroke();
 
       const margen = L.margen;
 
       let y = HEADER + L.offsetTitulo;
+      ctx.fillStyle = DORADO;
+      ctx.fillRect(margen, y - 12, 3, 14);
       ctx.fillStyle = VERDE;
       ctx.font = `700 17px ${SANS}`;
-      ctx.fillText("Detalle del pago", margen, y);
-      ctx.strokeStyle = "#DCE3DD";
+      ctx.fillText("Detalle del pago", margen + 11, y);
+      ctx.strokeStyle = "#E9DFC4";
       ctx.lineWidth = 1;
       ctx.beginPath();
       ctx.moveTo(margen, y + 14);
@@ -289,13 +394,26 @@ export function generarReciboImagen(clienteId, cliente, pago) {
       ctx.stroke();
 
       y += L.offsetPrimeraFila;
+      const columnaValor = margen + 130;
       const fila = (etiqueta, valor) => {
         ctx.font = `400 12.5px ${SANS}`;
         ctx.fillStyle = "#7A8478";
         ctx.fillText(etiqueta.toUpperCase(), margen, y);
+        const anchoEtiqueta = ctx.measureText(etiqueta.toUpperCase()).width;
+        // Guía punteada entre la etiqueta y el valor, como en una factura
+        // impresa clásica — separa las dos columnas sin necesitar una línea
+        // continua que compita visualmente con el contenido.
+        ctx.strokeStyle = "#D8DDD5";
+        ctx.lineWidth = 1;
+        ctx.setLineDash([1, 3]);
+        ctx.beginPath();
+        ctx.moveTo(margen + anchoEtiqueta + 8, y - 4);
+        ctx.lineTo(columnaValor - 10, y - 4);
+        ctx.stroke();
+        ctx.setLineDash([]);
         ctx.font = `600 14.5px ${SANS}`;
         ctx.fillStyle = "#1A2420";
-        ctx.fillText(valor, margen + 118, y);
+        ctx.fillText(valor, columnaValor, y);
         y += L.altoFila;
       };
 
@@ -305,28 +423,60 @@ export function generarReciboImagen(clienteId, cliente, pago) {
       if (pago.concepto) fila("Concepto", pago.concepto);
 
       y += L.gapAntesCaja;
-      ctx.fillStyle = "#EEF6F1";
-      ctx.fillRect(margen, y, width - margen * 2, L.altoCaja);
-      ctx.fillStyle = VERDE;
+      const degradadoCaja = ctx.createLinearGradient(margen, y, width - margen, y + L.altoCaja);
+      degradadoCaja.addColorStop(0, "#EEF6F1");
+      degradadoCaja.addColorStop(1, "#E4F0E8");
+      trazarRectRedondeado(ctx, margen, y, width - margen * 2, L.altoCaja, 10);
+      ctx.fillStyle = degradadoCaja;
+      ctx.fill();
+      ctx.save();
+      ctx.clip();
+      ctx.fillStyle = DORADO;
       ctx.fillRect(margen, y, 4, L.altoCaja);
+      ctx.restore();
       ctx.fillStyle = "#5C6B60";
       ctx.font = `700 11px ${SANS}`;
+      if ("letterSpacing" in ctx) ctx.letterSpacing = "1px";
       ctx.fillText("VALOR PAGADO", margen + 24, y + 32);
+      if ("letterSpacing" in ctx) ctx.letterSpacing = "0px";
       ctx.fillStyle = VERDE;
       ctx.font = `800 32px ${SANS}`;
-      ctx.fillText(formatoCOP(pago.valor), margen + 24, y + 73);
+      const textoValor = formatoCOP(pago.valor);
+      const anchoValor = ctx.measureText(textoValor).width;
+      ctx.fillText(textoValor, margen + 24, y + 73);
+      ctx.fillStyle = "#7C9686";
+      ctx.font = `700 11px ${SANS}`;
+      ctx.fillText("COP", margen + 24 + anchoValor + 8, y + 73);
+
+      dibujarSello();
 
       y += L.altoCaja + L.gapDespuesCaja;
-      ctx.strokeStyle = "#E7EAE6";
+      ctx.strokeStyle = "#E9DFC4";
       ctx.beginPath();
       ctx.moveTo(margen, y);
       ctx.lineTo(width - margen, y);
       ctx.stroke();
 
+      ctx.textAlign = "center";
       ctx.fillStyle = "#9AA39B";
       ctx.font = `400 10.5px ${SANS}`;
-      ctx.fillText(`Recibo N.º ${pago.id} · Comprobante generado electrónicamente`, margen, y + L.pieLinea1);
-      ctx.fillText(getNombreDespacho(), margen, y + L.pieLinea2);
+      ctx.fillText(`Recibo N.º ${pago.id} · Comprobante generado electrónicamente`, width / 2, y + L.pieLinea1);
+      ctx.fillStyle = "#6B7A70";
+      ctx.font = `700 10px ${SANS}`;
+      if ("letterSpacing" in ctx) ctx.letterSpacing = "1.2px";
+      ctx.fillText(getNombreDespacho().toUpperCase(), width / 2, y + L.pieLinea2);
+      if ("letterSpacing" in ctx) ctx.letterSpacing = "0px";
+      ctx.textAlign = "left";
+
+      // Se cierra el recorte de la tarjeta antes del borde: un trazo
+      // dibujado con el clip todavía activo se vería cortado por la mitad.
+      ctx.restore();
+      trazarRectRedondeado(ctx, FUERA + 0.5, FUERA + 0.5, width - 1, alto - 1, RADIO);
+      ctx.strokeStyle = DORADO;
+      ctx.globalAlpha = 0.55;
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      ctx.globalAlpha = 1;
 
       // Se sube al bucket "recibos" (privado, aislado por despacho) en vez
       // de guardar la imagen completa dentro de la fila del cliente — así
@@ -927,7 +1077,7 @@ function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-const APP_VERSION = "1.50.2";
+const APP_VERSION = "1.51.0";
 
 function SelloVersion({ oscuro }) {
   return (
