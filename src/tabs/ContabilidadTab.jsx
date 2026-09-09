@@ -1094,7 +1094,7 @@ function OtroIngresoCard({ ingreso, onEditar, onEliminar }) {
   );
 }
 
-export default function ContabilidadTab({ usuarioActual }) {
+export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onClienteInicialPagoConsumido }) {
   const { ids, cargado } = useIndex("indice-clientes", false);
   const [clientes, setClientes] = useState({});
   const [formAbiertoId, setFormAbiertoId] = useState(null);
@@ -1108,6 +1108,16 @@ export default function ContabilidadTab({ usuarioActual }) {
   // u otro ingreso suelto) sin tener que ir a buscar nada primero.
   const [modoRegistro, setModoRegistro] = useState(null); // null | "pago" | "egreso" | "ingreso"
   const [pagoRapidoClienteId, setPagoRapidoClienteId] = useState("");
+  // Atajo desde la tarjeta de un cliente en Clientes ("Registrar pago") —
+  // llega ya con el cliente elegido, así que se abre el formulario de pago
+  // directo en vez de dejar que lo busquen otra vez en el desplegable.
+  useEffect(() => {
+    if (clienteInicialPago && clientes[clienteInicialPago]) {
+      setPagoRapidoClienteId(clienteInicialPago);
+      setModoRegistro("pago");
+      onClienteInicialPagoConsumido?.();
+    }
+  }, [clienteInicialPago, clientes, onClienteInicialPagoConsumido]);
   const [filtroEgreso, setFiltroEgreso] = useState("");
   const [categoriaFiltroEgreso, setCategoriaFiltroEgreso] = useState("Todas");
   const [filtroOtroIngreso, setFiltroOtroIngreso] = useState("");

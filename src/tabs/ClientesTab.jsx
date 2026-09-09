@@ -272,7 +272,7 @@ function PlanDePagoIA({ planPago, onChange }) {
   );
 }
 
-export default function ClientesTab({ usuarioActual }) {
+export default function ClientesTab({ usuarioActual, onIrARegistrarPago }) {
   const { ids, cargado, addId, removeId } = useIndex("indice-clientes", false);
   const { usuarios: abogadosDespacho } = useUsuariosDespacho();
   const [clientes, setClientes] = useState({});
@@ -317,6 +317,17 @@ export default function ClientesTab({ usuarioActual }) {
 
   const guardar = async () => {
     if (!form.nombre.trim()) return;
+    // Error clásico: escribir cómo paga el cliente en el cuadro de texto y
+    // olvidar darle clic a "Organizar con IA" (o "Usar este servicio") —
+    // sin esto, el cliente se guardaba con la descripción ahí escrita pero
+    // sin frecuencia, valor ni próxima fecha, y nadie se daba cuenta hasta
+    // que el cobro nunca llegó.
+    if (form.planPago?.descripcion?.trim() && !form.planPago?.proximaFecha) {
+      const seguir = await confirmar(
+        `Escribiste cómo paga ${form.nombre || "el cliente"} pero no se organizó el plan de pago (falta darle clic a "Organizar con IA" o "Usar este servicio"). Si guardas así, el cliente va a quedar sin próximo cobro programado. ¿Guardar de todas formas?`
+      );
+      if (!seguir) return;
+    }
     const id = uid();
     const proximoPago = form.planPago?.proximaFecha ? { fecha: form.planPago.proximaFecha, valorEsperado: form.planPago.valor } : null;
     // "radicado" (el primero) se mantiene además de "radicados" (la lista
@@ -331,8 +342,12 @@ export default function ClientesTab({ usuarioActual }) {
     );
     await addId(id);
     registrarAuditoria(usuarioActual, "crear_cliente", "cliente", id, { nombre: form.nombre });
-    setToastGuardado(`"${form.nombre}" se guardó correctamente`);
-    setTimeout(() => setToastGuardado(""), 2800);
+    setToastGuardado(
+      proximoPago
+        ? `"${form.nombre}" se guardó correctamente`
+        : `"${form.nombre}" se guardó correctamente. Cuando pague, ve a Contabilidad para registrar el pago.`
+    );
+    setTimeout(() => setToastGuardado(""), 4200);
     guardarJSONLocal(LLAVE_BORRADOR_CLIENTE, null);
     setBorradorDisponible(null);
     setForm(FORM_CLIENTE_INICIAL);
@@ -364,6 +379,12 @@ export default function ClientesTab({ usuarioActual }) {
     const proximoPago = formEdicion.planPago?.proximaFecha
       ? { fecha: formEdicion.planPago.proximaFecha, valorEsperado: formEdicion.planPago.valor }
       : formEdicion.proximoPago || null;
+    if (formEdicion.planPago?.descripcion?.trim() && !formEdicion.planPago?.proximaFecha && !proximoPago) {
+      const seguir = await confirmar(
+        `Escribiste cómo paga ${formEdicion.nombre || "el cliente"} pero no se organizó el plan de pago (falta darle clic a "Organizar con IA" o "Usar este servicio"). Si guardas así, va a quedar sin próximo cobro programado. ¿Guardar de todas formas?`
+      );
+      if (!seguir) return;
+    }
     const radicados = (formEdicion.radicados || []).map((r) => r.trim()).filter(Boolean);
     const actualizado = { ...formEdicion, radicados, radicado: radicados[0] || "", proximoPago };
     await storageSet(`cliente:${id}`, JSON.stringify(actualizado), false);
@@ -1014,6 +1035,16 @@ export default function ClientesTab({ usuarioActual }) {
                   >
                     {copiado === `todo-${id}` ? "✓ Copiado" : "Copiar datos"}
                   </button>
+                  {onIrARegistrarPago && (
+                    <button
+                      className="drx-btn-ghost"
+                      style={{ ...buttonGhost, color: "#F43F5E", borderColor: "#FBD5DC" }}
+                      title="Ir a Contabilidad a registrar un pago de este cliente"
+                      onClick={() => onIrARegistrarPago(id)}
+                    >
+                      Registrar pago ↗
+                    </button>
+                  )}
                   <button
                     className="drx-btn-ghost"
                     style={{ ...buttonGhost, ...(c.procesoPausado ? { background: "#FEF3E2", color: "#B45309", borderColor: "#FCE3B8" } : {}) }}

@@ -1077,7 +1077,7 @@ function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-const APP_VERSION = "1.51.1";
+const APP_VERSION = "1.52.0";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -8697,6 +8697,15 @@ function App() {
     setTab("contabilidad");
     setMostrarNotificaciones(false);
   };
+  // Atajo directo desde la tarjeta de un cliente en Clientes hasta el
+  // formulario de "Registrar pago" en Contabilidad, con ese cliente ya
+  // elegido — sin esto había que memorizar el nombre, cambiar de pestaña y
+  // volver a buscarlo en el desplegable.
+  const [clienteParaPago, setClienteParaPago] = useState(null);
+  const irARegistrarPago = (clienteId) => {
+    setClienteParaPago(clienteId);
+    setTab("contabilidad");
+  };
 
   const puedeVer = (seccionId) => {
     if (usuarioActual.rol === "Administrador") return true;
@@ -9020,7 +9029,7 @@ function App() {
             {tab === "clientes" && puedeVer("clientes") && (
               <TabErrorBoundary nombre="clientes">
                 <Suspense fallback={<Spinner />}>
-                  <ClientesTab usuarioActual={usuarioActual} />
+                  <ClientesTab usuarioActual={usuarioActual} onIrARegistrarPago={irARegistrarPago} />
                 </Suspense>
               </TabErrorBoundary>
             )}
@@ -9034,7 +9043,7 @@ function App() {
             {tab === "contabilidad" && puedeVer("contabilidad") && (
               <TabErrorBoundary nombre="contabilidad">
                 <Suspense fallback={<Spinner />}>
-                  <ContabilidadTab usuarioActual={usuarioActual} />
+                  <ContabilidadTab usuarioActual={usuarioActual} clienteInicialPago={clienteParaPago} onClienteInicialPagoConsumido={() => setClienteParaPago(null)} />
                 </Suspense>
               </TabErrorBoundary>
             )}
