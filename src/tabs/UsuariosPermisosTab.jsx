@@ -8,7 +8,7 @@ import {
   inputStyle, buttonPrimary, buttonGhost, Card, EncabezadoSeccion, Icono, IconoCampana,
   CampoContrasena, useCuentaRegresiva, leerJSONLocal, guardarJSONLocal, permisosPorDefecto,
   notificacionesPorDefecto, SECCIONES_PERMISOS, NOTIF_CATEGORIAS, CampoDinero,
-  useServicios, FRECUENCIAS_SERVICIO,
+  useServicios, FRECUENCIAS_SERVICIO, useReferenciadores, useAbogadosAsociados,
 } from "../App.jsx";
 
 // Los administradores ya pueden leer toda la auditoría de su despacho (ver
@@ -284,6 +284,104 @@ function PanelServicios({ usuarioActual }) {
   );
 }
 
+// Catálogo de personas con las que el despacho reparte un pago por
+// porcentaje — quien refirió al cliente (comisión) o un abogado externo que
+// trabaja el caso junto al despacho (honorarios compartidos). Mismo panel
+// reutilizado para los dos, solo cambian el título, el hook y la etiqueta
+// de auditoría — la forma de los datos es idéntica en ambos casos.
+function PanelContactosComision({ usuarioActual, titulo, icono, descripcion, hook, accionCrear, accionEliminar, placeholderNombre, etiquetaBoton }) {
+  const { contactos, crear, eliminar } = hook();
+  const [mostrarForm, setMostrarForm] = useState(false);
+  const [nombre, setNombre] = useState("");
+  const [telefono, setTelefono] = useState("");
+  const [medioPago, setMedioPago] = useState("");
+  const [datosPago, setDatosPago] = useState("");
+  const [guardando, setGuardando] = useState(false);
+  const { confirmar, ConfirmarDialogo } = useConfirmarDialogo();
+
+  const guardar = async () => {
+    if (!nombre.trim()) return;
+    setGuardando(true);
+    const nuevo = await crear({ nombre, telefono, medioPago, datosPago });
+    registrarAuditoria(usuarioActual, accionCrear, "contacto", nuevo.id, { nombre: nuevo.nombre });
+    setNombre("");
+    setTelefono("");
+    setMedioPago("");
+    setDatosPago("");
+    setMostrarForm(false);
+    setGuardando(false);
+  };
+
+  const eliminarClick = async (c) => {
+    if (!(await confirmar(`¿Eliminar a "${c.nombre}" de este catálogo? Los clientes que ya lo tengan asignado no se ven afectados.`))) return;
+    await eliminar(c.id);
+    registrarAuditoria(usuarioActual, accionEliminar, "contacto", c.id, { nombre: c.nombre });
+  };
+
+  return (
+    <Card style={{ marginBottom: 20 }}>
+      {ConfirmarDialogo}
+      <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, fontWeight: 700, color: COLORS.ink, marginBottom: 4 }}>
+        <Icono tipo={icono} size={15} style={{ marginRight: 6, verticalAlign: -2 }} /> {titulo}
+      </p>
+      <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, marginBottom: 14 }}>{descripcion}</p>
+
+      {contactos.length > 0 && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 14 }}>
+          {contactos.map((c) => (
+            <div
+              key={c.id}
+              style={{
+                display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10,
+                background: COLORS.surfaceSoft, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "10px 14px",
+              }}
+            >
+              <div>
+                <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, fontWeight: 700, color: COLORS.ink, margin: 0 }}>{c.nombre}</p>
+                <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, margin: "2px 0 0" }}>
+                  {[c.telefono, c.medioPago, c.datosPago].filter(Boolean).join(" · ") || "Sin datos de pago registrados"}
+                </p>
+              </div>
+              <button className="drx-btn-ghost" style={{ ...buttonGhost, padding: "5px 10px", fontSize: 11.5, color: "#B42318", borderColor: "#F2B8B5" }} onClick={() => eliminarClick(c)}>
+                Eliminar
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {mostrarForm ? (
+        <div className="drx-grid-form" style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr 1fr 1fr", gap: 10, alignItems: "flex-end" }}>
+          <Field label="Nombre">
+            <input className="drx-input" style={inputStyle} value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder={placeholderNombre} />
+          </Field>
+          <Field label="Teléfono">
+            <input className="drx-input" style={inputStyle} value={telefono} onChange={(e) => setTelefono(e.target.value)} />
+          </Field>
+          <Field label="Medio de pago">
+            <input className="drx-input" style={inputStyle} value={medioPago} onChange={(e) => setMedioPago(e.target.value)} placeholder="Ej: Nequi, Bancolombia" />
+          </Field>
+          <Field label="Cuenta / número">
+            <input className="drx-input" style={inputStyle} value={datosPago} onChange={(e) => setDatosPago(e.target.value)} />
+          </Field>
+          <div style={{ display: "flex", gap: 8, gridColumn: "1 / -1" }}>
+            <button className="drx-btn-primary" style={buttonPrimary} onClick={guardar} disabled={guardando || !nombre.trim()}>
+              {guardando ? "Guardando…" : "Guardar"}
+            </button>
+            <button className="drx-btn-ghost" style={buttonGhost} onClick={() => setMostrarForm(false)}>
+              Cancelar
+            </button>
+          </div>
+        </div>
+      ) : (
+        <button className="drx-btn-ghost" style={buttonGhost} onClick={() => setMostrarForm(true)}>
+          {etiquetaBoton}
+        </button>
+      )}
+    </Card>
+  );
+}
+
 export default function UsuariosPermisosTab({ usuarioActual, onDespachoRenombrado }) {
   const usuarioActualId = usuarioActual.id;
   const { usuarios, crear: crearUsuario, actualizar, eliminar: eliminarUsuario } = useUsuariosDespacho();
@@ -541,6 +639,28 @@ export default function UsuariosPermisosTab({ usuarioActual, onDespachoRenombrad
       <PanelAccesoPrueba />
 
       <PanelServicios usuarioActual={usuarioActual} />
+      <PanelContactosComision
+        usuarioActual={usuarioActual}
+        titulo="Referenciadores"
+        icono="persona"
+        descripcion='Personas que envían clientes al despacho, con derecho a una comisión. Se elige al registrar el cliente en Clientes, con el porcentaje que le corresponde sobre cada pago — la cuenta de cobro descuenta esa comisión para mostrar la utilidad real.'
+        hook={useReferenciadores}
+        accionCrear="crear_referenciador"
+        accionEliminar="eliminar_referenciador"
+        placeholderNombre="Nombre de quien refiere"
+        etiquetaBoton="+ Agregar nuevo referenciador"
+      />
+      <PanelContactosComision
+        usuarioActual={usuarioActual}
+        titulo="Abogados asociados"
+        icono="balanza"
+        descripcion="Abogados externos con los que se trabaja un caso puntual en conjunto (no son usuarios del sistema). Igual que con los referenciadores, se eligen al registrar el cliente con el porcentaje de honorarios que les corresponde."
+        hook={useAbogadosAsociados}
+        accionCrear="crear_abogado_asociado"
+        accionEliminar="eliminar_abogado_asociado"
+        placeholderNombre="Nombre del abogado"
+        etiquetaBoton="+ Agregar nuevo abogado asociado"
+      />
 
       <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 16 }}>
         <button className="drx-btn-primary" style={buttonPrimary} onClick={() => setMostrarForm((s) => !s)}>
@@ -861,6 +981,10 @@ const ETIQUETAS_ACCION = {
   activar_servicio: { texto: "activó un servicio para", color: "#10B981" },
   pausar_proceso: { texto: "pausó el proceso de", color: "#B45309" },
   reanudar_proceso: { texto: "reanudó el proceso de", color: "#10B981" },
+  crear_referenciador: { texto: "agregó al referenciador", color: "#10B981" },
+  eliminar_referenciador: { texto: "eliminó al referenciador", color: "#B42318" },
+  crear_abogado_asociado: { texto: "agregó al abogado asociado", color: "#10B981" },
+  eliminar_abogado_asociado: { texto: "eliminó al abogado asociado", color: "#B42318" },
 };
 
 const AUDITORIA_POR_PAGINA = 25;

@@ -785,6 +785,34 @@ function ReciboCard({ cliente, pago, onEditar, onEliminar, datosResponsable, por
             💰 Aparta para ahorro ({porcentajeAhorro}%): {formatoCOP(montoAhorro(pago, porcentajeAhorro))}
           </p>
         )}
+        {(Number(cliente.referenciador?.porcentaje) > 0 || Number(cliente.abogadoAsociado?.porcentaje) > 0) &&
+          (() => {
+            // El reparto se calcula sobre lo que el despacho realmente
+            // recibió (ya descontada la retención), no sobre el valor bruto
+            // del pago — es información interna, para saber cuánto queda de
+            // utilidad real, y nunca aparece en el recibo ni en la cuenta de
+            // cobro que ve el cliente.
+            const netoPago = valorNetoPago(pago);
+            const comisionReferenciador = Number(cliente.referenciador?.porcentaje) > 0 ? Math.round((netoPago * Number(cliente.referenciador.porcentaje)) / 100) : 0;
+            const honorariosAsociado = Number(cliente.abogadoAsociado?.porcentaje) > 0 ? Math.round((netoPago * Number(cliente.abogadoAsociado.porcentaje)) / 100) : 0;
+            const utilidadDespacho = netoPago - comisionReferenciador - honorariosAsociado;
+            return (
+              <div style={{ background: "#FFFBEB", border: "1px solid #FDE68A", borderRadius: 8, padding: "8px 11px", margin: "0 0 8px", fontFamily: "Inter, sans-serif", fontSize: 11.5, color: "#92400E" }}>
+                <p style={{ fontWeight: 700, margin: "0 0 3px" }}>Reparto de este pago (interno, no va en el recibo)</p>
+                {comisionReferenciador > 0 && (
+                  <p style={{ margin: "1px 0" }}>
+                    Comisión {cliente.referenciador.nombre} ({cliente.referenciador.porcentaje}%): {formatoCOP(comisionReferenciador)}
+                  </p>
+                )}
+                {honorariosAsociado > 0 && (
+                  <p style={{ margin: "1px 0" }}>
+                    Honorarios {cliente.abogadoAsociado.nombre} ({cliente.abogadoAsociado.porcentaje}%): {formatoCOP(honorariosAsociado)}
+                  </p>
+                )}
+                <p style={{ margin: "3px 0 0", fontWeight: 700 }}>Utilidad neta del despacho: {formatoCOP(utilidadDespacho)}</p>
+              </div>
+            );
+          })()}
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           {urlRecibo && (
             <a

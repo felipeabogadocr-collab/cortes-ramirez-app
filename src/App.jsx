@@ -1077,7 +1077,7 @@ function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-const APP_VERSION = "1.53.3";
+const APP_VERSION = "1.54.0";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -4917,6 +4917,66 @@ export function useServicios() {
   };
 
   return { servicios, cargado, crear, editar, eliminar };
+}
+
+// Catálogo compartido para dos tipos de personas con las que el despacho
+// reparte un pago: quien refirió al cliente (comisión) y un abogado
+// asociado que trabaja el caso junto al despacho (honorarios). Misma forma
+// de datos en los dos casos (nombre, teléfono, medio de pago, cuenta/datos
+// de pago) — solo cambia dónde se guardan, así que se factoriza una vez en
+// vez de duplicar el mismo CRUD dos veces.
+function useContactosDespacho(storageKey) {
+  const [contactos, setContactosState] = useState([]);
+  const [cargado, setCargado] = useState(false);
+
+  const cargar = useCallback(async () => {
+    const raw = await storageGet(storageKey, false);
+    setContactosState(raw ? JSON.parse(raw) : []);
+    setCargado(true);
+  }, [storageKey]);
+
+  useEffect(() => {
+    cargar();
+  }, [cargar]);
+
+  const crear = async (datos) => {
+    const nuevo = {
+      id: uid(),
+      nombre: (datos.nombre || "").trim(),
+      telefono: datos.telefono || "",
+      medioPago: datos.medioPago || "",
+      datosPago: datos.datosPago || "",
+    };
+    const actualizados = [...contactos, nuevo];
+    await storageSet(storageKey, JSON.stringify(actualizados), false);
+    setContactosState(actualizados);
+    return nuevo;
+  };
+
+  const eliminar = async (id) => {
+    const actualizados = contactos.filter((c) => c.id !== id);
+    await storageSet(storageKey, JSON.stringify(actualizados), false);
+    setContactosState(actualizados);
+  };
+
+  return { contactos, cargado, crear, eliminar };
+}
+
+// Quien refirió al cliente al despacho — se le puede reconocer un
+// porcentaje de comisión sobre lo que ese cliente pague, sin que eso
+// cambie nada de la contabilidad del cliente en sí (el cliente sigue
+// pagando el 100%; el reparto es interno, para que el despacho sepa cuánto
+// le queda de utilidad real).
+export function useReferenciadores() {
+  return useContactosDespacho("referenciadores-despacho");
+}
+
+// Un abogado externo con el que se trabaja un caso puntual en conjunto
+// (no es un usuario del sistema como los del despacho) — mismo concepto de
+// reparto por porcentaje, pero como honorarios compartidos en vez de
+// comisión por referido.
+export function useAbogadosAsociados() {
+  return useContactosDespacho("abogados-asociados-despacho");
 }
 
 export const CATEGORIAS_OTRO_INGRESO = ["Ingreso administrativo", "Rendimientos financieros", "Reembolso", "Asesoría o consulta puntual", "Otro / no identificado"];

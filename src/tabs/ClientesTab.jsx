@@ -6,7 +6,7 @@ import {
   buttonGhost, Card, EncabezadoSeccion, Icono, AvatarIniciales, EstadoVacio, LineaDeTiempo,
   AREAS_PROCESO, COLOR_AREA_PROCESO, DIAS_ALERTA_INACTIVIDAD, numeroWhatsappCliente,
   radicadosDeCliente, tiposProcesoDeArea, useServicios, calcularProximaFechaPorFrecuencia,
-  fechaHoyISO, formatoCOP, leerJSONLocal, guardarJSONLocal,
+  fechaHoyISO, formatoCOP, leerJSONLocal, guardarJSONLocal, useReferenciadores, useAbogadosAsociados,
 } from "../App.jsx";
 
 // Enlace oficial de la Fiscalía para consultar el estado de una denuncia en
@@ -35,6 +35,8 @@ const FORM_CLIENTE_INICIAL = {
   abogadoAsignado: "",
   otrasPersonas: [],
   pagador: null,
+  referenciador: null,
+  abogadoAsociado: null,
 };
 
 // A veces quien paga no es el cliente: el proceso es de Pepito, pero Juan
@@ -86,6 +88,97 @@ function SelectorPagador({ pagador, onChange }) {
             onChange={(e) => onChange({ ...pagador, telefono: e.target.value })}
             placeholder="Teléfono de quien paga"
           />
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Selector reutilizado para dos casos: quien refirió al cliente (comisión)
+// y un abogado asociado con el que se trabaja el caso (honorarios
+// compartidos). Elige de un catálogo del despacho (con memoria — se define
+// una vez en Usuarios y permisos, o aquí mismo con "+ Nuevo") y el
+// porcentaje que le corresponde sobre cada pago. La cuenta de cobro usa
+// ese porcentaje para descontarlo y mostrar la utilidad real del despacho.
+function SelectorComision({ titulo, contactosHook, valor, onChange, placeholderNombre }) {
+  const { contactos, crear } = contactosHook();
+  const [mostrarNuevo, setMostrarNuevo] = useState(false);
+  const [nombreNuevo, setNombreNuevo] = useState("");
+  const [telefonoNuevo, setTelefonoNuevo] = useState("");
+
+  const elegir = (id) => {
+    if (!id) {
+      onChange(null);
+      return;
+    }
+    const c = contactos.find((x) => x.id === id);
+    if (c) onChange({ id: c.id, nombre: c.nombre, porcentaje: valor?.porcentaje ?? "" });
+  };
+
+  const crearRapido = async () => {
+    if (!nombreNuevo.trim()) return;
+    const nuevo = await crear({ nombre: nombreNuevo, telefono: telefonoNuevo });
+    onChange({ id: nuevo.id, nombre: nuevo.nombre, porcentaje: valor?.porcentaje ?? "" });
+    setNombreNuevo("");
+    setTelefonoNuevo("");
+    setMostrarNuevo(false);
+  };
+
+  return (
+    <div style={{ marginTop: 12 }}>
+      <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, fontWeight: 600, color: COLORS.inkSoft, marginBottom: 8 }}>{titulo}</p>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-end" }}>
+        <Field label="Elegir">
+          <select
+            className="drx-input"
+            style={{ ...inputStyle, fontSize: 12.5, padding: "7px 8px", minWidth: 200 }}
+            value={valor?.id || ""}
+            onChange={(e) => elegir(e.target.value)}
+          >
+            <option value="">Ninguno</option>
+            {contactos.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.nombre}
+              </option>
+            ))}
+          </select>
+        </Field>
+        {valor?.id && (
+          <Field label="% que le corresponde">
+            <input
+              type="number"
+              min="0"
+              max="100"
+              className="drx-input"
+              style={{ ...inputStyle, fontSize: 12.5, padding: "7px 8px", width: 90 }}
+              value={valor.porcentaje ?? ""}
+              onChange={(e) => onChange({ ...valor, porcentaje: e.target.value })}
+            />
+          </Field>
+        )}
+        <button className="drx-btn-ghost" style={{ ...buttonGhost, padding: "8px 14px", fontSize: 12.5 }} onClick={() => setMostrarNuevo((m) => !m)}>
+          {mostrarNuevo ? "Cancelar" : "+ Nuevo"}
+        </button>
+      </div>
+      {mostrarNuevo && (
+        <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
+          <input
+            className="drx-input"
+            style={{ ...inputStyle, padding: "8px 10px", fontSize: 13 }}
+            value={nombreNuevo}
+            onChange={(e) => setNombreNuevo(e.target.value)}
+            placeholder={placeholderNombre}
+          />
+          <input
+            className="drx-input"
+            style={{ ...inputStyle, padding: "8px 10px", fontSize: 13 }}
+            value={telefonoNuevo}
+            onChange={(e) => setTelefonoNuevo(e.target.value)}
+            placeholder="Teléfono (opcional)"
+          />
+          <button className="drx-btn-ghost" style={{ ...buttonGhost, padding: "8px 14px", fontSize: 12.5 }} onClick={crearRapido} disabled={!nombreNuevo.trim()}>
+            Guardar
+          </button>
         </div>
       )}
     </div>
@@ -772,6 +865,20 @@ export default function ClientesTab({ usuarioActual, onIrARegistrarPago }) {
           <EditorOtrasPersonas personas={form.otrasPersonas} onChange={(otrasPersonas) => setForm({ ...form, otrasPersonas })} />
           <SelectorPagador pagador={form.pagador} onChange={(pagador) => setForm({ ...form, pagador })} />
           <PlanDePago planPago={form.planPago} onChange={(planPago) => setForm({ ...form, planPago })} />
+          <SelectorComision
+            titulo="¿Alguien refirió a este cliente? (comisión)"
+            contactosHook={useReferenciadores}
+            valor={form.referenciador}
+            onChange={(referenciador) => setForm({ ...form, referenciador })}
+            placeholderNombre="Nombre de quien refiere"
+          />
+          <SelectorComision
+            titulo="¿Se trabaja este caso con otro abogado? (honorarios compartidos)"
+            contactosHook={useAbogadosAsociados}
+            valor={form.abogadoAsociado}
+            onChange={(abogadoAsociado) => setForm({ ...form, abogadoAsociado })}
+            placeholderNombre="Nombre del abogado"
+          />
           <button className="drx-btn-primary" style={{ ...buttonPrimary, marginTop: 14 }} onClick={guardar}>
             Guardar cliente
           </button>
@@ -867,6 +974,20 @@ export default function ClientesTab({ usuarioActual, onIrARegistrarPago }) {
                 <EditorOtrasPersonas personas={formEdicion.otrasPersonas} onChange={(otrasPersonas) => setFormEdicion({ ...formEdicion, otrasPersonas })} />
                 <SelectorPagador pagador={formEdicion.pagador} onChange={(pagador) => setFormEdicion({ ...formEdicion, pagador })} />
                 <PlanDePago planPago={formEdicion.planPago} onChange={(planPago) => setFormEdicion({ ...formEdicion, planPago })} />
+                <SelectorComision
+                  titulo="¿Alguien refirió a este cliente? (comisión)"
+                  contactosHook={useReferenciadores}
+                  valor={formEdicion.referenciador}
+                  onChange={(referenciador) => setFormEdicion({ ...formEdicion, referenciador })}
+                  placeholderNombre="Nombre de quien refiere"
+                />
+                <SelectorComision
+                  titulo="¿Se trabaja este caso con otro abogado? (honorarios compartidos)"
+                  contactosHook={useAbogadosAsociados}
+                  valor={formEdicion.abogadoAsociado}
+                  onChange={(abogadoAsociado) => setFormEdicion({ ...formEdicion, abogadoAsociado })}
+                  placeholderNombre="Nombre del abogado"
+                />
                 <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
                   <button className="drx-btn-ghost" style={buttonGhost} onClick={() => setEditandoId(null)}>
                     Cancelar
@@ -1072,6 +1193,20 @@ export default function ClientesTab({ usuarioActual, onIrARegistrarPago }) {
                       <Icono tipo="tarjeta" size={12} style={{ marginRight: 4, verticalAlign: -2 }} />
                       Paga: <strong>{c.pagador.nombre}</strong>
                       {c.pagador.telefono ? ` · ${c.pagador.telefono}` : ""}
+                    </p>
+                  )}
+                  {c.referenciador?.nombre && (
+                    <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.inkSoft, margin: "4px 0 0" }}>
+                      <Icono tipo="persona" size={12} style={{ marginRight: 4, verticalAlign: -2 }} />
+                      Refirió: <strong>{c.referenciador.nombre}</strong>
+                      {c.referenciador.porcentaje ? ` · ${c.referenciador.porcentaje}% comisión` : ""}
+                    </p>
+                  )}
+                  {c.abogadoAsociado?.nombre && (
+                    <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.inkSoft, margin: "4px 0 0" }}>
+                      <Icono tipo="balanza" size={12} style={{ marginRight: 4, verticalAlign: -2 }} />
+                      Con: <strong>{c.abogadoAsociado.nombre}</strong>
+                      {c.abogadoAsociado.porcentaje ? ` · ${c.abogadoAsociado.porcentaje}% honorarios` : ""}
                     </p>
                   )}
                   {c.notas && <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.inkSoft, margin: "8px 0 0" }}>{c.notas}</p>}
