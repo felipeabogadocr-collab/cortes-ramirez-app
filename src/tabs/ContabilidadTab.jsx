@@ -768,8 +768,11 @@ function ReciboCard({ cliente, pago, onEditar, onEliminar, datosResponsable, por
         </div>
       ) : null}
       <div style={{ flex: 1, minWidth: 180 }}>
-        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, fontWeight: 600, color: COLORS.ink, margin: 0 }}>
-          {formatoCOP(pago.valor)} · {pago.medioPago}
+        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11, fontWeight: 700, color: "#166534", background: "#DCFCE7", display: "inline-block", padding: "2px 8px", borderRadius: 20, margin: "0 0 4px" }}>
+          + ABONO
+        </p>
+        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, fontWeight: 600, color: "#166534", margin: 0 }}>
+          + {formatoCOP(pago.valor)} · {pago.medioPago}
         </p>
         <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, margin: "3px 0 8px" }}>
           {new Date(pago.fecha).toLocaleDateString("es-CO", { dateStyle: "medium" })}
@@ -986,8 +989,11 @@ function EgresoCard({ egreso, onEditar, onEliminar }) {
   return (
     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap", background: COLORS.surfaceSoft, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: 12, marginTop: 10 }}>
       <div>
-        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, fontWeight: 600, color: COLORS.ink, margin: 0 }}>
-          {formatoCOP(egreso.valor)} · {egreso.concepto}
+        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11, fontWeight: 700, color: "#B42318", background: "#FEF2F2", display: "inline-block", padding: "2px 8px", borderRadius: 20, margin: "0 0 4px" }}>
+          − EGRESO
+        </p>
+        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, fontWeight: 600, color: "#B42318", margin: 0 }}>
+          − {formatoCOP(egreso.valor)} · {egreso.concepto}
         </p>
         <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, margin: "3px 0 0" }}>
           {egreso.categoria} · {new Date(egreso.fecha).toLocaleDateString("es-CO", { dateStyle: "medium" })}
@@ -1115,8 +1121,11 @@ function OtroIngresoCard({ ingreso, onEditar, onEliminar }) {
   return (
     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap", background: COLORS.surfaceSoft, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: 12, marginTop: 10 }}>
       <div>
-        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, fontWeight: 600, color: COLORS.ink, margin: 0 }}>
-          {formatoCOP(ingreso.valor)} · {ingreso.concepto}
+        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11, fontWeight: 700, color: "#166534", background: "#DCFCE7", display: "inline-block", padding: "2px 8px", borderRadius: 20, margin: "0 0 4px" }}>
+          + INGRESO
+        </p>
+        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, fontWeight: 600, color: "#166534", margin: 0 }}>
+          + {formatoCOP(ingreso.valor)} · {ingreso.concepto}
         </p>
         <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, margin: "3px 0 0" }}>
           {ingreso.categoria} · {new Date(ingreso.fecha).toLocaleDateString("es-CO", { dateStyle: "medium" })}
