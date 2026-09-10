@@ -44,6 +44,21 @@ import {
 
 const MEDIOS_PAGO = ["Nequi", "Daviplata", "Nu", "Cuenta bancaria", "Llave"];
 
+// Flechita de comparación contra el mes anterior en las tarjetas de resumen
+// — subeEsBueno invierte los colores para Egresos, donde subir es la mala
+// noticia (al contrario que Recaudado/Neto).
+function BadgeCambioMes({ cambio, subeEsBueno }) {
+  if (cambio === null) return null;
+  const esBuena = subeEsBueno ? cambio >= 0 : cambio <= 0;
+  const color = cambio === 0 ? "#6B7480" : esBuena ? "#166534" : "#B42318";
+  const flecha = cambio > 0 ? "▲" : cambio < 0 ? "▼" : "●";
+  return (
+    <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11, fontWeight: 700, color, margin: "3px 0 0" }}>
+      {flecha} {Math.abs(cambio)}% vs. mes anterior
+    </p>
+  );
+}
+
 // Cuando el cliente que paga es agente retenedor (típicamente una empresa),
 // no transfiere el valor completo de la cuenta de cobro: retiene un
 // porcentaje y se lo entrega directamente a la DIAN a nombre del abogado.
@@ -591,6 +606,54 @@ function CampoRetencion({ valor, onChange, valorOtro, onChangeOtro }) {
         </Field>
       )}
     </>
+  );
+}
+
+function PanelMetaRecaudo({ meta, onGuardar }) {
+  const [abierto, setAbierto] = useState(false);
+  const [valor, setValor] = useState(meta?.valor ? String(meta.valor) : "");
+  const [guardando, setGuardando] = useState(false);
+
+  useEffect(() => {
+    setValor(meta?.valor ? String(meta.valor) : "");
+  }, [meta]);
+
+  const guardar = async () => {
+    setGuardando(true);
+    await onGuardar({ valor: Number(valor) || 0 });
+    setGuardando(false);
+    setAbierto(false);
+  };
+
+  const activo = Number(meta?.valor) > 0;
+
+  return (
+    <Card style={{ marginBottom: 20 }}>
+      <button
+        onClick={() => setAbierto((a) => !a)}
+        style={{ background: "none", border: "none", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%", padding: 0 }}
+      >
+        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 14, fontWeight: 700, color: COLORS.ink, margin: 0, display: "flex", alignItems: "center", gap: 6 }}>
+          <Icono tipo="objetivo" size={14} /> Meta de recaudo mensual {activo ? "" : "(sin definir)"}
+        </p>
+        <span style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.muted }}>{abierto ? "Ocultar ▲" : "Editar ▼"}</span>
+      </button>
+      {!abierto && (
+        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, marginTop: 6 }}>
+          {activo ? `Meta: ${formatoCOP(meta.valor)} al mes.` : "Ponte una meta de cuánto quieres recaudar al mes para ver tu progreso de un vistazo."}
+        </p>
+      )}
+      {abierto && (
+        <div style={{ marginTop: 14 }}>
+          <Field label="Meta de recaudo al mes (opcional)">
+            <CampoDinero style={{ ...inputStyle, maxWidth: 260 }} value={valor} onChange={(e) => setValor(e.target.value)} placeholder="Ej: 8.000.000" />
+          </Field>
+          <button className="drx-btn-primary" style={{ ...buttonPrimary, marginTop: 12 }} onClick={guardar} disabled={guardando}>
+            {guardando ? "Guardando…" : "Guardar meta"}
+          </button>
+        </div>
+      )}
+    </Card>
   );
 }
 
@@ -1484,6 +1547,18 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
     setPresupuesto(datos);
   };
 
+  const [metaRecaudo, setMetaRecaudo] = useState(null);
+  useEffect(() => {
+    (async () => {
+      const raw = await storageGet("meta-recaudo-mensual", false);
+      setMetaRecaudo(raw ? JSON.parse(raw) : {});
+    })();
+  }, []);
+  const guardarMetaRecaudo = async (datos) => {
+    await storageSet("meta-recaudo-mensual", JSON.stringify(datos), false);
+    setMetaRecaudo(datos);
+  };
+
   const [ahorro, setAhorro] = useState(null);
   useEffect(() => {
     (async () => {
@@ -1692,44 +1767,63 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
   };
 
   const hoy = new Date();
+  const mesAnteriorRef = new Date(hoy.getFullYear(), hoy.getMonth() - 1, 1);
+  const esMesActual = (fecha) => fecha.getFullYear() === hoy.getFullYear() && fecha.getMonth() === hoy.getMonth();
+  const esMesAnterior = (fecha) => fecha.getFullYear() === mesAnteriorRef.getFullYear() && fecha.getMonth() === mesAnteriorRef.getMonth();
+
   let recaudadoTotal = 0;
   let recaudadoMes = 0;
+  let recaudadoMesAnterior = 0;
   let retenidoMes = 0;
   let retenidoTotal = 0;
   let ahorroSugeridoMes = 0;
   let ahorroSugeridoTotal = 0;
   const porMedioPagoMes = {};
+  const totalPorClienteHistorico = {};
   ids.forEach((id) => {
     (clientes[id]?.pagos || []).forEach((p) => {
       const valor = Number(p.valor) || 0;
       recaudadoTotal += valor;
       retenidoTotal += valorRetenido(p);
       ahorroSugeridoTotal += montoAhorro(p, porcentajeAhorro);
+      totalPorClienteHistorico[id] = (totalPorClienteHistorico[id] || 0) + valor;
       const fechaPago = new Date(p.fecha);
-      if (fechaPago.getFullYear() === hoy.getFullYear() && fechaPago.getMonth() === hoy.getMonth()) {
+      if (esMesActual(fechaPago)) {
         recaudadoMes += valor;
         retenidoMes += valorRetenido(p);
         ahorroSugeridoMes += montoAhorro(p, porcentajeAhorro);
         const medio = p.medioPago || "Otro";
         porMedioPagoMes[medio] = (porMedioPagoMes[medio] || 0) + valor;
+      } else if (esMesAnterior(fechaPago)) {
+        recaudadoMesAnterior += valor;
       }
     });
   });
   const mediosPagoOrdenados = Object.entries(porMedioPagoMes).sort((a, b) => b[1] - a[1]);
+  // Ranking de quién más ha aportado en la vida del despacho — útil para
+  // saber a quién priorizar en el servicio, y para el análisis financiero
+  // de Resumen (de dónde viene realmente la plata).
+  const topClientesHistorico = Object.entries(totalPorClienteHistorico)
+    .map(([id, total]) => ({ id, nombre: clientes[id]?.nombre || "—", total }))
+    .sort((a, b) => b.total - a.total)
+    .slice(0, 5);
 
   // Salidas de dinero (arriendo, nómina, servicios...) — sin esto, la
   // pantalla solo mostraba lo que entraba y nunca lo que salía, así que no
   // servía para saber si el despacho realmente está ganando plata o no.
   let egresoTotal = 0;
   let egresoMes = 0;
+  let egresoMesAnterior = 0;
   const porCategoriaEgresoTotal = {};
   egresos.forEach((e) => {
     const valor = Number(e.valor) || 0;
     egresoTotal += valor;
     porCategoriaEgresoTotal[e.categoria] = (porCategoriaEgresoTotal[e.categoria] || 0) + valor;
     const fechaEgreso = new Date(e.fecha);
-    if (fechaEgreso.getFullYear() === hoy.getFullYear() && fechaEgreso.getMonth() === hoy.getMonth()) {
+    if (esMesActual(fechaEgreso)) {
       egresoMes += valor;
+    } else if (esMesAnterior(fechaEgreso)) {
+      egresoMesAnterior += valor;
     }
   });
   const categoriasEgresoOrdenadas = Object.entries(porCategoriaEgresoTotal).sort((a, b) => b[1] - a[1]);
@@ -1749,19 +1843,57 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
   // dónde clasificar) — sin esto se quedaban fuera de "cuánto entró".
   let otrosIngresosTotal = 0;
   let otrosIngresosMes = 0;
+  let otrosIngresosMesAnterior = 0;
   otrosIngresos.forEach((i) => {
     const valor = Number(i.valor) || 0;
     otrosIngresosTotal += valor;
     const fechaIngreso = new Date(i.fecha);
-    if (fechaIngreso.getFullYear() === hoy.getFullYear() && fechaIngreso.getMonth() === hoy.getMonth()) {
+    if (esMesActual(fechaIngreso)) {
       otrosIngresosMes += valor;
+    } else if (esMesAnterior(fechaIngreso)) {
+      otrosIngresosMesAnterior += valor;
     }
   });
 
   const ingresoTotalMes = recaudadoMes + otrosIngresosMes;
+  const ingresoTotalMesAnterior = recaudadoMesAnterior + otrosIngresosMesAnterior;
   const ingresoTotalHistoricoTodo = recaudadoTotal + otrosIngresosTotal;
   const netoMes = ingresoTotalMes - egresoMes;
+  const netoMesAnterior = ingresoTotalMesAnterior - egresoMesAnterior;
   const netoTotal = ingresoTotalHistoricoTodo - egresoTotal;
+
+  // Comparativo contra el mes anterior — null cuando el mes anterior no
+  // tuvo movimiento (dividir por cero no dice nada útil, así que la
+  // tarjeta simplemente no muestra la flecha en ese caso).
+  const cambioPct = (actual, anterior) => (anterior > 0 ? Math.round(((actual - anterior) / anterior) * 100) : null);
+  const cambioRecaudadoMes = cambioPct(ingresoTotalMes, ingresoTotalMesAnterior);
+  const cambioEgresoMes = cambioPct(egresoMes, egresoMesAnterior);
+  const cambioNetoMes = cambioPct(netoMes, netoMesAnterior);
+
+  // Meta de recaudo mensual (distinta del presupuesto de gastos): progreso
+  // de lo que ya entró este mes contra lo que el usuario se propuso.
+  const metaRecaudoValor = Number(metaRecaudo?.valor) || 0;
+  const porcentajeMetaRecaudo = metaRecaudoValor > 0 ? Math.min(999, Math.round((ingresoTotalMes / metaRecaudoValor) * 100)) : 0;
+
+  // Flujo de caja proyectado: suma del próximo pago esperado de cada
+  // cliente activo con saldo, agrupado por mes — usa el mismo dato que ya
+  // alimenta "Próximos pagos por vencer", así que no hay doble
+  // contabilidad ni una fuente de verdad distinta.
+  const hoyInicioDia = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
+  const mesesProyeccion = [0, 1, 2].map((i) => {
+    const d = new Date(hoy.getFullYear(), hoy.getMonth() + i, 1);
+    return { clave: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`, etiqueta: d.toLocaleDateString("es-CO", { month: "long", year: "numeric" }), total: 0 };
+  });
+  ids.forEach((id) => {
+    const c = clientes[id];
+    if (!c || c.procesoPausado || !c.proximoPago?.fecha || !c.proximoPago?.valorEsperado) return;
+    const fecha = new Date(c.proximoPago.fecha);
+    if (fecha < hoyInicioDia) return; // ya vencido: no es proyección futura, es cartera atrasada
+    const clave = `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, "0")}`;
+    const bucket = mesesProyeccion.find((m) => m.clave === clave);
+    if (bucket) bucket.total += Number(c.proximoPago.valorEsperado) || 0;
+  });
+  const totalProyeccion3Meses = mesesProyeccion.reduce((s, m) => s + m.total, 0);
 
   const mesesEgresos = [];
   for (let i = 5; i >= 0; i--) {
@@ -1834,8 +1966,32 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
       <EncabezadoSeccion titulo="Contabilidad" color="#F43F5E" />
 
       <PanelDatosCuentaCobro datos={datosResponsable} onGuardar={guardarDatosResponsable} />
+      <PanelMetaRecaudo meta={metaRecaudo} onGuardar={guardarMetaRecaudo} />
       <PanelPresupuesto presupuesto={presupuesto} onGuardar={guardarPresupuesto} />
       <PanelAhorro ahorro={ahorro} onGuardar={guardarAhorro} />
+
+      {metaRecaudoValor > 0 &&
+        (() => {
+          const colorMeta = porcentajeMetaRecaudo >= 100 ? "#10B981" : porcentajeMetaRecaudo >= 60 ? "#166534" : "#B45309";
+          return (
+            <Card style={{ marginBottom: 20, borderLeft: `4px solid ${colorMeta}` }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: 8, marginBottom: 10 }}>
+                <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, fontWeight: 700, color: COLORS.ink, margin: 0 }}>Meta de recaudo del mes</p>
+                <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, fontWeight: 700, color: colorMeta, margin: 0 }}>
+                  {formatoCOP(ingresoTotalMes)} de {formatoCOP(metaRecaudoValor)} ({porcentajeMetaRecaudo}%)
+                </p>
+              </div>
+              <div style={{ height: 10, borderRadius: 6, background: COLORS.surfaceSoft, overflow: "hidden" }}>
+                <div style={{ height: "100%", width: `${Math.min(porcentajeMetaRecaudo, 100)}%`, background: colorMeta, transition: "width 0.3s ease" }} />
+              </div>
+              <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: colorMeta, marginTop: 8, marginBottom: 0 }}>
+                {porcentajeMetaRecaudo >= 100
+                  ? `¡Meta cumplida! Vas ${formatoCOP(ingresoTotalMes - metaRecaudoValor)} por encima.`
+                  : `Te faltan ${formatoCOP(metaRecaudoValor - ingresoTotalMes)} para llegar a la meta este mes.`}
+              </p>
+            </Card>
+          );
+        })()}
 
       {presupuestoValor > 0 && (
         <Card style={{ marginBottom: 20, borderLeft: `4px solid ${colorPresupuesto}` }}>
@@ -1935,6 +2091,7 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
             Recaudado este mes
           </p>
           <p style={{ fontFamily: "Inter, sans-serif", fontSize: 22, fontWeight: 800, color: "#166534", margin: "4px 0 0" }}>{formatoCOP(recaudadoMes)}</p>
+          <BadgeCambioMes cambio={cambioRecaudadoMes} subeEsBueno />
         </Card>
         <Card
           role="button"
@@ -1947,6 +2104,7 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
             Egresos este mes
           </p>
           <p style={{ fontFamily: "Inter, sans-serif", fontSize: 22, fontWeight: 800, color: "#B42318", margin: "4px 0 0" }}>{formatoCOP(egresoMes)}</p>
+          <BadgeCambioMes cambio={cambioEgresoMes} subeEsBueno={false} />
         </Card>
         <Card
           role="button"
@@ -1959,6 +2117,7 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
             Neto este mes
           </p>
           <p style={{ fontFamily: "Inter, sans-serif", fontSize: 22, fontWeight: 800, color: netoMes >= 0 ? COLORS.navy : "#B42318", margin: "4px 0 0" }}>{formatoCOP(netoMes)}</p>
+          <BadgeCambioMes cambio={cambioNetoMes} subeEsBueno />
         </Card>
         <Card
           role="button"
@@ -2060,6 +2219,43 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
           </Card>
         )}
       </div>
+
+      {totalProyeccion3Meses > 0 && (
+        <Card style={{ marginBottom: 20 }}>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, fontWeight: 700, color: COLORS.ink, marginBottom: 4 }}>Flujo de caja proyectado</p>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, marginBottom: 14 }}>
+            Según el próximo pago esperado de cada cliente activo — no incluye pagos ya vencidos, esos están en "Cartera pendiente".
+          </p>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 10 }}>
+            {mesesProyeccion.map((m) => (
+              <div key={m.clave} style={{ background: COLORS.surfaceSoft, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: 12 }}>
+                <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11, fontWeight: 700, color: COLORS.muted, textTransform: "uppercase", letterSpacing: 0.5, margin: 0 }}>
+                  {m.etiqueta}
+                </p>
+                <p style={{ fontFamily: "Inter, sans-serif", fontSize: 19, fontWeight: 800, color: COLORS.navy, margin: "4px 0 0" }}>{formatoCOP(m.total)}</p>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
+      {topClientesHistorico.length > 0 && (
+        <Card style={{ marginBottom: 20 }}>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, fontWeight: 700, color: COLORS.ink, marginBottom: 4 }}>Top clientes por recaudo histórico</p>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, marginBottom: 14 }}>Quiénes más le han aportado al despacho desde siempre.</p>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {topClientesHistorico.map((c, i) => (
+              <div key={c.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: COLORS.surfaceSoft, borderRadius: 8, padding: "8px 12px" }}>
+                <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.ink, margin: 0, display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ fontWeight: 800, color: COLORS.muted, fontSize: 12, width: 16 }}>{i + 1}</span>
+                  {c.nombre}
+                </p>
+                <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, fontWeight: 700, color: COLORS.navy, margin: 0 }}>{formatoCOP(c.total)}</p>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
 
       <Card style={{ marginBottom: 20 }}>
         <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, fontWeight: 700, color: COLORS.ink, marginBottom: 4 }}>Ingresos vs. egresos por mes</p>

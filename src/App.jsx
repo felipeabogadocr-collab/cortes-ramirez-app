@@ -1078,7 +1078,7 @@ function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-const APP_VERSION = "1.58.1";
+const APP_VERSION = "1.59.0";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -1707,6 +1707,24 @@ function analisisFinanciero(rep, r) {
   } else if (r.totalAbogados > 0 && clientesPorAbogado < 6) {
     puntos += 1;
     senales.push({ positiva: true, texto: `Cada abogado tiene en promedio ${Math.round(clientesPorAbogado)} clientes activos — hay capacidad disponible para atender más.` });
+  }
+
+  // Flujo de caja proyectado del próximo mes contra lo que se gastó este
+  // mes: si lo que ya está comprometido para entrar no alcanza a cubrir el
+  // ritmo de gasto actual, es una señal de riesgo aunque el mes actual haya
+  // cerrado bien — mismo dato que "Flujo de caja proyectado" en
+  // Contabilidad, sin inventar un cálculo aparte.
+  if (rep.egresoMesActual > 0 && rep.proyeccionProximoMes !== undefined) {
+    if (rep.proyeccionProximoMes < rep.egresoMesActual * 0.7) {
+      puntos -= 2;
+      senales.push({
+        positiva: false,
+        texto: `Lo ya comprometido para el próximo mes (${formatoCOP(rep.proyeccionProximoMes)}) no alcanza a cubrir el gasto de este mes (${formatoCOP(rep.egresoMesActual)}) — vale la pena asegurar más cobros antes de sumar carga nueva.`,
+      });
+    } else if (rep.proyeccionProximoMes >= rep.egresoMesActual * 1.3) {
+      puntos += 1;
+      senales.push({ positiva: true, texto: `Ya hay ${formatoCOP(rep.proyeccionProximoMes)} comprometidos para el próximo mes, bien por encima del gasto mensual actual.` });
+    }
   }
 
   const areaLider = (rep.filasArea || [])[0];
@@ -4981,6 +4999,19 @@ export function useDatosReportes() {
   const clientesConPago = listaClientes.filter((c) => (c.pagos || []).length > 0).length;
   const ticketPromedio = clientesConPago > 0 ? ingresoTotalHistorico / clientesConPago : 0;
 
+  // Cuánto ya está "comprometido" para el próximo mes según el próximo pago
+  // esperado de cada cliente activo — mismo dato que alimenta "Próximos
+  // pagos por vencer" en Contabilidad, así el análisis financiero de
+  // Resumen no inventa una fuente de verdad distinta.
+  const hoyProyeccion = new Date();
+  const inicioProximoMes = new Date(hoyProyeccion.getFullYear(), hoyProyeccion.getMonth() + 1, 1);
+  const finProximoMes = new Date(hoyProyeccion.getFullYear(), hoyProyeccion.getMonth() + 2, 1);
+  const proyeccionProximoMes = listaClientes.reduce((sum, c) => {
+    if (c.procesoPausado || !c.proximoPago?.fecha || !c.proximoPago?.valorEsperado) return sum;
+    const fecha = new Date(c.proximoPago.fecha);
+    return fecha >= inicioProximoMes && fecha < finProximoMes ? sum + (Number(c.proximoPago.valorEsperado) || 0) : sum;
+  }, 0);
+
   return {
     cargando,
     listaClientes,
@@ -5006,6 +5037,7 @@ export function useDatosReportes() {
     maxArea,
     clientesConPago,
     ticketPromedio,
+    proyeccionProximoMes,
   };
 }
 
