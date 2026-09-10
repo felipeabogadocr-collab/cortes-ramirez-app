@@ -2145,11 +2145,11 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
                         fontWeight: 700,
                         padding: "2px 9px",
                         borderRadius: 20,
-                        background: saldo <= 0 ? "#DCFCE7" : "#FEF3E2",
-                        color: saldo <= 0 ? "#166534" : "#B45309",
+                        background: saldo <= 0 ? "#DCFCE7" : "#EFF6FF",
+                        color: saldo <= 0 ? "#166534" : "#1D4ED8",
                       }}
                     >
-                      {saldo <= 0 ? "Al día" : `Debe ${formatoCOP(saldo)}`}
+                      {saldo <= 0 ? "Al día" : `Saldo del plan: ${formatoCOP(saldo)}`}
                     </p>
                   )}
                   </div>

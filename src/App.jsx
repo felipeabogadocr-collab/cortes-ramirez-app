@@ -1078,7 +1078,7 @@ function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-const APP_VERSION = "1.57.0";
+const APP_VERSION = "1.57.1";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -4700,11 +4700,11 @@ function VistaPortalCliente() {
                   fontWeight: 700,
                   padding: "3px 10px",
                   borderRadius: 20,
-                  background: saldo <= 0 ? "#DCFCE7" : "#FEF3E2",
-                  color: saldo <= 0 ? "#166534" : "#B45309",
+                  background: saldo <= 0 ? "#DCFCE7" : "#EFF6FF",
+                  color: saldo <= 0 ? "#166534" : "#1D4ED8",
                 }}
               >
-                {saldo <= 0 ? "Al día" : `Saldo pendiente: ${formatoCOP(saldo)}`}
+                {saldo <= 0 ? "Al día" : `Saldo del plan: ${formatoCOP(saldo)}`}
               </p>
             </Card>
           )}
