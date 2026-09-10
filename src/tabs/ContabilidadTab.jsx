@@ -1138,6 +1138,12 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
   const { ids, cargado } = useIndex("indice-clientes", false);
   const [clientes, setClientes] = useState({});
   const [formAbiertoId, setFormAbiertoId] = useState(null);
+  // Un egreso no tiene nada que ver con un cliente puntual (es plata que
+  // sale del despacho en general) — este atajo solo evita tener que subir
+  // hasta la barra de arriba mientras se está revisando la lista de un
+  // cliente en particular; abre exactamente el mismo formulario que "+
+  // Registrar egreso" de arriba.
+  const [egresoAbiertoId, setEgresoAbiertoId] = useState(null);
   const [filtro, setFiltro] = useState("");
   const [soloPendientes, setSoloPendientes] = useState(false);
   const [orden, setOrden] = useState("nombre");
@@ -1998,7 +2004,7 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
 
           return (
             <Card key={id} style={{ borderLeft: "4px solid #F43F5E" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 12 }}>
                 <div style={{ display: "flex", gap: 12 }}>
                   <AvatarIniciales nombre={c.nombre} />
                   <div>
@@ -2026,12 +2032,26 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
                   )}
                   </div>
                 </div>
-                <button className="drx-btn-ghost" style={buttonGhost} onClick={() => setFormAbiertoId(formAbiertoId === id ? null : id)}>
-                  {formAbiertoId === id ? "Cancelar" : "+ Registrar pago"}
-                </button>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  <button className="drx-btn-ghost" style={buttonGhost} onClick={() => setFormAbiertoId(formAbiertoId === id ? null : id)}>
+                    {formAbiertoId === id ? "Cancelar" : "+ Registrar pago"}
+                  </button>
+                  <button
+                    className="drx-btn-ghost"
+                    style={{ ...buttonGhost, color: "#F43F5E", borderColor: "#FBD5DC" }}
+                    onClick={() => setEgresoAbiertoId(egresoAbiertoId === id ? null : id)}
+                  >
+                    {egresoAbiertoId === id ? "Cancelar" : "+ Registrar egreso"}
+                  </button>
+                </div>
               </div>
 
               {formAbiertoId === id && <FormularioPago cliente={c} onRegistrar={(datos) => registrarPago(id, datos)} />}
+              {egresoAbiertoId === id && (
+                <div style={{ marginTop: 12, borderTop: `1px solid ${COLORS.border}`, paddingTop: 14 }}>
+                  <FormularioEgreso onRegistrar={async (datos) => { await registrarEgreso(datos); setEgresoAbiertoId(null); }} />
+                </div>
+              )}
 
               {pagos.length > 0 && (() => {
                 const ordenados = [...pagos].sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
