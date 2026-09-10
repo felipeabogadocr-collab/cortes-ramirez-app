@@ -1,10 +1,10 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "../lib/supabaseClient";
-import { storageSet, obtenerClientesPorId } from "../lib/storage";
+import { storageSet, obtenerClientesPorId, getNombreDespacho } from "../lib/storage";
 import {
   COLORS, uid, diasDesde, useIndex, useConfirmarDialogo, inputStyle, buttonPrimary, buttonGhost, Card,
   EncabezadoSeccion, Icono, AvatarIniciales, EstadoVacio, LineaDeTiempo, COLOR_AREA_PROCESO,
-  ESTADOS_VIGILANCIA, consultarRamaJudicial, radicadosDeCliente,
+  ESTADOS_VIGILANCIA, consultarRamaJudicial, radicadosDeCliente, numeroWhatsappCliente,
 } from "../App.jsx";
 
 // El estado de "última consulta" de un radicado vive en dos lugares por
@@ -55,6 +55,36 @@ async function explicarActuacion(actuacion, anotacion) {
   return data.truncado ? `${texto}\n\n(La respuesta se cortó por límite de espacio — vuelve a intentar si falta algo importante.)` : texto;
 }
 
+// Igual que explicarActuacion, pero pensada para el cliente (no para el
+// abogado): sin sugerir qué debe hacer el abogado, en tono cercano y sin
+// tecnicismos, porque esto va directo en el mensaje de WhatsApp que recibe
+// la persona. Si falla o tarda, la notificación se envía igual con solo el
+// dato crudo de la actuación — nunca debe bloquear el aviso al cliente.
+async function explicarParaCliente(actuacion, anotacion) {
+  const { data: sesionData } = await supabase.auth.getSession();
+  const token = sesionData?.session?.access_token;
+  const response = await fetch("/api/assistant", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({
+      model: "claude-sonnet-4-6",
+      max_tokens: 400,
+      system:
+        `Eres el asistente de un despacho de abogados colombiano, escribiendo un mensaje breve para un cliente sin formación jurídica. ` +
+        `Te doy el nombre de una actuación judicial y su anotación tal como aparecen en la Rama Judicial. ` +
+        `Responde en máximo 2 frases cortas, en español sencillo y cercano, explicando qué significa esta novedad para su caso EN TÉRMINOS PRÁCTICOS. ` +
+        `No sugieras acciones para el abogado, no uses tecnicismos innecesarios, no agregues saludos ni despedidas — ve directo a la explicación.`,
+      messages: [{ role: "user", content: `Actuación: ${actuacion}\nAnotación: ${anotacion || "(sin anotación)"}` }],
+    }),
+  });
+  const data = await response.json();
+  if (!response.ok || data.error) throw new Error(data.error || "No se pudo contactar al asistente de IA");
+  return (data.content || []).map((b) => b.text || "").join("").trim();
+}
+
 export default function VigilanciaTab() {
   const { ids } = useIndex("indice-clientes", false);
   const [clientes, setClientes] = useState({});
@@ -64,6 +94,8 @@ export default function VigilanciaTab() {
   const [consultandoTodos, setConsultandoTodos] = useState(false);
   const [explicaciones, setExplicaciones] = useState({});
   const [explicando, setExplicando] = useState(null);
+  const [notificando, setNotificando] = useState(null);
+  const [novedadesRecientes, setNovedadesRecientes] = useState([]);
   const [filtroEstado, setFiltroEstado] = useState("Todos");
   const [radicadoCopiado, setRadicadoCopiado] = useState("");
   const [explicacionCopiada, setExplicacionCopiada] = useState("");
@@ -213,6 +245,43 @@ export default function VigilanciaTab() {
     setExplicando(null);
   };
 
+  // Notificación directa al cliente por WhatsApp cuando hay novedad en su
+  // proceso — trae al mensaje la explicación en lenguaje sencillo (si se
+  // alcanza a generar a tiempo), pero nunca se queda esperando para
+  // siempre: si el asistente de IA falla, el aviso sale igual solo con el
+  // dato crudo de la actuación.
+  const notificarNovedadPorWhatsapp = async (id, radicado, actuacion) => {
+    const c = clientes[id];
+    const numero = numeroWhatsappCliente(c?.telefono);
+    if (!numero) return;
+    const clave = `${id}:${radicado}`;
+    setNotificando(clave);
+    let explicacion = "";
+    try {
+      explicacion = await explicarParaCliente(actuacion.actuacion, actuacion.anotacion);
+    } catch (e) {
+      // Sigue sin explicación de IA — el aviso no puede depender de que el
+      // asistente esté disponible en ese momento.
+    }
+    setNotificando(null);
+    const fechaTexto = new Date(actuacion.fecha).toLocaleDateString("es-CO", { dateStyle: "long" });
+    const partes = [
+      `*${getNombreDespacho()}*`,
+      "",
+      `Hola ${c?.nombre || ""}, le informamos una novedad en su proceso${c?.tipoProceso ? ` de ${c.tipoProceso}` : ""} (radicado ${radicado}):`,
+      "",
+      `Actuación: ${actuacion.actuacion}`,
+      actuacion.anotacion ? actuacion.anotacion : null,
+      `Fecha: ${fechaTexto}`,
+      actuacion.despacho ? `Despacho: ${actuacion.despacho}` : null,
+      "",
+      explicacion || null,
+      explicacion ? "" : null,
+      "Cualquier duda, quedamos atentos por este mismo medio.",
+    ].filter((linea) => linea !== null);
+    window.open(`https://wa.me/${numero}?text=${encodeURIComponent(partes.join("\n"))}`, "_blank");
+  };
+
   const conRadicado = ids.filter((id) => radicadosDeCliente(clientes[id]).length > 0);
   const sinRadicado = ids.filter((id) => radicadosDeCliente(clientes[id]).length === 0);
   // Cada radicado se vigila por separado — un cliente con 3 radicados cuenta
@@ -250,6 +319,7 @@ export default function VigilanciaTab() {
   const consultarTodos = async () => {
     setConsultandoTodos(true);
     const clientesLocales = { ...clientes };
+    const novedadesNuevas = [];
     for (const { id, radicado } of paresRadicado) {
       const clave = `${id}:${radicado}`;
       try {
@@ -278,6 +348,11 @@ export default function VigilanciaTab() {
           // con toda su línea de tiempo marcada como "hoy".
           const nuevaEntrada = { id: uid(), fecha: fechaNueva, nota: texto };
           actualizado = { ...actualizado, timeline: [...(c.timeline || []), nuevaEntrada], ultimaActuacion: new Date().toISOString(), estadoVigilancia: "Con novedad" };
+          novedadesNuevas.push({
+            id,
+            radicado,
+            actuacion: { actuacion: data.ultimaActuacion.actuacion, anotacion: data.ultimaActuacion.anotacion, fecha: fechaNueva, despacho: data.proceso?.despacho },
+          });
         }
         await storageSet(`cliente:${id}`, JSON.stringify(actualizado), false);
         clientesLocales[id] = actualizado;
@@ -286,6 +361,7 @@ export default function VigilanciaTab() {
       }
     }
     setClientes(clientesLocales);
+    setNovedadesRecientes(novedadesNuevas);
     setConsultandoTodos(false);
   };
 
@@ -347,6 +423,46 @@ export default function VigilanciaTab() {
           </button>
         )}
       </div>
+
+      {novedadesRecientes.length > 0 && (
+        <Card style={{ marginBottom: 16, borderLeft: "4px solid #F5A524", background: "#FEF3E2" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
+            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13.5, fontWeight: 700, color: "#92400E", margin: 0 }}>
+              <Icono tipo="alerta" size={13} style={{ marginRight: 4, verticalAlign: -2 }} /> {novedadesRecientes.length} novedad{novedadesRecientes.length !== 1 ? "es" : ""} nueva
+              {novedadesRecientes.length !== 1 ? "s" : ""} — avisa al cliente
+            </p>
+            <button className="drx-btn-ghost" style={{ ...buttonGhost, fontSize: 11.5, padding: "4px 10px", background: "#fff" }} onClick={() => setNovedadesRecientes([])}>
+              Ocultar
+            </button>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {novedadesRecientes.map((n) => {
+              const c = clientes[n.id];
+              const clave = `${n.id}:${n.radicado}`;
+              return (
+                <div key={clave} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "#fff", border: "1px solid #FCE3B8", borderRadius: 8, padding: "8px 12px", gap: 10, flexWrap: "wrap" }}>
+                  <div>
+                    <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, fontWeight: 600, color: COLORS.ink, margin: 0 }}>{c?.nombre || "—"}</p>
+                    <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, color: COLORS.muted, margin: "2px 0 0" }}>{n.actuacion.actuacion}</p>
+                  </div>
+                  {c?.telefono ? (
+                    <button
+                      className="drx-btn-primary"
+                      style={{ ...buttonPrimary, fontSize: 12, padding: "6px 12px", background: "#1DA851" }}
+                      onClick={() => notificarNovedadPorWhatsapp(n.id, n.radicado, n.actuacion)}
+                      disabled={notificando === clave}
+                    >
+                      {notificando === clave ? "Preparando…" : "Notificar por WhatsApp ↗"}
+                    </button>
+                  ) : (
+                    <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, color: "#B45309", margin: 0 }}>Sin teléfono registrado</p>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </Card>
+      )}
 
       {conRadicado.length > 0 && (
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
@@ -571,6 +687,16 @@ export default function VigilanciaTab() {
                                 </>
                               )}
                             </button>
+                            {c.telefono && (
+                              <button
+                                className="drx-btn-primary"
+                                style={{ ...buttonPrimary, fontSize: 12, padding: "6px 12px", background: "#1DA851" }}
+                                onClick={() => notificarNovedadPorWhatsapp(id, radicado, { ...resultado.ultimaActuacion, despacho: resultado.proceso?.despacho })}
+                                disabled={notificando === clave}
+                              >
+                                {notificando === clave ? "Preparando notificación…" : "Notificar novedad por WhatsApp ↗"}
+                              </button>
+                            )}
                           </div>
                           {explicaciones[clave] && (
                             <div style={{ marginTop: 10, background: COLORS.accentSoft, border: "1px solid #C7D6EA", borderRadius: 8, padding: 10 }}>
