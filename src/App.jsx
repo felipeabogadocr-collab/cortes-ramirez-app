@@ -1078,7 +1078,7 @@ function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-const APP_VERSION = "1.56.0";
+const APP_VERSION = "1.57.0";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -1622,6 +1622,125 @@ function diagnosticoOperacion(r) {
   }
 
   return { puntaje, etiqueta, color, razones, sugerencias };
+}
+
+// Análisis financiero tipo "asesor" para el Resumen: a diferencia del
+// diagnóstico operativo de arriba (que mira pendientes del día a día), esto
+// mira la plata en el tiempo — tendencia de ingresos, margen real, cuánto
+// hay atascado en cartera, y qué tan cargado está cada abogado — para dar
+// un veredicto concreto sobre si es buen momento para salir a buscar más
+// clientes, o si primero hay que resolver algo. Necesita al menos un par de
+// meses con datos para poder hablar de tendencia; con menos, se queda en un
+// mensaje honesto de "todavía no hay suficiente historial".
+function analisisFinanciero(rep, r) {
+  const meses = rep.mesesEtiquetas || [];
+  const valoresIngreso = meses.map((m) => rep.ingresosPorMes[m.clave] || 0);
+  const mesesConDatos = valoresIngreso.filter((v) => v > 0).length;
+
+  if (rep.cargando || (rep.listaClientes || []).length === 0 || mesesConDatos < 2) {
+    return {
+      listo: false,
+      mesesConDatos,
+    };
+  }
+
+  const promedioMensual = valoresIngreso.reduce((s, v) => s + v, 0) / meses.length;
+  const mitad = Math.floor(meses.length / 2);
+  const ingresoUltimaMitad = valoresIngreso.slice(mitad).reduce((s, v) => s + v, 0);
+  const ingresoPrimeraMitad = valoresIngreso.slice(0, mitad).reduce((s, v) => s + v, 0);
+  const tendenciaPct = ingresoPrimeraMitad > 0 ? Math.round(((ingresoUltimaMitad - ingresoPrimeraMitad) / ingresoPrimeraMitad) * 100) : null;
+
+  const margenMes = rep.ingresoMesActual > 0 ? rep.netoMesActual / rep.ingresoMesActual : null;
+  const margenHistorico = rep.ingresoTotalHistorico > 0 ? rep.netoTotalHistorico / rep.ingresoTotalHistorico : null;
+  const mesesDeCarteraAtascada = promedioMensual > 0 ? rep.carteraPendienteTotal / promedioMensual : null;
+
+  const abogados = Math.max(1, r.totalAbogados || 1);
+  const clientesPorAbogado = r.totalClientes / abogados;
+
+  const proporcionAtrasados = r.totalClientes > 0 ? r.pagosAtrasados / r.totalClientes : 0;
+
+  const senales = [];
+  let puntos = 0;
+
+  if (tendenciaPct !== null) {
+    if (tendenciaPct >= 8) {
+      puntos += 2;
+      senales.push({ positiva: true, texto: `Los ingresos vienen subiendo (${tendenciaPct >= 0 ? "+" : ""}${tendenciaPct}% comparando la primera mitad de los últimos ${meses.length} meses con la segunda).` });
+    } else if (tendenciaPct <= -8) {
+      puntos -= 2;
+      senales.push({ positiva: false, texto: `Los ingresos vienen bajando (${tendenciaPct}% en los últimos ${meses.length} meses) — antes de buscar más clientes conviene entender por qué.` });
+    } else {
+      senales.push({ positiva: null, texto: `Los ingresos se han mantenido más o menos estables en los últimos ${meses.length} meses (${tendenciaPct >= 0 ? "+" : ""}${tendenciaPct}%).` });
+    }
+  }
+
+  if (margenMes !== null) {
+    if (margenMes >= 0.35) {
+      puntos += 2;
+      senales.push({ positiva: true, texto: `El margen de este mes es sano: de cada peso que entra, queda ${Math.round(margenMes * 100)}% neto después de egresos.` });
+    } else if (margenMes < 0.15) {
+      puntos -= 2;
+      senales.push({ positiva: false, texto: `El margen de este mes es apretado: solo queda ${Math.round(margenMes * 100)}% neto después de egresos — traer clientes nuevos sin resolver esto solo multiplica el problema.` });
+    } else {
+      senales.push({ positiva: null, texto: `El margen de este mes es moderado: ${Math.round(margenMes * 100)}% neto después de egresos.` });
+    }
+  }
+
+  if (mesesDeCarteraAtascada !== null) {
+    if (mesesDeCarteraAtascada > 2.5) {
+      puntos -= 2;
+      senales.push({ positiva: false, texto: `Hay ${formatoCOP(rep.carteraPendienteTotal)} en cartera pendiente — equivale a casi ${mesesDeCarteraAtascada.toFixed(1)} meses de facturación atascados por cobrar.` });
+    } else if (mesesDeCarteraAtascada < 1) {
+      puntos += 1;
+      senales.push({ positiva: true, texto: `La cartera pendiente está bajo control (${formatoCOP(rep.carteraPendienteTotal)}, menos de un mes de facturación).` });
+    }
+  }
+
+  if (proporcionAtrasados > 0.15) {
+    puntos -= 1;
+    senales.push({ positiva: false, texto: `${r.pagosAtrasados} de ${r.totalClientes} clientes tienen pagos atrasados — vale la pena poner al día el cobro antes de sumar más carga.` });
+  }
+
+  if (r.totalAbogados > 0 && clientesPorAbogado > 15) {
+    puntos -= 2;
+    senales.push({ positiva: false, texto: `Cada abogado tiene en promedio ${Math.round(clientesPorAbogado)} clientes activos — la limitación ahora mismo puede ser capacidad, no falta de clientes.` });
+  } else if (r.totalAbogados > 0 && clientesPorAbogado < 6) {
+    puntos += 1;
+    senales.push({ positiva: true, texto: `Cada abogado tiene en promedio ${Math.round(clientesPorAbogado)} clientes activos — hay capacidad disponible para atender más.` });
+  }
+
+  const areaLider = (rep.filasArea || [])[0];
+
+  let veredicto;
+  let color;
+  let consejo;
+  if (puntos >= 3) {
+    veredicto = "Es buen momento para traer más clientes";
+    color = "#10B981";
+    consejo = `Los números aguantan crecer: ${areaLider ? `${areaLider[0]} es tu área más fuerte hoy (${areaLider[1]} cliente${areaLider[1] !== 1 ? "s" : ""}), un buen punto de partida para enfocar el mercadeo. ` : ""}Mantén el ritmo de cobro al día para que el crecimiento no se te vaya en cartera pendiente.`;
+  } else if (puntos <= -3) {
+    veredicto = "Antes de buscar más clientes, hay que estabilizar";
+    color = "#B42318";
+    consejo = "Resolver lo de arriba primero (cobro, margen o capacidad, según lo que aplique) evita que el crecimiento agrave el mismo problema en mayor escala.";
+  } else {
+    veredicto = "Vas estable — puedes crecer con cuidado";
+    color = "#F5A524";
+    consejo = "No hay una señal fuerte en ningún sentido: es razonable ir sumando clientes de a poco mientras vigilas que el margen y la cartera no se deterioren.";
+  }
+
+  return {
+    listo: true,
+    veredicto,
+    color,
+    consejo,
+    senales,
+    tendenciaPct,
+    margenMes,
+    margenHistorico,
+    mesesDeCarteraAtascada,
+    clientesPorAbogado: r.totalAbogados > 0 ? clientesPorAbogado : null,
+    areaLider,
+  };
 }
 
 function TarjetaResumen({ titulo, valor, detalle, onClick, color, alerta }) {
@@ -3043,6 +3162,77 @@ function ResumenTab({ nombre, usuarioId, usuarioActual, onIr }) {
                   ))}
                 </ul>
               </div>
+            )}
+          </Card>
+        );
+      })()}
+
+      {(() => {
+        const a = analisisFinanciero(rep, r);
+        return (
+          <Card
+            style={{
+              marginBottom: 24,
+              borderLeft: `4px solid ${a.listo ? a.color : "#94A3B8"}`,
+              background: `linear-gradient(135deg, ${COLORS.panel} 0%, ${a.listo ? a.color + "0D" : COLORS.surfaceSoft} 100%)`,
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14, flexWrap: "wrap", gap: 10 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div
+                  style={{
+                    width: 38,
+                    height: 38,
+                    borderRadius: 10,
+                    background: a.listo ? a.color + "1F" : COLORS.surfaceSoft,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    flexShrink: 0,
+                  }}
+                >
+                  <Icono tipo="objetivo" size={18} style={{ color: a.listo ? a.color : COLORS.muted }} />
+                </div>
+                <div>
+                  <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, fontWeight: 600, color: COLORS.muted, textTransform: "uppercase", letterSpacing: 0.5, margin: 0 }}>
+                    Análisis financiero · crecimiento
+                  </p>
+                  <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, margin: "2px 0 0" }}>Con base en tus ingresos, egresos, cartera y carga de trabajo</p>
+                </div>
+              </div>
+              {a.listo && (
+                <button className="drx-btn-ghost" style={{ ...buttonGhost, padding: "4px 10px", fontSize: 11.5 }} onClick={() => onIr("reportes")}>
+                  Ver reportes →
+                </button>
+              )}
+            </div>
+
+            {!a.listo ? (
+              <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.inkSoft, margin: 0 }}>
+                Todavía no hay suficiente historial de ingresos y egresos para dar un veredicto confiable — con dos o tres meses de pagos y egresos registrados, aquí verás si conviene salir a buscar más clientes o consolidar primero.
+              </p>
+            ) : (
+              <>
+                <p style={{ fontFamily: "Inter, sans-serif", fontSize: 19, fontWeight: 800, color: a.color, margin: "0 0 10px" }}>{a.veredicto}</p>
+                <p style={{ fontFamily: "'Source Serif 4', serif", fontSize: 13.5, color: COLORS.ink, lineHeight: 1.6, margin: "0 0 16px" }}>{a.consejo}</p>
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {a.senales.map((s, i) => (
+                    <div key={i} style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+                      <span
+                        style={{
+                          marginTop: 5,
+                          width: 7,
+                          height: 7,
+                          borderRadius: "50%",
+                          flexShrink: 0,
+                          background: s.positiva === true ? "#10B981" : s.positiva === false ? "#B42318" : "#94A3B8",
+                        }}
+                      />
+                      <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.inkSoft, margin: 0, lineHeight: 1.5 }}>{s.texto}</p>
+                    </div>
+                  ))}
+                </div>
+              </>
             )}
           </Card>
         );
