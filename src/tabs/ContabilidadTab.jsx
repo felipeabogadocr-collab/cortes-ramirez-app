@@ -177,8 +177,20 @@ async function generarCuentaDeCobroPdf({ cliente, pago, datosResponsable, numero
 // devolverla — un PDF no se puede editar sin herramientas aparte. Se genera
 // en el navegador y se descarga directo, sin guardar nada en la base de
 // datos: no hay ningún archivo que "se llene" con el tiempo.
+function base64ImagenALogo(dataUri) {
+  const base64 = (dataUri || "").split(",")[1] || "";
+  const binario = atob(base64);
+  const bytes = new Uint8Array(binario.length);
+  for (let i = 0; i < binario.length; i++) bytes[i] = binario.charCodeAt(i);
+  return bytes;
+}
+
+const AZUL_MARCA = "0B1220";
+const VERDE_MARCA = "166534";
+const GRIS_TEXTO = "475569";
+
 async function generarCuentaDeCobroComisionDocx({ contacto, tipoContacto, cliente, monto, porcentaje, pago, datosResponsable, numero }) {
-  const { Document, Packer, Paragraph, TextRun, AlignmentType } = await import("docx");
+  const { Document, Packer, Paragraph, TextRun, AlignmentType, ImageRun, Table, TableRow, TableCell, WidthType, BorderStyle, ShadingType, VerticalAlign } = await import("docx");
 
   const nombreDespacho = getNombreDespacho();
   const pagador = (datosResponsable?.nombre || nombreDespacho || "").trim();
@@ -189,35 +201,129 @@ async function generarCuentaDeCobroComisionDocx({ contacto, tipoContacto, client
     tipoContacto === "Referenciador"
       ? `comisión por la referencia del cliente ${cliente.nombre || ""}`
       : `honorarios por el apoyo en el proceso del cliente ${cliente.nombre || ""}`;
-  const datosPagoContacto = [contacto?.medioPago, contacto?.datosPago].filter((v) => v && String(v).trim()).join(" – ");
 
-  const parrafo = (texto, opciones = {}) => new Paragraph({ spacing: { after: 200 }, children: [new TextRun({ text: texto, size: 22, ...opciones })] });
+  const sinBorde = { style: BorderStyle.NONE, size: 0, color: "FFFFFF" };
+  const sinBordes = { top: sinBorde, bottom: sinBorde, left: sinBorde, right: sinBorde };
+  const celda = (texto, opciones = {}) =>
+    new TableCell({
+      width: opciones.width || { size: 50, type: WidthType.PERCENTAGE },
+      borders: sinBordes,
+      shading: opciones.shading ? { type: ShadingType.CLEAR, fill: opciones.shading } : undefined,
+      verticalAlign: VerticalAlign.CENTER,
+      margins: { top: 90, bottom: 90, left: 140, right: 140 },
+      children: [
+        new Paragraph({
+          children: [new TextRun({ text: texto, size: opciones.size || 20, bold: !!opciones.bold, color: opciones.color || "111827", italics: !!opciones.italics })],
+        }),
+      ],
+    });
+
+  let logo = [];
+  try {
+    logo = [
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        spacing: { after: 120 },
+        children: [new ImageRun({ type: "png", data: base64ImagenALogo(LOGO_SRC), transformation: { width: 60, height: 60 } })],
+      }),
+    ];
+  } catch (e) {
+    // Si el logo no carga por lo que sea, el documento se genera igual.
+  }
+
+  const filaDatoPago = (etiqueta, valor) =>
+    new TableRow({
+      children: [celda(etiqueta, { width: { size: 34, type: WidthType.PERCENTAGE }, size: 18, color: GRIS_TEXTO }), celda(valor || "", { size: 20, bold: true })],
+    });
 
   const doc = new Document({
     sections: [
       {
-        properties: {},
+        properties: { page: { margin: { top: 900, bottom: 900, left: 1000, right: 1000 } } },
         children: [
-          new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 40 }, children: [new TextRun({ text: nombreDespacho, bold: true, size: 26 })] }),
-          new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 300 }, children: [new TextRun({ text: "CUENTA DE COBRO", bold: true, size: 30 })] }),
-          parrafo(`${(datosResponsable?.ciudad || "").trim() || "___________"}, ${fechaHoy}`),
-          parrafo(
-            `Yo, ${contacto?.nombre || "___________________________"}, identificado(a) con cédula de ciudadanía No. ______________________, cobro a ${pagador}${
-              documentoPagador ? `, identificado(a) con C.C./NIT No. ${documentoPagador}` : ""
-            } la suma de:`
-          ),
-          parrafo(`${numeroEnLetras(monto)} (${formatoCOP(monto)})`, { bold: true }),
-          parrafo(
-            `Por concepto de: ${conceptoBase}${porcentaje ? ` (${porcentaje}% pactado)` : ""}, correspondiente al pago recibido por el despacho el ${fechaPago}.`
-          ),
-          parrafo(`Favor consignar a: ${datosPagoContacto || "______________________________"}`),
-          new Paragraph({ spacing: { before: 600, after: 200 }, children: [new TextRun({ text: "______________________________", size: 22 })] }),
-          parrafo("Firma"),
-          parrafo(`Nombre: ${contacto?.nombre || "___________________________"}`),
-          parrafo("C.C. No. ______________________"),
+          ...logo,
+          new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 4 }, children: [new TextRun({ text: nombreDespacho, bold: true, size: 24, color: AZUL_MARCA })] }),
           new Paragraph({
-            spacing: { before: 400 },
-            children: [new TextRun({ text: `Documento No. ${numero} · ${nombreDespacho}`, size: 16, color: "999999", italics: true })],
+            alignment: AlignmentType.CENTER,
+            spacing: { after: 260 },
+            border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: "E2E8F0", space: 10 } },
+            children: [new TextRun({ text: "Cortés Ramírez Abogados", size: 16, color: GRIS_TEXTO, italics: true })],
+          }),
+          new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 4 }, children: [new TextRun({ text: "CUENTA DE COBRO", bold: true, size: 32, color: AZUL_MARCA })] }),
+          new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 320 }, children: [new TextRun({ text: `No. ${numero}`, size: 18, color: GRIS_TEXTO })] }),
+
+          new Paragraph({ spacing: { after: 200 }, children: [new TextRun({ text: `${(datosResponsable?.ciudad || "").trim() || "___________"}, ${fechaHoy}`, size: 20 })] }),
+
+          new Paragraph({
+            spacing: { after: 220 },
+            alignment: AlignmentType.JUSTIFIED,
+            children: [
+              new TextRun({
+                text: `Yo, ${contacto?.nombre || "___________________________"}, identificado(a) con cédula de ciudadanía No. ______________________, cobro a ${pagador}${
+                  documentoPagador ? `, identificado(a) con C.C./NIT No. ${documentoPagador}` : ""
+                } la suma de:`,
+                size: 20,
+              }),
+            ],
+          }),
+
+          // Caja destacada con el valor — en letras (como exige la costumbre
+          // mercantil colombiana para este tipo de documento) y en número,
+          // para que no haya que buscar el valor dentro de un párrafo.
+          new Table({
+            width: { size: 100, type: WidthType.PERCENTAGE },
+            rows: [
+              new TableRow({
+                children: [
+                  new TableCell({
+                    borders: {
+                      top: { style: BorderStyle.SINGLE, size: 4, color: "D1FAE5" },
+                      bottom: { style: BorderStyle.SINGLE, size: 4, color: "D1FAE5" },
+                      left: { style: BorderStyle.SINGLE, size: 4, color: "D1FAE5" },
+                      right: { style: BorderStyle.SINGLE, size: 4, color: "D1FAE5" },
+                    },
+                    shading: { type: ShadingType.CLEAR, fill: "F0FDF4" },
+                    margins: { top: 180, bottom: 180, left: 220, right: 220 },
+                    children: [
+                      new Paragraph({ spacing: { after: 60 }, children: [new TextRun({ text: formatoCOP(monto), bold: true, size: 34, color: VERDE_MARCA })] }),
+                      new Paragraph({ children: [new TextRun({ text: `Son: ${numeroEnLetras(monto)}`, italics: true, size: 19, color: "166534" })] }),
+                    ],
+                  }),
+                ],
+              }),
+            ],
+          }),
+
+          new Paragraph({
+            spacing: { before: 260, after: 260 },
+            alignment: AlignmentType.JUSTIFIED,
+            children: [
+              new TextRun({
+                text: `Por concepto de: ${conceptoBase}${porcentaje ? ` (${porcentaje}% pactado)` : ""}, correspondiente al pago recibido por el despacho el ${fechaPago}.`,
+                size: 20,
+              }),
+            ],
+          }),
+
+          new Paragraph({ spacing: { after: 100 }, children: [new TextRun({ text: "DATOS PARA CONSIGNAR", bold: true, size: 17, color: GRIS_TEXTO })] }),
+          new Table({
+            width: { size: 100, type: WidthType.PERCENTAGE },
+            rows: [
+              filaDatoPago("Medio de pago", contacto?.medioPago || "___________________________"),
+              filaDatoPago("Cuenta / número", contacto?.datosPago || "___________________________"),
+              filaDatoPago("A nombre de", contacto?.nombre || "___________________________"),
+            ],
+          }),
+
+          new Paragraph({ spacing: { before: 700, after: 40 }, children: [new TextRun({ text: "______________________________", size: 20 })] }),
+          new Paragraph({ spacing: { after: 4 }, children: [new TextRun({ text: "Firma", size: 18, color: GRIS_TEXTO })] }),
+          new Paragraph({ spacing: { after: 4 }, children: [new TextRun({ text: `Nombre: ${contacto?.nombre || "___________________________"}`, size: 20, bold: true })] }),
+          new Paragraph({ children: [new TextRun({ text: "C.C. No. ______________________", size: 20 })] }),
+
+          new Paragraph({
+            spacing: { before: 500 },
+            border: { top: { style: BorderStyle.SINGLE, size: 4, color: "E2E8F0", space: 8 } },
+            children: [new TextRun({ text: `Documento No. ${numero} · ${nombreDespacho} · generado electrónicamente`, size: 14, color: "94A3B8", italics: true })],
           }),
         ],
       },
