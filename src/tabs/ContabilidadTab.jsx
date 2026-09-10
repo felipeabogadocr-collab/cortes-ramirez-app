@@ -38,6 +38,8 @@ import {
   enviarRecordatorioPago,
   ensureJsPDF,
   LOGO_SRC,
+  useReferenciadores,
+  useAbogadosAsociados,
 } from "../App.jsx";
 
 const MEDIOS_PAGO = ["Nequi", "Daviplata", "Nu", "Cuenta bancaria", "Llave"];
@@ -166,6 +168,71 @@ async function generarCuentaDeCobroPdf({ cliente, pago, datosResponsable, numero
 
   const nombreArchivo = `cuenta_de_cobro_${numero}_${(cliente.nombre || "cliente").replace(/[^a-z0-9]+/gi, "_").toLowerCase()}.pdf`;
   pdf.save(nombreArchivo);
+}
+
+// Cuenta de cobro para el referenciador o el abogado asociado — a
+// diferencia de la del cliente (que cobra el despacho), aquí quien cobra es
+// el contacto y quien paga es el despacho. Se entrega en Word porque quien
+// la recibe todavía tiene que completarla (cédula y firma) antes de
+// devolverla — un PDF no se puede editar sin herramientas aparte. Se genera
+// en el navegador y se descarga directo, sin guardar nada en la base de
+// datos: no hay ningún archivo que "se llene" con el tiempo.
+async function generarCuentaDeCobroComisionDocx({ contacto, tipoContacto, cliente, monto, porcentaje, pago, datosResponsable, numero }) {
+  const { Document, Packer, Paragraph, TextRun, AlignmentType } = await import("docx");
+
+  const nombreDespacho = getNombreDespacho();
+  const pagador = (datosResponsable?.nombre || nombreDespacho || "").trim();
+  const documentoPagador = (datosResponsable?.documento || "").trim();
+  const fechaHoy = new Date().toLocaleDateString("es-CO", { day: "numeric", month: "long", year: "numeric" });
+  const fechaPago = new Date(pago.fecha).toLocaleDateString("es-CO", { day: "numeric", month: "long", year: "numeric" });
+  const conceptoBase =
+    tipoContacto === "Referenciador"
+      ? `comisión por la referencia del cliente ${cliente.nombre || ""}`
+      : `honorarios por el apoyo en el proceso del cliente ${cliente.nombre || ""}`;
+  const datosPagoContacto = [contacto?.medioPago, contacto?.datosPago].filter((v) => v && String(v).trim()).join(" – ");
+
+  const parrafo = (texto, opciones = {}) => new Paragraph({ spacing: { after: 200 }, children: [new TextRun({ text: texto, size: 22, ...opciones })] });
+
+  const doc = new Document({
+    sections: [
+      {
+        properties: {},
+        children: [
+          new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 40 }, children: [new TextRun({ text: nombreDespacho, bold: true, size: 26 })] }),
+          new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 300 }, children: [new TextRun({ text: "CUENTA DE COBRO", bold: true, size: 30 })] }),
+          parrafo(`${(datosResponsable?.ciudad || "").trim() || "___________"}, ${fechaHoy}`),
+          parrafo(
+            `Yo, ${contacto?.nombre || "___________________________"}, identificado(a) con cédula de ciudadanía No. ______________________, cobro a ${pagador}${
+              documentoPagador ? `, identificado(a) con C.C./NIT No. ${documentoPagador}` : ""
+            } la suma de:`
+          ),
+          parrafo(`${numeroEnLetras(monto)} (${formatoCOP(monto)})`, { bold: true }),
+          parrafo(
+            `Por concepto de: ${conceptoBase}${porcentaje ? ` (${porcentaje}% pactado)` : ""}, correspondiente al pago recibido por el despacho el ${fechaPago}.`
+          ),
+          parrafo(`Favor consignar a: ${datosPagoContacto || "______________________________"}`),
+          new Paragraph({ spacing: { before: 600, after: 200 }, children: [new TextRun({ text: "______________________________", size: 22 })] }),
+          parrafo("Firma"),
+          parrafo(`Nombre: ${contacto?.nombre || "___________________________"}`),
+          parrafo("C.C. No. ______________________"),
+          new Paragraph({
+            spacing: { before: 400 },
+            children: [new TextRun({ text: `Documento No. ${numero} · ${nombreDespacho}`, size: 16, color: "999999", italics: true })],
+          }),
+        ],
+      },
+    ],
+  });
+
+  const blob = await Packer.toBlob(doc);
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `cuenta_de_cobro_${numero}_${(contacto?.nombre || tipoContacto).replace(/[^a-z0-9]+/gi, "_").toLowerCase()}.docx`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }
 
 // Paleta compartida entre el gráfico de barras por categoría y las tarjetas
@@ -665,7 +732,7 @@ function useUrlRecibo(reciboImagen) {
   return url;
 }
 
-function ReciboCard({ cliente, pago, onEditar, onEliminar, datosResponsable, porcentajeAhorro }) {
+function ReciboCard({ cliente, pago, onEditar, onEliminar, datosResponsable, porcentajeAhorro, referenciadores, abogadosAsociados }) {
   const [copiado, setCopiado] = useState(false);
   const [editando, setEditando] = useState(false);
   const [medioPago, setMedioPago] = useState(pago.medioPago);
@@ -702,6 +769,44 @@ function ReciboCard({ cliente, pago, onEditar, onEliminar, datosResponsable, por
       console.error("No se pudo generar la cuenta de cobro:", e);
     }
     setGenerandoCuenta(false);
+  };
+
+  // Cascada igual a la del cuadro "Reparto de este pago" de abajo: primero
+  // se calcula la comisión del referenciador sobre el neto completo, y solo
+  // después el abogado asociado recibe su % sobre lo que queda.
+  const netoPagoComisiones = valorNetoPago(pago);
+  const referenciadorCliente = cliente.referenciador?.id ? (referenciadores || []).find((r) => r.id === cliente.referenciador.id) : null;
+  const abogadoAsociadoCliente = cliente.abogadoAsociado?.id ? (abogadosAsociados || []).find((a) => a.id === cliente.abogadoAsociado.id) : null;
+  const comisionReferenciadorPago = Number(cliente.referenciador?.porcentaje) > 0 ? Math.round((netoPagoComisiones * Number(cliente.referenciador.porcentaje)) / 100) : 0;
+  const remanenteTrasReferenciadorPago = netoPagoComisiones - comisionReferenciadorPago;
+  const honorariosAsociadoPago = Number(cliente.abogadoAsociado?.porcentaje) > 0 ? Math.round((remanenteTrasReferenciadorPago * Number(cliente.abogadoAsociado.porcentaje)) / 100) : 0;
+
+  const [generandoCuentaComision, setGenerandoCuentaComision] = useState(null);
+  const descargarCuentaDeCobroComision = async (tipoContacto) => {
+    const esReferenciador = tipoContacto === "Referenciador";
+    const contacto = esReferenciador ? referenciadorCliente || cliente.referenciador : abogadoAsociadoCliente || cliente.abogadoAsociado;
+    const monto = esReferenciador ? comisionReferenciadorPago : honorariosAsociadoPago;
+    const porcentaje = esReferenciador ? cliente.referenciador?.porcentaje : cliente.abogadoAsociado?.porcentaje;
+    if (!contacto || monto <= 0) return;
+    setGenerandoCuentaComision(tipoContacto);
+    try {
+      const numeroConsecutivo = await siguienteConsecutivoCuentaCobro();
+      await generarCuentaDeCobroComisionDocx({ contacto, tipoContacto, cliente, monto, porcentaje, pago, datosResponsable, numero: numeroConsecutivo });
+    } catch (e) {
+      console.error("No se pudo generar la cuenta de cobro:", e);
+    }
+    setGenerandoCuentaComision(null);
+  };
+
+  const enviarMensajeCuentaCobroComision = (tipoContacto) => {
+    const esReferenciador = tipoContacto === "Referenciador";
+    const contacto = esReferenciador ? referenciadorCliente || cliente.referenciador : abogadoAsociadoCliente || cliente.abogadoAsociado;
+    const monto = esReferenciador ? comisionReferenciadorPago : honorariosAsociadoPago;
+    if (!contacto?.telefono) return;
+    const numero = numeroWhatsappCliente(contacto.telefono);
+    const concepto = esReferenciador ? `tu comisión por la referencia del cliente ${cliente.nombre}` : `tus honorarios por el apoyo en el proceso del cliente ${cliente.nombre}`;
+    const mensaje = `*${getNombreDespacho()}*\n\nHola ${contacto.nombre}, te comparto la cuenta de cobro de ${concepto}: ${formatoCOP(monto)}.\n\nAdjunto va el documento en Word — complétalo con tu cédula y firma, y devuélvemelo por este mismo medio. Cuando lo tenga, te paso el enlace para firmarlo electrónicamente.\n\nGracias.`;
+    window.open(`https://wa.me/${numero}?text=${encodeURIComponent(mensaje)}`, "_blank");
   };
 
   const guardarEdicion = async () => {
@@ -800,24 +905,64 @@ function ReciboCard({ cliente, pago, onEditar, onEliminar, datosResponsable, por
             // primero se le paga al referenciador su comisión sobre el neto
             // completo, y SOLO DESPUÉS el abogado asociado recibe su
             // porcentaje sobre lo que queda (no sobre el neto original) —
-            // en cascada, como se reparte de verdad.
-            const netoPago = valorNetoPago(pago);
-            const comisionReferenciador = Number(cliente.referenciador?.porcentaje) > 0 ? Math.round((netoPago * Number(cliente.referenciador.porcentaje)) / 100) : 0;
-            const remanenteTrasReferenciador = netoPago - comisionReferenciador;
-            const honorariosAsociado = Number(cliente.abogadoAsociado?.porcentaje) > 0 ? Math.round((remanenteTrasReferenciador * Number(cliente.abogadoAsociado.porcentaje)) / 100) : 0;
-            const utilidadDespacho = remanenteTrasReferenciador - honorariosAsociado;
+            // en cascada, como se reparte de verdad. Los montos ya vienen
+            // calculados arriba (comisionReferenciadorPago/honorariosAsociadoPago)
+            // para que los botones de cuenta de cobro usen exactamente lo mismo.
+            const utilidadDespacho = remanenteTrasReferenciadorPago - honorariosAsociadoPago;
             return (
               <div style={{ background: "#FFFBEB", border: "1px solid #FDE68A", borderRadius: 8, padding: "8px 11px", margin: "0 0 8px", fontFamily: "Inter, sans-serif", fontSize: 11.5, color: "#92400E" }}>
                 <p style={{ fontWeight: 700, margin: "0 0 3px" }}>Reparto de este pago (interno, no va en el recibo)</p>
-                {comisionReferenciador > 0 && (
-                  <p style={{ margin: "1px 0" }}>
-                    Comisión {cliente.referenciador.nombre} ({cliente.referenciador.porcentaje}%): {formatoCOP(comisionReferenciador)}
-                  </p>
+                {comisionReferenciadorPago > 0 && (
+                  <>
+                    <p style={{ margin: "1px 0" }}>
+                      Comisión {cliente.referenciador.nombre} ({cliente.referenciador.porcentaje}%): {formatoCOP(comisionReferenciadorPago)}
+                    </p>
+                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap", margin: "4px 0 6px" }}>
+                      <button
+                        className="drx-btn-ghost"
+                        style={{ ...buttonGhost, padding: "3px 9px", fontSize: 10.5, background: "#FFFFFF" }}
+                        onClick={() => descargarCuentaDeCobroComision("Referenciador")}
+                        disabled={generandoCuentaComision === "Referenciador"}
+                      >
+                        {generandoCuentaComision === "Referenciador" ? "Generando..." : "Cuenta de cobro (Word)"}
+                      </button>
+                      {(referenciadorCliente || cliente.referenciador)?.telefono && (
+                        <button
+                          className="drx-btn-ghost"
+                          style={{ ...buttonGhost, padding: "3px 9px", fontSize: 10.5, background: "#FFFFFF" }}
+                          onClick={() => enviarMensajeCuentaCobroComision("Referenciador")}
+                        >
+                          Enviar mensaje por WhatsApp ↗
+                        </button>
+                      )}
+                    </div>
+                  </>
                 )}
-                {honorariosAsociado > 0 && (
-                  <p style={{ margin: "1px 0" }}>
-                    Honorarios {cliente.abogadoAsociado.nombre} ({cliente.abogadoAsociado.porcentaje}% de lo que queda tras la comisión): {formatoCOP(honorariosAsociado)}
-                  </p>
+                {honorariosAsociadoPago > 0 && (
+                  <>
+                    <p style={{ margin: "1px 0" }}>
+                      Honorarios {cliente.abogadoAsociado.nombre} ({cliente.abogadoAsociado.porcentaje}% de lo que queda tras la comisión): {formatoCOP(honorariosAsociadoPago)}
+                    </p>
+                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap", margin: "4px 0 6px" }}>
+                      <button
+                        className="drx-btn-ghost"
+                        style={{ ...buttonGhost, padding: "3px 9px", fontSize: 10.5, background: "#FFFFFF" }}
+                        onClick={() => descargarCuentaDeCobroComision("Abogado asociado")}
+                        disabled={generandoCuentaComision === "Abogado asociado"}
+                      >
+                        {generandoCuentaComision === "Abogado asociado" ? "Generando..." : "Cuenta de cobro (Word)"}
+                      </button>
+                      {(abogadoAsociadoCliente || cliente.abogadoAsociado)?.telefono && (
+                        <button
+                          className="drx-btn-ghost"
+                          style={{ ...buttonGhost, padding: "3px 9px", fontSize: 10.5, background: "#FFFFFF" }}
+                          onClick={() => enviarMensajeCuentaCobroComision("Abogado asociado")}
+                        >
+                          Enviar mensaje por WhatsApp ↗
+                        </button>
+                      )}
+                    </div>
+                  </>
                 )}
                 <p style={{ margin: "3px 0 0", fontWeight: 700 }}>Utilidad neta del despacho: {formatoCOP(utilidadDespacho)}</p>
               </div>
@@ -1201,6 +1346,8 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
   const [categoriaFiltroOtroIngreso, setCategoriaFiltroOtroIngreso] = useState("Todas");
   const { egresos, crear: crearEgreso, editar: editarEgreso, eliminar: eliminarEgresoBase, recategorizarMasivo } = useEgresos();
   const { ingresos: otrosIngresos, crear: crearOtroIngreso, editar: editarOtroIngreso, eliminar: eliminarOtroIngresoBase } = useOtrosIngresos();
+  const { contactos: referenciadores } = useReferenciadores();
+  const { contactos: abogadosAsociados } = useAbogadosAsociados();
   const { confirmar, ConfirmarDialogo } = useConfirmarDialogo();
 
   // Mismos datos que usa "Firmar documentos" para la firma del abogado
@@ -2190,6 +2337,8 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
                         onEliminar={() => eliminarPago(id, p.id)}
                         datosResponsable={datosResponsable}
                         porcentajeAhorro={porcentajeAhorro}
+                        referenciadores={referenciadores}
+                        abogadosAsociados={abogadosAsociados}
                       />
                     ))}
                     {ordenados.length > 3 && (
