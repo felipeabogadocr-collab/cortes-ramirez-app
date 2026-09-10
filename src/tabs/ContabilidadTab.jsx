@@ -933,18 +933,19 @@ function FormularioEgreso({ onRegistrar }) {
   );
 }
 
-function EgresoCard({ egreso, onEditar, onEliminar }) {
+function EgresoCard({ egreso, onEditar, onEliminar, clientesDisponibles }) {
   const [editando, setEditando] = useState(false);
   const [concepto, setConcepto] = useState(egreso.concepto);
   const [categoria, setCategoria] = useState(egreso.categoria);
   const [valor, setValor] = useState(String(egreso.valor ?? ""));
   const [fecha, setFecha] = useState(new Date(egreso.fecha).toISOString().slice(0, 10));
+  const [clienteId, setClienteId] = useState(egreso.clienteId || "");
   const [guardando, setGuardando] = useState(false);
 
   const guardarEdicion = async () => {
     if (!concepto.trim() || !valor || Number(valor) <= 0) return;
     setGuardando(true);
-    await onEditar({ concepto: concepto.trim(), categoria, valor: Number(valor), fecha: new Date(`${fecha}T12:00:00`).toISOString() });
+    await onEditar({ concepto: concepto.trim(), categoria, valor: Number(valor), fecha: new Date(`${fecha}T12:00:00`).toISOString(), clienteId: clienteId || null });
     setGuardando(false);
     setEditando(false);
   };
@@ -974,6 +975,20 @@ function EgresoCard({ egreso, onEditar, onEliminar }) {
             <input type="date" className="drx-input" style={inputStyle} value={fecha} onChange={(e) => setFecha(e.target.value)} />
           </Field>
         </div>
+        {clientesDisponibles && (
+          <div style={{ marginBottom: 12 }}>
+            <Field label="Cliente asociado (opcional) — se ve también en su tarjeta">
+              <select className="drx-input" style={inputStyle} value={clienteId} onChange={(e) => setClienteId(e.target.value)}>
+                <option value="">Ninguno</option>
+                {clientesDisponibles.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.nombre}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          </div>
+        )}
         <div style={{ display: "flex", gap: 8 }}>
           <button className="drx-btn-primary" style={{ ...buttonPrimary, padding: "6px 14px", fontSize: 12 }} onClick={guardarEdicion} disabled={guardando}>
             {guardando ? "Guardando..." : "Guardar cambios"}
@@ -1146,6 +1161,13 @@ function OtroIngresoCard({ ingreso, onEditar, onEliminar }) {
 export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onClienteInicialPagoConsumido }) {
   const { ids, cargado } = useIndex("indice-clientes", false);
   const [clientes, setClientes] = useState({});
+  // Lista simple {id, nombre} para el selector "cliente asociado" de un
+  // egreso — se arma una sola vez por cambio de datos en vez de recorrer
+  // ids/clientes en cada EgresoCard.
+  const clientesParaSelector = useMemo(
+    () => [...ids].map((id) => ({ id, nombre: clientes[id]?.nombre })).filter((c) => c.nombre).sort((a, b) => a.nombre.localeCompare(b.nombre)),
+    [ids, clientes]
+  );
   const [formAbiertoId, setFormAbiertoId] = useState(null);
   // Un egreso no tiene nada que ver con un cliente puntual (es plata que
   // sale del despacho en general) — este atajo solo evita tener que subir
@@ -1807,7 +1829,7 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
         {egresosFiltrados.length > 0 ? (
           <div style={{ marginTop: 12 }}>
             {egresosFiltrados.map((e) => (
-              <EgresoCard key={e.id} egreso={e} onEditar={(cambios) => editarEgreso(e.id, cambios)} onEliminar={() => eliminarEgreso(e)} />
+              <EgresoCard key={e.id} egreso={e} onEditar={(cambios) => editarEgreso(e.id, cambios)} onEliminar={() => eliminarEgreso(e)} clientesDisponibles={clientesParaSelector} />
             ))}
           </div>
         ) : (
@@ -2058,7 +2080,7 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
               {formAbiertoId === id && <FormularioPago cliente={c} onRegistrar={(datos) => registrarPago(id, datos)} />}
               {egresoAbiertoId === id && (
                 <div style={{ marginTop: 12, borderTop: `1px solid ${COLORS.border}`, paddingTop: 14 }}>
-                  <FormularioEgreso onRegistrar={async (datos) => { await registrarEgreso(datos); setEgresoAbiertoId(null); }} />
+                  <FormularioEgreso onRegistrar={async (datos) => { await registrarEgreso({ ...datos, clienteId: id }); setEgresoAbiertoId(null); }} />
                 </div>
               )}
 
@@ -2088,6 +2110,21 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
                         {expandido ? "Mostrar menos" : `Ver todos los pagos (${ordenados.length})`}
                       </button>
                     )}
+                  </div>
+                );
+              })()}
+
+              {/* Egresos registrados desde esta misma tarjeta (clienteId) — se
+                  siguen contando igual en el total de egresos del despacho,
+                  pero además quedan visibles aquí, junto a los pagos de este
+                  cliente, en vez de solo en la sección Egresos de más arriba. */}
+              {egresos.filter((e) => e.clienteId === id).length > 0 && (() => {
+                const egresosCliente = [...egresos.filter((e) => e.clienteId === id)].sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+                return (
+                  <div>
+                    {egresosCliente.map((e) => (
+                      <EgresoCard key={e.id} egreso={e} onEditar={(cambios) => editarEgreso(e.id, cambios)} onEliminar={() => eliminarEgreso(e)} clientesDisponibles={clientesParaSelector} />
+                    ))}
                   </div>
                 );
               })()}

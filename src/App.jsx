@@ -1077,7 +1077,7 @@ function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-const APP_VERSION = "1.54.4";
+const APP_VERSION = "1.55.0";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -4818,7 +4818,7 @@ export function useDatosReportes() {
   };
 }
 
-export const CATEGORIAS_EGRESO = ["Arriendo", "Nómina", "Servicios públicos", "Insumos de oficina", "Impuestos", "Software y herramientas", "Marketing", "Otro"];
+export const CATEGORIAS_EGRESO = ["Arriendo", "Nómina", "Servicios públicos", "Insumos de oficina", "Impuestos", "Software y herramientas", "Marketing", "Pendiente por clasificar", "Otro"];
 
 // Los egresos del despacho (arriendo, nómina, servicios...) no pertenecen a
 // ningún cliente puntual, así que se guardan como una sola lista bajo una
@@ -4846,6 +4846,11 @@ export function useEgresos() {
       concepto: datos.concepto.trim(),
       categoria: datos.categoria,
       valor: Number(datos.valor) || 0,
+      // Opcional: si el egreso se registró desde la tarjeta de un cliente
+      // puntual (el atajo "+ Registrar egreso" dentro de Contabilidad),
+      // queda asociado a ese cliente y se ve ahí también — sin dejar de
+      // contar igual que cualquier otro egreso en los totales del despacho.
+      clienteId: datos.clienteId || null,
     };
     const actualizados = [nuevo, ...egresos];
     await storageSet("egresos-contabilidad", JSON.stringify(actualizados), false);
