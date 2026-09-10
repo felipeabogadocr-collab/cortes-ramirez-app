@@ -1077,7 +1077,7 @@ function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-const APP_VERSION = "1.55.0";
+const APP_VERSION = "1.55.1";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -4870,7 +4870,19 @@ export function useEgresos() {
     setEgresosState(actualizados);
   };
 
-  return { egresos, cargado, crear, editar, eliminar };
+  // Recategorizar de a uno (llamando editar() en un ciclo) tiene la misma
+  // falla que ya se corrigió en otras partes de la app: cada llamada
+  // reescribe la lista ENTERA de egresos a partir del estado que tenía en
+  // memoria en ese momento, así que llamadas rápidas seguidas se pisan
+  // entre sí y algunas quedan sin guardar. Aquí se arma la lista completa
+  // ya corregida y se guarda de una sola vez.
+  const recategorizarMasivo = async (categoriaOrigen, categoriaDestino) => {
+    const actualizados = egresos.map((e) => (e.categoria === categoriaOrigen ? { ...e, categoria: categoriaDestino } : e));
+    await storageSet("egresos-contabilidad", JSON.stringify(actualizados), false);
+    setEgresosState(actualizados);
+  };
+
+  return { egresos, cargado, crear, editar, eliminar, recategorizarMasivo };
 }
 
 export const FRECUENCIAS_SERVICIO = ["Mensual", "Quincenal", "Semanal", "Pago único"];

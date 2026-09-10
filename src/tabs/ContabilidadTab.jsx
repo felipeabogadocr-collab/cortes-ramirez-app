@@ -1199,7 +1199,7 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
   const [categoriaFiltroEgreso, setCategoriaFiltroEgreso] = useState("Todas");
   const [filtroOtroIngreso, setFiltroOtroIngreso] = useState("");
   const [categoriaFiltroOtroIngreso, setCategoriaFiltroOtroIngreso] = useState("Todas");
-  const { egresos, crear: crearEgreso, editar: editarEgreso, eliminar: eliminarEgresoBase } = useEgresos();
+  const { egresos, crear: crearEgreso, editar: editarEgreso, eliminar: eliminarEgresoBase, recategorizarMasivo } = useEgresos();
   const { ingresos: otrosIngresos, crear: crearOtroIngreso, editar: editarOtroIngreso, eliminar: eliminarOtroIngresoBase } = useOtrosIngresos();
   const { confirmar, ConfirmarDialogo } = useConfirmarDialogo();
 
@@ -1313,6 +1313,20 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
     if (!ok) return;
     await eliminarEgresoBase(egreso.id);
     registrarAuditoria(usuarioActual, "eliminar_egreso", "egreso", egreso.id, { concepto: egreso.concepto, valor: egreso.valor });
+  };
+
+  // "Otro" era la categoría más parecida a "no sé qué es todavía" antes de
+  // que existiera "Pendiente por clasificar" — esto deja pasar de una a la
+  // otra los egresos que ya quedaron en "Otro", en vez de tener que
+  // editarlos uno por uno a mano.
+  const egresosOtro = egresos.filter((e) => e.categoria === "Otro");
+  const recategorizarOtroAPendientes = async () => {
+    const ok = await confirmar(
+      `Esto va a cambiar la categoría de los ${egresosOtro.length} egreso${egresosOtro.length !== 1 ? "s" : ""} que hoy están en "Otro" (${formatoCOP(egresosOtro.reduce((sum, e) => sum + (Number(e.valor) || 0), 0))} en total) a "Pendiente por clasificar". No se puede deshacer con un clic — pero cada uno se puede volver a editar después a mano. ¿Continuar?`
+    );
+    if (!ok) return;
+    await recategorizarMasivo("Otro", "Pendiente por clasificar");
+    registrarAuditoria(usuarioActual, "recategorizar_egresos", "egreso", "masivo", { de: "Otro", a: "Pendiente por clasificar", cantidad: egresosOtro.length });
   };
 
   const registrarOtroIngreso = async (datos) => {
@@ -1776,6 +1790,16 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
           <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, marginBottom: 14 }}>
             Histórico completo · La que más consume: <strong style={{ color: COLORS.headingText }}>{categoriaMayorGasto?.[0]}</strong> ({formatoCOP(categoriaMayorGasto?.[1] || 0)})
           </p>
+          {egresosOtro.length > 0 && (
+            <div style={{ background: "#FFFBEB", border: "1px solid #FDE68A", borderRadius: 8, padding: "10px 12px", marginBottom: 14, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+              <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: "#92400E", margin: 0 }}>
+                {egresosOtro.length} egreso{egresosOtro.length !== 1 ? "s" : ""} en "Otro" no dice mucho en esta gráfica — se pueden pasar a "Pendiente por clasificar" de una vez.
+              </p>
+              <button className="drx-btn-ghost" style={{ ...buttonGhost, padding: "6px 12px", fontSize: 12, background: "#FFFFFF" }} onClick={recategorizarOtroAPendientes}>
+                Recategorizar "Otro" → "Pendiente por clasificar"
+              </button>
+            </div>
+          )}
           <GraficaBarras datos={categoriasEgresoOrdenadas.map(([categoria, valor]) => ({ etiqueta: categoria, valor }))} color="#F43F5E" formatoValor={formatoCOP} />
         </Card>
       )}
