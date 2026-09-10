@@ -1329,6 +1329,13 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
     registrarAuditoria(usuarioActual, "recategorizar_egresos", "egreso", "masivo", { de: "Otro", a: "Pendiente por clasificar", cantidad: egresosOtro.length });
   };
 
+  const irASeccion = (idSeccion, opciones = {}) => {
+    if (opciones.soloPendientes) setSoloPendientes(true);
+    setTimeout(() => {
+      document.getElementById(idSeccion)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 50);
+  };
+
   const registrarOtroIngreso = async (datos) => {
     const nuevo = await crearOtroIngreso(datos);
     registrarAuditoria(usuarioActual, "registrar_otro_ingreso", "otro_ingreso", nuevo.id, { concepto: nuevo.concepto, valor: nuevo.valor });
@@ -1664,50 +1671,98 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
       )}
 
       <div className="drx-grid-form" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: 12, marginBottom: 20 }}>
-        <Card style={{ borderLeft: "4px solid #10B981", background: "#F0FDF4" }}>
+        <Card
+          role="button"
+          tabIndex={0}
+          onClick={() => irASeccion("seccion-clientes")}
+          onKeyDown={(e) => e.key === "Enter" && irASeccion("seccion-clientes")}
+          style={{ borderLeft: "4px solid #10B981", background: "#F0FDF4", cursor: "pointer" }}
+        >
           <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, fontWeight: 700, color: "#166534", textTransform: "uppercase", letterSpacing: 0.5, margin: 0 }}>
             Recaudado este mes
           </p>
           <p style={{ fontFamily: "Inter, sans-serif", fontSize: 22, fontWeight: 800, color: "#166534", margin: "4px 0 0" }}>{formatoCOP(recaudadoMes)}</p>
         </Card>
-        <Card style={{ borderLeft: "4px solid #F43F5E", background: "#FEF2F2" }}>
+        <Card
+          role="button"
+          tabIndex={0}
+          onClick={() => irASeccion("seccion-egresos")}
+          onKeyDown={(e) => e.key === "Enter" && irASeccion("seccion-egresos")}
+          style={{ borderLeft: "4px solid #F43F5E", background: "#FEF2F2", cursor: "pointer" }}
+        >
           <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, fontWeight: 700, color: "#B42318", textTransform: "uppercase", letterSpacing: 0.5, margin: 0 }}>
             Egresos este mes
           </p>
           <p style={{ fontFamily: "Inter, sans-serif", fontSize: 22, fontWeight: 800, color: "#B42318", margin: "4px 0 0" }}>{formatoCOP(egresoMes)}</p>
         </Card>
-        <Card style={{ borderLeft: `4px solid ${netoMes >= 0 ? "#10B981" : "#B42318"}`, background: netoMes >= 0 ? COLORS.accentSoft : "#FEF2F2" }}>
+        <Card
+          role="button"
+          tabIndex={0}
+          onClick={() => irASeccion("seccion-clientes")}
+          onKeyDown={(e) => e.key === "Enter" && irASeccion("seccion-clientes")}
+          style={{ borderLeft: `4px solid ${netoMes >= 0 ? "#10B981" : "#B42318"}`, background: netoMes >= 0 ? COLORS.accentSoft : "#FEF2F2", cursor: "pointer" }}
+        >
           <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, fontWeight: 700, color: netoMes >= 0 ? COLORS.navy : "#B42318", textTransform: "uppercase", letterSpacing: 0.5, margin: 0 }}>
             Neto este mes
           </p>
           <p style={{ fontFamily: "Inter, sans-serif", fontSize: 22, fontWeight: 800, color: netoMes >= 0 ? COLORS.navy : "#B42318", margin: "4px 0 0" }}>{formatoCOP(netoMes)}</p>
         </Card>
-        <Card style={{ borderLeft: `4px solid ${COLORS.accentBright}`, background: COLORS.accentSoft }}>
+        <Card
+          role="button"
+          tabIndex={0}
+          onClick={() => irASeccion("seccion-clientes")}
+          onKeyDown={(e) => e.key === "Enter" && irASeccion("seccion-clientes")}
+          style={{ borderLeft: `4px solid ${COLORS.accentBright}`, background: COLORS.accentSoft, cursor: "pointer" }}
+        >
           <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, fontWeight: 700, color: COLORS.navy, textTransform: "uppercase", letterSpacing: 0.5, margin: 0 }}>
             Recaudado histórico
           </p>
           <p style={{ fontFamily: "Inter, sans-serif", fontSize: 22, fontWeight: 800, color: COLORS.navy, margin: "4px 0 0" }}>{formatoCOP(recaudadoTotal)}</p>
         </Card>
-        <Card style={{ borderLeft: "4px solid #10B981", background: "#F0FDF4" }}>
+        <Card
+          role="button"
+          tabIndex={0}
+          onClick={() => irASeccion("seccion-otros-ingresos")}
+          onKeyDown={(e) => e.key === "Enter" && irASeccion("seccion-otros-ingresos")}
+          style={{ borderLeft: "4px solid #10B981", background: "#F0FDF4", cursor: "pointer" }}
+        >
           <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, fontWeight: 700, color: "#166534", textTransform: "uppercase", letterSpacing: 0.5, margin: 0 }}>
             Otros ingresos este mes
           </p>
           <p style={{ fontFamily: "Inter, sans-serif", fontSize: 22, fontWeight: 800, color: "#166534", margin: "4px 0 0" }}>{formatoCOP(otrosIngresosMes)}</p>
         </Card>
-        <Card style={{ borderLeft: "4px solid #6B7480", background: COLORS.surfaceSoft }}>
+        <Card
+          role="button"
+          tabIndex={0}
+          onClick={() => irASeccion("seccion-egresos")}
+          onKeyDown={(e) => e.key === "Enter" && irASeccion("seccion-egresos")}
+          style={{ borderLeft: "4px solid #6B7480", background: COLORS.surfaceSoft, cursor: "pointer" }}
+        >
           <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, fontWeight: 700, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.5, margin: 0 }}>
             Egresos histórico
           </p>
           <p style={{ fontFamily: "Inter, sans-serif", fontSize: 22, fontWeight: 800, color: COLORS.ink, margin: "4px 0 0" }}>{formatoCOP(egresoTotal)}</p>
         </Card>
-        <Card style={{ borderLeft: `4px solid ${netoTotal >= 0 ? "#10B981" : "#B42318"}` }}>
+        <Card
+          role="button"
+          tabIndex={0}
+          onClick={() => irASeccion("seccion-clientes")}
+          onKeyDown={(e) => e.key === "Enter" && irASeccion("seccion-clientes")}
+          style={{ borderLeft: `4px solid ${netoTotal >= 0 ? "#10B981" : "#B42318"}`, cursor: "pointer" }}
+        >
           <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, fontWeight: 700, color: COLORS.muted, textTransform: "uppercase", letterSpacing: 0.5, margin: 0 }}>
             Neto histórico
           </p>
           <p style={{ fontFamily: "Inter, sans-serif", fontSize: 22, fontWeight: 800, color: netoTotal >= 0 ? "#166534" : "#B42318", margin: "4px 0 0" }}>{formatoCOP(netoTotal)}</p>
         </Card>
         {carteraTotal > 0 && (
-          <Card style={{ borderLeft: "4px solid #F5A524", background: "#FEF3E2" }}>
+          <Card
+            role="button"
+            tabIndex={0}
+            onClick={() => irASeccion("seccion-clientes", { soloPendientes: true })}
+            onKeyDown={(e) => e.key === "Enter" && irASeccion("seccion-clientes", { soloPendientes: true })}
+            style={{ borderLeft: "4px solid #F5A524", background: "#FEF3E2", cursor: "pointer" }}
+          >
             <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, fontWeight: 700, color: "#B45309", textTransform: "uppercase", letterSpacing: 0.5, margin: 0 }}>
               Cartera pendiente total
             </p>
@@ -1718,7 +1773,13 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
           </Card>
         )}
         {retenidoMes > 0 && (
-          <Card style={{ borderLeft: "4px solid #8B5CF6", background: "#F5F3FF" }}>
+          <Card
+            role="button"
+            tabIndex={0}
+            onClick={() => irASeccion("seccion-clientes")}
+            onKeyDown={(e) => e.key === "Enter" && irASeccion("seccion-clientes")}
+            style={{ borderLeft: "4px solid #8B5CF6", background: "#F5F3FF", cursor: "pointer" }}
+          >
             <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, fontWeight: 700, color: "#7C3AED", textTransform: "uppercase", letterSpacing: 0.5, margin: 0 }}>
               Retenido en la fuente (mes)
             </p>
@@ -1729,7 +1790,13 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
           </Card>
         )}
         {porcentajeAhorro > 0 && (
-          <Card style={{ borderLeft: "4px solid #0D9488", background: "#F0FDFA" }}>
+          <Card
+            role="button"
+            tabIndex={0}
+            onClick={() => irASeccion("seccion-clientes")}
+            onKeyDown={(e) => e.key === "Enter" && irASeccion("seccion-clientes")}
+            style={{ borderLeft: "4px solid #0D9488", background: "#F0FDFA", cursor: "pointer" }}
+          >
             <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, fontWeight: 700, color: "#0D9488", textTransform: "uppercase", letterSpacing: 0.5, margin: 0 }}>
               Ahorro sugerido (mes)
             </p>
@@ -1804,7 +1871,7 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
         </Card>
       )}
 
-      <Card style={{ marginBottom: 20 }}>
+      <Card id="seccion-egresos" style={{ marginBottom: 20 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 8, marginBottom: 4 }}>
           <div>
             <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, fontWeight: 700, color: COLORS.ink, margin: 0 }}>Egresos</p>
@@ -1863,7 +1930,7 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
         )}
       </Card>
 
-      <Card style={{ marginBottom: 20 }}>
+      <Card id="seccion-otros-ingresos" style={{ marginBottom: 20 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 8, marginBottom: 4 }}>
           <div>
             <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, fontWeight: 700, color: COLORS.ink, margin: 0 }}>Otros ingresos</p>
@@ -1997,7 +2064,7 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
         </div>
       )}
 
-      <div style={{ marginBottom: 14, display: "flex", gap: 14, flexWrap: "wrap", alignItems: "center" }}>
+      <div id="seccion-clientes" style={{ marginBottom: 14, display: "flex", gap: 14, flexWrap: "wrap", alignItems: "center" }}>
         <input
           className="drx-input"
           style={{ ...inputStyle, maxWidth: 320, flex: 1, minWidth: 220 }}

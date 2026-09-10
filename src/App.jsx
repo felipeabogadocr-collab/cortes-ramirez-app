@@ -959,7 +959,7 @@ const footerLinkStyle = {
   textDecoration: "none",
 };
 
-export function Card({ children, style }) {
+export function Card({ children, style, ...resto }) {
   return (
     <div
       className="drx-card"
@@ -970,6 +970,7 @@ export function Card({ children, style }) {
         padding: 20,
         ...style,
       }}
+      {...resto}
     >
       {children}
     </div>
@@ -1077,7 +1078,7 @@ function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-const APP_VERSION = "1.55.1";
+const APP_VERSION = "1.56.0";
 
 function SelloVersion({ oscuro }) {
   return (
