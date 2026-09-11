@@ -1078,7 +1078,7 @@ function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-const APP_VERSION = "1.60.0";
+const APP_VERSION = "1.61.0";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -1644,6 +1644,20 @@ function analisisFinanciero(rep, r) {
     };
   }
 
+  // Detector de plata duplicada por traslados entre cuentas propias
+  // (Nequi/Nu/Daviplata, típicamente): cuando se registra el mismo dinero
+  // como "egreso" al salir de una cuenta y como "ingreso" al entrar a otra,
+  // el ingreso bruto y el egreso bruto de ese mes quedan casi idénticos —
+  // algo que un gasto real (arriendo, nómina, comisiones) no tiene ninguna
+  // razón para calzar así con lo que pagaron los clientes. El Neto no se ve
+  // muy afectado (los traslados se cancelan solos ahí), pero el bruto sí, y
+  // eso distorsiona el % de margen y las demás señales de este análisis.
+  const valoresEgreso = meses.map((m) => rep.egresosPorMes[m.clave] || 0);
+  const UMBRAL_MINIMO_TRASLADO = 300000;
+  const mesesConPosibleTraslado = meses
+    .map((m, i) => ({ etiqueta: m.etiqueta, ingreso: valoresIngreso[i], egreso: valoresEgreso[i] }))
+    .filter((m) => m.ingreso >= UMBRAL_MINIMO_TRASLADO && m.egreso > 0 && m.egreso / m.ingreso >= 0.85 && m.egreso / m.ingreso <= 1.15);
+
   const promedioMensual = valoresIngreso.reduce((s, v) => s + v, 0) / meses.length;
   const mitad = Math.floor(meses.length / 2);
   const ingresoUltimaMitad = valoresIngreso.slice(mitad).reduce((s, v) => s + v, 0);
@@ -1727,6 +1741,15 @@ function analisisFinanciero(rep, r) {
     }
   }
 
+  if (mesesConPosibleTraslado.length > 0) {
+    puntos -= 1;
+    const listaMeses = mesesConPosibleTraslado.map((m) => m.etiqueta).join(", ");
+    senales.push({
+      positiva: false,
+      texto: `${mesesConPosibleTraslado.length} de los últimos ${meses.length} meses (${listaMeses}) tienen ingresos y egresos casi idénticos — probable señal de que estás registrando dos veces la misma plata al moverla entre tus propias cuentas (Nequi/Nu/Daviplata), no que el despacho gaste casi todo lo que factura.`,
+    });
+  }
+
   const areaLider = (rep.filasArea || [])[0];
 
   let veredicto;
@@ -1758,6 +1781,7 @@ function analisisFinanciero(rep, r) {
     mesesDeCarteraAtascada,
     clientesPorAbogado: r.totalAbogados > 0 ? clientesPorAbogado : null,
     areaLider,
+    mesesConPosibleTraslado,
   };
 }
 
@@ -3252,6 +3276,34 @@ function ResumenTab({ nombre, usuarioId, usuarioActual, onIr }) {
                 </div>
               </>
             )}
+          </Card>
+        );
+      })()}
+
+      {(() => {
+        const a = analisisFinanciero(rep, r);
+        if (!a.listo || !a.mesesConPosibleTraslado?.length) return null;
+        return (
+          <Card style={{ marginBottom: 24, borderLeft: "4px solid #F5A524", background: "#FFFBEB" }}>
+            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 14, fontWeight: 700, color: "#92400E", margin: "0 0 6px" }}>
+              <Icono tipo="alerta" size={14} style={{ marginRight: 4, verticalAlign: -2 }} /> Posible plata duplicada por traslados entre tus cuentas
+            </p>
+            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: "#92400E", margin: "0 0 10px", lineHeight: 1.5 }}>
+              En estos meses, lo que entró y lo que salió son casi el mismo valor — típico de mover la misma plata entre Nequi, Nu o Daviplata y registrarla dos veces (como egreso al salir y como ingreso al entrar), en vez de ser gasto real. Esto no suele afectar mucho el Neto (se cancela solo), pero sí infla el Recaudado y los Egresos brutos.
+            </p>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 12 }}>
+              {a.mesesConPosibleTraslado.map((m) => (
+                <div key={m.etiqueta} style={{ display: "flex", justifyContent: "space-between", background: "#fff", border: "1px solid #FDE68A", borderRadius: 8, padding: "7px 11px" }}>
+                  <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, fontWeight: 600, color: "#92400E", margin: 0, textTransform: "capitalize" }}>{m.etiqueta}</p>
+                  <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: "#92400E", margin: 0 }}>
+                    Entró {formatoCOP(m.ingreso)} · Salió {formatoCOP(m.egreso)}
+                  </p>
+                </div>
+              ))}
+            </div>
+            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: "#92400E", margin: 0 }}>
+              Revisa esos meses en los extractos de cada cuenta: si el que envía o recibe eres tú mismo (no un cliente ni un tercero), bórralo en Contabilidad — no es un ingreso ni un gasto real.
+            </p>
           </Card>
         );
       })()}
