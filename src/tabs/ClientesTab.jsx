@@ -7,6 +7,7 @@ import {
   AREAS_PROCESO, COLOR_AREA_PROCESO, DIAS_ALERTA_INACTIVIDAD, numeroWhatsappCliente,
   radicadosDeCliente, tiposProcesoDeArea, useServicios, calcularProximaFechaPorFrecuencia,
   fechaHoyISO, formatoCOP, leerJSONLocal, guardarJSONLocal, useReferenciadores, useAbogadosAsociados,
+  useValorConRetraso,
 } from "../App.jsx";
 
 // Enlace oficial de la Fiscalía para consultar el estado de una denuncia en
@@ -611,6 +612,7 @@ export default function ClientesTab({ usuarioActual, onIrARegistrarPago }) {
   // repita en cada render (por ejemplo, cada tecla escrita en el formulario
   // de un cliente que ni siquiera está en la lista filtrada), que en
   // despachos con muchos clientes se sentía como que la pantalla iba lenta.
+  const filtroConRetraso = useValorConRetraso(filtro);
   const idsFiltrados = useMemo(() => {
     const idsOrdenados = [...ids].sort((a, b) => {
       if (orden === "az") return (clientes[a]?.nombre || "").localeCompare(clientes[b]?.nombre || "");
@@ -624,7 +626,7 @@ export default function ClientesTab({ usuarioActual, onIrARegistrarPago }) {
       return fb.localeCompare(fa);
     });
 
-    const textoFiltro = filtro.trim().toLowerCase();
+    const textoFiltro = filtroConRetraso.trim().toLowerCase();
     let resultado = textoFiltro
       ? idsOrdenados.filter((id) => {
           const c = clientes[id];
@@ -644,7 +646,7 @@ export default function ClientesTab({ usuarioActual, onIrARegistrarPago }) {
       });
     }
     return resultado;
-  }, [ids, clientes, orden, filtro, soloSinRadicado, soloInactivos]);
+  }, [ids, clientes, orden, filtroConRetraso, soloSinRadicado, soloInactivos]);
 
   return (
     <div>

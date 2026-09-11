@@ -1078,7 +1078,7 @@ function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-const APP_VERSION = "1.61.0";
+const APP_VERSION = "1.62.0";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -1750,7 +1750,11 @@ function analisisFinanciero(rep, r) {
     });
   }
 
-  const areaLider = (rep.filasArea || [])[0];
+  // Cuál área recomendar no es la que tiene más CLIENTES, sino la que más
+  // PLATA ha facturado — un área con pocos clientes grandes puede pesar más
+  // que una con muchos clientes chicos, y recomendar mercadeo por cantidad
+  // llevaría a enfocar esfuerzo en lo que menos rentabilidad deja.
+  const areaLider = (rep.filasAreaPorIngreso || [])[0];
 
   let veredicto;
   let color;
@@ -1758,7 +1762,7 @@ function analisisFinanciero(rep, r) {
   if (puntos >= 3) {
     veredicto = "Es buen momento para traer más clientes";
     color = "#10B981";
-    consejo = `Los números aguantan crecer: ${areaLider ? `${areaLider[0]} es tu área más fuerte hoy (${areaLider[1]} cliente${areaLider[1] !== 1 ? "s" : ""}), un buen punto de partida para enfocar el mercadeo. ` : ""}Mantén el ritmo de cobro al día para que el crecimiento no se te vaya en cartera pendiente.`;
+    consejo = `Los números aguantan crecer: ${areaLider ? `${areaLider[0]} es tu área más rentable hoy (${formatoCOP(areaLider[1])} facturados históricamente), un buen punto de partida para enfocar el mercadeo — no necesariamente la que más clientes tiene, sino la que más plata deja. ` : ""}Mantén el ritmo de cobro al día para que el crecimiento no se te vaya en cartera pendiente.`;
   } else if (puntos <= -3) {
     veredicto = "Antes de buscar más clientes, hay que estabilizar";
     color = "#B42318";
@@ -3099,6 +3103,11 @@ function ResumenTab({ nombre, usuarioId, usuarioActual, onIr }) {
   const rep = useDatosReportes();
   const versiculo = fraseDelDia(VERSICULOS);
   const tareasPendientes = r.clientesInactivos + r.docsFaltaAbogado + r.pagosPendientes + r.procesosConNovedad;
+  // Se usa en dos tarjetas de abajo (el veredicto y, aparte, la alerta de
+  // traslados) — calcularlo una sola vez por render en vez de dos evita
+  // recorrer los últimos 6 meses de datos financieros por partida doble.
+  const analisis = useMemo(() => analisisFinanciero(rep, r), [rep, r]);
+  const [mostrarGlosario, setMostrarGlosario] = useState(false);
 
   return (
     <div>
@@ -3210,7 +3219,7 @@ function ResumenTab({ nombre, usuarioId, usuarioActual, onIr }) {
       })()}
 
       {(() => {
-        const a = analisisFinanciero(rep, r);
+        const a = analisis;
         return (
           <Card
             style={{
@@ -3274,6 +3283,36 @@ function ResumenTab({ nombre, usuarioId, usuarioActual, onIr }) {
                     </div>
                   ))}
                 </div>
+                <button
+                  onClick={() => setMostrarGlosario((m) => !m)}
+                  style={{
+                    background: "none",
+                    border: "none",
+                    cursor: "pointer",
+                    padding: 0,
+                    marginTop: 14,
+                    fontFamily: "Inter, sans-serif",
+                    fontSize: 11.5,
+                    fontWeight: 600,
+                    color: COLORS.accentBright,
+                  }}
+                >
+                  {mostrarGlosario ? "Ocultar qué significan estos términos ▲" : "¿Qué significan estos términos? ▼"}
+                </button>
+                {mostrarGlosario && (
+                  <div style={{ marginTop: 10, background: COLORS.surfaceSoft, borderRadius: 10, padding: 12, display: "flex", flexDirection: "column", gap: 8 }}>
+                    {[
+                      ["Margen neto", "de cada peso que te paga un cliente, cuánto te queda después de pagar todos los gastos del mes. Si el margen es 30%, de $100.000 te quedan $30.000 limpios."],
+                      ["Cartera pendiente (en meses de facturación)", "cuánto te deben en total tus clientes, expresado en cuántos meses de tu facturación normal representa esa plata — si son 2 meses, significa que tienes atascados dos meses enteros de ingreso sin cobrar."],
+                      ["Flujo de caja proyectado", "la plata que ya sabes que te va a entrar en los próximos meses (por los pagos pendientes ya acordados con tus clientes), no lo que esperas o deseas — es lo comprometido de verdad."],
+                      ["Capacidad por abogado", "cuántos clientes activos atiende, en promedio, cada abogado del despacho — si el número es muy alto, el freno para crecer puede ser que no dan abasto, no que falten clientes."],
+                    ].map(([termino, def]) => (
+                      <p key={termino} style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.inkSoft, margin: 0, lineHeight: 1.5 }}>
+                        <strong style={{ color: COLORS.headingText }}>{termino}:</strong> {def}
+                      </p>
+                    ))}
+                  </div>
+                )}
               </>
             )}
           </Card>
@@ -3281,7 +3320,7 @@ function ResumenTab({ nombre, usuarioId, usuarioActual, onIr }) {
       })()}
 
       {(() => {
-        const a = analisisFinanciero(rep, r);
+        const a = analisis;
         if (!a.listo || !a.mesesConPosibleTraslado?.length) return null;
         return (
           <Card style={{ marginBottom: 24, borderLeft: "4px solid #F5A524", background: "#FFFBEB" }}>
@@ -4188,12 +4227,13 @@ export function AvatarIniciales({ nombre, size = 34, fotoUrl }) {
   );
 }
 
-function SidebarButton({ active, onClick, children, color, icono }) {
+function SidebarButton({ active, onClick, onMouseEnter, children, color, icono }) {
   const c = color || "#2F80ED";
   return (
     <button
       className="drx-tab"
       onClick={onClick}
+      onMouseEnter={onMouseEnter}
       style={{
         display: "flex",
         alignItems: "center",
@@ -5048,6 +5088,21 @@ export function useDatosReportes() {
   const filasArea = Object.entries(cargaPorArea).sort((a, b) => b[1] - a[1]);
   const maxArea = Math.max(1, ...filasArea.map(([, n]) => n));
 
+  // Lo mismo que arriba pero por PLATA facturada, no por número de
+  // clientes — un área con pocos clientes puede facturar más que una con
+  // muchos (ej. 2 procesos comerciales grandes vs. 10 consultas laborales
+  // chicas), así que recomendar dónde enfocar mercadeo solo por cantidad de
+  // clientes puede llevar a la conclusión equivocada.
+  const ingresoPorArea = {};
+  listaClientes.forEach((c) => {
+    const area = c.areaProceso?.trim() || "Sin definir";
+    const totalCliente = (c.pagos || []).reduce((s, p) => s + (Number(p.valor) || 0), 0);
+    ingresoPorArea[area] = (ingresoPorArea[area] || 0) + totalCliente;
+  });
+  const filasAreaPorIngreso = Object.entries(ingresoPorArea)
+    .filter(([, valor]) => valor > 0)
+    .sort((a, b) => b[1] - a[1]);
+
   const clientesConPago = listaClientes.filter((c) => (c.pagos || []).length > 0).length;
   const ticketPromedio = clientesConPago > 0 ? ingresoTotalHistorico / clientesConPago : 0;
 
@@ -5087,6 +5142,7 @@ export function useDatosReportes() {
     maxCarga,
     filasArea,
     maxArea,
+    filasAreaPorIngreso,
     clientesConPago,
     ticketPromedio,
     proyeccionProximoMes,
@@ -7642,6 +7698,20 @@ export function guardarJSONLocal(llave, valor) {
 // combina con nada del diseño) por un diálogo propio, con el mismo estilo
 // del resto de la app. Se usa como: const ok = await confirmar("¿Seguro?");
 // y se debe renderizar {ConfirmarDialogo} en algún lugar del componente.
+// Para cajas de búsqueda: el texto tecleado se actualiza al instante (el
+// input nunca se siente lento), pero el valor que de verdad dispara el
+// filtrado espera un respiro breve tras la última tecla — así escribir
+// rápido no recalcula la lista filtrada en cada letra, solo cuando la
+// persona hace una pausa.
+export function useValorConRetraso(valor, esperaMs = 200) {
+  const [valorConRetraso, setValorConRetraso] = useState(valor);
+  useEffect(() => {
+    const temporizador = setTimeout(() => setValorConRetraso(valor), esperaMs);
+    return () => clearTimeout(temporizador);
+  }, [valor, esperaMs]);
+  return valorConRetraso;
+}
+
 export function useConfirmarDialogo() {
   const [pregunta, setPregunta] = useState(null);
 
@@ -8758,6 +8828,26 @@ function App() {
   const [errorCargaPerfil, setErrorCargaPerfil] = useState(null);
   const [cambiandoUsuario, setCambiandoUsuario] = useState(false);
   const [tab, setTab] = useState("resumen");
+  // Cada pestaña (menos Resumen) se carga con React.lazy para no meter todo
+  // el código de la app en un solo bundle — el costo es que la primera vez
+  // que alguien la abre hay un mini-salto mientras descarga su chunk. Al
+  // precargar el chunk apenas el mouse pasa por el botón (antes de hacer
+  // clic), para cuando el clic llega el chunk ya está en caché y el cambio
+  // de pestaña se siente instantáneo. import() repetido no vuelve a pedir
+  // nada por red si ya está en caché, así que esto no tiene costo si al
+  // final no se hace clic.
+  const PRECARGA_TAB = {
+    contabilidad: () => import("./tabs/ContabilidadTab.jsx"),
+    agenda: () => import("./tabs/AgendaTab.jsx"),
+    clientes: () => import("./tabs/ClientesTab.jsx"),
+    vigilancia: () => import("./tabs/VigilanciaTab.jsx"),
+    reportes: () => import("./tabs/ReportesTab.jsx"),
+    contenido: () => import("./tabs/ContenidoTab.jsx"),
+    documentos: () => import("./tabs/DocumentosTab.jsx"),
+    plataforma: () => import("./tabs/PlataformaTab.jsx"),
+    usuarios: () => import("./tabs/UsuariosPermisosTab.jsx"),
+  };
+  const precargarTab = (nombreTab) => PRECARGA_TAB[nombreTab]?.();
   const [mostrarNotificaciones, setMostrarNotificaciones] = useState(false);
   const [sidebarMovilAbierta, setSidebarMovilAbierta] = useState(false);
   const [mostrarSeguridad2FA, setMostrarSeguridad2FA] = useState(false);
@@ -9180,47 +9270,47 @@ function App() {
             </SidebarButton>
           )}
           {puedeVer("agenda") && (
-            <SidebarButton active={tab === "agenda"} onClick={() => setTab("agenda")} color="#8B5CF6" icono="agenda">
+            <SidebarButton active={tab === "agenda"} onClick={() => setTab("agenda")} onMouseEnter={() => precargarTab("agenda")} color="#8B5CF6" icono="agenda">
               Agenda
             </SidebarButton>
           )}
           {puedeVer("clientes") && (
-            <SidebarButton active={tab === "clientes"} onClick={() => setTab("clientes")} color="#14B8A6" icono="clientes">
+            <SidebarButton active={tab === "clientes"} onClick={() => setTab("clientes")} onMouseEnter={() => precargarTab("clientes")} color="#14B8A6" icono="clientes">
               Clientes
             </SidebarButton>
           )}
           {puedeVer("vigilancia") && (
-            <SidebarButton active={tab === "vigilancia"} onClick={() => setTab("vigilancia")} color="#F5A524" icono="vigilancia">
+            <SidebarButton active={tab === "vigilancia"} onClick={() => setTab("vigilancia")} onMouseEnter={() => precargarTab("vigilancia")} color="#F5A524" icono="vigilancia">
               Vigilancia judicial
             </SidebarButton>
           )}
           {puedeVer("contabilidad") && (
-            <SidebarButton active={tab === "contabilidad"} onClick={() => setTab("contabilidad")} color="#F43F5E" icono="contabilidad">
+            <SidebarButton active={tab === "contabilidad"} onClick={() => setTab("contabilidad")} onMouseEnter={() => precargarTab("contabilidad")} color="#F43F5E" icono="contabilidad">
               Contabilidad
             </SidebarButton>
           )}
           {puedeVer("contenido") && (
-            <SidebarButton active={tab === "contenido"} onClick={() => setTab("contenido")} color="#8B5CF6" icono="contenido">
+            <SidebarButton active={tab === "contenido"} onClick={() => setTab("contenido")} onMouseEnter={() => precargarTab("contenido")} color="#8B5CF6" icono="contenido">
               Calendario de contenido
             </SidebarButton>
           )}
           {puedeVer("documentos") && (
-            <SidebarButton active={tab === "documentos"} onClick={irADocumentos} color="#10B981" icono="documentos">
+            <SidebarButton active={tab === "documentos"} onClick={irADocumentos} onMouseEnter={() => precargarTab("documentos")} color="#10B981" icono="documentos">
               Firmar documentos
             </SidebarButton>
           )}
           {puedeVer("reportes") && (
-            <SidebarButton active={tab === "reportes"} onClick={() => setTab("reportes")} color="#0EA5E9" icono="reportes">
+            <SidebarButton active={tab === "reportes"} onClick={() => setTab("reportes")} onMouseEnter={() => precargarTab("reportes")} color="#0EA5E9" icono="reportes">
               Reportes
             </SidebarButton>
           )}
           {usuarioActual.rol === "Administrador" && (
-            <SidebarButton active={tab === "usuarios"} onClick={() => setTab("usuarios")} color="#6B7480" icono="usuarios">
+            <SidebarButton active={tab === "usuarios"} onClick={() => setTab("usuarios")} onMouseEnter={() => precargarTab("usuarios")} color="#6B7480" icono="usuarios">
               Usuarios y permisos
             </SidebarButton>
           )}
           {usuarioActual.es_superadmin && (
-            <SidebarButton active={tab === "plataforma"} onClick={() => setTab("plataforma")} color="#DC2626" icono="usuarios">
+            <SidebarButton active={tab === "plataforma"} onClick={() => setTab("plataforma")} onMouseEnter={() => precargarTab("plataforma")} color="#DC2626" icono="usuarios">
               Plataforma
             </SidebarButton>
           )}

@@ -40,6 +40,7 @@ import {
   LOGO_SRC,
   useReferenciadores,
   useAbogadosAsociados,
+  useValorConRetraso,
 } from "../App.jsx";
 
 const MEDIOS_PAGO = ["Nequi", "Daviplata", "Nu", "Cuenta bancaria", "Llave"];
@@ -1928,23 +1929,34 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
     .map((id) => clientes[id])
     .filter((c) => c && Number(c.valorTotal) > 0 && (c.pagos || []).length === 0);
 
-  const egresosFiltrados = [...egresos]
-    .filter((e) => categoriaFiltroEgreso === "Todas" || e.categoria === categoriaFiltroEgreso)
-    .filter((e) => !filtroEgreso.trim() || e.concepto.toLowerCase().includes(filtroEgreso.trim().toLowerCase()))
-    .sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+  const filtroEgresoConRetraso = useValorConRetraso(filtroEgreso);
+  const egresosFiltrados = useMemo(
+    () =>
+      [...egresos]
+        .filter((e) => categoriaFiltroEgreso === "Todas" || e.categoria === categoriaFiltroEgreso)
+        .filter((e) => !filtroEgresoConRetraso.trim() || e.concepto.toLowerCase().includes(filtroEgresoConRetraso.trim().toLowerCase()))
+        .sort((a, b) => new Date(b.fecha) - new Date(a.fecha)),
+    [egresos, categoriaFiltroEgreso, filtroEgresoConRetraso]
+  );
 
-  const otrosIngresosFiltrados = [...otrosIngresos]
-    .filter((i) => categoriaFiltroOtroIngreso === "Todas" || i.categoria === categoriaFiltroOtroIngreso)
-    .filter((i) => !filtroOtroIngreso.trim() || i.concepto.toLowerCase().includes(filtroOtroIngreso.trim().toLowerCase()))
-    .sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+  const filtroOtroIngresoConRetraso = useValorConRetraso(filtroOtroIngreso);
+  const otrosIngresosFiltrados = useMemo(
+    () =>
+      [...otrosIngresos]
+        .filter((i) => categoriaFiltroOtroIngreso === "Todas" || i.categoria === categoriaFiltroOtroIngreso)
+        .filter((i) => !filtroOtroIngresoConRetraso.trim() || i.concepto.toLowerCase().includes(filtroOtroIngresoConRetraso.trim().toLowerCase()))
+        .sort((a, b) => new Date(b.fecha) - new Date(a.fecha)),
+    [otrosIngresos, categoriaFiltroOtroIngreso, filtroOtroIngresoConRetraso]
+  );
 
   // Filtrar y ordenar es O(n log n) sobre todos los clientes — sin memoizar,
   // se repetía en CADA render (incluyendo cada tecla escrita en cualquier
   // otro campo de la pantalla, no solo el filtro), lo que se sentía como
   // lentitud en despachos con muchos clientes. useMemo solo lo recalcula
   // cuando algo que realmente afecta el resultado cambió.
+  const filtroConRetraso = useValorConRetraso(filtro);
   const idsFiltrados = useMemo(() => {
-    const textoFiltro = filtro.trim().toLowerCase();
+    const textoFiltro = filtroConRetraso.trim().toLowerCase();
     let resultado = textoFiltro ? ids.filter((id) => clientes[id]?.nombre?.toLowerCase().includes(textoFiltro)) : ids;
     if (soloPendientes) resultado = resultado.filter((id) => (saldoDe(clientes[id]) || 0) > 0);
     return [...resultado].sort((a, b) => {
@@ -1959,7 +1971,7 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
       }
       return (clientes[a]?.nombre || "").localeCompare(clientes[b]?.nombre || "");
     });
-  }, [ids, clientes, filtro, soloPendientes, orden]);
+  }, [ids, clientes, filtroConRetraso, soloPendientes, orden]);
 
   return (
     <div>
