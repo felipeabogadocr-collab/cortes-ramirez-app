@@ -658,6 +658,56 @@ function PanelMetaRecaudo({ meta, onGuardar }) {
   );
 }
 
+function PanelDatosLimpios({ fecha, onGuardar }) {
+  const [abierto, setAbierto] = useState(false);
+  const [valor, setValor] = useState(fecha || "");
+  const [guardando, setGuardando] = useState(false);
+
+  useEffect(() => {
+    setValor(fecha || "");
+  }, [fecha]);
+
+  const guardar = async () => {
+    setGuardando(true);
+    await onGuardar(valor || null);
+    setGuardando(false);
+    setAbierto(false);
+  };
+
+  const activo = !!fecha;
+
+  return (
+    <Card style={{ marginBottom: 20 }}>
+      <button
+        onClick={() => setAbierto((a) => !a)}
+        style={{ background: "none", border: "none", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%", padding: 0 }}
+      >
+        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 14, fontWeight: 700, color: COLORS.ink, margin: 0, display: "flex", alignItems: "center", gap: 6 }}>
+          <Icono tipo="check" size={14} /> Contabilidad clasificada cliente por cliente desde {activo ? "" : "(sin definir)"}
+        </p>
+        <span style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.muted }}>{abierto ? "Ocultar ▲" : "Editar ▼"}</span>
+      </button>
+      {!abierto && (
+        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, marginTop: 6 }}>
+          {activo
+            ? `Desde el ${new Date(`${fecha}T12:00:00`).toLocaleDateString("es-CO", { dateStyle: "long" })} — antes de esa fecha, el análisis financiero no marca alertas de "plata duplicada" (ya sabes que los meses de atrás quedaron cargados en bloque, no cliente por cliente).`
+            : "Si cargaste meses atrás en bloque (un solo abono/egreso total, sin clasificar cliente por cliente) mientras te ponías al día, pon aquí desde cuándo sí quedó todo bien clasificado — así el análisis financiero no te marca esos meses viejos como sospechosos."}
+        </p>
+      )}
+      {abierto && (
+        <div style={{ marginTop: 14 }}>
+          <Field label="Clasificado cliente por cliente desde (opcional)">
+            <input type="date" className="drx-input" style={{ ...inputStyle, maxWidth: 200 }} value={valor} onChange={(e) => setValor(e.target.value)} />
+          </Field>
+          <button className="drx-btn-primary" style={{ ...buttonPrimary, marginTop: 12 }} onClick={guardar} disabled={guardando}>
+            {guardando ? "Guardando…" : "Guardar"}
+          </button>
+        </div>
+      )}
+    </Card>
+  );
+}
+
 function PanelPresupuesto({ presupuesto, onGuardar }) {
   const [abierto, setAbierto] = useState(false);
   const [valor, setValor] = useState(presupuesto?.valor ? String(presupuesto.valor) : "");
@@ -1576,6 +1626,18 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
     setMetaRecaudo(datos);
   };
 
+  const [fechaDatosLimpios, setFechaDatosLimpios] = useState(null);
+  useEffect(() => {
+    (async () => {
+      const raw = await storageGet("fecha-datos-limpios", false);
+      setFechaDatosLimpios(raw || null);
+    })();
+  }, []);
+  const guardarFechaDatosLimpios = async (fecha) => {
+    await storageSet("fecha-datos-limpios", fecha || "", false);
+    setFechaDatosLimpios(fecha || null);
+  };
+
   const [ahorro, setAhorro] = useState(null);
   useEffect(() => {
     (async () => {
@@ -2051,6 +2113,7 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
       <EncabezadoSeccion titulo="Contabilidad" color="#F43F5E" />
 
       <PanelDatosCuentaCobro datos={datosResponsable} onGuardar={guardarDatosResponsable} />
+      <PanelDatosLimpios fecha={fechaDatosLimpios} onGuardar={guardarFechaDatosLimpios} />
       <PanelMetaRecaudo meta={metaRecaudo} onGuardar={guardarMetaRecaudo} />
       <PanelPresupuesto presupuesto={presupuesto} onGuardar={guardarPresupuesto} />
       <PanelAhorro ahorro={ahorro} onGuardar={guardarAhorro} />

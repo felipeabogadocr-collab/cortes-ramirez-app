@@ -1081,7 +1081,7 @@ function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-const APP_VERSION = "1.70.0";
+const APP_VERSION = "1.71.0";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -1672,8 +1672,14 @@ function analisisFinanciero(rep, r) {
   // eso distorsiona el % de margen y las demás señales de este análisis.
   const valoresEgreso = meses.map((m) => rep.egresosPorMes[m.clave] || 0);
   const UMBRAL_MINIMO_TRASLADO = 300000;
+  // Si el usuario marcó desde cuándo quedó la contabilidad clasificada
+  // cliente por cliente (fechaDatosLimpios), los meses de antes no deben
+  // disparar esta alerta — ya se sabe que están cargados en bloque, sin
+  // desglosar, así que ver ingresos≈egresos ahí no es una señal nueva.
+  const claveDatosLimpios = rep.fechaDatosLimpios ? rep.fechaDatosLimpios.slice(0, 7) : null;
   const mesesConPosibleTraslado = meses
-    .map((m, i) => ({ etiqueta: m.etiqueta, ingreso: valoresIngreso[i], egreso: valoresEgreso[i] }))
+    .map((m, i) => ({ clave: m.clave, etiqueta: m.etiqueta, ingreso: valoresIngreso[i], egreso: valoresEgreso[i] }))
+    .filter((m) => !claveDatosLimpios || m.clave >= claveDatosLimpios)
     .filter((m) => m.ingreso >= UMBRAL_MINIMO_TRASLADO && m.egreso > 0 && m.egreso / m.ingreso >= 0.85 && m.egreso / m.ingreso <= 1.15);
 
   const promedioMensual = valoresIngreso.reduce((s, v) => s + v, 0) / meses.length;
@@ -3530,6 +3536,12 @@ function ResumenTab({ nombre, usuarioId, usuarioActual, onIr }) {
                 </div>
                 <p style={{ fontFamily: "'Source Serif 4', serif", fontSize: 13.5, color: COLORS.ink, lineHeight: 1.6, margin: "0 0 16px" }}>{a.consejo}</p>
 
+                {rep.fechaDatosLimpios && (
+                  <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, color: COLORS.muted, margin: "0 0 14px", fontStyle: "italic" }}>
+                    Los meses antes del {new Date(`${rep.fechaDatosLimpios}T12:00:00`).toLocaleDateString("es-CO", { dateStyle: "long" })} quedaron cargados en bloque (sin clasificar cliente por cliente) — el análisis no los marca como sospechosos por eso.
+                  </p>
+                )}
+
                 <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11, fontWeight: 700, color: COLORS.muted, textTransform: "uppercase", letterSpacing: 0.5, margin: "0 0 8px" }}>
                   Lo que hay detrás del veredicto
                 </p>
@@ -5293,6 +5305,19 @@ export function useDatosReportes() {
   const { ingresos: otrosIngresos } = useOtrosIngresos();
   const [clientes, setClientes] = useState({});
   const [cargando, setCargando] = useState(true);
+  // Fecha opcional a partir de la cual los pagos/egresos quedaron
+  // registrados cliente por cliente (no en un solo bloque mensual como se
+  // hizo mientras se ponía al día la contabilidad atrasada). El análisis
+  // financiero la usa para no tratar esos meses en bloque como si fueran
+  // una señal real de riesgo (plata duplicada, concentración, etc.) — ya
+  // se sabe por qué se ven así, no hace falta que el sistema alarme por eso.
+  const [fechaDatosLimpios, setFechaDatosLimpiosState] = useState(null);
+  useEffect(() => {
+    (async () => {
+      const raw = await storageGet("fecha-datos-limpios", false);
+      setFechaDatosLimpiosState(raw || null);
+    })();
+  }, []);
 
   useEffect(() => {
     (async () => {
@@ -5543,6 +5568,7 @@ export function useDatosReportes() {
     egresoMasGrandeMes,
     egresoMasGrandePct,
     retenidoTotalHistorico,
+    fechaDatosLimpios,
   };
 }
 
