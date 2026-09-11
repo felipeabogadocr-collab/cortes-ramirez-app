@@ -753,6 +753,8 @@ const GlobalStyle = () => (
       z-index: 0;
     }
     @keyframes drx-pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(22,163,74,0.35); } 50% { box-shadow: 0 0 0 6px rgba(22,163,74,0); } }
+    @keyframes drx-pulse-lex { 0%, 100% { box-shadow: 0 4px 14px rgba(124,58,237,0.4), 0 0 0 0 rgba(124,58,237,0.35); } 50% { box-shadow: 0 4px 14px rgba(124,58,237,0.4), 0 0 0 8px rgba(124,58,237,0); } }
+    @keyframes drx-flotar { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
     @keyframes drx-fade-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
     .drx-fade-in { animation: drx-fade-in 0.22s ease; }
     @keyframes drx-tab-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
@@ -1078,7 +1080,7 @@ function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-const APP_VERSION = "1.65.0";
+const APP_VERSION = "1.66.0";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -2412,6 +2414,101 @@ const SUGERENCIAS_ASISTENTE = [
 // herramienta genérica que a alguien con quien de verdad se habla del
 // negocio todos los días.
 const NOMBRE_ASISTENTE = "Lex";
+
+// Burbuja flotante de Lex, visible en cualquier pestaña (no solo en
+// Resumen) — reaparece cada cierto tiempo con un mensaje corto, casi
+// siempre basado en pendientes reales del despacho para que no se sienta
+// como relleno. Al hacer clic (en la burbuja o en el avatar) lleva a
+// Resumen, donde vive la conversación completa con Lex — mover todo el
+// chat a una ventana flotante global sería un cambio mucho más grande y
+// arriesgado, y esto ya resuelve "que esté siempre presente".
+function LexFlotante({ onIr, tabActual }) {
+  const r = useResumenGeneral();
+  const [indice, setIndice] = useState(0);
+  const [visible, setVisible] = useState(true);
+
+  const mensajes = useMemo(() => {
+    const lista = [];
+    if (r.pagosPendientes > 0) lista.push(`Tienes ${r.pagosPendientes} pago${r.pagosPendientes !== 1 ? "s" : ""} por vencer.`);
+    if (r.procesosConNovedad > 0) lista.push(`${r.procesosConNovedad} proceso${r.procesosConNovedad !== 1 ? "s" : ""} con novedad judicial sin revisar.`);
+    if (r.clientesInactivos > 0) lista.push(`${r.clientesInactivos} cliente${r.clientesInactivos !== 1 ? "s" : ""} sin actividad reciente — un mensaje corto ya ayuda.`);
+    if (r.docsFaltaAbogado > 0) lista.push(`Tienes ${r.docsFaltaAbogado} documento${r.docsFaltaAbogado !== 1 ? "s" : ""} esperando tu firma.`);
+    if (lista.length === 0) lista.push("Todo al día por hoy. Pregúntame lo que necesites.");
+    lista.push("¿Registro un pago, busco un cliente, o te ayudo con algo más?");
+    lista.push("Puedo generar recibos, documentos y hasta un resumen fiscal cuando quieras.");
+    return lista;
+  }, [r.pagosPendientes, r.procesosConNovedad, r.clientesInactivos, r.docsFaltaAbogado]);
+
+  useEffect(() => {
+    const rotar = setInterval(() => {
+      setIndice((i) => (i + 1) % mensajes.length);
+      setVisible(true);
+    }, 45000);
+    return () => clearInterval(rotar);
+  }, [mensajes.length]);
+
+  useEffect(() => {
+    if (!visible) return;
+    const ocultar = setTimeout(() => setVisible(false), 9000);
+    return () => clearTimeout(ocultar);
+  }, [visible, indice]);
+
+  if (tabActual === "resumen") return null; // ya está viendo a Lex ahí mismo
+
+  return (
+    <div style={{ position: "fixed", bottom: 22, right: 22, zIndex: 1500, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8 }}>
+      {visible && (
+        <div
+          className="drx-fade-in"
+          onClick={() => onIr("resumen")}
+          style={{
+            maxWidth: 230,
+            background: COLORS.panel,
+            border: `1px solid ${COLORS.border}`,
+            borderRadius: 14,
+            borderBottomRightRadius: 4,
+            padding: "10px 12px",
+            boxShadow: "0 8px 24px rgba(16,24,40,0.14)",
+            cursor: "pointer",
+            position: "relative",
+          }}
+        >
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setVisible(false);
+            }}
+            aria-label="Ocultar"
+            style={{ position: "absolute", top: 4, right: 6, background: "none", border: "none", cursor: "pointer", color: COLORS.muted, fontSize: 13, padding: 2, lineHeight: 1 }}
+          >
+            ✕
+          </button>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11, fontWeight: 700, color: "#7C3AED", margin: "0 0 3px" }}>{NOMBRE_ASISTENTE}</p>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.ink, margin: 0, lineHeight: 1.4, paddingRight: 10 }}>{mensajes[indice]}</p>
+        </div>
+      )}
+      <button
+        onClick={() => onIr("resumen")}
+        title={`Hablar con ${NOMBRE_ASISTENTE}`}
+        style={{
+          width: 52,
+          height: 52,
+          borderRadius: "50%",
+          border: "none",
+          cursor: "pointer",
+          background: "linear-gradient(135deg, #7C3AED, #4F46E5)",
+          color: "#FFFFFF",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          animation: "drx-flotar 3s ease-in-out infinite, drx-pulse-lex 2.6s ease-in-out infinite",
+        }}
+      >
+        <Icono tipo="chispa" size={22} />
+      </button>
+    </div>
+  );
+}
 
 function AsistenteIA({ nombre, usuarioId, usuarioActual, onAccionCompletada }) {
   const claveIndice = `chat-asistente-indice:${usuarioId || "general"}`;
@@ -9649,6 +9746,8 @@ function App() {
           </div>
         </div>
       </div>
+
+      <LexFlotante onIr={setTab} tabActual={tab} />
 
       {avisoInactividad && (
         <div
