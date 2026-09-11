@@ -715,6 +715,7 @@ const GlobalStyle = () => (
     .drx-fila-funcion:hover p:first-child { color: ${COLORS.accentBright} !important; }
     .drx-chip-vigilancia { transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease; }
     .drx-chip-vigilancia:hover { transform: translateY(-1px); border-color: ${COLORS.accentBright} !important; }
+    .drx-senal-clicable:hover { background: ${COLORS.surfaceSoft} !important; }
     .drx-chip-vigilancia:active { transform: translateY(0) scale(0.97); }
     /* El calendario que se despliega al hacer clic es del navegador — eso no
        se puede re-diseñar (por seguridad, ningún navegador deja tocar ese
@@ -1080,7 +1081,7 @@ function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-const APP_VERSION = "1.67.1";
+const APP_VERSION = "1.68.0";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -2430,14 +2431,14 @@ const SUGERENCIAS_ASISTENTE = [
 // negocio todos los días.
 const NOMBRE_ASISTENTE = "Lex";
 
-// Burbuja flotante de Lex, visible en cualquier pestaña (no solo en
-// Resumen) — reaparece cada cierto tiempo con un mensaje corto, casi
-// siempre basado en pendientes reales del despacho para que no se sienta
-// como relleno. Un clic (en la burbuja o en el avatar) abre el chat
-// completo ahí mismo, flotando encima de lo que se esté viendo, en vez de
-// mandar a la pestaña Resumen — reutiliza el mismo AsistenteIA de siempre,
-// solo que montado en una ventana flotante en vez de fijo en Resumen.
-function LexFlotante({ tabActual, usuarioActual }) {
+// Burbuja flotante de Lex, visible en todas las pestañas (incluida
+// Resumen, que antes tenía su propio chat fijo aparte — ahora es este
+// mismo el único lugar donde se habla con Lex, sin duplicar la
+// conversación en dos sitios). Reaparece cada cierto tiempo con un mensaje
+// corto, casi siempre basado en pendientes reales del despacho para que no
+// se sienta como relleno. Un clic (en la burbuja o en el avatar) abre el
+// chat completo ahí mismo, flotando encima de lo que se esté viendo.
+function LexFlotante({ usuarioActual }) {
   const r = useResumenGeneral();
   const [indice, setIndice] = useState(0);
   const [visible, setVisible] = useState(true);
@@ -2468,8 +2469,6 @@ function LexFlotante({ tabActual, usuarioActual }) {
     const ocultar = setTimeout(() => setVisible(false), 9000);
     return () => clearTimeout(ocultar);
   }, [visible, indice]);
-
-  if (tabActual === "resumen") return null; // ya está viendo a Lex ahí mismo
 
   if (chatAbierto) {
     return (
@@ -3429,19 +3428,20 @@ function ResumenTab({ nombre, usuarioId, usuarioActual, onIr }) {
                   style={{
                     width: 38,
                     height: 38,
-                    borderRadius: 10,
-                    background: a.listo ? a.color + "1F" : COLORS.surfaceSoft,
+                    borderRadius: "50%",
+                    background: `linear-gradient(135deg, ${COLORS.navy}, ${COLORS.accentBright})`,
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
                     flexShrink: 0,
+                    color: "#FFFFFF",
                   }}
                 >
-                  <Icono tipo="objetivo" size={18} style={{ color: a.listo ? a.color : COLORS.muted }} />
+                  <IconoLex size={19} />
                 </div>
                 <div>
-                  <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, fontWeight: 600, color: COLORS.muted, textTransform: "uppercase", letterSpacing: 0.5, margin: 0 }}>
-                    Análisis financiero · crecimiento
+                  <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, fontWeight: 800, color: COLORS.headingText, margin: 0 }}>
+                    {NOMBRE_ASISTENTE} · análisis financiero
                   </p>
                   <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, margin: "2px 0 0" }}>Con base en tus ingresos, egresos, cartera y carga de trabajo</p>
                 </div>
@@ -3461,9 +3461,27 @@ function ResumenTab({ nombre, usuarioId, usuarioActual, onIr }) {
               <>
                 <p style={{ fontFamily: "Inter, sans-serif", fontSize: 19, fontWeight: 800, color: a.color, margin: "0 0 10px" }}>{a.veredicto}</p>
                 <p style={{ fontFamily: "'Source Serif 4', serif", fontSize: 13.5, color: COLORS.ink, lineHeight: 1.6, margin: "0 0 16px" }}>{a.consejo}</p>
-                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                   {a.senales.map((s, i) => (
-                    <div key={i} style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+                    <button
+                      key={i}
+                      onClick={() => onIr("contabilidad")}
+                      title="Ver el detalle en Contabilidad"
+                      style={{
+                        display: "flex",
+                        gap: 8,
+                        alignItems: "flex-start",
+                        background: "none",
+                        border: "none",
+                        cursor: "pointer",
+                        textAlign: "left",
+                        padding: "4px 6px",
+                        marginLeft: -6,
+                        borderRadius: 8,
+                        fontFamily: "inherit",
+                      }}
+                      className="drx-senal-clicable"
+                    >
                       <span
                         style={{
                           marginTop: 5,
@@ -3475,7 +3493,7 @@ function ResumenTab({ nombre, usuarioId, usuarioActual, onIr }) {
                         }}
                       />
                       <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.inkSoft, margin: 0, lineHeight: 1.5 }}>{s.texto}</p>
-                    </div>
+                    </button>
                   ))}
                 </div>
                 <button
@@ -3529,12 +3547,29 @@ function ResumenTab({ nombre, usuarioId, usuarioActual, onIr }) {
             </p>
             <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 12 }}>
               {a.mesesConPosibleTraslado.map((m) => (
-                <div key={m.etiqueta} style={{ display: "flex", justifyContent: "space-between", background: "#fff", border: "1px solid #FDE68A", borderRadius: 8, padding: "7px 11px" }}>
+                <button
+                  key={m.etiqueta}
+                  onClick={() => onIr("contabilidad")}
+                  title="Ver el detalle en Contabilidad"
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    background: "#fff",
+                    border: "1px solid #FDE68A",
+                    borderRadius: 8,
+                    padding: "7px 11px",
+                    cursor: "pointer",
+                    fontFamily: "inherit",
+                    textAlign: "left",
+                    width: "100%",
+                  }}
+                  className="drx-senal-clicable"
+                >
                   <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, fontWeight: 600, color: "#92400E", margin: 0, textTransform: "capitalize" }}>{m.etiqueta}</p>
                   <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: "#92400E", margin: 0 }}>
                     Entró {formatoCOP(m.ingreso)} · Salió {formatoCOP(m.egreso)}
                   </p>
-                </div>
+                </button>
               ))}
             </div>
             <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: "#92400E", margin: 0 }}>
@@ -3543,8 +3578,6 @@ function ResumenTab({ nombre, usuarioId, usuarioActual, onIr }) {
           </Card>
         );
       })()}
-
-      <AsistenteIA nombre={nombre} usuarioId={usuarioId} usuarioActual={usuarioActual} onAccionCompletada={r.reload} />
 
       {tareasPendientes > 0 && (
         <div className="drx-fade-in" style={{ marginBottom: 20 }}>
@@ -9796,7 +9829,7 @@ function App() {
         </div>
       </div>
 
-      <LexFlotante tabActual={tab} usuarioActual={usuarioActual} />
+      <LexFlotante usuarioActual={usuarioActual} />
 
       {avisoInactividad && (
         <div
