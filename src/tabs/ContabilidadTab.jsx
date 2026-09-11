@@ -1200,15 +1200,17 @@ function FormularioEgreso({ onRegistrar }) {
   const [categoria, setCategoria] = useState(CATEGORIAS_EGRESO[0]);
   const [valor, setValor] = useState("");
   const [fecha, setFecha] = useState(hoyStr);
+  const [esInversion, setEsInversion] = useState(false);
   const [guardando, setGuardando] = useState(false);
 
   const registrar = async () => {
     if (!concepto.trim() || !valor || Number(valor) <= 0) return;
     setGuardando(true);
-    await onRegistrar({ concepto, categoria, valor, fecha });
+    await onRegistrar({ concepto, categoria, valor, fecha, esInversion });
     setConcepto("");
     setValor("");
     setFecha(hoyStr);
+    setEsInversion(false);
     setGuardando(false);
   };
 
@@ -1236,6 +1238,10 @@ function FormularioEgreso({ onRegistrar }) {
           <input type="date" className="drx-input" style={inputStyle} value={fecha} onChange={(e) => setFecha(e.target.value)} />
         </Field>
       </div>
+      <label style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 12, fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.inkSoft, cursor: "pointer" }}>
+        <input type="checkbox" checked={esInversion} onChange={(e) => setEsInversion(e.target.checked)} />
+        Es una inversión (equipo, software, capacitación...) — quiero ver cuándo se recupera
+      </label>
       <button
         className="drx-btn-primary"
         style={{ ...buttonPrimary, marginTop: 14, background: "#F43F5E" }}
@@ -1255,12 +1261,13 @@ function EgresoCard({ egreso, onEditar, onEliminar, clientesDisponibles }) {
   const [valor, setValor] = useState(String(egreso.valor ?? ""));
   const [fecha, setFecha] = useState(new Date(egreso.fecha).toISOString().slice(0, 10));
   const [clienteId, setClienteId] = useState(egreso.clienteId || "");
+  const [esInversion, setEsInversion] = useState(!!egreso.esInversion);
   const [guardando, setGuardando] = useState(false);
 
   const guardarEdicion = async () => {
     if (!concepto.trim() || !valor || Number(valor) <= 0) return;
     setGuardando(true);
-    await onEditar({ concepto: concepto.trim(), categoria, valor: Number(valor), fecha: new Date(`${fecha}T12:00:00`).toISOString(), clienteId: clienteId || null });
+    await onEditar({ concepto: concepto.trim(), categoria, valor: Number(valor), fecha: new Date(`${fecha}T12:00:00`).toISOString(), clienteId: clienteId || null, esInversion });
     setGuardando(false);
     setEditando(false);
   };
@@ -1304,6 +1311,10 @@ function EgresoCard({ egreso, onEditar, onEliminar, clientesDisponibles }) {
             </Field>
           </div>
         )}
+        <label style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 12, fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.inkSoft, cursor: "pointer" }}>
+          <input type="checkbox" checked={esInversion} onChange={(e) => setEsInversion(e.target.checked)} />
+          Es una inversión — quiero ver cuándo se recupera
+        </label>
         <div style={{ display: "flex", gap: 8 }}>
           <button className="drx-btn-primary" style={{ ...buttonPrimary, padding: "6px 14px", fontSize: 12 }} onClick={guardarEdicion} disabled={guardando}>
             {guardando ? "Guardando..." : "Guardar cambios"}
@@ -1322,6 +1333,11 @@ function EgresoCard({ egreso, onEditar, onEliminar, clientesDisponibles }) {
         <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11, fontWeight: 700, color: "#B42318", background: "#FEF2F2", display: "inline-block", padding: "2px 8px", borderRadius: 20, margin: "0 0 4px" }}>
           − EGRESO
         </p>
+        {egreso.esInversion && (
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11, fontWeight: 700, color: "#0D9488", background: "#F0FDFA", display: "inline-block", padding: "2px 8px", borderRadius: 20, margin: "0 0 4px 6px" }}>
+            📈 Inversión
+          </p>
+        )}
         <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, fontWeight: 600, color: "#B42318", margin: 0 }}>
           − {formatoCOP(egreso.valor)} · {egreso.concepto}
         </p>
@@ -1896,6 +1912,62 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
   });
   const totalProyeccion3Meses = mesesProyeccion.reduce((s, m) => s + m.total, 0);
 
+  // Retorno de inversión: no hay forma de saber qué ingresos exactos vino
+  // POR CAUSA de una inversión puntual (comprar un software no dice "este
+  // cliente llegó gracias a esto") — lo más honesto que se puede calcular
+  // es cuánta utilidad neta real ha dejado el despacho completo desde la
+  // fecha de la inversión (todo lo que entró menos todo lo que salió, esa
+  // misma inversión incluida), y a qué ritmo, para estimar cuándo se
+  // recupera si el despacho sigue a ese paso. Es una aproximación de flujo
+  // de caja, no una atribución exacta — se explica así en la pantalla.
+  // Una inversión pagada en cuotas queda como varios egresos separados
+  // (uno por cuota) — se agrupan por concepto (ignorando un sufijo tipo
+  // "- cuota 2" si lo tiene) para tratarlas como una sola inversión: el
+  // monto es lo pagado hasta ahora en total, y la fecha de arranque es la
+  // de la primera cuota, no la última.
+  const normalizarConceptoInversion = (concepto) =>
+    (concepto || "")
+      .trim()
+      .toLowerCase()
+      .replace(/\s*-?\s*cuota\s*\d+\s*$/i, "")
+      .trim();
+  const gruposInversion = {};
+  egresos
+    .filter((e) => e.esInversion)
+    .forEach((e) => {
+      const clave = normalizarConceptoInversion(e.concepto) || e.concepto;
+      if (!gruposInversion[clave]) gruposInversion[clave] = { concepto: e.concepto, monto: 0, fecha: e.fecha };
+      gruposInversion[clave].monto += Number(e.valor) || 0;
+      if (new Date(e.fecha) < new Date(gruposInversion[clave].fecha)) {
+        gruposInversion[clave].fecha = e.fecha;
+        gruposInversion[clave].concepto = e.concepto;
+      }
+    });
+  const estadoInversiones = Object.values(gruposInversion).map((inv) => {
+    const fechaInversion = new Date(inv.fecha);
+    let ingresoDesde = 0;
+    let egresoDesde = 0;
+    ids.forEach((id) => {
+      (clientes[id]?.pagos || []).forEach((p) => {
+        if (new Date(p.fecha) >= fechaInversion) ingresoDesde += Number(p.valor) || 0;
+      });
+    });
+    otrosIngresos.forEach((i) => {
+      if (new Date(i.fecha) >= fechaInversion) ingresoDesde += Number(i.valor) || 0;
+    });
+    egresos.forEach((e) => {
+      if (new Date(e.fecha) >= fechaInversion) egresoDesde += Number(e.valor) || 0;
+    });
+    const utilidadDesde = ingresoDesde - egresoDesde;
+    const monto = inv.monto;
+    const mesesTranscurridos = Math.max((hoy - fechaInversion) / (1000 * 60 * 60 * 24 * 30.4), 0.1);
+    const ritmoMensual = utilidadDesde / mesesTranscurridos;
+    const porcentajeRecuperado = monto > 0 ? Math.max(0, Math.round((utilidadDesde / monto) * 100)) : 0;
+    const recuperada = utilidadDesde >= monto;
+    const mesesFaltantes = !recuperada && ritmoMensual > 0 ? Math.ceil((monto - utilidadDesde) / ritmoMensual) : null;
+    return { inv, monto, utilidadDesde, porcentajeRecuperado, recuperada, mesesFaltantes, mesesTranscurridos };
+  });
+
   const mesesEgresos = [];
   for (let i = 5; i >= 0; i--) {
     const d = new Date(hoy.getFullYear(), hoy.getMonth() - i, 1);
@@ -2263,6 +2335,44 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
                   {c.nombre}
                 </p>
                 <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, fontWeight: 700, color: COLORS.navy, margin: 0 }}>{formatoCOP(c.total)}</p>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
+      {estadoInversiones.length > 0 && (
+        <Card style={{ marginBottom: 20 }}>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, fontWeight: 700, color: COLORS.ink, marginBottom: 4 }}>Retorno de inversión</p>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, marginBottom: 14, lineHeight: 1.5 }}>
+            Aproximado: compara la utilidad neta real del despacho desde la fecha de cada inversión (todo lo que entró menos todo lo que salió) contra lo invertido — no significa que ese ingreso vino "por causa" de la inversión, es el ritmo general del negocio desde ese momento.
+          </p>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {estadoInversiones.map((e) => (
+              <div key={e.inv.concepto + e.inv.fecha} style={{ background: COLORS.surfaceSoft, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: 12 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8, flexWrap: "wrap", marginBottom: 6 }}>
+                  <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, fontWeight: 700, color: COLORS.ink, margin: 0 }}>{e.inv.concepto}</p>
+                  <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, margin: 0 }}>
+                    {formatoCOP(e.monto)} · desde {new Date(e.inv.fecha).toLocaleDateString("es-CO", { dateStyle: "medium" })}
+                  </p>
+                </div>
+                <div style={{ height: 8, borderRadius: 6, background: "#E2E8F0", overflow: "hidden", marginBottom: 6 }}>
+                  <div
+                    style={{
+                      height: "100%",
+                      width: `${Math.min(e.porcentajeRecuperado, 100)}%`,
+                      background: e.recuperada ? "#10B981" : e.porcentajeRecuperado >= 50 ? "#0D9488" : "#F5A524",
+                      transition: "width 0.3s ease",
+                    }}
+                  />
+                </div>
+                <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: e.recuperada ? "#166534" : COLORS.inkSoft, margin: 0, fontWeight: e.recuperada ? 700 : 400 }}>
+                  {e.recuperada
+                    ? `✓ Recuperada — la utilidad del despacho desde esa fecha (${formatoCOP(e.utilidadDesde)}) ya superó lo invertido.`
+                    : e.mesesFaltantes !== null
+                    ? `${e.porcentajeRecuperado}% recuperado — a este ritmo, faltan aprox. ${e.mesesFaltantes} mes${e.mesesFaltantes !== 1 ? "es" : ""} más.`
+                    : `${e.porcentajeRecuperado}% recuperado — al ritmo actual del despacho (utilidad negativa o nula desde esa fecha), no se está recuperando todavía.`}
+                </p>
               </div>
             ))}
           </div>
