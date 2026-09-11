@@ -753,7 +753,7 @@ const GlobalStyle = () => (
       z-index: 0;
     }
     @keyframes drx-pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(22,163,74,0.35); } 50% { box-shadow: 0 0 0 6px rgba(22,163,74,0); } }
-    @keyframes drx-pulse-lex { 0%, 100% { box-shadow: 0 4px 14px rgba(124,58,237,0.4), 0 0 0 0 rgba(124,58,237,0.35); } 50% { box-shadow: 0 4px 14px rgba(124,58,237,0.4), 0 0 0 8px rgba(124,58,237,0); } }
+    @keyframes drx-pulse-lex { 0%, 100% { box-shadow: 0 4px 14px rgba(11,61,46,0.4), 0 0 0 0 rgba(22,163,74,0.35); } 50% { box-shadow: 0 4px 14px rgba(11,61,46,0.4), 0 0 0 8px rgba(22,163,74,0); } }
     @keyframes drx-flotar { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
     @keyframes drx-fade-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
     .drx-fade-in { animation: drx-fade-in 0.22s ease; }
@@ -1080,7 +1080,7 @@ function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-const APP_VERSION = "1.67.0";
+const APP_VERSION = "1.67.1";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -1294,6 +1294,21 @@ export function IconoCampana({ size = 17 }) {
 // Ícono de línea genérico para reemplazar los emojis sueltos por toda la
 // app — mismo lenguaje visual (trazo fino, sin relleno) que IconoCampana e
 // IconoSeguridad, para que se vea consistente y no "barato".
+// Carita de Lex: un ícono propio (no un emoji, que se ve distinto o mal en
+// cada dispositivo) con lentes — el guiño quedó, pero dibujado en el mismo
+// estilo de trazo que el resto de los íconos de la app, no pegado como
+// algo aparte.
+function IconoLex({ size = 16, style }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, ...style }}>
+      <circle cx="7.5" cy="12" r="3.2" />
+      <circle cx="16.5" cy="12" r="3.2" />
+      <path d="M10.7 12h2.6M2.5 11l1.8 1M21.5 11l-1.8 1" />
+      <path d="M9 17c1.2 1 3.8 1 5 0" />
+    </svg>
+  );
+}
+
 export function Icono({ tipo, size = 15, style, className }) {
   const p = { width: size, height: size, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 1.8, strokeLinecap: "round", strokeLinejoin: "round", className, style: { flexShrink: 0, ...style } };
   switch (tipo) {
@@ -2517,7 +2532,7 @@ function LexFlotante({ tabActual, usuarioActual }) {
           >
             ✕
           </button>
-          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11, fontWeight: 700, color: "#7C3AED", margin: "0 0 3px" }}>{NOMBRE_ASISTENTE}</p>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11, fontWeight: 700, color: COLORS.navy, margin: "0 0 3px" }}>{NOMBRE_ASISTENTE}</p>
           <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.ink, margin: 0, lineHeight: 1.4, paddingRight: 10 }}>{mensajes[indice]}</p>
         </div>
       )}
@@ -2530,17 +2545,15 @@ function LexFlotante({ tabActual, usuarioActual }) {
           borderRadius: "50%",
           border: "none",
           cursor: "pointer",
-          background: "linear-gradient(135deg, #7C3AED, #4F46E5)",
+          background: `linear-gradient(135deg, ${COLORS.navy}, ${COLORS.accentBright})`,
           color: "#FFFFFF",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          fontSize: 26,
-          lineHeight: 1,
           animation: "drx-flotar 3s ease-in-out infinite, drx-pulse-lex 2.6s ease-in-out infinite",
         }}
       >
-        🤓
+        <IconoLex size={26} />
       </button>
     </div>
   );
@@ -2803,18 +2816,16 @@ function AsistenteIA({ nombre, usuarioId, usuarioActual, onAccionCompletada }) {
               width: 34,
               height: 34,
               borderRadius: "50%",
-              background: "linear-gradient(135deg, #7C3AED, #4F46E5)",
+              background: `linear-gradient(135deg, ${COLORS.navy}, ${COLORS.accentBright})`,
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
               color: "#FFFFFF",
               flexShrink: 0,
-              boxShadow: "0 2px 8px rgba(124,58,237,0.35)",
-              fontSize: 17,
-              lineHeight: 1,
+              boxShadow: `0 2px 8px ${COLORS.navy}40`,
             }}
           >
-            🤓
+            <IconoLex size={18} />
           </div>
           <div style={{ minWidth: 0 }}>
             <p style={{ fontFamily: "Inter, sans-serif", fontSize: 14.5, fontWeight: 800, color: COLORS.headingText, margin: 0, letterSpacing: 0.2, display: "flex", alignItems: "baseline", gap: 6 }}>
@@ -2928,13 +2939,11 @@ function AsistenteIA({ nombre, usuarioId, usuarioActual, onAccionCompletada }) {
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                background: m.rol === "usuario" ? COLORS.accentSoft : "linear-gradient(135deg, #7C3AED, #4F46E5)",
+                background: m.rol === "usuario" ? COLORS.accentSoft : `linear-gradient(135deg, ${COLORS.navy}, ${COLORS.accentBright})`,
                 color: m.rol === "usuario" ? COLORS.navy : "#FFFFFF",
-                fontSize: m.rol === "usuario" ? undefined : 13,
-                lineHeight: 1,
               }}
             >
-              {m.rol === "usuario" ? <Icono tipo="persona" size={13} /> : "🤓"}
+              {m.rol === "usuario" ? <Icono tipo="persona" size={13} /> : <IconoLex size={13} />}
             </div>
             <div
               className="drx-fade-in"
@@ -3003,8 +3012,8 @@ function AsistenteIA({ nombre, usuarioId, usuarioActual, onAccionCompletada }) {
         ))}
         {cargando && (
           <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
-            <div style={{ width: 26, height: 26, borderRadius: "50%", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "linear-gradient(135deg, #7C3AED, #4F46E5)", color: "#FFFFFF", fontSize: 13, lineHeight: 1 }}>
-              🤓
+            <div style={{ width: 26, height: 26, borderRadius: "50%", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", background: `linear-gradient(135deg, ${COLORS.navy}, ${COLORS.accentBright})`, color: "#FFFFFF" }}>
+              <IconoLex size={13} />
             </div>
             <div style={{ background: COLORS.accentSoft, borderRadius: 12, padding: "10px 14px" }}>
               <PuntosEscribiendo />
