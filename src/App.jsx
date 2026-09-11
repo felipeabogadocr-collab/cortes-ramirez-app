@@ -1081,7 +1081,7 @@ function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-const APP_VERSION = "1.69.0";
+const APP_VERSION = "1.70.0";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -1796,6 +1796,64 @@ function analisisFinanciero(rep, r) {
       categoria: "Calidad del dato",
       positiva: false,
       texto: `${mesesConPosibleTraslado.length} de ${meses.length} meses (${listaMeses}) con ingresos y egresos casi idénticos — probable plata duplicada al moverla entre tus propias cuentas.`,
+    });
+  }
+
+  // Año actual vs. mismo punto del año anterior — dice si hay crecimiento
+  // real o solo el vaivén normal de un mes bueno o malo.
+  if (rep.cambioAnualPct !== null) {
+    if (rep.cambioAnualPct >= 15) {
+      puntos += 2;
+      senales.push({ categoria: "Año contra año", positiva: true, texto: `Vas ${rep.cambioAnualPct}% arriba de lo facturado en el mismo punto del año pasado (${formatoCOP(rep.ingresoYTDActual)} vs. ${formatoCOP(rep.ingresoYTDAnterior)}).` });
+    } else if (rep.cambioAnualPct <= -15) {
+      puntos -= 2;
+      senales.push({ categoria: "Año contra año", positiva: false, texto: `Vas ${Math.abs(rep.cambioAnualPct)}% por debajo de lo facturado en el mismo punto del año pasado (${formatoCOP(rep.ingresoYTDActual)} vs. ${formatoCOP(rep.ingresoYTDAnterior)}).` });
+    } else {
+      senales.push({ categoria: "Año contra año", positiva: null, texto: `Parecido al año pasado en este mismo punto (${rep.cambioAnualPct >= 0 ? "+" : ""}${rep.cambioAnualPct}%).` });
+    }
+  }
+
+  // Cartera pendiente sin próximo cobro programado — no está vencida
+  // todavía, pero tampoco aparece en "Flujo de caja proyectado" porque
+  // nadie le puso fecha, así que da una falsa sensación de que ya no
+  // falta cobrar nada más este mes.
+  if (rep.clientesSinProximoPago > 0) {
+    senales.push({
+      categoria: "Cobro sin programar",
+      positiva: false,
+      texto: `${rep.clientesSinProximoPago} cliente${rep.clientesSinProximoPago !== 1 ? "s" : ""} con saldo pendiente sin próximo cobro programado — no salen en el flujo de caja proyectado hasta que les pongas fecha.`,
+    });
+  }
+
+  // Mejor y peor mes de los últimos 6, para saber si el mes actual es
+  // normal o un extremo.
+  if (rep.mejorMes && rep.peorMes && rep.mejorMes.etiqueta !== rep.peorMes.etiqueta) {
+    senales.push({
+      categoria: "Rango del semestre",
+      positiva: null,
+      texto: `El mejor mes de los últimos 6 fue ${rep.mejorMes.etiqueta} (${formatoCOP(rep.mejorMes.valor)}); el más flojo, ${rep.peorMes.etiqueta} (${formatoCOP(rep.peorMes.valor)}).`,
+    });
+  }
+
+  // Egreso atípico: un solo gasto que concentra buena parte del mes puede
+  // ser una compra puntual (equipo, una inversión), no un cambio real en
+  // el ritmo de gasto — vale la pena distinguirlo antes de asustarse con
+  // el total de "Egresos este mes".
+  if (rep.egresoMasGrandeMes && rep.egresoMasGrandePct !== null && rep.egresoMasGrandePct >= 40) {
+    senales.push({
+      categoria: "Gasto atípico",
+      positiva: null,
+      texto: `"${rep.egresoMasGrandeMes.concepto}" (${formatoCOP(rep.egresoMasGrandeMes.valor)}) es el ${rep.egresoMasGrandePct}% del gasto de este mes — si fue algo puntual (no repetitivo), el gasto normal del despacho es más bajo que el total del mes.`,
+    });
+  }
+
+  // Retención acumulada: recordatorio fiscal, no una señal de salud del
+  // negocio — por eso no suma ni resta puntos, solo informa.
+  if (rep.retenidoTotalHistorico > 0) {
+    senales.push({
+      categoria: "Retención acumulada",
+      positiva: null,
+      texto: `${formatoCOP(rep.retenidoTotalHistorico)} retenidos históricamente por tus clientes — ya se le declararon a la DIAN a tu nombre, tenlos presentes en tu declaración de renta.`,
     });
   }
 
@@ -3531,6 +3589,10 @@ function ResumenTab({ nombre, usuarioId, usuarioActual, onIr }) {
                       ["Capacidad por abogado", "cuántos clientes activos atiende, en promedio, cada abogado del despacho — si el número es muy alto, el freno para crecer puede ser que no dan abasto, no que falten clientes."],
                       ["Concentración de cartera", "qué porcentaje de todo lo que ha facturado el despacho viene de un solo cliente. Mientras más alto, más riesgo — si ese cliente se va, se va una parte grande de tu facturación de un solo golpe."],
                       ["Punto de equilibrio", "cuántos clientes, pagando lo que paga un cliente típico (tu ticket promedio), necesitas cada mes solo para cubrir tus gastos — no para ganar, solo para no perder. Todo lo que entra por encima de ese número es ganancia real."],
+                      ["Año contra año", "compara lo facturado este año hasta hoy contra lo que llevabas facturado en el mismo día del año pasado — dice si de verdad estás creciendo, o si solo estás viendo el vaivén normal de un mes bueno o malo."],
+                      ["Cobro sin programar", "clientes que todavía te deben pero a los que no les has puesto fecha de próximo pago — no aparecen como atrasados (todavía no vence nada), pero tampoco se ven en el flujo de caja proyectado."],
+                      ["Gasto atípico", "cuando un solo egreso concentra una parte muy grande del gasto del mes — si fue algo puntual (un equipo, una inversión), el gasto normal del despacho es más bajo que el total que ves ese mes."],
+                      ["Retención acumulada", "la plata que tus clientes le han retenido a tus pagos y ya le declararon a la DIAN a tu nombre — no es un ingreso perdido, es un anticipo de tus propios impuestos que debes tener presente al declarar renta."],
                     ].map(([termino, def]) => (
                       <p key={termino} style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.inkSoft, margin: 0, lineHeight: 1.5 }}>
                         <strong style={{ color: COLORS.headingText }}>{termino}:</strong> {def}
@@ -5333,8 +5395,16 @@ export function useDatosReportes() {
   // muchos (ej. 2 procesos comerciales grandes vs. 10 consultas laborales
   // chicas), así que recomendar dónde enfocar mercadeo solo por cantidad de
   // clientes puede llevar a la conclusión equivocada.
+  // Un cliente marcado "esClienteAdministrativo" (ej. una bolsa tipo "Pagos
+  // pendientes por clasificar" para organizar pagos sin asignar todavía) no
+  // es un cliente real — su plata sigue contando en los totales de
+  // recaudado/egresos del despacho (esa plata sí entró de verdad), pero no
+  // debe distorsionar rankings ni riesgos que son específicamente "por
+  // cliente" o "por área": ahí solo entran clientes reales.
+  const listaClientesReales = listaClientes.filter((c) => !c.esClienteAdministrativo);
+
   const ingresoPorArea = {};
-  listaClientes.forEach((c) => {
+  listaClientesReales.forEach((c) => {
     const area = c.areaProceso?.trim() || "Sin definir";
     const totalCliente = (c.pagos || []).reduce((s, p) => s + (Number(p.valor) || 0), 0);
     ingresoPorArea[area] = (ingresoPorArea[area] || 0) + totalCliente;
@@ -5343,20 +5413,23 @@ export function useDatosReportes() {
     .filter(([, valor]) => valor > 0)
     .sort((a, b) => b[1] - a[1]);
 
-  const clientesConPago = listaClientes.filter((c) => (c.pagos || []).length > 0).length;
-  const ticketPromedio = clientesConPago > 0 ? ingresoTotalHistorico / clientesConPago : 0;
+  const clientesConPago = listaClientesReales.filter((c) => (c.pagos || []).length > 0).length;
+  const ingresoTotalClientesReales = listaClientesReales.reduce((s, c) => s + (c.pagos || []).reduce((s2, p) => s2 + (Number(p.valor) || 0), 0), 0);
+  const ticketPromedio = clientesConPago > 0 ? ingresoTotalClientesReales / clientesConPago : 0;
 
   // Concentración de cartera: cuánto de la facturación histórica depende de
   // un solo cliente — un despacho que vive de 1-2 clientes grandes tiene un
   // riesgo real que uno con la plata repartida entre muchos no tiene, así
   // que es una señal de riesgo tan válida como el margen o la cartera
-  // pendiente, aunque casi nunca se mire.
-  const ingresoPorCliente = listaClientes
+  // pendiente, aunque casi nunca se mire. El % se calcula sobre la plata de
+  // clientes reales solamente, no sobre el total del despacho (que puede
+  // incluir la bolsa administrativa u otros ingresos sueltos).
+  const ingresoPorCliente = listaClientesReales
     .map((c) => ({ nombre: c.nombre, total: (c.pagos || []).reduce((s, p) => s + (Number(p.valor) || 0), 0) }))
     .filter((c) => c.total > 0)
     .sort((a, b) => b.total - a.total);
   const clienteMasGrande = ingresoPorCliente[0] || null;
-  const concentracionTop1Pct = clienteMasGrande && ingresoTotalHistorico > 0 ? Math.round((clienteMasGrande.total / ingresoTotalHistorico) * 100) : null;
+  const concentracionTop1Pct = clienteMasGrande && ingresoTotalClientesReales > 0 ? Math.round((clienteMasGrande.total / ingresoTotalClientesReales) * 100) : null;
 
   // Cuánto ya está "comprometido" para el próximo mes según el próximo pago
   // esperado de cada cliente activo — mismo dato que alimenta "Próximos
@@ -5370,6 +5443,67 @@ export function useDatosReportes() {
     const fecha = new Date(c.proximoPago.fecha);
     return fecha >= inicioProximoMes && fecha < finProximoMes ? sum + (Number(c.proximoPago.valorEsperado) || 0) : sum;
   }, 0);
+
+  // Año actual vs mismo período del año anterior (year-to-date) — el
+  // comparativo de 6 meses ya existe, pero no dice si el negocio va mejor
+  // o peor que el mismo momento del año pasado, que es la comparación que
+  // de verdad importa para saber si hay crecimiento real o solo
+  // estacionalidad del mes.
+  const inicioAnioActual = new Date(hoyProyeccion.getFullYear(), 0, 1);
+  const inicioAnioAnterior = new Date(hoyProyeccion.getFullYear() - 1, 0, 1);
+  const mismoPuntoAnioAnterior = new Date(hoyProyeccion.getFullYear() - 1, hoyProyeccion.getMonth(), hoyProyeccion.getDate());
+  let ingresoYTDActual = 0;
+  let ingresoYTDAnterior = 0;
+  listaClientesReales.forEach((c) => {
+    (c.pagos || []).forEach((p) => {
+      const fecha = new Date(p.fecha);
+      const valor = Number(p.valor) || 0;
+      if (fecha >= inicioAnioActual) ingresoYTDActual += valor;
+      else if (fecha >= inicioAnioAnterior && fecha <= mismoPuntoAnioAnterior) ingresoYTDAnterior += valor;
+    });
+  });
+  const cambioAnualPct = ingresoYTDAnterior > 0 ? Math.round(((ingresoYTDActual - ingresoYTDAnterior) / ingresoYTDAnterior) * 100) : null;
+
+  // Clientes con saldo pendiente pero sin ningún próximo cobro programado:
+  // no vencidos todavía (eso ya lo cubre "pagos atrasados"), simplemente
+  // nadie les puso fecha — quedan invisibles en "Flujo de caja proyectado"
+  // dando una falsa sensación de que ya no falta nada por cobrar.
+  const clientesSinProximoPago = listaClientesReales.filter((c) => {
+    if (c.procesoPausado) return false;
+    const totalPagado = (c.pagos || []).reduce((s, p) => s + (Number(p.valor) || 0), 0);
+    const saldo = (Number(c.valorTotal) || 0) - totalPagado;
+    return saldo > 0 && !c.proximoPago?.fecha;
+  }).length;
+
+  // Mejor y peor mes de los últimos 6, para dar contexto de qué tan lejos
+  // está el mes actual de lo normal del despacho.
+  const mesesConValor = mesesEtiquetas.map((m) => ({ etiqueta: m.etiqueta, valor: ingresosPorMes[m.clave] || 0 })).filter((m) => m.valor > 0);
+  const mejorMes = mesesConValor.length > 0 ? mesesConValor.reduce((a, b) => (b.valor > a.valor ? b : a)) : null;
+  const peorMes = mesesConValor.length > 0 ? mesesConValor.reduce((a, b) => (b.valor < a.valor ? b : a)) : null;
+
+  // Egreso más grande del mes actual y qué tanto pesa sobre el total — un
+  // solo gasto atípico (una compra grande, un pago fuera de lo normal)
+  // puede disparar el "Egresos este mes" sin que sea un patrón nuevo de
+  // gasto, y vale la pena distinguir eso de un aumento real y sostenido.
+  const egresosMesActualLista = egresos.filter((e) => {
+    const f = new Date(e.fecha);
+    return f.getFullYear() === hoyProyeccion.getFullYear() && f.getMonth() === hoyProyeccion.getMonth();
+  });
+  const egresoMasGrandeMes = egresosMesActualLista.length > 0 ? egresosMesActualLista.reduce((a, b) => ((Number(b.valor) || 0) > (Number(a.valor) || 0) ? b : a)) : null;
+  const egresoMasGrandePct =
+    egresoMasGrandeMes && egresoMesActual > 0 ? Math.round(((Number(egresoMasGrandeMes.valor) || 0) / egresoMesActual) * 100) : null;
+
+  // Retención en la fuente acumulada históricamente — recordatorio de que
+  // esa plata no es "menos ingreso perdido", es un anticipo de impuestos
+  // que ya se le declaró a la DIAN a nombre del despacho y hay que tenerlo
+  // presente en la declaración de renta.
+  let retenidoTotalHistorico = 0;
+  listaClientesReales.forEach((c) => {
+    (c.pagos || []).forEach((p) => {
+      const pct = Number(p.retencionPorcentaje) || 0;
+      if (pct > 0) retenidoTotalHistorico += Math.round(((Number(p.valor) || 0) * pct) / 100);
+    });
+  });
 
   return {
     cargando,
@@ -5400,6 +5534,15 @@ export function useDatosReportes() {
     proyeccionProximoMes,
     clienteMasGrande,
     concentracionTop1Pct,
+    cambioAnualPct,
+    ingresoYTDActual,
+    ingresoYTDAnterior,
+    clientesSinProximoPago,
+    mejorMes,
+    peorMes,
+    egresoMasGrandeMes,
+    egresoMasGrandePct,
+    retenidoTotalHistorico,
   };
 }
 

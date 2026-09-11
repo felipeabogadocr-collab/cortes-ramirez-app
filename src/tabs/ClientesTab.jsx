@@ -994,6 +994,20 @@ export default function ClientesTab({ usuarioActual, onIrARegistrarPago }) {
                   />
                   Proceso en pausa (no generar avisos de inactividad ni de pago para este cliente)
                 </label>
+                <label
+                  style={{
+                    display: "flex", alignItems: "center", gap: 8, marginTop: 10, cursor: "pointer",
+                    fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.inkSoft,
+                  }}
+                  title="Para bolsas administrativas como 'Pagos pendientes por clasificar' — no es un cliente real, así que no debe contar en la concentración de cartera, el ranking de clientes ni el área más rentable."
+                >
+                  <input
+                    type="checkbox"
+                    checked={!!formEdicion.esClienteAdministrativo}
+                    onChange={(e) => setFormEdicion({ ...formEdicion, esClienteAdministrativo: e.target.checked })}
+                  />
+                  No es un cliente real (bolsa administrativa) — excluir del análisis financiero
+                </label>
                 <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
                   <button className="drx-btn-ghost" style={buttonGhost} onClick={() => setEditandoId(null)}>
                     Cancelar

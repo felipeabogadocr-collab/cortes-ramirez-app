@@ -1821,6 +1821,7 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
   // saber a quién priorizar en el servicio, y para el análisis financiero
   // de Resumen (de dónde viene realmente la plata).
   const topClientesHistorico = Object.entries(totalPorClienteHistorico)
+    .filter(([id]) => !clientes[id]?.esClienteAdministrativo)
     .map(([id, total]) => ({ id, nombre: clientes[id]?.nombre || "—", total }))
     .sort((a, b) => b.total - a.total)
     .slice(0, 5);
