@@ -1081,7 +1081,7 @@ function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-const APP_VERSION = "1.68.0";
+const APP_VERSION = "1.69.0";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -1697,48 +1697,48 @@ function analisisFinanciero(rep, r) {
   if (tendenciaPct !== null) {
     if (tendenciaPct >= 8) {
       puntos += 2;
-      senales.push({ positiva: true, texto: `Los ingresos vienen subiendo (${tendenciaPct >= 0 ? "+" : ""}${tendenciaPct}% comparando la primera mitad de los últimos ${meses.length} meses con la segunda).` });
+      senales.push({ categoria: "Tendencia", positiva: true, texto: `Ingresos al alza: ${tendenciaPct >= 0 ? "+" : ""}${tendenciaPct}% comparando la primera mitad de los últimos ${meses.length} meses con la segunda.` });
     } else if (tendenciaPct <= -8) {
       puntos -= 2;
-      senales.push({ positiva: false, texto: `Los ingresos vienen bajando (${tendenciaPct}% en los últimos ${meses.length} meses) — antes de buscar más clientes conviene entender por qué.` });
+      senales.push({ categoria: "Tendencia", positiva: false, texto: `Ingresos a la baja: ${tendenciaPct}% en los últimos ${meses.length} meses — antes de buscar más clientes, entender por qué.` });
     } else {
-      senales.push({ positiva: null, texto: `Los ingresos se han mantenido más o menos estables en los últimos ${meses.length} meses (${tendenciaPct >= 0 ? "+" : ""}${tendenciaPct}%).` });
+      senales.push({ categoria: "Tendencia", positiva: null, texto: `Estables en los últimos ${meses.length} meses (${tendenciaPct >= 0 ? "+" : ""}${tendenciaPct}%).` });
     }
   }
 
   if (margenMes !== null) {
     if (margenMes >= 0.35) {
       puntos += 2;
-      senales.push({ positiva: true, texto: `El margen de este mes es sano: de cada peso que entra, queda ${Math.round(margenMes * 100)}% neto después de egresos.` });
+      senales.push({ categoria: "Margen", positiva: true, texto: `Sano: de cada peso que entra, queda ${Math.round(margenMes * 100)}% neto después de egresos.` });
     } else if (margenMes < 0.15) {
       puntos -= 2;
-      senales.push({ positiva: false, texto: `El margen de este mes es apretado: solo queda ${Math.round(margenMes * 100)}% neto después de egresos — traer clientes nuevos sin resolver esto solo multiplica el problema.` });
+      senales.push({ categoria: "Margen", positiva: false, texto: `Apretado: solo queda ${Math.round(margenMes * 100)}% neto — traer clientes nuevos sin resolver esto multiplica el problema.` });
     } else {
-      senales.push({ positiva: null, texto: `El margen de este mes es moderado: ${Math.round(margenMes * 100)}% neto después de egresos.` });
+      senales.push({ categoria: "Margen", positiva: null, texto: `Moderado: ${Math.round(margenMes * 100)}% neto después de egresos.` });
     }
   }
 
   if (mesesDeCarteraAtascada !== null) {
     if (mesesDeCarteraAtascada > 2.5) {
       puntos -= 2;
-      senales.push({ positiva: false, texto: `Hay ${formatoCOP(rep.carteraPendienteTotal)} en cartera pendiente — equivale a casi ${mesesDeCarteraAtascada.toFixed(1)} meses de facturación atascados por cobrar.` });
+      senales.push({ categoria: "Cartera pendiente", positiva: false, texto: `${formatoCOP(rep.carteraPendienteTotal)} sin cobrar — casi ${mesesDeCarteraAtascada.toFixed(1)} meses de facturación atascados.` });
     } else if (mesesDeCarteraAtascada < 1) {
       puntos += 1;
-      senales.push({ positiva: true, texto: `La cartera pendiente está bajo control (${formatoCOP(rep.carteraPendienteTotal)}, menos de un mes de facturación).` });
+      senales.push({ categoria: "Cartera pendiente", positiva: true, texto: `Bajo control: ${formatoCOP(rep.carteraPendienteTotal)}, menos de un mes de facturación.` });
     }
   }
 
   if (proporcionAtrasados > 0.15) {
     puntos -= 1;
-    senales.push({ positiva: false, texto: `${r.pagosAtrasados} de ${r.totalClientes} clientes tienen pagos atrasados — vale la pena poner al día el cobro antes de sumar más carga.` });
+    senales.push({ categoria: "Cobro", positiva: false, texto: `${r.pagosAtrasados} de ${r.totalClientes} clientes con pagos atrasados — ponte al día antes de sumar más carga.` });
   }
 
   if (r.totalAbogados > 0 && clientesPorAbogado > 15) {
     puntos -= 2;
-    senales.push({ positiva: false, texto: `Cada abogado tiene en promedio ${Math.round(clientesPorAbogado)} clientes activos — la limitación ahora mismo puede ser capacidad, no falta de clientes.` });
+    senales.push({ categoria: "Capacidad", positiva: false, texto: `${Math.round(clientesPorAbogado)} clientes activos por abogado en promedio — el freno puede ser capacidad, no falta de clientes.` });
   } else if (r.totalAbogados > 0 && clientesPorAbogado < 6) {
     puntos += 1;
-    senales.push({ positiva: true, texto: `Cada abogado tiene en promedio ${Math.round(clientesPorAbogado)} clientes activos — hay capacidad disponible para atender más.` });
+    senales.push({ categoria: "Capacidad", positiva: true, texto: `${Math.round(clientesPorAbogado)} clientes activos por abogado en promedio — hay margen para atender más.` });
   }
 
   // Concentración de cartera: si casi toda la plata histórica viene de un
@@ -1748,11 +1748,12 @@ function analisisFinanciero(rep, r) {
     if (rep.concentracionTop1Pct >= 40) {
       puntos -= 1;
       senales.push({
+        categoria: "Concentración",
         positiva: false,
-        texto: `${rep.concentracionTop1Pct}% de lo que ha facturado el despacho históricamente viene de un solo cliente (${rep.clienteMasGrande.nombre}) — si ese cliente se va, la facturación cae fuerte de un solo golpe. Vale la pena diversificar antes de depender más de uno solo.`,
+        texto: `${rep.concentracionTop1Pct}% de la facturación histórica viene de un solo cliente (${rep.clienteMasGrande.nombre}) — si se va, la caída es fuerte de un golpe.`,
       });
     } else if (rep.concentracionTop1Pct <= 15) {
-      senales.push({ positiva: true, texto: `Ningún cliente concentra más del ${rep.concentracionTop1Pct}% de tu facturación histórica — la cartera está bien repartida, no depende de uno solo.` });
+      senales.push({ categoria: "Concentración", positiva: true, texto: `Bien repartida: ningún cliente pasa del ${rep.concentracionTop1Pct}% de tu facturación histórica.` });
     }
   }
 
@@ -1763,8 +1764,9 @@ function analisisFinanciero(rep, r) {
   const clientesParaEquilibrio = rep.egresoMesActual > 0 && rep.ticketPromedio > 0 ? Math.ceil(rep.egresoMesActual / rep.ticketPromedio) : null;
   if (clientesParaEquilibrio !== null) {
     senales.push({
+      categoria: "Punto de equilibrio",
       positiva: null,
-      texto: `Con tu ticket promedio histórico (${formatoCOP(rep.ticketPromedio)} por cliente), necesitas aproximadamente ${clientesParaEquilibrio} cliente${clientesParaEquilibrio !== 1 ? "s" : ""} pagando al mes solo para cubrir el gasto actual (${formatoCOP(rep.egresoMesActual)}) — lo que entre por encima de eso es lo que realmente queda de utilidad.`,
+      texto: `Con tu ticket promedio (${formatoCOP(rep.ticketPromedio)}), necesitas ~${clientesParaEquilibrio} cliente${clientesParaEquilibrio !== 1 ? "s" : ""} pagando al mes solo para cubrir el gasto actual (${formatoCOP(rep.egresoMesActual)}).`,
     });
   }
 
@@ -1777,12 +1779,13 @@ function analisisFinanciero(rep, r) {
     if (rep.proyeccionProximoMes < rep.egresoMesActual * 0.7) {
       puntos -= 2;
       senales.push({
+        categoria: "Flujo de caja",
         positiva: false,
-        texto: `Lo ya comprometido para el próximo mes (${formatoCOP(rep.proyeccionProximoMes)}) no alcanza a cubrir el gasto de este mes (${formatoCOP(rep.egresoMesActual)}) — vale la pena asegurar más cobros antes de sumar carga nueva.`,
+        texto: `Lo comprometido para el próximo mes (${formatoCOP(rep.proyeccionProximoMes)}) no cubre el gasto de este mes (${formatoCOP(rep.egresoMesActual)}) — asegura más cobros antes de sumar carga.`,
       });
     } else if (rep.proyeccionProximoMes >= rep.egresoMesActual * 1.3) {
       puntos += 1;
-      senales.push({ positiva: true, texto: `Ya hay ${formatoCOP(rep.proyeccionProximoMes)} comprometidos para el próximo mes, bien por encima del gasto mensual actual.` });
+      senales.push({ categoria: "Flujo de caja", positiva: true, texto: `${formatoCOP(rep.proyeccionProximoMes)} ya comprometidos para el próximo mes, bien por encima del gasto mensual actual.` });
     }
   }
 
@@ -1790,8 +1793,9 @@ function analisisFinanciero(rep, r) {
     puntos -= 1;
     const listaMeses = mesesConPosibleTraslado.map((m) => m.etiqueta).join(", ");
     senales.push({
+      categoria: "Calidad del dato",
       positiva: false,
-      texto: `${mesesConPosibleTraslado.length} de los últimos ${meses.length} meses (${listaMeses}) tienen ingresos y egresos casi idénticos — probable señal de que estás registrando dos veces la misma plata al moverla entre tus propias cuentas (Nequi/Nu/Daviplata), no que el despacho gaste casi todo lo que factura.`,
+      texto: `${mesesConPosibleTraslado.length} de ${meses.length} meses (${listaMeses}) con ingresos y egresos casi idénticos — probable plata duplicada al moverla entre tus propias cuentas.`,
     });
   }
 
@@ -3446,11 +3450,6 @@ function ResumenTab({ nombre, usuarioId, usuarioActual, onIr }) {
                   <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, margin: "2px 0 0" }}>Con base en tus ingresos, egresos, cartera y carga de trabajo</p>
                 </div>
               </div>
-              {a.listo && (
-                <button className="drx-btn-ghost" style={{ ...buttonGhost, padding: "4px 10px", fontSize: 11.5 }} onClick={() => onIr("contabilidad")}>
-                  Ver el detalle en Contabilidad →
-                </button>
-              )}
             </div>
 
             {!a.listo ? (
@@ -3459,43 +3458,54 @@ function ResumenTab({ nombre, usuarioId, usuarioActual, onIr }) {
               </p>
             ) : (
               <>
-                <p style={{ fontFamily: "Inter, sans-serif", fontSize: 19, fontWeight: 800, color: a.color, margin: "0 0 10px" }}>{a.veredicto}</p>
-                <p style={{ fontFamily: "'Source Serif 4', serif", fontSize: 13.5, color: COLORS.ink, lineHeight: 1.6, margin: "0 0 16px" }}>{a.consejo}</p>
-                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                  {a.senales.map((s, i) => (
-                    <button
-                      key={i}
-                      onClick={() => onIr("contabilidad")}
-                      title="Ver el detalle en Contabilidad"
-                      style={{
-                        display: "flex",
-                        gap: 8,
-                        alignItems: "flex-start",
-                        background: "none",
-                        border: "none",
-                        cursor: "pointer",
-                        textAlign: "left",
-                        padding: "4px 6px",
-                        marginLeft: -6,
-                        borderRadius: 8,
-                        fontFamily: "inherit",
-                      }}
-                      className="drx-senal-clicable"
-                    >
-                      <span
-                        style={{
-                          marginTop: 5,
-                          width: 7,
-                          height: 7,
-                          borderRadius: "50%",
-                          flexShrink: 0,
-                          background: s.positiva === true ? "#10B981" : s.positiva === false ? "#B42318" : "#94A3B8",
-                        }}
-                      />
-                      <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.inkSoft, margin: 0, lineHeight: 1.5 }}>{s.texto}</p>
-                    </button>
-                  ))}
+                <div
+                  style={{
+                    display: "inline-block",
+                    background: a.color + "1A",
+                    border: `1px solid ${a.color}40`,
+                    borderRadius: 10,
+                    padding: "8px 14px",
+                    marginBottom: 16,
+                  }}
+                >
+                  <p style={{ fontFamily: "Inter, sans-serif", fontSize: 17, fontWeight: 800, color: a.color, margin: 0 }}>{a.veredicto}</p>
                 </div>
+                <p style={{ fontFamily: "'Source Serif 4', serif", fontSize: 13.5, color: COLORS.ink, lineHeight: 1.6, margin: "0 0 16px" }}>{a.consejo}</p>
+
+                <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11, fontWeight: 700, color: COLORS.muted, textTransform: "uppercase", letterSpacing: 0.5, margin: "0 0 8px" }}>
+                  Lo que hay detrás del veredicto
+                </p>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 8, marginBottom: 6 }}>
+                  {a.senales.map((s, i) => {
+                    const colorSenal = s.positiva === true ? "#166534" : s.positiva === false ? "#B42318" : COLORS.navy;
+                    const fondoSenal = s.positiva === true ? "#F0FDF4" : s.positiva === false ? "#FEF2F2" : COLORS.surfaceSoft;
+                    const bordeSenal = s.positiva === true ? "#BBF7D0" : s.positiva === false ? "#FECACA" : COLORS.border;
+                    return (
+                      <button
+                        key={i}
+                        onClick={() => onIr("contabilidad")}
+                        title="Ver el detalle en Contabilidad"
+                        style={{
+                          display: "block",
+                          background: fondoSenal,
+                          border: `1px solid ${bordeSenal}`,
+                          cursor: "pointer",
+                          textAlign: "left",
+                          padding: "9px 12px",
+                          borderRadius: 10,
+                          fontFamily: "inherit",
+                        }}
+                        className="drx-senal-clicable"
+                      >
+                        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 10.5, fontWeight: 800, color: colorSenal, textTransform: "uppercase", letterSpacing: 0.4, margin: "0 0 3px" }}>
+                          {s.categoria}
+                        </p>
+                        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.ink, margin: 0, lineHeight: 1.45 }}>{s.texto}</p>
+                      </button>
+                    );
+                  })}
+                </div>
+                <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11, color: COLORS.muted, margin: "0 0 14px" }}>Toca cualquier tarjeta para ver el detalle en Contabilidad.</p>
                 <button
                   onClick={() => setMostrarGlosario((m) => !m)}
                   style={{
