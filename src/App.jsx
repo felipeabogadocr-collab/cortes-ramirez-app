@@ -1080,7 +1080,7 @@ function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-const APP_VERSION = "1.66.0";
+const APP_VERSION = "1.67.0";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -2418,14 +2418,15 @@ const NOMBRE_ASISTENTE = "Lex";
 // Burbuja flotante de Lex, visible en cualquier pestaña (no solo en
 // Resumen) — reaparece cada cierto tiempo con un mensaje corto, casi
 // siempre basado en pendientes reales del despacho para que no se sienta
-// como relleno. Al hacer clic (en la burbuja o en el avatar) lleva a
-// Resumen, donde vive la conversación completa con Lex — mover todo el
-// chat a una ventana flotante global sería un cambio mucho más grande y
-// arriesgado, y esto ya resuelve "que esté siempre presente".
-function LexFlotante({ onIr, tabActual }) {
+// como relleno. Un clic (en la burbuja o en el avatar) abre el chat
+// completo ahí mismo, flotando encima de lo que se esté viendo, en vez de
+// mandar a la pestaña Resumen — reutiliza el mismo AsistenteIA de siempre,
+// solo que montado en una ventana flotante en vez de fijo en Resumen.
+function LexFlotante({ tabActual, usuarioActual }) {
   const r = useResumenGeneral();
   const [indice, setIndice] = useState(0);
   const [visible, setVisible] = useState(true);
+  const [chatAbierto, setChatAbierto] = useState(false);
 
   const mensajes = useMemo(() => {
     const lista = [];
@@ -2455,12 +2456,45 @@ function LexFlotante({ onIr, tabActual }) {
 
   if (tabActual === "resumen") return null; // ya está viendo a Lex ahí mismo
 
+  if (chatAbierto) {
+    return (
+      <div
+        className="drx-fade-in"
+        style={{
+          position: "fixed",
+          bottom: 22,
+          right: 22,
+          zIndex: 1600,
+          width: "min(400px, calc(100vw - 32px))",
+          maxHeight: "min(600px, calc(100vh - 100px))",
+          display: "flex",
+          flexDirection: "column",
+        }}
+      >
+        <div style={{ background: COLORS.panel, borderRadius: 16, boxShadow: "0 16px 48px rgba(16,24,40,0.24)", overflow: "hidden", display: "flex", flexDirection: "column" }}>
+          <div style={{ display: "flex", justifyContent: "flex-end", padding: "8px 8px 0" }}>
+            <button
+              onClick={() => setChatAbierto(false)}
+              aria-label="Cerrar chat"
+              style={{ background: COLORS.surfaceSoft, border: "none", borderRadius: "50%", width: 26, height: 26, cursor: "pointer", color: COLORS.muted, fontSize: 13 }}
+            >
+              ✕
+            </button>
+          </div>
+          <div style={{ padding: "0 4px 4px", overflowY: "auto" }}>
+            <AsistenteIA nombre={usuarioActual.nombre} usuarioId={usuarioActual.id} usuarioActual={usuarioActual} onAccionCompletada={r.reload} />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={{ position: "fixed", bottom: 22, right: 22, zIndex: 1500, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8 }}>
       {visible && (
         <div
           className="drx-fade-in"
-          onClick={() => onIr("resumen")}
+          onClick={() => setChatAbierto(true)}
           style={{
             maxWidth: 230,
             background: COLORS.panel,
@@ -2488,11 +2522,11 @@ function LexFlotante({ onIr, tabActual }) {
         </div>
       )}
       <button
-        onClick={() => onIr("resumen")}
+        onClick={() => setChatAbierto(true)}
         title={`Hablar con ${NOMBRE_ASISTENTE}`}
         style={{
-          width: 52,
-          height: 52,
+          width: 56,
+          height: 56,
           borderRadius: "50%",
           border: "none",
           cursor: "pointer",
@@ -2501,10 +2535,12 @@ function LexFlotante({ onIr, tabActual }) {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
+          fontSize: 26,
+          lineHeight: 1,
           animation: "drx-flotar 3s ease-in-out infinite, drx-pulse-lex 2.6s ease-in-out infinite",
         }}
       >
-        <Icono tipo="chispa" size={22} />
+        🤓
       </button>
     </div>
   );
@@ -2774,9 +2810,11 @@ function AsistenteIA({ nombre, usuarioId, usuarioActual, onAccionCompletada }) {
               color: "#FFFFFF",
               flexShrink: 0,
               boxShadow: "0 2px 8px rgba(124,58,237,0.35)",
+              fontSize: 17,
+              lineHeight: 1,
             }}
           >
-            <Icono tipo="chispa" size={16} />
+            🤓
           </div>
           <div style={{ minWidth: 0 }}>
             <p style={{ fontFamily: "Inter, sans-serif", fontSize: 14.5, fontWeight: 800, color: COLORS.headingText, margin: 0, letterSpacing: 0.2, display: "flex", alignItems: "baseline", gap: 6 }}>
@@ -2892,9 +2930,11 @@ function AsistenteIA({ nombre, usuarioId, usuarioActual, onAccionCompletada }) {
                 justifyContent: "center",
                 background: m.rol === "usuario" ? COLORS.accentSoft : "linear-gradient(135deg, #7C3AED, #4F46E5)",
                 color: m.rol === "usuario" ? COLORS.navy : "#FFFFFF",
+                fontSize: m.rol === "usuario" ? undefined : 13,
+                lineHeight: 1,
               }}
             >
-              {m.rol === "usuario" ? <Icono tipo="persona" size={13} /> : <Icono tipo="chispa" size={13} />}
+              {m.rol === "usuario" ? <Icono tipo="persona" size={13} /> : "🤓"}
             </div>
             <div
               className="drx-fade-in"
@@ -2963,8 +3003,8 @@ function AsistenteIA({ nombre, usuarioId, usuarioActual, onAccionCompletada }) {
         ))}
         {cargando && (
           <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
-            <div style={{ width: 26, height: 26, borderRadius: "50%", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "linear-gradient(135deg, #7C3AED, #4F46E5)", color: "#FFFFFF" }}>
-              <Icono tipo="chispa" size={13} />
+            <div style={{ width: 26, height: 26, borderRadius: "50%", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "linear-gradient(135deg, #7C3AED, #4F46E5)", color: "#FFFFFF", fontSize: 13, lineHeight: 1 }}>
+              🤓
             </div>
             <div style={{ background: COLORS.accentSoft, borderRadius: 12, padding: "10px 14px" }}>
               <PuntosEscribiendo />
@@ -9747,7 +9787,7 @@ function App() {
         </div>
       </div>
 
-      <LexFlotante onIr={setTab} tabActual={tab} />
+      <LexFlotante tabActual={tab} usuarioActual={usuarioActual} />
 
       {avisoInactividad && (
         <div
