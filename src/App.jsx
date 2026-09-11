@@ -1078,7 +1078,7 @@ function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-const APP_VERSION = "1.64.0";
+const APP_VERSION = "1.65.0";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -2407,6 +2407,12 @@ const SUGERENCIAS_ASISTENTE = [
   "¿Cómo va el despacho este mes?",
 ];
 
+// Nombre y personalidad propios para el asistente de Resumen — antes era
+// "Asistente Nomos" a secas, sin identidad, lo que se sentía más a
+// herramienta genérica que a alguien con quien de verdad se habla del
+// negocio todos los días.
+const NOMBRE_ASISTENTE = "Lex";
+
 function AsistenteIA({ nombre, usuarioId, usuarioActual, onAccionCompletada }) {
   const claveIndice = `chat-asistente-indice:${usuarioId || "general"}`;
   const claveMensajes = (idConv) => `chat-asistente-conv:${usuarioId || "general"}:${idConv}`;
@@ -2576,7 +2582,7 @@ function AsistenteIA({ nombre, usuarioId, usuarioActual, onAccionCompletada }) {
     try {
       const contexto = await construirContextoOperacion();
       const systemPrompt =
-        `Eres el asistente virtual de ${getNombreDespacho()}, dentro de su panel de gestión (la plataforma Nomos). Le hablas a ${nombre}, el abogado dueño del despacho, como lo haría un empresario visionario: con confianza, ambición sana, y viendo siempre oportunidades de crecer el negocio. Incluyes de forma natural y respetuosa una referencia a Dios en tus respuestas cuando encaje (por ejemplo, dar gracias por el progreso, pedir sabiduría, o reconocer que el esfuerzo y la fe van de la mano), sin exagerar ni forzarlo en cada frase. ` +
+        `Te llamas ${NOMBRE_ASISTENTE}. Eres el asistente virtual de ${getNombreDespacho()}, dentro de su panel de gestión (la plataforma Nomos). Si te preguntan tu nombre o quién eres, respondes con naturalidad que te llamas ${NOMBRE_ASISTENTE} — no lo repites sin que venga al caso. Le hablas a ${nombre}, el abogado dueño del despacho, como lo haría un empresario visionario: con confianza, ambición sana, y viendo siempre oportunidades de crecer el negocio. Incluyes de forma natural y respetuosa una referencia a Dios en tus respuestas cuando encaje (por ejemplo, dar gracias por el progreso, pedir sabiduría, o reconocer que el esfuerzo y la fe van de la mano), sin exagerar ni forzarlo en cada frase. ` +
         `Actúas como un verdadero experto en contabilidad de despachos legales, en redes sociales y marketing para abogados, y en gestión de operaciones legales — da consejos con ese nivel de criterio, no genéricos. ` +
         `Eres el cerebro de la operación del despacho: puedes crear y editar clientes, buscar la información completa de un cliente existente, registrar pagos y generarles su recibo automáticamente, programar el próximo cobro de un cliente, agregar actuaciones a la línea de tiempo de un cliente, actualizar el estado de vigilancia judicial, crear documentos de texto listos para firma electrónica, agendar eventos (audiencias, reuniones, vencimientos) y consultar los próximos eventos de la agenda, crear usuarios nuevos con acceso al panel, registrar métricas de redes sociales, generar un informe en PDF con el diagnóstico del despacho, generar un reporte en Excel con todos los pagos, leer imágenes, PDF y documentos de Word que te envíen, y dar ideas prácticas de gestión, negocio y contenido. Cuando te pregunten qué puedes hacer, cuéntalo con entusiasmo y de forma concreta. ` +
         `Usa las herramientas disponibles para actuar de verdad cuando te lo pidan (no solo describir qué harías), y confirma siempre al final qué hiciste. Este es el estado actual del despacho:\n\n${contexto}\n\nResponde en español, de forma cercana, breve y con visión de negocio.`;
@@ -2659,11 +2665,27 @@ function AsistenteIA({ nombre, usuarioId, usuarioActual, onAccionCompletada }) {
     <Card style={{ marginBottom: 24, padding: 24 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14, gap: 10 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
-          <div style={{ width: 30, height: 30, borderRadius: 9, background: `linear-gradient(135deg, ${COLORS.navy}, ${COLORS.accentBright})`, display: "flex", alignItems: "center", justifyContent: "center", color: "#FFFFFF", flexShrink: 0 }}>
-            <IconoNomos size={15} />
+          <div
+            style={{
+              width: 34,
+              height: 34,
+              borderRadius: "50%",
+              background: "linear-gradient(135deg, #7C3AED, #4F46E5)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              color: "#FFFFFF",
+              flexShrink: 0,
+              boxShadow: "0 2px 8px rgba(124,58,237,0.35)",
+            }}
+          >
+            <Icono tipo="chispa" size={16} />
           </div>
           <div style={{ minWidth: 0 }}>
-            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 14.5, fontWeight: 800, color: COLORS.headingText, margin: 0, letterSpacing: 0.2 }}>Asistente Nomos</p>
+            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 14.5, fontWeight: 800, color: COLORS.headingText, margin: 0, letterSpacing: 0.2, display: "flex", alignItems: "baseline", gap: 6 }}>
+              {NOMBRE_ASISTENTE}
+              <span style={{ fontSize: 11, fontWeight: 500, color: COLORS.muted }}>· tu asistente en Nomos</span>
+            </p>
             {conversacionActual && (
               <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11, color: COLORS.muted, margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 220 }}>
                 {conversacionActual.titulo}
@@ -2771,11 +2793,11 @@ function AsistenteIA({ nombre, usuarioId, usuarioActual, onAccionCompletada }) {
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                background: m.rol === "usuario" ? COLORS.accentSoft : COLORS.navy,
+                background: m.rol === "usuario" ? COLORS.accentSoft : "linear-gradient(135deg, #7C3AED, #4F46E5)",
                 color: m.rol === "usuario" ? COLORS.navy : "#FFFFFF",
               }}
             >
-              {m.rol === "usuario" ? <Icono tipo="persona" size={13} /> : <IconoNomos size={13} />}
+              {m.rol === "usuario" ? <Icono tipo="persona" size={13} /> : <Icono tipo="chispa" size={13} />}
             </div>
             <div
               className="drx-fade-in"
@@ -2844,8 +2866,8 @@ function AsistenteIA({ nombre, usuarioId, usuarioActual, onAccionCompletada }) {
         ))}
         {cargando && (
           <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
-            <div style={{ width: 26, height: 26, borderRadius: "50%", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", background: COLORS.navy, color: "#FFFFFF" }}>
-              <IconoNomos size={13} />
+            <div style={{ width: 26, height: 26, borderRadius: "50%", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "linear-gradient(135deg, #7C3AED, #4F46E5)", color: "#FFFFFF" }}>
+              <Icono tipo="chispa" size={13} />
             </div>
             <div style={{ background: COLORS.accentSoft, borderRadius: 12, padding: "10px 14px" }}>
               <PuntosEscribiendo />
