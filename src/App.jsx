@@ -1078,7 +1078,7 @@ function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-const APP_VERSION = "1.62.0";
+const APP_VERSION = "1.63.0";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -1721,6 +1721,33 @@ function analisisFinanciero(rep, r) {
   } else if (r.totalAbogados > 0 && clientesPorAbogado < 6) {
     puntos += 1;
     senales.push({ positiva: true, texto: `Cada abogado tiene en promedio ${Math.round(clientesPorAbogado)} clientes activos — hay capacidad disponible para atender más.` });
+  }
+
+  // Concentración de cartera: si casi toda la plata histórica viene de un
+  // solo cliente, es un riesgo real (qué pasa si ese cliente se va) aunque
+  // el resto de los números se vean bien.
+  if (rep.concentracionTop1Pct !== null) {
+    if (rep.concentracionTop1Pct >= 40) {
+      puntos -= 1;
+      senales.push({
+        positiva: false,
+        texto: `${rep.concentracionTop1Pct}% de lo que ha facturado el despacho históricamente viene de un solo cliente (${rep.clienteMasGrande.nombre}) — si ese cliente se va, la facturación cae fuerte de un solo golpe. Vale la pena diversificar antes de depender más de uno solo.`,
+      });
+    } else if (rep.concentracionTop1Pct <= 15) {
+      senales.push({ positiva: true, texto: `Ningún cliente concentra más del ${rep.concentracionTop1Pct}% de tu facturación histórica — la cartera está bien repartida, no depende de uno solo.` });
+    }
+  }
+
+  // Punto de equilibrio: con el ticket promedio histórico, cuántos clientes
+  // pagando al mes hacen falta solo para cubrir el gasto fijo actual — una
+  // forma concreta de responder "¿cuánto me falta vender?" en vez de dejarlo
+  // en abstracto.
+  const clientesParaEquilibrio = rep.egresoMesActual > 0 && rep.ticketPromedio > 0 ? Math.ceil(rep.egresoMesActual / rep.ticketPromedio) : null;
+  if (clientesParaEquilibrio !== null) {
+    senales.push({
+      positiva: null,
+      texto: `Con tu ticket promedio histórico (${formatoCOP(rep.ticketPromedio)} por cliente), necesitas aproximadamente ${clientesParaEquilibrio} cliente${clientesParaEquilibrio !== 1 ? "s" : ""} pagando al mes solo para cubrir el gasto actual (${formatoCOP(rep.egresoMesActual)}) — lo que entre por encima de eso es lo que realmente queda de utilidad.`,
+    });
   }
 
   // Flujo de caja proyectado del próximo mes contra lo que se gastó este
@@ -3252,8 +3279,8 @@ function ResumenTab({ nombre, usuarioId, usuarioActual, onIr }) {
                 </div>
               </div>
               {a.listo && (
-                <button className="drx-btn-ghost" style={{ ...buttonGhost, padding: "4px 10px", fontSize: 11.5 }} onClick={() => onIr("reportes")}>
-                  Ver reportes →
+                <button className="drx-btn-ghost" style={{ ...buttonGhost, padding: "4px 10px", fontSize: 11.5 }} onClick={() => onIr("contabilidad")}>
+                  Ver el detalle en Contabilidad →
                 </button>
               )}
             </div>
@@ -3306,6 +3333,8 @@ function ResumenTab({ nombre, usuarioId, usuarioActual, onIr }) {
                       ["Cartera pendiente (en meses de facturación)", "cuánto te deben en total tus clientes, expresado en cuántos meses de tu facturación normal representa esa plata — si son 2 meses, significa que tienes atascados dos meses enteros de ingreso sin cobrar."],
                       ["Flujo de caja proyectado", "la plata que ya sabes que te va a entrar en los próximos meses (por los pagos pendientes ya acordados con tus clientes), no lo que esperas o deseas — es lo comprometido de verdad."],
                       ["Capacidad por abogado", "cuántos clientes activos atiende, en promedio, cada abogado del despacho — si el número es muy alto, el freno para crecer puede ser que no dan abasto, no que falten clientes."],
+                      ["Concentración de cartera", "qué porcentaje de todo lo que ha facturado el despacho viene de un solo cliente. Mientras más alto, más riesgo — si ese cliente se va, se va una parte grande de tu facturación de un solo golpe."],
+                      ["Punto de equilibrio", "cuántos clientes, pagando lo que paga un cliente típico (tu ticket promedio), necesitas cada mes solo para cubrir tus gastos — no para ganar, solo para no perder. Todo lo que entra por encima de ese número es ganancia real."],
                     ].map(([termino, def]) => (
                       <p key={termino} style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.inkSoft, margin: 0, lineHeight: 1.5 }}>
                         <strong style={{ color: COLORS.headingText }}>{termino}:</strong> {def}
@@ -5106,6 +5135,18 @@ export function useDatosReportes() {
   const clientesConPago = listaClientes.filter((c) => (c.pagos || []).length > 0).length;
   const ticketPromedio = clientesConPago > 0 ? ingresoTotalHistorico / clientesConPago : 0;
 
+  // Concentración de cartera: cuánto de la facturación histórica depende de
+  // un solo cliente — un despacho que vive de 1-2 clientes grandes tiene un
+  // riesgo real que uno con la plata repartida entre muchos no tiene, así
+  // que es una señal de riesgo tan válida como el margen o la cartera
+  // pendiente, aunque casi nunca se mire.
+  const ingresoPorCliente = listaClientes
+    .map((c) => ({ nombre: c.nombre, total: (c.pagos || []).reduce((s, p) => s + (Number(p.valor) || 0), 0) }))
+    .filter((c) => c.total > 0)
+    .sort((a, b) => b.total - a.total);
+  const clienteMasGrande = ingresoPorCliente[0] || null;
+  const concentracionTop1Pct = clienteMasGrande && ingresoTotalHistorico > 0 ? Math.round((clienteMasGrande.total / ingresoTotalHistorico) * 100) : null;
+
   // Cuánto ya está "comprometido" para el próximo mes según el próximo pago
   // esperado de cada cliente activo — mismo dato que alimenta "Próximos
   // pagos por vencer" en Contabilidad, así el análisis financiero de
@@ -5146,6 +5187,8 @@ export function useDatosReportes() {
     clientesConPago,
     ticketPromedio,
     proyeccionProximoMes,
+    clienteMasGrande,
+    concentracionTop1Pct,
   };
 }
 
