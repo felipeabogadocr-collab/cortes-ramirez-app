@@ -1081,7 +1081,7 @@ function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-const APP_VERSION = "1.72.0";
+const APP_VERSION = "1.73.0";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -1377,6 +1377,8 @@ export function Icono({ tipo, size = 15, style, className }) {
       return <svg {...p}><circle cx="10.5" cy="10.5" r="6.5" /><path d="m20 20-4.5-4.5" /></svg>;
     case "grafico":
       return <svg {...p}><path d="M4 20V10M11 20V4M18 20v-7" /><path d="M2.5 20h19" /></svg>;
+    case "calculadora":
+      return <svg {...p}><rect x="5" y="2.5" width="14" height="19" rx="2" /><path d="M8 6.5h8M8 11h1.5M8 14.5h1.5M8 18h1.5M12.25 11h1.5M12.25 14.5h1.5M12.25 18h1.5M16.5 11h1.5M16.5 14.5v3.5" /></svg>;
     default:
       return null;
   }
