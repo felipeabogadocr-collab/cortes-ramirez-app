@@ -524,17 +524,19 @@ function PanelDatosCuentaCobro({ datos, onGuardar }) {
   const [nombre, setNombre] = useState(datos?.nombre || "");
   const [documento, setDocumento] = useState(datos?.documento || "");
   const [ciudad, setCiudad] = useState(datos?.ciudad || "");
+  const [tp, setTp] = useState(datos?.tp || "");
   const [guardando, setGuardando] = useState(false);
 
   useEffect(() => {
     setNombre(datos?.nombre || "");
     setDocumento(datos?.documento || "");
     setCiudad(datos?.ciudad || "");
+    setTp(datos?.tp || "");
   }, [datos]);
 
   const guardar = async () => {
     setGuardando(true);
-    await onGuardar({ nombre: nombre.trim(), documento: documento.trim(), ciudad: ciudad.trim() });
+    await onGuardar({ nombre: nombre.trim(), documento: documento.trim(), ciudad: ciudad.trim(), tp: tp.trim() });
     setGuardando(false);
     setAbierto(false);
   };
@@ -569,9 +571,14 @@ function PanelDatosCuentaCobro({ datos, onGuardar }) {
               <input className="drx-input" style={inputStyle} value={documento} onChange={(e) => setDocumento(e.target.value)} placeholder="Ej: 1.234.567.890" />
             </Field>
           </div>
-          <Field label="Ciudad (opcional)">
-            <input className="drx-input" style={{ ...inputStyle, maxWidth: 260 }} value={ciudad} onChange={(e) => setCiudad(e.target.value)} placeholder="Ej: Bogotá D.C." />
-          </Field>
+          <div className="drx-grid-form" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <Field label="Ciudad (opcional)">
+              <input className="drx-input" style={inputStyle} value={ciudad} onChange={(e) => setCiudad(e.target.value)} placeholder="Ej: Bogotá D.C." />
+            </Field>
+            <Field label="Tarjeta profesional / T.P. (opcional)">
+              <input className="drx-input" style={inputStyle} value={tp} onChange={(e) => setTp(e.target.value)} placeholder="Ej: 443.425 del H. Consejo Superior de la Judicatura" />
+            </Field>
+          </div>
           <button className="drx-btn-primary" style={{ ...buttonPrimary, marginTop: 12 }} onClick={guardar} disabled={guardando || !nombre.trim()}>
             {guardando ? "Guardando…" : "Guardar datos"}
           </button>
