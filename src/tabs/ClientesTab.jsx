@@ -322,6 +322,14 @@ function PlanDePago({ planPago, onChange }) {
   // demás.
   const actualizar = (campos) => {
     const combinado = { ...plan, ...campos };
+    // El selector de Frecuencia MUESTRA "Mensual" de una vez por defecto
+    // (value={plan.frecuencia || FRECUENCIAS_PAGO[2]}) aunque nadie lo haya
+    // tocado todavía — pero si la persona nunca hace clic ahí, plan.frecuencia
+    // se queda sin valor de verdad. Sin esto, generarCuotas recibía
+    // frecuencia vacía y como la condición para avanzar la fecha exige que
+    // haya una frecuencia real, todas las cuotas quedaban con la misma
+    // fecha — aunque en pantalla se viera "Mensual" seleccionado.
+    combinado.frecuencia = combinado.frecuencia || FRECUENCIAS_PAGO[2];
     // combinado.numCuotas se guarda TAL CUAL se escribió (puede quedar en ""
     // un instante mientras se borra para escribir otro número) — solo se
     // redondea a un mínimo de 1 aquí, para generar el calendario y el
@@ -415,9 +423,20 @@ function PlanDePago({ planPago, onChange }) {
       </div>
       {plan.cuotas?.length > 1 && (
         <div style={{ marginTop: 12, borderTop: `1px solid ${COLORS.border}`, paddingTop: 12, textAlign: "left" }}>
-          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, fontWeight: 600, color: COLORS.inkSoft, marginBottom: 8 }}>
-            Calendario de cuotas — ajusta la fecha o el valor de una en particular si no es igual a las demás
-          </p>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 8 }}>
+            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, fontWeight: 600, color: COLORS.inkSoft, margin: 0 }}>
+              Calendario de cuotas — ajusta la fecha o el valor de una en particular si no es igual a las demás
+            </p>
+            <button
+              type="button"
+              className="drx-btn-ghost"
+              style={{ ...buttonGhost, padding: "4px 10px", fontSize: 11.5, flexShrink: 0 }}
+              onClick={() => actualizar({})}
+              title="Vuelve a calcular todas las fechas encadenando la frecuencia desde la primera cuota, por si alguna quedó repetida"
+            >
+              🔁 Recalcular fechas
+            </button>
+          </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             {plan.cuotas.map((c, idx) => (
               <div key={idx} className="drx-grid-form" style={{ display: "grid", gridTemplateColumns: "70px 1fr 1fr", gap: 8, alignItems: "center" }}>
