@@ -1081,7 +1081,7 @@ function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-const APP_VERSION = "1.71.2";
+const APP_VERSION = "1.72.0";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -5188,6 +5188,18 @@ export function enviarRecordatorioPago(cliente) {
   window.open(`https://wa.me/${numero}?text=${encodeURIComponent(mensaje)}`, "_blank");
 }
 
+// WhatsApp no permite prellenar texto al abrir un grupo existente (el
+// prellenado de "wa.me/<numero>?text=" solo funciona con un número
+// individual) — así que en vez de armar el mensaje directo, se copia al
+// portapapeles y se abre el grupo para que la persona solo lo pegue.
+export function enviarRecordatorioPagoGrupo(cliente) {
+  const fechaTexto = new Date(cliente.proximoPago.fecha).toLocaleDateString("es-CO", { dateStyle: "long" });
+  const valorTexto = cliente.proximoPago.valorEsperado ? ` por un valor de ${formatoCOP(cliente.proximoPago.valorEsperado)}` : "";
+  const mensaje = `*${getNombreDespacho()}*\n\nHola, les recordamos que el próximo pago de ${cliente.nombre} está programado para el ${fechaTexto}${valorTexto}.\n\nSi ya se realizó el pago, ignoren este mensaje — quedamos atentos a la confirmación. Cualquier duda, con gusto ayudamos.`;
+  navigator.clipboard?.writeText(mensaje).catch(() => {});
+  window.open(cliente.grupoWhatsapp, "_blank");
+}
+
 // Gráfica de barras VERTICALES de una sola serie — una barra por categoría,
 // cada una con su propio color opcional (para "Procesos por estado",
 // "Distribución por área", etc.) o un color único para toda la serie (para
@@ -6251,9 +6263,21 @@ function ModalNotificaciones({
                       {cliente.proximoPago?.valorEsperado ? ` · ${formatoCOP(cliente.proximoPago.valorEsperado)}` : ""}
                     </p>
                   </div>
-                  <button className="drx-btn-primary" style={{ ...buttonPrimary, padding: "5px 10px", fontSize: 11.5, background: "#1DA851" }} onClick={() => enviarRecordatorioPago(cliente)}>
-                    Recordar ↗
-                  </button>
+                  <div style={{ display: "flex", gap: 6 }}>
+                    <button className="drx-btn-primary" style={{ ...buttonPrimary, padding: "5px 10px", fontSize: 11.5, background: "#1DA851" }} onClick={() => enviarRecordatorioPago(cliente)}>
+                      Recordar ↗
+                    </button>
+                    {cliente.grupoWhatsapp && (
+                      <button
+                        className="drx-btn-ghost"
+                        style={{ ...buttonGhost, padding: "5px 10px", fontSize: 11.5 }}
+                        title="Copia el mensaje y abre el grupo de WhatsApp del proceso"
+                        onClick={() => enviarRecordatorioPagoGrupo(cliente)}
+                      >
+                        Al grupo ↗
+                      </button>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>

@@ -35,6 +35,7 @@ const FORM_CLIENTE_INICIAL = {
   valorTotal: "",
   abogadoAsignado: "",
   otrasPersonas: [],
+  grupoWhatsapp: "",
   pagador: null,
   referenciador: null,
   abogadoAsociado: null,
@@ -884,6 +885,20 @@ export default function ClientesTab({ usuarioActual, onIrARegistrarPago }) {
             </Field>
           </div>
           <EditorOtrasPersonas personas={form.otrasPersonas} onChange={(otrasPersonas) => setForm({ ...form, otrasPersonas })} />
+          <div style={{ marginTop: 12, marginBottom: 12 }}>
+            <Field label="Grupo de WhatsApp del proceso (opcional)">
+              <input
+                className="drx-input"
+                style={inputStyle}
+                value={form.grupoWhatsapp}
+                onChange={(e) => setForm({ ...form, grupoWhatsapp: e.target.value })}
+                placeholder="https://chat.whatsapp.com/..."
+              />
+            </Field>
+            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, color: COLORS.muted, margin: "4px 0 0" }}>
+              Si son varias personas en el proceso, pega aquí el enlace del grupo (WhatsApp → grupo → Info del grupo → Invitar por enlace). El botón "Al grupo" copiará el recordatorio y abrirá el grupo para pegarlo.
+            </p>
+          </div>
           <SelectorPagador pagador={form.pagador} onChange={(pagador) => setForm({ ...form, pagador })} />
           <PlanDePago planPago={form.planPago} onChange={(planPago) => setForm({ ...form, planPago })} />
           <SelectorComision
@@ -993,6 +1008,17 @@ export default function ClientesTab({ usuarioActual, onIrARegistrarPago }) {
                   </Field>
                 </div>
                 <EditorOtrasPersonas personas={formEdicion.otrasPersonas} onChange={(otrasPersonas) => setFormEdicion({ ...formEdicion, otrasPersonas })} />
+                <div style={{ marginTop: 12, marginBottom: 12 }}>
+                  <Field label="Grupo de WhatsApp del proceso (opcional)">
+                    <input
+                      className="drx-input"
+                      style={inputStyle}
+                      value={formEdicion.grupoWhatsapp || ""}
+                      onChange={(e) => setFormEdicion({ ...formEdicion, grupoWhatsapp: e.target.value })}
+                      placeholder="https://chat.whatsapp.com/..."
+                    />
+                  </Field>
+                </div>
                 <SelectorPagador pagador={formEdicion.pagador} onChange={(pagador) => setFormEdicion({ ...formEdicion, pagador })} />
                 <PlanDePago planPago={formEdicion.planPago} onChange={(planPago) => setFormEdicion({ ...formEdicion, planPago })} />
                 <SelectorComision

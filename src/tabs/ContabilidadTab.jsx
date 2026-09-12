@@ -36,6 +36,7 @@ import {
   numeroWhatsappCliente,
   textoEstadoPago,
   enviarRecordatorioPago,
+  enviarRecordatorioPagoGrupo,
   ensureJsPDF,
   LOGO_SRC,
   useReferenciadores,
@@ -2689,9 +2690,21 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
                       {c.proximoPago.valorEsperado ? ` · ${formatoCOP(c.proximoPago.valorEsperado)}` : ""}
                     </p>
                   </div>
-                  <button className="drx-btn-primary" style={{ ...buttonPrimary, padding: "6px 12px", fontSize: 12, background: "#1DA851" }} onClick={() => enviarRecordatorioPago(c)}>
-                    Enviar recordatorio ↗
-                  </button>
+                  <div style={{ display: "flex", gap: 6 }}>
+                    <button className="drx-btn-primary" style={{ ...buttonPrimary, padding: "6px 12px", fontSize: 12, background: "#1DA851" }} onClick={() => enviarRecordatorioPago(c)}>
+                      Enviar recordatorio ↗
+                    </button>
+                    {c.grupoWhatsapp && (
+                      <button
+                        className="drx-btn-ghost"
+                        style={{ ...buttonGhost, padding: "6px 12px", fontSize: 12 }}
+                        title="Copia el mensaje y abre el grupo de WhatsApp del proceso"
+                        onClick={() => enviarRecordatorioPagoGrupo(c)}
+                      >
+                        Al grupo ↗
+                      </button>
+                    )}
+                  </div>
                 </div>
               );
             })}
