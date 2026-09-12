@@ -263,6 +263,12 @@ function EditorRadicados({ radicados, onChange }) {
 
 const FRECUENCIAS_PAGO = ["Semanal", "Quincenal", "Mensual", "Pago único", "Otro"];
 
+// Un typo en "Número de cuotas" (ej. escribir "4270" en vez de "7") generaba
+// esa cantidad real de filas en el calendario — miles de cuotas, la
+// pantalla casi congelada. 30 cuotas ya cubre de sobra un plan semanal a un
+// año, así que es un tope generoso, no una limitación real de uso.
+const MAX_CUOTAS = 30;
+
 // Antes esto se armaba pidiéndole a una IA que interpretara una frase en
 // lenguaje libre ("Paga $500.000 mensual...") y devolviera un JSON — cuando
 // el modelo respondía algo mal formado (pasaba con cierta frecuencia), el
@@ -322,7 +328,7 @@ function PlanDePago({ planPago, onChange }) {
     // resumen, sin pisar lo que la persona todavía está escribiendo en el
     // campo. Si se sobrescribiera con el valor ya corregido, el campo
     // "saltaba" de vuelta a 1 apenas se intentaba borrar para cambiarlo.
-    const numCuotasEfectivo = combinado.frecuencia === "Pago único" ? 1 : Math.max(1, Number(combinado.numCuotas) || 1);
+    const numCuotasEfectivo = combinado.frecuencia === "Pago único" ? 1 : Math.min(MAX_CUOTAS, Math.max(1, Number(combinado.numCuotas) || 1));
     const cuotasTexto = numCuotasEfectivo > 1 ? ` en ${numCuotasEfectivo} cuotas` : "";
     const resumen = combinado.valor
       ? `${formatoCOP(combinado.valor)} ${(combinado.frecuencia || "").toLowerCase()}${cuotasTexto}`.trim()
@@ -382,15 +388,19 @@ function PlanDePago({ planPago, onChange }) {
           </select>
         </Field>
         {plan.frecuencia !== "Pago único" && (
-          <Field label="Número de cuotas">
+          <Field label="Número de cuotas (máximo 30)">
             <input
               type="number"
               min="1"
+              max={MAX_CUOTAS}
               className="drx-input"
               style={{ ...inputStyle, fontSize: 12.5, padding: "7px 8px" }}
               value={plan.numCuotas === undefined || plan.numCuotas === null ? 1 : plan.numCuotas}
               onChange={(e) => actualizar({ numCuotas: e.target.value })}
             />
+            {Number(plan.numCuotas) > MAX_CUOTAS && (
+              <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11, color: "#B45309", margin: "4px 0 0" }}>Se van a generar máximo {MAX_CUOTAS} cuotas.</p>
+            )}
           </Field>
         )}
         <Field label={plan.frecuencia === "Pago único" ? "Fecha de pago" : "Fecha de la primera cuota"}>
