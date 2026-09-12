@@ -78,6 +78,7 @@ export const SECCIONES_PERMISOS = [
   { id: "clientes", nombre: "Clientes" },
   { id: "vigilancia", nombre: "Vigilancia judicial" },
   { id: "contabilidad", nombre: "Contabilidad" },
+  { id: "calculadora", nombre: "Calculadora de precios" },
   { id: "contenido", nombre: "Calendario de contenido" },
   { id: "documentos", nombre: "Firmar documentos" },
   { id: "reportes", nombre: "Reportes" },
@@ -86,7 +87,7 @@ export const SECCIONES_PERMISOS = [
 export function permisosPorDefecto(rol) {
   const todos = Object.fromEntries(SECCIONES_PERMISOS.map((s) => [s.id, true]));
   if (rol === "Administrador" || rol === "Abogado") return todos;
-  return { resumen: true, agenda: true, clientes: true, vigilancia: false, contabilidad: false, contenido: false, documentos: true, reportes: false };
+  return { resumen: true, agenda: true, clientes: true, vigilancia: false, contabilidad: false, calculadora: false, contenido: false, documentos: true, reportes: false };
 }
 
 export const NOTIF_CATEGORIAS = [

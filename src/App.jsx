@@ -5,6 +5,7 @@ import { useState, useEffect, useRef, useCallback, useMemo, Fragment, Component,
 // alguien realmente abre esa pestaña, en vez de siempre al entrar a Nomos,
 // hace que el resto de la app arranque más rápido.
 const ContabilidadTab = lazy(() => import("./tabs/ContabilidadTab.jsx"));
+const CalculadoraTab = lazy(() => import("./tabs/CalculadoraTab.jsx"));
 const AgendaTab = lazy(() => import("./tabs/AgendaTab.jsx"));
 const ClientesTab = lazy(() => import("./tabs/ClientesTab.jsx"));
 const VigilanciaTab = lazy(() => import("./tabs/VigilanciaTab.jsx"));
@@ -1081,7 +1082,7 @@ function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-const APP_VERSION = "1.73.0";
+const APP_VERSION = "1.74.0";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -4284,6 +4285,7 @@ const ICONOS_TAB = {
   reportes: "M4 16.5v-6M9 16.5v-10M14 16.5v-3.5M2.5 16.5h15",
   agenda: "M3.5 5h13v11h-13v-11ZM3.5 8.5h13M7 3v3M13 3v3M6.5 11.5h2M11.5 11.5h2",
   usuarios: "M10 12.7a2.7 2.7 0 1 0 0-5.4 2.7 2.7 0 0 0 0 5.4Zm7-2.7a7 7 0 0 1-.1 1.2l1.6 1.2-1.5 2.6-1.9-.7c-.4.3-.9.6-1.4.8l-.3 2H8.6l-.3-2c-.5-.2-1-.5-1.4-.8l-1.9.7-1.5-2.6 1.6-1.2A7 7 0 0 1 5 10c0-.4 0-.8.1-1.2L3.5 7.6l1.5-2.6 1.9.7c.4-.3.9-.6 1.4-.8l.3-2h2.8l.3 2c.5.2 1 .5 1.4.8l1.9-.7 1.5 2.6-1.6 1.2c.1.4.1.8.1 1.2Z",
+  calculadora: "M5 2.5h10v15H5v-15Zm0 4.2h10M7 10h1M7 12.5h1M7 15h1M9.7 10h1M9.7 12.5h1M9.7 15h1M12.4 10h1M12.4 12.5v2.5",
 };
 
 function IconoTab({ tipo }) {
@@ -9291,6 +9293,7 @@ function App() {
   // final no se hace clic.
   const PRECARGA_TAB = {
     contabilidad: () => import("./tabs/ContabilidadTab.jsx"),
+    calculadora: () => import("./tabs/CalculadoraTab.jsx"),
     agenda: () => import("./tabs/AgendaTab.jsx"),
     clientes: () => import("./tabs/ClientesTab.jsx"),
     vigilancia: () => import("./tabs/VigilanciaTab.jsx"),
@@ -9742,6 +9745,11 @@ function App() {
               Contabilidad
             </SidebarButton>
           )}
+          {puedeVer("calculadora") && (
+            <SidebarButton active={tab === "calculadora"} onClick={() => setTab("calculadora")} onMouseEnter={() => precargarTab("calculadora")} color="#F59E0B" icono="calculadora">
+              Calculadora de precios
+            </SidebarButton>
+          )}
           {puedeVer("contenido") && (
             <SidebarButton active={tab === "contenido"} onClick={() => setTab("contenido")} onMouseEnter={() => precargarTab("contenido")} color="#8B5CF6" icono="contenido">
               Calendario de contenido
@@ -9974,6 +9982,13 @@ function App() {
               <TabErrorBoundary nombre="contabilidad">
                 <Suspense fallback={<Spinner />}>
                   <ContabilidadTab usuarioActual={usuarioActual} clienteInicialPago={clienteParaPago} onClienteInicialPagoConsumido={() => setClienteParaPago(null)} />
+                </Suspense>
+              </TabErrorBoundary>
+            )}
+            {tab === "calculadora" && puedeVer("calculadora") && (
+              <TabErrorBoundary nombre="calculadora">
+                <Suspense fallback={<Spinner />}>
+                  <CalculadoraTab />
                 </Suspense>
               </TabErrorBoundary>
             )}
