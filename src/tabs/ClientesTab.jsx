@@ -7,7 +7,7 @@ import {
   AREAS_PROCESO, COLOR_AREA_PROCESO, DIAS_ALERTA_INACTIVIDAD, numeroWhatsappCliente,
   radicadosDeCliente, tiposProcesoDeArea, useServicios, calcularProximaFechaPorFrecuencia,
   fechaHoyISO, formatoCOP, leerJSONLocal, guardarJSONLocal, useReferenciadores, useAbogadosAsociados,
-  useValorConRetraso,
+  useValorConRetraso, SelectorComision,
 } from "../App.jsx";
 
 // Enlace oficial de la Fiscalía para consultar el estado de una denuncia en
@@ -102,91 +102,6 @@ function SelectorPagador({ pagador, onChange }) {
 // una vez en Usuarios y permisos, o aquí mismo con "+ Nuevo") y el
 // porcentaje que le corresponde sobre cada pago. La cuenta de cobro usa
 // ese porcentaje para descontarlo y mostrar la utilidad real del despacho.
-function SelectorComision({ titulo, contactosHook, valor, onChange, placeholderNombre }) {
-  const { contactos, crear } = contactosHook();
-  const [mostrarNuevo, setMostrarNuevo] = useState(false);
-  const [nombreNuevo, setNombreNuevo] = useState("");
-  const [telefonoNuevo, setTelefonoNuevo] = useState("");
-
-  const elegir = (id) => {
-    if (!id) {
-      onChange(null);
-      return;
-    }
-    const c = contactos.find((x) => x.id === id);
-    if (c) onChange({ id: c.id, nombre: c.nombre, porcentaje: valor?.porcentaje ?? "" });
-  };
-
-  const crearRapido = async () => {
-    if (!nombreNuevo.trim()) return;
-    const nuevo = await crear({ nombre: nombreNuevo, telefono: telefonoNuevo });
-    onChange({ id: nuevo.id, nombre: nuevo.nombre, porcentaje: valor?.porcentaje ?? "" });
-    setNombreNuevo("");
-    setTelefonoNuevo("");
-    setMostrarNuevo(false);
-  };
-
-  return (
-    <div style={{ marginTop: 12 }}>
-      <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, fontWeight: 600, color: COLORS.inkSoft, marginBottom: 8 }}>{titulo}</p>
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-end" }}>
-        <Field label="Elegir">
-          <select
-            className="drx-input"
-            style={{ ...inputStyle, fontSize: 12.5, padding: "7px 8px", minWidth: 200 }}
-            value={valor?.id || ""}
-            onChange={(e) => elegir(e.target.value)}
-          >
-            <option value="">Ninguno</option>
-            {contactos.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.nombre}
-              </option>
-            ))}
-          </select>
-        </Field>
-        {valor?.id && (
-          <Field label="% que le corresponde">
-            <input
-              type="number"
-              min="0"
-              max="100"
-              className="drx-input"
-              style={{ ...inputStyle, fontSize: 12.5, padding: "7px 8px", width: 90 }}
-              value={valor.porcentaje ?? ""}
-              onChange={(e) => onChange({ ...valor, porcentaje: e.target.value })}
-            />
-          </Field>
-        )}
-        <button className="drx-btn-ghost" style={{ ...buttonGhost, padding: "8px 14px", fontSize: 12.5 }} onClick={() => setMostrarNuevo((m) => !m)}>
-          {mostrarNuevo ? "Cancelar" : "+ Nuevo"}
-        </button>
-      </div>
-      {mostrarNuevo && (
-        <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
-          <input
-            className="drx-input"
-            style={{ ...inputStyle, padding: "8px 10px", fontSize: 13 }}
-            value={nombreNuevo}
-            onChange={(e) => setNombreNuevo(e.target.value)}
-            placeholder={placeholderNombre}
-          />
-          <input
-            className="drx-input"
-            style={{ ...inputStyle, padding: "8px 10px", fontSize: 13 }}
-            value={telefonoNuevo}
-            onChange={(e) => setTelefonoNuevo(e.target.value)}
-            placeholder="Teléfono (opcional)"
-          />
-          <button className="drx-btn-ghost" style={{ ...buttonGhost, padding: "8px 14px", fontSize: 12.5 }} onClick={crearRapido} disabled={!nombreNuevo.trim()}>
-            Guardar
-          </button>
-        </div>
-      )}
-    </div>
-  );
-}
-
 // Un contrato o proceso muchas veces no es con una sola persona — un
 // arriendo con dos arrendatarios, una sucesión entre varios herederos, una
 // sociedad con varios socios. Esto deja agregar a las demás personas
