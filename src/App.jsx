@@ -1176,7 +1176,7 @@ function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-const APP_VERSION = "1.82.1";
+const APP_VERSION = "1.83.0";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -1787,7 +1787,10 @@ function analisisFinanciero(rep, r) {
 
   const margenMes = rep.ingresoMesActual > 0 ? rep.netoMesActual / rep.ingresoMesActual : null;
   const margenHistorico = rep.ingresoTotalHistorico > 0 ? rep.netoTotalHistorico / rep.ingresoTotalHistorico : null;
-  const mesesDeCarteraAtascada = promedioMensual > 0 ? rep.carteraPendienteTotal / promedioMensual : null;
+  // Solo la cartera ATRASADA (no toda la cartera pendiente — un cliente
+  // pagando a cuotas a tiempo siempre debe hasta la última cuota, y eso no
+  // es una señal de alarma).
+  const mesesDeCarteraAtascada = promedioMensual > 0 ? rep.carteraAtrasadaTotal / promedioMensual : null;
 
   const abogados = Math.max(1, r.totalAbogados || 1);
   const clientesPorAbogado = r.totalClientes / abogados;
@@ -1821,13 +1824,13 @@ function analisisFinanciero(rep, r) {
     }
   }
 
-  if (mesesDeCarteraAtascada !== null) {
+  if (mesesDeCarteraAtascada !== null && rep.carteraAtrasadaTotal > 0) {
     if (mesesDeCarteraAtascada > 2.5) {
       puntos -= 2;
-      senales.push({ categoria: "Cartera pendiente", positiva: false, texto: `${formatoCOP(rep.carteraPendienteTotal)} sin cobrar — casi ${mesesDeCarteraAtascada.toFixed(1)} meses de facturación atascados.` });
+      senales.push({ categoria: "Cartera atrasada", positiva: false, texto: `${formatoCOP(rep.carteraAtrasadaTotal)} de clientes atrasados (no lo que va a cuotas a tiempo) — casi ${mesesDeCarteraAtascada.toFixed(1)} meses de facturación sin cobrar.` });
     } else if (mesesDeCarteraAtascada < 1) {
       puntos += 1;
-      senales.push({ categoria: "Cartera pendiente", positiva: true, texto: `Bajo control: ${formatoCOP(rep.carteraPendienteTotal)}, menos de un mes de facturación.` });
+      senales.push({ categoria: "Cartera atrasada", positiva: true, texto: `Bajo control: solo ${formatoCOP(rep.carteraAtrasadaTotal)} de clientes atrasados, menos de un mes de facturación.` });
     }
   }
 
@@ -3693,7 +3696,7 @@ function ResumenTab({ nombre, usuarioId, usuarioActual, onIr }) {
                   <div style={{ marginTop: 10, background: COLORS.surfaceSoft, borderRadius: 10, padding: 12, display: "flex", flexDirection: "column", gap: 8 }}>
                     {[
                       ["Margen neto", "de cada peso que te paga un cliente, cuánto te queda después de pagar todos los gastos del mes. Si el margen es 30%, de $100.000 te quedan $30.000 limpios."],
-                      ["Cartera pendiente (en meses de facturación)", "cuánto te deben en total tus clientes, expresado en cuántos meses de tu facturación normal representa esa plata — si son 2 meses, significa que tienes atascados dos meses enteros de ingreso sin cobrar."],
+                      ["Cartera atrasada (en meses de facturación)", "cuánto te deben los clientes que ya se pasaron de la fecha de su próximo pago (no lo que va a cuotas a tiempo), expresado en cuántos meses de tu facturación normal representa esa plata — si son 2 meses, significa que tienes atascados dos meses enteros de ingreso realmente atrasado."],
                       ["Flujo de caja proyectado", "la plata que ya sabes que te va a entrar en los próximos meses (por los pagos pendientes ya acordados con tus clientes), no lo que esperas o deseas — es lo comprometido de verdad."],
                       ["Capacidad por abogado", "cuántos clientes activos atiende, en promedio, cada abogado del despacho — si el número es muy alto, el freno para crecer puede ser que no dan abasto, no que falten clientes."],
                       ["Concentración de cartera", "qué porcentaje de todo lo que ha facturado el despacho viene de un solo cliente. Mientras más alto, más riesgo — si ese cliente se va, se va una parte grande de tu facturación de un solo golpe."],
@@ -5496,6 +5499,20 @@ export function useDatosReportes() {
     return saldo > 0 ? sum + saldo : sum;
   }, 0);
 
+  // Solo la parte de esa cartera que está de verdad ATRASADA (la fecha del
+  // próximo pago ya pasó) — un cliente pagando a cuotas a tiempo siempre
+  // tiene saldo pendiente hasta la última cuota, y eso no es un atraso, así
+  // que no debería sumar aquí (sí suma en carteraPendienteTotal, que es el
+  // total sin cobrar todavía, atrasado o no).
+  const carteraAtrasadaTotal = listaClientes.reduce((sum, c) => {
+    if (c.procesoPausado || !c.proximoPago?.fecha) return sum;
+    const totalPagado = (c.pagos || []).reduce((s, p) => s + (Number(p.valor) || 0), 0);
+    const valorTotal = Number(c.valorTotal) || 0;
+    const saldo = valorTotal > 0 ? valorTotal - totalPagado : 0;
+    const diasPago = diasHasta(c.proximoPago.fecha);
+    return saldo > 0 && diasPago !== null && diasPago < 0 ? sum + saldo : sum;
+  }, 0);
+
   // Procesos por estado.
   const conteoEstados = Object.fromEntries(ESTADOS_VIGILANCIA.map((e) => [e, 0]));
   let sinRevisar = 0;
@@ -5656,6 +5673,7 @@ export function useDatosReportes() {
     netoMesActual,
     netoTotalHistorico,
     carteraPendienteTotal,
+    carteraAtrasadaTotal,
     conteoEstados,
     sinRevisar,
     maxEstado,
