@@ -358,6 +358,178 @@ async function generarCuentaDeCobroComisionDocx({ contacto, tipoContacto, client
   URL.revokeObjectURL(url);
 }
 
+const pad2AcuerdoPago = (n) => String(n).padStart(2, "0");
+const ultimoDiaMesAcuerdoPago = (anio, mesIndex) => new Date(anio, mesIndex + 1, 0).getDate();
+const fechaISODiaMesAcuerdoPago = (anio, mesIndex, dia) => `${anio}-${pad2AcuerdoPago(mesIndex + 1)}-${pad2AcuerdoPago(Math.min(dia, ultimoDiaMesAcuerdoPago(anio, mesIndex)))}`;
+
+// Mismo criterio que en la Calculadora de precios: si el cliente acuerda
+// pagar un día del mes distinto al de hoy, la primera cuota del acuerdo no
+// es hoy, es la próxima vez que caiga ese día.
+function calcularPrimeraFechaCuotaAcuerdo(diaPago) {
+  const hoy = new Date();
+  if (!diaPago) return fechaISODiaMesAcuerdoPago(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
+  let anio = hoy.getFullYear();
+  let mes = hoy.getMonth();
+  if (hoy.getDate() > diaPago) {
+    mes += 1;
+    if (mes > 11) {
+      mes = 0;
+      anio += 1;
+    }
+  }
+  return fechaISODiaMesAcuerdoPago(anio, mes, diaPago);
+}
+
+function generarCuotasAcuerdoPago({ valorTotal, numCuotas, diaPago }) {
+  const primera = calcularPrimeraFechaCuotaAcuerdo(diaPago);
+  const valorCuota = numCuotas > 0 ? valorTotal / numCuotas : 0;
+  const cuotas = [];
+  let fecha = primera;
+  for (let i = 0; i < numCuotas; i++) {
+    cuotas.push({ fecha, valor: valorCuota });
+    fecha = calcularProximaFechaPorFrecuencia(fecha, "Mensual");
+  }
+  return cuotas;
+}
+
+// Un acuerdo de pago es, en el fondo, una renegociación del saldo que ya
+// debía el cliente — reconoce la deuda actual y la reemplaza por un plan
+// nuevo, con la advertencia de qué pasa si tampoco se cumple este. Texto
+// en una sola estructura (igual que el contrato de la Calculadora de
+// precios) para que el documento de firma electrónica y el Word salgan
+// del mismo contenido.
+function construirClausulasAcuerdoPago({ cliente, saldo, cedulaCliente, cuotas, datosResponsable }) {
+  const nombreDespacho = getNombreDespacho();
+  const responsable = (datosResponsable?.nombre || nombreDespacho || "").trim();
+  const documentoResponsable = (datosResponsable?.documento || "").trim();
+  const ciudad = (datosResponsable?.ciudad || "").trim() || "___________";
+  const fechaHoy = new Date().toLocaleDateString("es-CO", { day: "numeric", month: "long", year: "numeric" });
+
+  const listaCuotas =
+    cuotas.length > 1
+      ? cuotas.map((c, i) => `Cuota ${i + 1}: ${formatoCOP(c.valor)}, con vencimiento el ${new Date(`${c.fecha}T12:00:00`).toLocaleDateString("es-CO", { day: "numeric", month: "long", year: "numeric" })}.`).join(" ")
+      : `en un solo pago, con vencimiento el ${cuotas[0] ? new Date(`${cuotas[0].fecha}T12:00:00`).toLocaleDateString("es-CO", { day: "numeric", month: "long", year: "numeric" }) : "___________"}.`;
+
+  return {
+    encabezado: "ACUERDO DE PAGO",
+    intro: `Entre los suscritos, a saber, de una parte ${responsable}, identificado(a) con cédula de ciudadanía No. ${
+      documentoResponsable || "______________________"
+    }, actuando en nombre y representación de ${nombreDespacho}, quien en adelante se denominará EL ACREEDOR; y de otra parte ${
+      cliente?.nombre || "___________________________"
+    }, identificado(a) con cédula de ciudadanía No. ${cedulaCliente || "______________________"}, quien en adelante se denominará EL DEUDOR, hemos convenido celebrar el presente acuerdo de pago, el cual se regirá por las siguientes cláusulas:`,
+    fecha: `${ciudad}, ${fechaHoy}`,
+    responsable,
+    documentoResponsable,
+    clausulas: [
+      {
+        titulo: "CLÁUSULA PRIMERA. RECONOCIMIENTO DE LA DEUDA.",
+        texto: `Las partes reconocen que, a la fecha de firma del presente acuerdo, EL DEUDOR mantiene una obligación pendiente de pago a favor de EL ACREEDOR por la suma de ${formatoCOP(
+          saldo
+        )} (${numeroEnLetras(saldo)}), correspondiente al saldo de los honorarios profesionales pactados por la gestión encomendada.`,
+      },
+      { titulo: "CLÁUSULA SEGUNDA. NUEVO PLAN DE PAGO.", texto: `EL DEUDOR se compromete a cancelar la suma reconocida en la cláusula anterior a EL ACREEDOR así: ${listaCuotas}` },
+      {
+        titulo: "CLÁUSULA TERCERA. INCUMPLIMIENTO.",
+        texto: "El incumplimiento de cualquiera de las cuotas aquí pactadas dará lugar a que EL ACREEDOR pueda exigir el pago total del saldo pendiente de manera inmediata, sin necesidad de requerimiento previo, además de las acciones legales a que haya lugar.",
+      },
+      {
+        titulo: "CLÁUSULA CUARTA. VIGENCIA DEL CONTRATO ORIGINAL.",
+        texto: "En lo no modificado por el presente acuerdo, continúan vigentes los términos y condiciones pactados inicialmente entre las partes.",
+      },
+      {
+        titulo: "CLÁUSULA QUINTA. ACEPTACIÓN.",
+        texto: "Las partes manifiestan que han leído y comprendido el contenido del presente acuerdo y que lo suscriben libremente, aceptando las condiciones aquí establecidas.",
+      },
+    ],
+  };
+}
+
+function construirTextoAcuerdoPago(datos) {
+  const c = construirClausulasAcuerdoPago(datos);
+  const partes = [c.encabezado, "", c.intro, ""];
+  c.clausulas.forEach((cl) => partes.push(cl.titulo, cl.texto, ""));
+  partes.push(`Para constancia, se firma en ${c.fecha}.`, "");
+  partes.push("EL ACREEDOR", c.responsable, `C.C. No. ${c.documentoResponsable || "______________________"}`, "");
+  partes.push("EL DEUDOR", datos.cliente?.nombre || "___________________________", `C.C. No. ${datos.cedulaCliente || "______________________"}`);
+  return partes.join("\n");
+}
+
+async function generarAcuerdoPagoDocx(datos) {
+  const { Document, Packer, Paragraph, TextRun, AlignmentType, ImageRun, BorderStyle } = await import("docx");
+  const c = construirClausulasAcuerdoPago(datos);
+  const FUENTE = "Tahoma";
+  const INTERLINEADO = { line: 360, lineRule: "auto" };
+
+  const run = (texto, extra = {}) => new TextRun({ text: texto, font: FUENTE, size: 24, ...extra });
+  const parrafo = (texto, opciones = {}) =>
+    new Paragraph({ alignment: AlignmentType.JUSTIFIED, spacing: { after: opciones.after ?? 140, ...INTERLINEADO }, children: [run(texto)] });
+  const titulo = (texto) => new Paragraph({ spacing: { before: 220, after: 80, ...INTERLINEADO }, children: [run(texto, { bold: true, color: AZUL_MARCA })] });
+
+  let logo = [];
+  try {
+    logo = [
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        spacing: { after: 120 },
+        children: [new ImageRun({ type: "png", data: base64ImagenALogo(LOGO_SRC), transformation: { width: 60, height: 60 } })],
+      }),
+    ];
+  } catch (e) {
+    // el documento se genera igual sin logo
+  }
+
+  const doc = new Document({
+    styles: { default: { document: { run: { font: FUENTE, size: 24 }, paragraph: { spacing: INTERLINEADO } } } },
+    sections: [
+      {
+        properties: { page: { margin: { top: 900, bottom: 900, left: 1100, right: 1100 } } },
+        children: [
+          ...logo,
+          new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 4 }, children: [run(getNombreDespacho(), { bold: true, size: 28, color: AZUL_MARCA })] }),
+          new Paragraph({
+            alignment: AlignmentType.CENTER,
+            spacing: { after: 260 },
+            border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: "E2E8F0", space: 10 } },
+            children: [run("Abogados & Asociados", { size: 18, color: GRIS_TEXTO, italics: true })],
+          }),
+          new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 320 }, children: [run(c.encabezado, { bold: true, size: 30, color: AZUL_MARCA })] }),
+
+          parrafo(c.intro),
+          ...c.clausulas.flatMap((cl) => [titulo(cl.titulo), parrafo(cl.texto)]),
+
+          parrafo(`Para constancia, se firma en ${c.fecha}.`, { after: 500 }),
+
+          new Paragraph({ spacing: { after: 40 }, children: [run("______________________________")] }),
+          new Paragraph({ spacing: { after: 4 }, children: [run("EL ACREEDOR", { bold: true, size: 22, color: GRIS_TEXTO })] }),
+          new Paragraph({ spacing: { after: 4 }, children: [run(c.responsable)] }),
+          new Paragraph({ spacing: { after: 500 }, children: [run(`C.C. No. ${c.documentoResponsable || "______________________"}`)] }),
+
+          new Paragraph({ spacing: { after: 40 }, children: [run("______________________________")] }),
+          new Paragraph({ spacing: { after: 4 }, children: [run("EL DEUDOR", { bold: true, size: 22, color: GRIS_TEXTO })] }),
+          new Paragraph({ spacing: { after: 4 }, children: [run(datos.cliente?.nombre || "___________________________")] }),
+          new Paragraph({ children: [run(`C.C. No. ${datos.cedulaCliente || "______________________"}`)] }),
+
+          new Paragraph({
+            spacing: { before: 200 },
+            border: { top: { style: BorderStyle.SINGLE, size: 4, color: "E2E8F0", space: 8 } },
+            children: [run(`${getNombreDespacho()} · generado electrónicamente`, { size: 16, color: "94A3B8", italics: true })],
+          }),
+        ],
+      },
+    ],
+  });
+
+  const blob = await Packer.toBlob(doc);
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `acuerdo_pago_${(datos.cliente?.nombre || "cliente").replace(/[^a-z0-9]+/gi, "_").toLowerCase()}.docx`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
 // Paleta compartida entre el gráfico de barras por categoría y las tarjetas
 // resumen del PDF fiscal, para que se vea igual de "de un solo sistema" que
 // el resto de la app (misma idea que COLORS pero en RGB, porque jsPDF pide
@@ -864,6 +1036,164 @@ function PanelConfiguracionContabilidad(props) {
         </div>
       )}
     </Card>
+  );
+}
+
+const MAX_CUOTAS_ACUERDO = 30;
+
+// Cuando un cliente se atrasa (como Sarai en el ejemplo que dio el
+// despacho), esto deja renegociar el saldo pendiente en un plan nuevo: se
+// reconoce la deuda actual, se arma un nuevo calendario de cuotas, y se
+// puede descargar el acuerdo en Word o mandarlo a firmar por WhatsApp
+// (mismo sistema de firma electrónica de "Firmar documentos"). Al enviarlo
+// a firmar, el plan de pago del cliente se reemplaza por el nuevo — así
+// Contabilidad deja de mostrar el saldo viejo y empieza a seguir el nuevo
+// calendario.
+function AcuerdoPagoForm({ cliente, clienteId, saldo, datosResponsable, usuarioActual, addIdDocumento, actualizarCliente }) {
+  const [valorAcordado, setValorAcordado] = useState(String(Math.round(saldo)));
+  const [numCuotas, setNumCuotas] = useState("1");
+  const [diaPago, setDiaPago] = useState("");
+  const [cedulaCliente, setCedulaCliente] = useState("");
+  const [celular, setCelular] = useState(cliente.telefono || "");
+  const [generando, setGenerando] = useState(false);
+  const [guardando, setGuardando] = useState(false);
+  const [hecho, setHecho] = useState(null);
+
+  const total = Number(valorAcordado) || 0;
+  const cuotasEfectivas = Math.min(MAX_CUOTAS_ACUERDO, Math.max(1, Number(numCuotas) || 1));
+  const diaPagoNum = Math.min(31, Math.max(0, Number(diaPago) || 0));
+  const cuotas = total > 0 ? generarCuotasAcuerdoPago({ valorTotal: total, numCuotas: cuotasEfectivas, diaPago: diaPagoNum }) : [];
+  const datosDocumento = { cliente, saldo: total, cedulaCliente, cuotas, datosResponsable };
+
+  const descargarWord = async () => {
+    setGenerando(true);
+    try {
+      await generarAcuerdoPagoDocx(datosDocumento);
+    } finally {
+      setGenerando(false);
+    }
+  };
+
+  const guardarYEnviar = async () => {
+    if (total <= 0 || !celular.trim()) return;
+    setGuardando(true);
+    try {
+      const totalPagadoCliente = (cliente.pagos || []).reduce((sum, p) => sum + (Number(p.valor) || 0), 0);
+      const primeraCuota = cuotas[0];
+      const nuevoPlanPago = {
+        valor: total,
+        frecuencia: "Mensual",
+        numCuotas: cuotasEfectivas,
+        proximaFecha: primeraCuota?.fecha || "",
+        cuotas,
+        resumen: `Acuerdo de pago: ${formatoCOP(total)}${cuotasEfectivas > 1 ? ` en ${cuotasEfectivas} cuotas` : ""}`,
+      };
+      await actualizarCliente(clienteId, {
+        planPago: nuevoPlanPago,
+        // valorTotal se recalcula como "ya pagado + lo recién acordado", para
+        // que el saldo pendiente quede en exactamente el valor del acuerdo
+        // (no se suma al valorTotal viejo, o el saldo quedaría doble).
+        valorTotal: totalPagadoCliente + total,
+        proximoPago: primeraCuota ? { fecha: primeraCuota.fecha, valorEsperado: primeraCuota.valor } : null,
+        acuerdoPago: { fecha: new Date().toISOString(), saldoOriginal: saldo, valorAcordado: total, cuotas },
+      });
+      registrarAuditoria(usuarioActual, "generar_acuerdo_pago", "cliente", clienteId, { nombre: cliente.nombre, saldo, valorAcordado: total });
+
+      const idDocumento = uid();
+      const titulo = `Acuerdo de pago – ${cliente.nombre}`;
+      const contenido = construirTextoAcuerdoPago(datosDocumento);
+      const numeroLimpio = (celular || "").replace(/[^0-9]/g, "");
+      const documentoPayload = {
+        titulo,
+        cliente: cliente.nombre,
+        whatsappIndicativo: "57",
+        whatsappNumero: numeroLimpio,
+        contenido,
+        nombreArchivo: "",
+        tipoDocumento: "texto",
+        archivoPdfBase64: "",
+        firmantes: [],
+        creadoEn: new Date().toISOString(),
+      };
+      await storageSet(`documento:${idDocumento}`, JSON.stringify(documentoPayload), true);
+      await addIdDocumento(idDocumento);
+      registrarAuditoria(usuarioActual, "crear_documento", "documento", idDocumento, { nombre: titulo });
+
+      const enlaceFirma = typeof window !== "undefined" ? `${window.location.origin}/#firmar` : "";
+      const pasos = enlaceFirma
+        ? `1. Haz clic aquí: ${enlaceFirma}\n2. Cuando te lo pida, escribe este código: *${idDocumento}*\n3. Sigue los pasos en pantalla para firmar`
+        : `1. Ingresa al aplicativo de firmas\n2. Escribe este código: *${idDocumento}*\n3. Sigue los pasos en pantalla para firmar`;
+      const mensaje = `*${getNombreDespacho()}*\n\nHola ${cliente.nombre}, te compartimos el acuerdo de pago para tu firma electrónica.\n\n${pasos}\n\nCualquier duda, escríbenos por este mismo medio.`;
+      const numero = numeroWhatsappCliente(celular);
+      window.open(`https://wa.me/${numero}?text=${encodeURIComponent(mensaje)}`, "_blank");
+
+      setHecho({ idDocumento });
+    } finally {
+      setGuardando(false);
+    }
+  };
+
+  if (hecho) {
+    return (
+      <div style={{ marginTop: 12, background: "#F0FDF4", border: "1px solid #D1FAE5", borderRadius: 10, padding: "14px 16px" }}>
+        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13.5, fontWeight: 700, color: "#166534", margin: 0 }}>
+          <Icono tipo="check" size={14} style={{ marginRight: 4, verticalAlign: -2 }} /> Acuerdo guardado y enviado a firmar
+        </p>
+        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: "#166534", margin: "6px 0 0" }}>
+          El plan de pago del cliente ya quedó actualizado. Código de firma: <b>{hecho.idDocumento}</b>.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ marginTop: 12, borderTop: `1px solid ${COLORS.border}`, paddingTop: 14 }}>
+      <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.muted, marginBottom: 12 }}>
+        Saldo pendiente actual: <b style={{ color: COLORS.ink }}>{formatoCOP(saldo)}</b> — ajusta el valor si el acuerdo es por otra cifra (con o sin recargo).
+      </p>
+      <div className="drx-grid-form" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+        <Field label="Valor total acordado">
+          <CampoDinero style={inputStyle} value={valorAcordado} onChange={(e) => setValorAcordado(e.target.value)} />
+        </Field>
+        <Field label="Número de cuotas (máximo 30)">
+          <input type="number" max={30} className="drx-input" style={inputStyle} value={numCuotas} onChange={(e) => setNumCuotas(e.target.value)} />
+        </Field>
+        <Field label="Día del mes en que paga (opcional)">
+          <input type="number" min={1} max={31} className="drx-input" style={inputStyle} value={diaPago} onChange={(e) => setDiaPago(e.target.value)} placeholder="Ej: 10" />
+        </Field>
+        <Field label="Cédula del cliente (opcional, para el documento)">
+          <input className="drx-input" style={inputStyle} value={cedulaCliente} onChange={(e) => setCedulaCliente(e.target.value)} />
+        </Field>
+        <Field label="Celular (recibe el WhatsApp)">
+          <input className="drx-input" style={inputStyle} value={celular} onChange={(e) => setCelular(e.target.value)} />
+        </Field>
+      </div>
+
+      {cuotas.length > 0 && (
+        <div style={{ marginTop: 12, background: COLORS.surfaceSoft, borderRadius: 10, padding: "12px 14px", display: "flex", flexDirection: "column", gap: 4 }}>
+          {cuotas.map((c, i) => (
+            <div key={i} style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, fontFamily: "Inter, sans-serif" }}>
+              <span style={{ color: COLORS.muted }}>
+                {cuotas.length > 1 ? `Cuota ${i + 1}` : "Pago único"} · {new Date(`${c.fecha}T12:00:00`).toLocaleDateString("es-CO", { day: "numeric", month: "short", year: "numeric" })}
+              </span>
+              <span style={{ fontWeight: 700, color: COLORS.ink }}>{formatoCOP(c.valor)}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div style={{ display: "flex", gap: 8, marginTop: 14, flexWrap: "wrap" }}>
+        <button className="drx-btn-ghost" style={buttonGhost} onClick={descargarWord} disabled={generando || total <= 0}>
+          {generando ? "Generando…" : "Descargar en Word"}
+        </button>
+        <button className="drx-btn-primary" style={buttonPrimary} onClick={guardarYEnviar} disabled={guardando || total <= 0 || !celular.trim()}>
+          {guardando ? "Guardando…" : "Guardar acuerdo y enviar a firmar por WhatsApp"}
+        </button>
+      </div>
+      <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11, color: COLORS.muted, marginTop: 8 }}>
+        Descargar en Word no cambia nada del cliente — solo el botón verde reemplaza el plan de pago actual por este nuevo acuerdo.
+      </p>
+    </div>
   );
 }
 
@@ -1657,6 +1987,8 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
   // cliente en particular; abre exactamente el mismo formulario que "+
   // Registrar egreso" de arriba.
   const [egresoAbiertoId, setEgresoAbiertoId] = useState(null);
+  const [acuerdoAbiertoId, setAcuerdoAbiertoId] = useState(null);
+  const { addId: addIdDocumentoAcuerdo } = useIndex("indice-documentos", true);
   const [filtro, setFiltro] = useState("");
   const [soloPendientes, setSoloPendientes] = useState(false);
   const [orden, setOrden] = useState("nombre");
@@ -1932,6 +2264,14 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
     await storageSet(`cliente:${id}`, JSON.stringify(actualizado), false);
     setClientes((prev) => ({ ...prev, [id]: actualizado }));
     registrarAuditoria(usuarioActual, "eliminar_pago", "cliente", id, { nombre: cliente.nombre, valor: pago?.valor });
+  };
+
+  // Usado por el acuerdo de pago para reemplazar el plan de pago del
+  // cliente por el nuevo acordado, sin tocar el resto de su ficha.
+  const actualizarCliente = async (id, cambios) => {
+    const actualizado = { ...clientes[id], ...cambios };
+    await storageSet(`cliente:${id}`, JSON.stringify(actualizado), false);
+    setClientes((prev) => ({ ...prev, [id]: actualizado }));
   };
 
   const proximosPagos = ids
@@ -3073,6 +3413,15 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
                   >
                     {egresoAbiertoId === id ? "Cancelar" : "+ Registrar egreso"}
                   </button>
+                  {saldo > 0 && (
+                    <button
+                      className="drx-btn-ghost"
+                      style={{ ...buttonGhost, color: "#7C3AED", borderColor: "#DDD6FE" }}
+                      onClick={() => setAcuerdoAbiertoId(acuerdoAbiertoId === id ? null : id)}
+                    >
+                      {acuerdoAbiertoId === id ? "Cancelar" : "📝 Acuerdo de pago"}
+                    </button>
+                  )}
                 </div>
               </div>
 
@@ -3081,6 +3430,17 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
                 <div style={{ marginTop: 12, borderTop: `1px solid ${COLORS.border}`, paddingTop: 14 }}>
                   <FormularioEgreso onRegistrar={async (datos) => { await registrarEgreso({ ...datos, clienteId: id }); setEgresoAbiertoId(null); }} />
                 </div>
+              )}
+              {acuerdoAbiertoId === id && saldo > 0 && (
+                <AcuerdoPagoForm
+                  cliente={c}
+                  clienteId={id}
+                  saldo={saldo}
+                  datosResponsable={datosResponsable}
+                  usuarioActual={usuarioActual}
+                  addIdDocumento={addIdDocumentoAcuerdo}
+                  actualizarCliente={actualizarCliente}
+                />
               )}
 
               {pagos.length > 0 && (() => {
