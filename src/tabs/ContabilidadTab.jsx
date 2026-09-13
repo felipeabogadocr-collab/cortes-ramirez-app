@@ -1729,6 +1729,11 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
 
   const [fechaDatosLimpios, setFechaDatosLimpios] = useState(null);
   const [mesFlujoExpandido, setMesFlujoExpandido] = useState(null);
+  // Contabilidad se había vuelto una sola página larguísima (resumen, egresos,
+  // ingresos y clientes todo revuelto en el mismo scroll) — se separa en
+  // pestañas internas para que cada cosa tenga su propio lugar y no haya
+  // que desplazarse entre secciones que no tienen nada que ver.
+  const [vistaContabilidad, setVistaContabilidad] = useState("resumen");
   useEffect(() => {
     (async () => {
       const raw = await storageGet("fecha-datos-limpios", false);
@@ -1838,8 +1843,14 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
     registrarAuditoria(usuarioActual, "recategorizar_egresos", "egreso", "masivo", { de: "Otro", a: "Pendiente por clasificar", cantidad: egresosOtro.length });
   };
 
+  // Los accesos directos desde las tarjetas de arriba ("Recaudado este
+  // mes" → clientes, etc.) apuntan a secciones que ahora viven cada una en
+  // su propia pestaña — primero hay que cambiar de pestaña para que el
+  // elemento exista en el DOM, y solo entonces se puede hacer scroll hasta él.
+  const VISTA_POR_SECCION = { "seccion-clientes": "clientes", "seccion-egresos": "egresos", "seccion-otros-ingresos": "ingresos" };
   const irASeccion = (idSeccion, opciones = {}) => {
     if (opciones.soloPendientes) setSoloPendientes(true);
+    if (VISTA_POR_SECCION[idSeccion]) setVistaContabilidad(VISTA_POR_SECCION[idSeccion]);
     setTimeout(() => {
       document.getElementById(idSeccion)?.scrollIntoView({ behavior: "smooth", block: "start" });
     }, 50);
@@ -2254,46 +2265,6 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
         guardarAhorro={guardarAhorro}
       />
 
-      {metaRecaudoValor > 0 &&
-        (() => {
-          const colorMeta = porcentajeMetaRecaudo >= 100 ? "#10B981" : porcentajeMetaRecaudo >= 60 ? "#166534" : "#B45309";
-          return (
-            <Card style={{ marginBottom: 20, borderLeft: `4px solid ${colorMeta}` }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: 8, marginBottom: 10 }}>
-                <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, fontWeight: 700, color: COLORS.ink, margin: 0 }}>Meta de recaudo del mes</p>
-                <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, fontWeight: 700, color: colorMeta, margin: 0 }}>
-                  {formatoCOP(ingresoTotalMes)} de {formatoCOP(metaRecaudoValor)} ({porcentajeMetaRecaudo}%)
-                </p>
-              </div>
-              <div style={{ height: 10, borderRadius: 6, background: COLORS.surfaceSoft, overflow: "hidden" }}>
-                <div style={{ height: "100%", width: `${Math.min(porcentajeMetaRecaudo, 100)}%`, background: colorMeta, transition: "width 0.3s ease" }} />
-              </div>
-              <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: colorMeta, marginTop: 8, marginBottom: 0 }}>
-                {porcentajeMetaRecaudo >= 100
-                  ? `¡Meta cumplida! Vas ${formatoCOP(ingresoTotalMes - metaRecaudoValor)} por encima.`
-                  : `Te faltan ${formatoCOP(metaRecaudoValor - ingresoTotalMes)} para llegar a la meta este mes.`}
-              </p>
-            </Card>
-          );
-        })()}
-
-      {presupuestoValor > 0 && (
-        <Card style={{ marginBottom: 20, borderLeft: `4px solid ${colorPresupuesto}` }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: 8, marginBottom: 10 }}>
-            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, fontWeight: 700, color: COLORS.ink, margin: 0 }}>Presupuesto de gastos del mes</p>
-            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, fontWeight: 700, color: colorPresupuesto, margin: 0 }}>
-              {formatoCOP(egresoMes)} de {formatoCOP(presupuestoValor)}
-            </p>
-          </div>
-          <div style={{ height: 10, borderRadius: 6, background: COLORS.surfaceSoft, overflow: "hidden" }}>
-            <div style={{ height: "100%", width: `${Math.min(porcentajePresupuesto, 100)}%`, background: colorPresupuesto, transition: "width 0.3s ease" }} />
-          </div>
-          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: colorPresupuesto, marginTop: 8, marginBottom: 0 }}>
-            {mensajePresupuesto}
-          </p>
-        </Card>
-      )}
-
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 20 }}>
         <button
           className="drx-btn-primary"
@@ -2362,6 +2333,75 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
           <FormularioOtroIngreso onRegistrar={registrarOtroIngreso} />
         </Card>
       )}
+
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 18, borderBottom: `1px solid ${COLORS.border}`, paddingBottom: 10 }}>
+        {[
+          { id: "resumen", etiqueta: "📊 Resumen" },
+          { id: "egresos", etiqueta: "− Egresos" },
+          { id: "ingresos", etiqueta: "+ Otros ingresos" },
+          { id: "clientes", etiqueta: "👤 Clientes y pagos" },
+        ].map((v) => (
+          <button
+            key={v.id}
+            onClick={() => setVistaContabilidad(v.id)}
+            style={{
+              fontFamily: "Inter, sans-serif",
+              fontSize: 13,
+              fontWeight: 700,
+              padding: "8px 16px",
+              borderRadius: 20,
+              border: `1px solid ${vistaContabilidad === v.id ? COLORS.navy : COLORS.border}`,
+              background: vistaContabilidad === v.id ? COLORS.navy : "transparent",
+              color: vistaContabilidad === v.id ? "#fff" : COLORS.inkSoft,
+              cursor: "pointer",
+            }}
+          >
+            {v.etiqueta}
+          </button>
+        ))}
+      </div>
+
+      {vistaContabilidad === "resumen" && (
+        <>
+          {metaRecaudoValor > 0 &&
+            (() => {
+              const colorMeta = porcentajeMetaRecaudo >= 100 ? "#10B981" : porcentajeMetaRecaudo >= 60 ? "#166534" : "#B45309";
+              return (
+                <Card style={{ marginBottom: 20, borderLeft: `4px solid ${colorMeta}` }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: 8, marginBottom: 10 }}>
+                    <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, fontWeight: 700, color: COLORS.ink, margin: 0 }}>Meta de recaudo del mes</p>
+                    <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, fontWeight: 700, color: colorMeta, margin: 0 }}>
+                      {formatoCOP(ingresoTotalMes)} de {formatoCOP(metaRecaudoValor)} ({porcentajeMetaRecaudo}%)
+                    </p>
+                  </div>
+                  <div style={{ height: 10, borderRadius: 6, background: COLORS.surfaceSoft, overflow: "hidden" }}>
+                    <div style={{ height: "100%", width: `${Math.min(porcentajeMetaRecaudo, 100)}%`, background: colorMeta, transition: "width 0.3s ease" }} />
+                  </div>
+                  <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: colorMeta, marginTop: 8, marginBottom: 0 }}>
+                    {porcentajeMetaRecaudo >= 100
+                      ? `¡Meta cumplida! Vas ${formatoCOP(ingresoTotalMes - metaRecaudoValor)} por encima.`
+                      : `Te faltan ${formatoCOP(metaRecaudoValor - ingresoTotalMes)} para llegar a la meta este mes.`}
+                  </p>
+                </Card>
+              );
+            })()}
+
+          {presupuestoValor > 0 && (
+            <Card style={{ marginBottom: 20, borderLeft: `4px solid ${colorPresupuesto}` }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: 8, marginBottom: 10 }}>
+                <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, fontWeight: 700, color: COLORS.ink, margin: 0 }}>Presupuesto de gastos del mes</p>
+                <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, fontWeight: 700, color: colorPresupuesto, margin: 0 }}>
+                  {formatoCOP(egresoMes)} de {formatoCOP(presupuestoValor)}
+                </p>
+              </div>
+              <div style={{ height: 10, borderRadius: 6, background: COLORS.surfaceSoft, overflow: "hidden" }}>
+                <div style={{ height: "100%", width: `${Math.min(porcentajePresupuesto, 100)}%`, background: colorPresupuesto, transition: "width 0.3s ease" }} />
+              </div>
+              <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: colorPresupuesto, marginTop: 8, marginBottom: 0 }}>
+                {mensajePresupuesto}
+              </p>
+            </Card>
+          )}
 
       <div className="drx-grid-form" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: 12, marginBottom: 20 }}>
         <Card
@@ -2695,7 +2735,11 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
           <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: "#B42318", margin: "10px 0 0" }}>{errorFiscal}</p>
         )}
       </Card>
+        </>
+      )}
 
+      {vistaContabilidad === "egresos" && (
+        <>
       {categoriasEgresoOrdenadas.length > 0 && (
         <Card style={{ marginBottom: 20 }}>
           <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, fontWeight: 700, color: COLORS.ink, marginBottom: 4 }}>Egresos por categoría</p>
@@ -2774,7 +2818,11 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
           </p>
         )}
       </Card>
+        </>
+      )}
 
+      {vistaContabilidad === "ingresos" && (
+        <>
       <Card id="seccion-otros-ingresos" style={{ marginBottom: 20 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 8, marginBottom: 4 }}>
           <div>
@@ -2835,7 +2883,11 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
           </p>
         )}
       </Card>
+        </>
+      )}
 
+      {vistaContabilidad === "clientes" && (
+        <>
       {mediosPagoOrdenados.length > 0 && (
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 20, marginTop: -8 }}>
           {mediosPagoOrdenados.map(([medio, valor]) => (
@@ -3086,6 +3138,8 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
           <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted }}>Ningún cliente coincide con "{filtro}".</p>
         )}
       </div>
+        </>
+      )}
       {ConfirmarDialogo}
     </div>
   );
