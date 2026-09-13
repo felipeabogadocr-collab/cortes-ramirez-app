@@ -2098,7 +2098,10 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
   // registrado con esa cuenta entró y salió de ahí. Solo cuenta lo que
   // tiene "medio de pago" puesto; lo que no lo tiene queda fuera y se
   // avisa aparte, para no mostrar un número que parece exacto sin serlo.
-  const CUENTAS_SALDO = ["Nequi", "Daviplata", "Nu"];
+  // Nequi y Daviplata pasaron a ser de uso personal (no del despacho), así
+  // que ya no tiene sentido calcularles un saldo "esperado" del negocio —
+  // solo Nu sigue siendo la cuenta del despacho para este seguimiento.
+  const CUENTAS_SALDO = ["Nu"];
   const saldoPorCuenta = Object.fromEntries(CUENTAS_SALDO.map((c) => [c, 0]));
   ids.forEach((id) => {
     (clientes[id]?.pagos || []).forEach((p) => {
@@ -2593,14 +2596,10 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
         <Card style={{ marginBottom: 20 }}>
           <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, fontWeight: 700, color: COLORS.ink, marginBottom: 4 }}>Saldo esperado por cuenta</p>
           <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, marginBottom: 14 }}>
-            Según lo que has registrado con cada medio de pago — no es el saldo real del banco/billetera, es lo que debería haber si todo entró y salió de ahí.
+            Según lo que has registrado con cada medio de pago — no es el saldo real del banco/billetera, es lo que debería haber si todo entró y salió de ahí. Solo Nu, porque Nequi y Daviplata son de uso personal.
           </p>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10 }}>
-            {[
-              { nombre: "Nequi", color: "#D6006C" },
-              { nombre: "Daviplata", color: "#E4032B" },
-              { nombre: "Nu", color: "#820AD1" },
-            ].map((cuenta) => (
+            {[{ nombre: "Nu", color: "#820AD1" }].map((cuenta) => (
               <div key={cuenta.nombre} style={{ display: "flex", alignItems: "center", gap: 10, background: COLORS.surfaceSoft, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: 12 }}>
                 <span
                   style={{
@@ -2632,7 +2631,7 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
           <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11, color: COLORS.muted, marginTop: 10 }}>
             {egresosSinCuenta > 0
               ? `${egresosSinCuenta} egreso${egresosSinCuenta !== 1 ? "s" : ""} sin cuenta asignada no están contados aquí — edítalos para elegir de qué cuenta salieron y afinar el número.`
-              : "Nota: no se usan logos reales de Nequi, Daviplata ni Nu (son marcas de terceros) — cada una tiene su propio color para diferenciarlas rápido."}
+              : "Nota: no se usa el logo real de Nu (es marca de terceros) — el círculo morado es solo para identificarla rápido."}
           </p>
         </Card>
       )}
