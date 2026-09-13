@@ -1173,7 +1173,7 @@ function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-const APP_VERSION = "1.77.0";
+const APP_VERSION = "1.78.0";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -5712,6 +5712,11 @@ export function useEgresos() {
       // queda asociado a ese cliente y se ve ahí también — sin dejar de
       // contar igual que cualquier otro egreso en los totales del despacho.
       clienteId: datos.clienteId || null,
+      // Opcional: de qué cuenta salió (Nequi, Daviplata, Nu...) — alimenta
+      // "Saldo esperado por cuenta". Sin este dato el egreso sigue
+      // contando igual en los totales, solo no se puede atribuir a una
+      // cuenta puntual.
+      medioPago: datos.medioPago || "",
       // Marca opcional para el seguimiento de retorno de inversión: no
       // cambia en nada cómo cuenta este egreso en los totales normales,
       // solo lo hace aparecer en la sección "Retorno de inversión".
@@ -5889,6 +5894,7 @@ export function useOtrosIngresos() {
       concepto: datos.concepto.trim(),
       categoria: datos.categoria,
       valor: Number(datos.valor) || 0,
+      medioPago: datos.medioPago || "",
     };
     const actualizados = [nuevo, ...ingresos];
     await storageSet("otros-ingresos-contabilidad", JSON.stringify(actualizados), false);

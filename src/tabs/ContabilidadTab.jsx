@@ -1295,16 +1295,18 @@ function FormularioEgreso({ onRegistrar }) {
   const [categoria, setCategoria] = useState(CATEGORIAS_EGRESO[0]);
   const [valor, setValor] = useState("");
   const [fecha, setFecha] = useState(hoyStr);
+  const [medioPago, setMedioPago] = useState("");
   const [esInversion, setEsInversion] = useState(false);
   const [guardando, setGuardando] = useState(false);
 
   const registrar = async () => {
     if (!concepto.trim() || !valor || Number(valor) <= 0) return;
     setGuardando(true);
-    await onRegistrar({ concepto, categoria, valor, fecha, esInversion });
+    await onRegistrar({ concepto, categoria, valor, fecha, medioPago, esInversion });
     setConcepto("");
     setValor("");
     setFecha(hoyStr);
+    setMedioPago("");
     setEsInversion(false);
     setGuardando(false);
   };
@@ -1333,6 +1335,18 @@ function FormularioEgreso({ onRegistrar }) {
           <input type="date" className="drx-input" style={inputStyle} value={fecha} onChange={(e) => setFecha(e.target.value)} />
         </Field>
       </div>
+      <div style={{ marginTop: 12 }}>
+        <Field label="¿De qué cuenta salió? (opcional)">
+          <select className="drx-input" style={{ ...inputStyle, maxWidth: 220 }} value={medioPago} onChange={(e) => setMedioPago(e.target.value)}>
+            <option value="">Sin especificar</option>
+            {MEDIOS_PAGO.map((m) => (
+              <option key={m} value={m}>
+                {m}
+              </option>
+            ))}
+          </select>
+        </Field>
+      </div>
       <label style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 12, fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.inkSoft, cursor: "pointer" }}>
         <input type="checkbox" checked={esInversion} onChange={(e) => setEsInversion(e.target.checked)} />
         Es una inversión (equipo, software, capacitación...) — quiero ver cuándo se recupera
@@ -1356,13 +1370,14 @@ function EgresoCard({ egreso, onEditar, onEliminar, clientesDisponibles }) {
   const [valor, setValor] = useState(String(egreso.valor ?? ""));
   const [fecha, setFecha] = useState(new Date(egreso.fecha).toISOString().slice(0, 10));
   const [clienteId, setClienteId] = useState(egreso.clienteId || "");
+  const [medioPago, setMedioPago] = useState(egreso.medioPago || "");
   const [esInversion, setEsInversion] = useState(!!egreso.esInversion);
   const [guardando, setGuardando] = useState(false);
 
   const guardarEdicion = async () => {
     if (!concepto.trim() || !valor || Number(valor) <= 0) return;
     setGuardando(true);
-    await onEditar({ concepto: concepto.trim(), categoria, valor: Number(valor), fecha: new Date(`${fecha}T12:00:00`).toISOString(), clienteId: clienteId || null, esInversion });
+    await onEditar({ concepto: concepto.trim(), categoria, valor: Number(valor), fecha: new Date(`${fecha}T12:00:00`).toISOString(), clienteId: clienteId || null, medioPago, esInversion });
     setGuardando(false);
     setEditando(false);
   };
@@ -1406,6 +1421,18 @@ function EgresoCard({ egreso, onEditar, onEliminar, clientesDisponibles }) {
             </Field>
           </div>
         )}
+        <div style={{ marginBottom: 12 }}>
+          <Field label="¿De qué cuenta salió? (opcional)">
+            <select className="drx-input" style={{ ...inputStyle, maxWidth: 220 }} value={medioPago} onChange={(e) => setMedioPago(e.target.value)}>
+              <option value="">Sin especificar</option>
+              {MEDIOS_PAGO.map((m) => (
+                <option key={m} value={m}>
+                  {m}
+                </option>
+              ))}
+            </select>
+          </Field>
+        </div>
         <label style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 12, fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.inkSoft, cursor: "pointer" }}>
           <input type="checkbox" checked={esInversion} onChange={(e) => setEsInversion(e.target.checked)} />
           Es una inversión — quiero ver cuándo se recupera
@@ -1438,6 +1465,7 @@ function EgresoCard({ egreso, onEditar, onEliminar, clientesDisponibles }) {
         </p>
         <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, margin: "3px 0 0" }}>
           {egreso.categoria} · {new Date(egreso.fecha).toLocaleDateString("es-CO", { dateStyle: "medium" })}
+          {egreso.medioPago ? ` · ${egreso.medioPago}` : ""}
         </p>
       </div>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -1458,15 +1486,17 @@ function FormularioOtroIngreso({ onRegistrar }) {
   const [categoria, setCategoria] = useState(CATEGORIAS_OTRO_INGRESO[0]);
   const [valor, setValor] = useState("");
   const [fecha, setFecha] = useState(hoyStr);
+  const [medioPago, setMedioPago] = useState("");
   const [guardando, setGuardando] = useState(false);
 
   const registrar = async () => {
     if (!concepto.trim() || !valor || Number(valor) <= 0) return;
     setGuardando(true);
-    await onRegistrar({ concepto, categoria, valor, fecha });
+    await onRegistrar({ concepto, categoria, valor, fecha, medioPago });
     setConcepto("");
     setValor("");
     setFecha(hoyStr);
+    setMedioPago("");
     setGuardando(false);
   };
 
@@ -1494,6 +1524,18 @@ function FormularioOtroIngreso({ onRegistrar }) {
           <input type="date" className="drx-input" style={inputStyle} value={fecha} onChange={(e) => setFecha(e.target.value)} />
         </Field>
       </div>
+      <div style={{ marginTop: 12 }}>
+        <Field label="¿A qué cuenta entró? (opcional)">
+          <select className="drx-input" style={{ ...inputStyle, maxWidth: 220 }} value={medioPago} onChange={(e) => setMedioPago(e.target.value)}>
+            <option value="">Sin especificar</option>
+            {MEDIOS_PAGO.map((m) => (
+              <option key={m} value={m}>
+                {m}
+              </option>
+            ))}
+          </select>
+        </Field>
+      </div>
       <button
         className="drx-btn-primary"
         style={{ ...buttonPrimary, marginTop: 14, background: "#10B981" }}
@@ -1512,12 +1554,13 @@ function OtroIngresoCard({ ingreso, onEditar, onEliminar }) {
   const [categoria, setCategoria] = useState(ingreso.categoria);
   const [valor, setValor] = useState(String(ingreso.valor ?? ""));
   const [fecha, setFecha] = useState(new Date(ingreso.fecha).toISOString().slice(0, 10));
+  const [medioPago, setMedioPago] = useState(ingreso.medioPago || "");
   const [guardando, setGuardando] = useState(false);
 
   const guardarEdicion = async () => {
     if (!concepto.trim() || !valor || Number(valor) <= 0) return;
     setGuardando(true);
-    await onEditar({ concepto: concepto.trim(), categoria, valor: Number(valor), fecha: new Date(`${fecha}T12:00:00`).toISOString() });
+    await onEditar({ concepto: concepto.trim(), categoria, valor: Number(valor), fecha: new Date(`${fecha}T12:00:00`).toISOString(), medioPago });
     setGuardando(false);
     setEditando(false);
   };
@@ -1547,6 +1590,18 @@ function OtroIngresoCard({ ingreso, onEditar, onEliminar }) {
             <input type="date" className="drx-input" style={inputStyle} value={fecha} onChange={(e) => setFecha(e.target.value)} />
           </Field>
         </div>
+        <div style={{ marginBottom: 12 }}>
+          <Field label="¿A qué cuenta entró? (opcional)">
+            <select className="drx-input" style={{ ...inputStyle, maxWidth: 220 }} value={medioPago} onChange={(e) => setMedioPago(e.target.value)}>
+              <option value="">Sin especificar</option>
+              {MEDIOS_PAGO.map((m) => (
+                <option key={m} value={m}>
+                  {m}
+                </option>
+              ))}
+            </select>
+          </Field>
+        </div>
         <div style={{ display: "flex", gap: 8 }}>
           <button className="drx-btn-primary" style={{ ...buttonPrimary, padding: "6px 14px", fontSize: 12 }} onClick={guardarEdicion} disabled={guardando}>
             {guardando ? "Guardando..." : "Guardar cambios"}
@@ -1570,6 +1625,7 @@ function OtroIngresoCard({ ingreso, onEditar, onEliminar }) {
         </p>
         <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, margin: "3px 0 0" }}>
           {ingreso.categoria} · {new Date(ingreso.fecha).toLocaleDateString("es-CO", { dateStyle: "medium" })}
+          {ingreso.medioPago ? ` · ${ingreso.medioPago}` : ""}
         </p>
       </div>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -1672,6 +1728,7 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
   };
 
   const [fechaDatosLimpios, setFechaDatosLimpios] = useState(null);
+  const [mesFlujoExpandido, setMesFlujoExpandido] = useState(null);
   useEffect(() => {
     (async () => {
       const raw = await storageGet("fecha-datos-limpios", false);
@@ -2007,7 +2064,7 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
   const hoyInicioDia = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
   const mesesProyeccion = [0, 1, 2].map((i) => {
     const d = new Date(hoy.getFullYear(), hoy.getMonth() + i, 1);
-    return { clave: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`, etiqueta: d.toLocaleDateString("es-CO", { month: "long", year: "numeric" }), total: 0 };
+    return { clave: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`, etiqueta: d.toLocaleDateString("es-CO", { month: "long", year: "numeric" }), total: 0, clientes: [] };
   });
   ids.forEach((id) => {
     const c = clientes[id];
@@ -2016,9 +2073,36 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
     if (fecha < hoyInicioDia) return; // ya vencido: no es proyección futura, es cartera atrasada
     const clave = `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, "0")}`;
     const bucket = mesesProyeccion.find((m) => m.clave === clave);
-    if (bucket) bucket.total += Number(c.proximoPago.valorEsperado) || 0;
+    if (bucket) {
+      const valor = Number(c.proximoPago.valorEsperado) || 0;
+      bucket.total += valor;
+      bucket.clientes.push({ id, nombre: c.nombre, valor, fecha: c.proximoPago.fecha });
+    }
   });
+  mesesProyeccion.forEach((m) => m.clientes.sort((a, b) => new Date(a.fecha) - new Date(b.fecha)));
   const totalProyeccion3Meses = mesesProyeccion.reduce((s, m) => s + m.total, 0);
+
+  // Saldo esperado por cuenta: no es el saldo real (eso solo lo sabe la
+  // app del banco/billetera) — es lo que DEBERÍA haber si todo lo
+  // registrado con esa cuenta entró y salió de ahí. Solo cuenta lo que
+  // tiene "medio de pago" puesto; lo que no lo tiene queda fuera y se
+  // avisa aparte, para no mostrar un número que parece exacto sin serlo.
+  const CUENTAS_SALDO = ["Nequi", "Daviplata", "Nu"];
+  const saldoPorCuenta = Object.fromEntries(CUENTAS_SALDO.map((c) => [c, 0]));
+  ids.forEach((id) => {
+    (clientes[id]?.pagos || []).forEach((p) => {
+      if (saldoPorCuenta[p.medioPago] !== undefined) saldoPorCuenta[p.medioPago] += Number(p.valor) || 0;
+    });
+  });
+  otrosIngresos.forEach((i) => {
+    if (saldoPorCuenta[i.medioPago] !== undefined) saldoPorCuenta[i.medioPago] += Number(i.valor) || 0;
+  });
+  let egresosSinCuenta = 0;
+  egresos.forEach((e) => {
+    if (saldoPorCuenta[e.medioPago] !== undefined) saldoPorCuenta[e.medioPago] -= Number(e.valor) || 0;
+    else egresosSinCuenta += 1;
+  });
+  const hayDatosSaldoCuenta = CUENTAS_SALDO.some((c) => saldoPorCuenta[c] !== 0);
 
   // Retorno de inversión: no hay forma de saber qué ingresos exactos vino
   // POR CAUSA de una inversión puntual (comprar un software no dice "este
@@ -2427,15 +2511,89 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
             Según el próximo pago esperado de cada cliente activo — no incluye pagos ya vencidos, esos están en "Cartera pendiente".
           </p>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 10 }}>
-            {mesesProyeccion.map((m) => (
-              <div key={m.clave} style={{ background: COLORS.surfaceSoft, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: 12 }}>
-                <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11, fontWeight: 700, color: COLORS.muted, textTransform: "uppercase", letterSpacing: 0.5, margin: 0 }}>
-                  {m.etiqueta}
-                </p>
-                <p style={{ fontFamily: "Inter, sans-serif", fontSize: 19, fontWeight: 800, color: COLORS.navy, margin: "4px 0 0" }}>{formatoCOP(m.total)}</p>
+            {mesesProyeccion.map((m) => {
+              const abierto = mesFlujoExpandido === m.clave;
+              return (
+                <div key={m.clave} style={{ background: COLORS.surfaceSoft, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: 12 }}>
+                  <button
+                    onClick={() => m.clientes.length > 0 && setMesFlujoExpandido(abierto ? null : m.clave)}
+                    style={{ background: "none", border: "none", padding: 0, width: "100%", textAlign: "left", cursor: m.clientes.length > 0 ? "pointer" : "default" }}
+                  >
+                    <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11, fontWeight: 700, color: COLORS.muted, textTransform: "uppercase", letterSpacing: 0.5, margin: 0, display: "flex", justifyContent: "space-between" }}>
+                      {m.etiqueta}
+                      {m.clientes.length > 0 && <span>{abierto ? "▲" : "▼"}</span>}
+                    </p>
+                    <p style={{ fontFamily: "Inter, sans-serif", fontSize: 19, fontWeight: 800, color: COLORS.navy, margin: "4px 0 0" }}>{formatoCOP(m.total)}</p>
+                    {m.clientes.length > 0 && (
+                      <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11, color: COLORS.muted, margin: "2px 0 0" }}>
+                        {m.clientes.length} cliente{m.clientes.length !== 1 ? "s" : ""}
+                      </p>
+                    )}
+                  </button>
+                  {abierto && (
+                    <div style={{ marginTop: 10, borderTop: `1px solid ${COLORS.border}`, paddingTop: 8, display: "flex", flexDirection: "column", gap: 6 }}>
+                      {m.clientes.map((c) => (
+                        <div key={c.id} style={{ display: "flex", justifyContent: "space-between", gap: 8, fontSize: 12, fontFamily: "Inter, sans-serif" }}>
+                          <span style={{ color: COLORS.ink }}>
+                            {c.nombre} <span style={{ color: COLORS.muted }}>· {new Date(`${c.fecha}T12:00:00`).toLocaleDateString("es-CO", { day: "numeric", month: "short" })}</span>
+                          </span>
+                          <span style={{ fontWeight: 700, color: COLORS.navy, flexShrink: 0 }}>{formatoCOP(c.valor)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </Card>
+      )}
+
+      {hayDatosSaldoCuenta && (
+        <Card style={{ marginBottom: 20 }}>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, fontWeight: 700, color: COLORS.ink, marginBottom: 4 }}>Saldo esperado por cuenta</p>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, marginBottom: 14 }}>
+            Según lo que has registrado con cada medio de pago — no es el saldo real del banco/billetera, es lo que debería haber si todo entró y salió de ahí.
+          </p>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10 }}>
+            {[
+              { nombre: "Nequi", color: "#D6006C" },
+              { nombre: "Daviplata", color: "#E4032B" },
+              { nombre: "Nu", color: "#820AD1" },
+            ].map((cuenta) => (
+              <div key={cuenta.nombre} style={{ display: "flex", alignItems: "center", gap: 10, background: COLORS.surfaceSoft, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: 12 }}>
+                <span
+                  style={{
+                    width: 34,
+                    height: 34,
+                    borderRadius: "50%",
+                    background: cuenta.color,
+                    color: "#fff",
+                    flexShrink: 0,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontFamily: "Inter, sans-serif",
+                    fontWeight: 800,
+                    fontSize: 13,
+                  }}
+                >
+                  {cuenta.nombre[0]}
+                </span>
+                <div>
+                  <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, fontWeight: 700, color: COLORS.muted, margin: 0 }}>{cuenta.nombre}</p>
+                  <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, fontWeight: 800, color: saldoPorCuenta[cuenta.nombre] >= 0 ? COLORS.navy : "#B42318", margin: "2px 0 0" }}>
+                    {formatoCOP(saldoPorCuenta[cuenta.nombre])}
+                  </p>
+                </div>
               </div>
             ))}
           </div>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11, color: COLORS.muted, marginTop: 10 }}>
+            {egresosSinCuenta > 0
+              ? `${egresosSinCuenta} egreso${egresosSinCuenta !== 1 ? "s" : ""} sin cuenta asignada no están contados aquí — edítalos para elegir de qué cuenta salieron y afinar el número.`
+              : "Nota: no se usan logos reales de Nequi, Daviplata ni Nu (son marcas de terceros) — cada una tiene su propio color para diferenciarlas rápido."}
+          </p>
         </Card>
       )}
 
