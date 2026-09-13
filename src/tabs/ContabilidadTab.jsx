@@ -3371,6 +3371,12 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
           const valorTotal = Number(c.valorTotal) || 0;
           const saldo = valorTotal > 0 ? valorTotal - totalPagado : null;
           const ultimoPago = ultimoPagoDe(c);
+          // El "Acuerdo de pago" es para cuando el cliente se ATRASÓ de
+          // verdad, no para uno que va cumpliendo su plan a tiempo — un
+          // plan de 4 cuotas, por ejemplo, siempre tiene saldo pendiente
+          // hasta la última, y eso no es un atraso.
+          const diasParaProximoPago = c.proximoPago?.fecha ? diasHasta(c.proximoPago.fecha) : null;
+          const clienteAtrasado = saldo > 0 && diasParaProximoPago !== null && diasParaProximoPago < 0;
 
           return (
             <Card key={id} style={{ borderLeft: "4px solid #F43F5E" }}>
@@ -3393,11 +3399,11 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
                         fontWeight: 700,
                         padding: "2px 9px",
                         borderRadius: 20,
-                        background: saldo <= 0 ? "#DCFCE7" : "#EFF6FF",
-                        color: saldo <= 0 ? "#166534" : "#1D4ED8",
+                        background: saldo <= 0 ? "#DCFCE7" : clienteAtrasado ? "#FEF2F2" : "#EFF6FF",
+                        color: saldo <= 0 ? "#166534" : clienteAtrasado ? "#B42318" : "#1D4ED8",
                       }}
                     >
-                      {saldo <= 0 ? "Al día" : `Saldo del plan: ${formatoCOP(saldo)}`}
+                      {saldo <= 0 ? "Al día" : clienteAtrasado ? `Atrasado — saldo ${formatoCOP(saldo)}` : `Saldo del plan: ${formatoCOP(saldo)}`}
                     </p>
                   )}
                   </div>
@@ -3413,7 +3419,7 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
                   >
                     {egresoAbiertoId === id ? "Cancelar" : "+ Registrar egreso"}
                   </button>
-                  {saldo > 0 && (
+                  {clienteAtrasado && (
                     <button
                       className="drx-btn-ghost"
                       style={{ ...buttonGhost, color: "#7C3AED", borderColor: "#DDD6FE" }}
@@ -3431,7 +3437,7 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
                   <FormularioEgreso onRegistrar={async (datos) => { await registrarEgreso({ ...datos, clienteId: id }); setEgresoAbiertoId(null); }} />
                 </div>
               )}
-              {acuerdoAbiertoId === id && saldo > 0 && (
+              {acuerdoAbiertoId === id && clienteAtrasado && (
                 <AcuerdoPagoForm
                   cliente={c}
                   clienteId={id}
