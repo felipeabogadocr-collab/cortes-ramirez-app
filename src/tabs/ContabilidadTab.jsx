@@ -830,6 +830,43 @@ function PanelAhorro({ ahorro, onGuardar }) {
   );
 }
 
+// Antes había 5 tarjetas de configuración apiladas arriba de Contabilidad,
+// cada una con su propio abrir/cerrar — ocupaban espacio por encima de lo
+// que sí se usa a diario (pagos, saldos) aunque casi nunca se tocan
+// después de la primera vez. Se agrupan aquí bajo un solo engranaje: se
+// abre una vez, se ve todo junto, y Contabilidad vuelve a abrir mostrando
+// primero lo importante del día.
+function PanelConfiguracionContabilidad(props) {
+  const [abierto, setAbierto] = useState(false);
+  return (
+    <Card style={{ marginBottom: 20 }}>
+      <button
+        onClick={() => setAbierto((a) => !a)}
+        style={{ background: "none", border: "none", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%", padding: 0 }}
+      >
+        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 14, fontWeight: 700, color: COLORS.ink, margin: 0, display: "flex", alignItems: "center", gap: 6 }}>
+          ⚙️ Configuración de Contabilidad
+        </p>
+        <span style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.muted }}>{abierto ? "Ocultar ▲" : "Ver ▼"}</span>
+      </button>
+      {!abierto && (
+        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, marginTop: 6 }}>
+          Datos para cuenta de cobro, calidad de los datos, meta de recaudo, presupuesto y ahorro — todo lo que se configura una vez, en un solo lugar.
+        </p>
+      )}
+      {abierto && (
+        <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 14 }}>
+          <PanelDatosCuentaCobro datos={props.datosResponsable} onGuardar={props.guardarDatosResponsable} />
+          <PanelDatosLimpios fecha={props.fechaDatosLimpios} onGuardar={props.guardarFechaDatosLimpios} />
+          <PanelMetaRecaudo meta={props.metaRecaudo} onGuardar={props.guardarMetaRecaudo} />
+          <PanelPresupuesto presupuesto={props.presupuesto} onGuardar={props.guardarPresupuesto} />
+          <PanelAhorro ahorro={props.ahorro} onGuardar={props.guardarAhorro} />
+        </div>
+      )}
+    </Card>
+  );
+}
+
 function FormularioPago({ cliente, onRegistrar }) {
   const hoyStr = new Date().toISOString().slice(0, 10);
   const [medioPago, setMedioPago] = useState(MEDIOS_PAGO[0]);
@@ -2120,11 +2157,18 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
     <div>
       <EncabezadoSeccion titulo="Contabilidad" color="#F43F5E" />
 
-      <PanelDatosCuentaCobro datos={datosResponsable} onGuardar={guardarDatosResponsable} />
-      <PanelDatosLimpios fecha={fechaDatosLimpios} onGuardar={guardarFechaDatosLimpios} />
-      <PanelMetaRecaudo meta={metaRecaudo} onGuardar={guardarMetaRecaudo} />
-      <PanelPresupuesto presupuesto={presupuesto} onGuardar={guardarPresupuesto} />
-      <PanelAhorro ahorro={ahorro} onGuardar={guardarAhorro} />
+      <PanelConfiguracionContabilidad
+        datosResponsable={datosResponsable}
+        guardarDatosResponsable={guardarDatosResponsable}
+        fechaDatosLimpios={fechaDatosLimpios}
+        guardarFechaDatosLimpios={guardarFechaDatosLimpios}
+        metaRecaudo={metaRecaudo}
+        guardarMetaRecaudo={guardarMetaRecaudo}
+        presupuesto={presupuesto}
+        guardarPresupuesto={guardarPresupuesto}
+        ahorro={ahorro}
+        guardarAhorro={guardarAhorro}
+      />
 
       {metaRecaudoValor > 0 &&
         (() => {
