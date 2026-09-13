@@ -85,6 +85,107 @@ async function explicarParaCliente(actuacion, anotacion) {
   return (data.content || []).map((b) => b.text || "").join("").trim();
 }
 
+// Pega una lista completa de movimientos ("fecha - qué pasó", una línea
+// por movimiento) y los agrega todos de una vez, en vez de tener que abrir
+// "agregar novedad" una por una — útil cuando se está poniendo al día un
+// proceso con muchos autos/actuaciones atrasadas (ej. copiando de una
+// carpeta de OneDrive con el listado de archivos del expediente).
+function CargaMasivaNovedades({ onAgregar }) {
+  const [abierto, setAbierto] = useState(false);
+  const [texto, setTexto] = useState("");
+  const [guardando, setGuardando] = useState(false);
+  const [ultimoResultado, setUltimoResultado] = useState(null);
+
+  const parsearFecha = (raw) => {
+    const t = raw.trim();
+    let m = t.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+    if (m) return `${m[1]}-${m[2].padStart(2, "0")}-${m[3].padStart(2, "0")}`;
+    m = t.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (m) return `${m[3]}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}`;
+    return null;
+  };
+
+  const lineas = texto
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean)
+    .map((linea) => {
+      // El guion necesita espacio a los dos lados (o si no, "2026-04-20"
+      // se partiría por sus propios guiones internos) — los dos puntos sí
+      // se aceptan pegados a la fecha ("2026-04-20: nota").
+      const separado = linea.match(/^(.+?)(?:\s+[-–]\s+|:\s*)(.+)$/);
+      if (!separado) return { linea, error: "Falta un separador (-, – o :) entre la fecha y qué pasó" };
+      const fecha = parsearFecha(separado[1]);
+      const nota = separado[2].trim();
+      if (!fecha) return { linea, error: `No entendí la fecha "${separado[1].trim()}" (usa DD/MM/AAAA o AAAA-MM-DD)` };
+      if (!nota) return { linea, error: "Falta la descripción" };
+      return { linea, fecha, nota };
+    });
+
+  const validas = lineas.filter((l) => !l.error);
+  const invalidas = lineas.filter((l) => l.error);
+
+  const agregarTodo = async () => {
+    if (validas.length === 0) return;
+    setGuardando(true);
+    await onAgregar(validas.map((l) => ({ fecha: l.fecha, nota: l.nota })));
+    setGuardando(false);
+    setUltimoResultado(validas.length);
+    setTexto("");
+    setAbierto(false);
+  };
+
+  return (
+    <div style={{ marginTop: 10 }}>
+      <button className="drx-btn-ghost" style={{ ...buttonGhost, padding: "5px 12px", fontSize: 12 }} onClick={() => setAbierto((a) => !a)}>
+        {abierto ? "Cancelar carga masiva" : "📋 Cargar varios movimientos de una vez"}
+      </button>
+      {!abierto && ultimoResultado !== null && (
+        <span style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: "#166534", marginLeft: 10 }}>
+          ✓ {ultimoResultado} movimiento{ultimoResultado !== 1 ? "s" : ""} agregado{ultimoResultado !== 1 ? "s" : ""}
+        </span>
+      )}
+      {abierto && (
+        <div style={{ marginTop: 10, background: COLORS.surfaceSoft, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: 12 }}>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, marginBottom: 8 }}>
+            Una línea por movimiento, así: <code>20/04/2026 - Auto que corre traslado</code>. También sirve <code>2026-04-20 - ...</code>.
+          </p>
+          <textarea
+            className="drx-input"
+            style={{ ...inputStyle, minHeight: 120, resize: "vertical", fontFamily: "monospace", fontSize: 12.5 }}
+            value={texto}
+            onChange={(e) => setTexto(e.target.value)}
+            placeholder={"20/04/2026 - Incidente de nulidad\n20/04/2026 - Auto que anuncia sentencia\n02/09/2025 - Notificación"}
+          />
+          {texto.trim() && (
+            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: invalidas.length > 0 ? "#B45309" : "#166534", marginTop: 8 }}>
+              {validas.length} línea{validas.length !== 1 ? "s" : ""} lista{validas.length !== 1 ? "s" : ""}
+              {invalidas.length > 0 ? ` · ${invalidas.length} con problema${invalidas.length !== 1 ? "s" : ""} (no se van a agregar)` : ""}
+            </p>
+          )}
+          {invalidas.length > 0 && (
+            <ul style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, color: "#B45309", margin: "4px 0 0", paddingLeft: 18 }}>
+              {invalidas.map((l, i) => (
+                <li key={i}>
+                  "{l.linea}" — {l.error}
+                </li>
+              ))}
+            </ul>
+          )}
+          <button
+            className="drx-btn-primary"
+            style={{ ...buttonPrimary, marginTop: 10 }}
+            onClick={agregarTodo}
+            disabled={guardando || validas.length === 0}
+          >
+            {guardando ? "Agregando…" : `Agregar ${validas.length || ""} movimiento${validas.length !== 1 ? "s" : ""}`}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function VigilanciaTab() {
   const { ids } = useIndex("indice-clientes", false);
   const [clientes, setClientes] = useState({});
@@ -137,6 +238,22 @@ export default function VigilanciaTab() {
     await storageSet(`cliente:${id}`, JSON.stringify(actualizado), false);
     setClientes((prev) => ({ ...prev, [id]: actualizado }));
     return actualizado;
+  };
+
+  // Agrega varios movimientos de una sola vez (pegando una lista, en vez de
+  // uno por uno) — arma el timeline completo y hace UN solo guardado, no
+  // uno por línea: si se llamara agregarNovedad() en un bucle, cada
+  // llamada leería "clientes[id]" del estado de React sin haberse
+  // refrescado todavía con lo que acababa de guardar la anterior, y solo
+  // quedaría guardada la última línea (mismo problema ya resuelto antes en
+  // este archivo para la consulta + novedad combinada).
+  const agregarNovedadesEnLote = async (id, entradas) => {
+    const c = clientes[id];
+    const nuevasEntradas = entradas.map((e) => ({ id: uid(), fecha: new Date(`${e.fecha}T12:00:00`).toISOString(), nota: e.nota }));
+    const actualizado = { ...c, timeline: [...(c.timeline || []), ...nuevasEntradas], ultimaActuacion: new Date().toISOString() };
+    await storageSet(`cliente:${id}`, JSON.stringify(actualizado), false);
+    setClientes((prev) => ({ ...prev, [id]: actualizado }));
+    return nuevasEntradas.length;
   };
 
   const editarFechaNovedad = async (id, entradaId, fecha) => {
@@ -734,6 +851,7 @@ export default function VigilanciaTab() {
                 onRestaurar={(entrada) => restaurarNovedad(id, entrada)}
                 confirmar={confirmar}
               />
+              <CargaMasivaNovedades onAgregar={(entradas) => agregarNovedadesEnLote(id, entradas)} />
             </Card>
           );
         })}
