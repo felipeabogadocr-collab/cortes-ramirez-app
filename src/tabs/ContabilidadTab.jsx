@@ -2223,14 +2223,33 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
     const reciboImagen = await generarReciboImagen(id, cliente, pago);
     pago.reciboImagen = reciboImagen;
 
+    const pagosAntesDeEste = cliente.pagos || [];
     let proximoPago = cliente.proximoPago || null;
     if (datosPago.fechaProximoPago) {
       // El abogado indicó manualmente la próxima fecha, tiene prioridad.
       proximoPago = { fecha: datosPago.fechaProximoPago, valorEsperado: datosPago.valorProximoPago };
-    } else if (cliente.planPago?.frecuencia && cliente.planPago.frecuencia !== "Pago único" && cliente.planPago.frecuencia !== "Otro") {
-      // No se indicó manualmente: si el cliente tiene un plan de pago recurrente, se calcula solo.
-      const siguienteFecha = calcularProximaFechaPorFrecuencia(datosPago.fechaPago, cliente.planPago.frecuencia);
-      proximoPago = { fecha: siguienteFecha, valorEsperado: cliente.planPago.valor || datosPago.valor };
+    } else if (cliente.planPago && cliente.planPago.frecuencia !== "Pago único" && cliente.planPago.frecuencia !== "Otro") {
+      // No se indicó manualmente: si el plan tiene un calendario de cuotas
+      // con fechas ya armado (lo normal, desde que se creó el cliente o
+      // desde un acuerdo de pago), el próximo pago de verdad es la
+      // siguiente cuota de esa lista — no una cuenta genérica de "un mes
+      // después de hoy", que podía quedar desfasada del calendario real.
+      const cuotas = cliente.planPago.cuotas;
+      const siguienteCuota = Array.isArray(cuotas) ? cuotas[pagosAntesDeEste.length + 1] : null;
+      if (siguienteCuota) {
+        proximoPago = { fecha: siguienteCuota.fecha, valorEsperado: siguienteCuota.valor };
+      } else {
+        // Sin calendario de cuotas (o ya se pagaron todas las que había):
+        // se calcula por frecuencia. Si el plan tiene valor pero nunca
+        // quedó guardada su frecuencia real (un cliente creado antes de
+        // que se corrigiera ese error en el editor de plan de pago), se
+        // asume mensual — mejor eso que dejar la fecha de "próximo pago"
+        // congelada para siempre en el pasado, mostrando al cliente como
+        // atrasado aunque acabe de pagar al día.
+        const frecuencia = cliente.planPago.frecuencia || "Mensual";
+        const siguienteFecha = calcularProximaFechaPorFrecuencia(datosPago.fechaPago, frecuencia);
+        proximoPago = { fecha: siguienteFecha, valorEsperado: cliente.planPago.valor || datosPago.valor };
+      }
     }
 
     const actualizado = {
