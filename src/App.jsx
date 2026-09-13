@@ -551,6 +551,9 @@ import {
   buscarGlobal,
   obtenerPapelera,
   restaurarDePapelera,
+  iniciarSincronizacionOffline,
+  cambiosSinSincronizar,
+  contarCambiosSinSincronizar,
   eliminarDefinitivo,
   firmarDocumentoPublico,
   subirReciboImagen,
@@ -1173,7 +1176,7 @@ function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-const APP_VERSION = "1.81.0";
+const APP_VERSION = "1.82.0";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -9171,6 +9174,62 @@ function AvisoErroresAlmacenamiento() {
   );
 }
 
+// Avisa cuando se está trabajando sin conexión (o con cambios todavía sin
+// subir después de recuperarla) — sin esto, alguien podría creer que ya
+// quedó guardado en el despacho cuando en realidad solo está a salvo en
+// este dispositivo, esperando a que vuelva la señal para subirse solo.
+function IndicadorSincronizacion() {
+  const [pendientes, setPendientes] = useState(0);
+  const [enLinea, setEnLinea] = useState(typeof navigator === "undefined" ? true : navigator.onLine);
+
+  useEffect(() => {
+    let activo = true;
+    const revisar = () => contarCambiosSinSincronizar().then((n) => activo && setPendientes(n));
+    revisar();
+    const dejarDeEscuchar = cambiosSinSincronizar(revisar);
+    const alConectar = () => setEnLinea(true);
+    const alDesconectar = () => setEnLinea(false);
+    window.addEventListener("online", alConectar);
+    window.addEventListener("offline", alDesconectar);
+    const intervalo = setInterval(revisar, 15000);
+    return () => {
+      activo = false;
+      dejarDeEscuchar();
+      window.removeEventListener("online", alConectar);
+      window.removeEventListener("offline", alDesconectar);
+      clearInterval(intervalo);
+    };
+  }, []);
+
+  if (enLinea && pendientes === 0) return null;
+  const texto = !enLinea
+    ? pendientes > 0
+      ? `Sin conexión — ${pendientes} cambio${pendientes !== 1 ? "s" : ""} guardado${pendientes !== 1 ? "s" : ""} en este dispositivo, se suben solos al volver`
+      : "Sin conexión — lo que registres queda guardado en este dispositivo"
+    : `Conectado, subiendo ${pendientes} cambio${pendientes !== 1 ? "s" : ""} pendiente${pendientes !== 1 ? "s" : ""}...`;
+  return (
+    <div
+      role="status"
+      style={{
+        position: "fixed",
+        top: 0,
+        left: 0,
+        right: 0,
+        zIndex: 3900,
+        background: enLinea ? "#0B3D2E" : "#92400E",
+        color: "#fff",
+        textAlign: "center",
+        padding: "6px 12px",
+        fontFamily: "Inter, sans-serif",
+        fontSize: 12.5,
+        fontWeight: 600,
+      }}
+    >
+      {enLinea ? "🔄" : "📴"} {texto}
+    </div>
+  );
+}
+
 // Red de seguridad ante cualquier error inesperado al dibujar la interfaz
 // (dato corrupto, propiedad que no existía, etc.): sin esto, React "desmonta"
 // toda la app y el usuario se queda mirando una pantalla en blanco sin ningún
@@ -9550,6 +9609,7 @@ function App() {
       return;
     }
     setDespachoActual(perfil?.despacho_id || null, perfil?.despachos?.nombre || "");
+    if (perfil?.despacho_id) iniciarSincronizacionOffline();
     // Un despacho nace "activo" con 7 días de prueba (prueba_hasta) — si esa
     // fecha ya pasó y nadie lo activó de verdad (lo que limpia prueba_hasta,
     // ver api/plataforma/despachos.js), vuelve a tratarse como pendiente de
@@ -9748,6 +9808,7 @@ function App() {
       <GlobalStyle />
       <TexturaGrano />
       <AvisoErroresAlmacenamiento />
+      <IndicadorSincronizacion />
       <AvisoPruebaGratis pruebaHasta={usuarioActual.pruebaHasta} />
       <div
         className={`drx-sidebar-overlay${sidebarMovilAbierta ? " drx-sidebar-abierta" : ""}`}

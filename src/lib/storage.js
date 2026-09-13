@@ -1,4 +1,5 @@
 import { supabase } from "./supabaseClient";
+import { queueSnapshot, getMirror, getPendingSnapshot, setMirror, queueIndexOp, getIndexOpsFor, esErrorDeConexion, sincronizarCola, contarPendientes, onCambioCola } from "./offlineQueue";
 
 /**
  * Reemplazo de window.storage (solo disponible dentro de Claude.ai) por Supabase.
@@ -145,14 +146,32 @@ async function obtenerClientesPorIdInterno(ids) {
       if (error) throw error;
       (data || []).forEach((fila) => {
         resultado[fila.id] = fila.data;
+        // Mismo esquema de clave que storageGet("cliente:ID") — para que
+        // una lectura offline más tarde (ver más abajo) encuentre esto.
+        setMirror(`cliente:${fila.id}`, JSON.stringify(fila.data));
       });
     }
     return resultado;
   } catch (e) {
+    if (esErrorDeConexion(e)) return await obtenerClientesPorIdDesdeMirror(ids);
     console.warn("obtenerClientesPorId falló:", e);
     avisarErrorAlmacenamiento("get", "clientes (varios)", e);
     return {};
   }
+}
+
+// Sin conexión: arma lo mejor que se puede con lo último que se supo de
+// cada cliente en este dispositivo — un cliente que nunca se haya visto
+// aquí antes (por ejemplo, uno creado desde el celular de otra persona)
+// no va a aparecer hasta que vuelva la señal, porque nunca se guardó una
+// copia local de él.
+async function obtenerClientesPorIdDesdeMirror(ids) {
+  const resultado = {};
+  for (const id of ids) {
+    const raw = await getMirror(`cliente:${id}`);
+    if (raw) resultado[id] = JSON.parse(raw);
+  }
+  return resultado;
 }
 
 // Mismo problema, misma solución, pero para documentos (usado en la
@@ -178,10 +197,19 @@ async function obtenerDocumentosPorIdInterno(ids) {
       if (error) throw error;
       (data || []).forEach((fila) => {
         resultado[fila.id] = fila.data;
+        setMirror(`documento:${fila.id}`, JSON.stringify(fila.data));
       });
     }
     return resultado;
   } catch (e) {
+    if (esErrorDeConexion(e)) {
+      const resultado = {};
+      for (const id of ids) {
+        const raw = await getMirror(`documento:${id}`);
+        if (raw) resultado[id] = JSON.parse(raw);
+      }
+      return resultado;
+    }
     console.warn("obtenerDocumentosPorId falló:", e);
     avisarErrorAlmacenamiento("get", "documentos (varios)", e);
     return {};
@@ -214,10 +242,19 @@ async function obtenerValoresPorClavesInterno(claves) {
       if (error) throw error;
       (data || []).forEach((fila) => {
         resultado[fila.key] = fila.value;
+        setMirror(fila.key, fila.value);
       });
     }
     return resultado;
   } catch (e) {
+    if (esErrorDeConexion(e)) {
+      const resultado = {};
+      for (const key of claves) {
+        const raw = await getMirror(key);
+        if (raw !== null && raw !== undefined) resultado[key] = raw;
+      }
+      return resultado;
+    }
     console.warn("obtenerValoresPorClaves falló:", e);
     avisarErrorAlmacenamiento("get", "app_settings (varios)", e);
     return {};
@@ -259,7 +296,12 @@ async function conReintento(fn, key, tipo) {
       return await fn();
     } catch (e2) {
       console.error(`${tipo === "set" ? "storageSet" : "storageGet"} error (tras reintento)`, key, e2);
-      avisarErrorAlmacenamiento(tipo, key, e2);
+      // Un error de CONEXIÓN ya no se avisa como "no se pudo guardar" — lo
+      // maneja el modo offline (se guarda en la cola local y se sube
+      // solo), así que ese aviso rojo ya no aplica y solo asustaría por
+      // algo que en realidad sí quedó a salvo. Solo se avisa para errores
+      // reales (por ejemplo, un permiso rechazado por la base de datos).
+      if (!esErrorDeConexion(e2)) avisarErrorAlmacenamiento(tipo, key, e2);
       throw e2;
     }
   }
@@ -267,10 +309,38 @@ async function conReintento(fn, key, tipo) {
 
 export async function storageGet(key) {
   try {
-    return await conReintento(() => storageGetInterno(key), key, "get");
+    const valor = await conReintento(() => storageGetInterno(key), key, "get");
+    // Se guarda una copia para poder leerla si más tarde se pierde la
+    // señal — la próxima vez que se pida esta misma clave sin conexión,
+    // hay algo que mostrar en vez de una pantalla vacía.
+    setMirror(key, valor);
+    return valor;
   } catch (e) {
-    return null;
+    if (!esErrorDeConexion(e)) return null;
+    if (INDEX_TABLES[key]) return await reconstruirIndiceOffline(key);
+    // Sin conexión: primero lo que se haya escrito offline y todavía no
+    // se ha subido (lo más reciente que existe), y si no hay nada
+    // pendiente, la última copia conocida de cuando sí hubo señal.
+    const pendiente = await getPendingSnapshot(key);
+    if (pendiente !== null) return pendiente;
+    return await getMirror(key);
   }
+}
+
+// La lista de ids que se vería sin conexión: el último espejo conocido de
+// esta misma consulta (de la última vez que sí hubo señal), con los
+// cambios hechos offline aplicados encima — así un cliente creado sin
+// conexión ya aparece en la lista antes incluso de sincronizar.
+async function reconstruirIndiceOffline(indexKey) {
+  const mirrorRaw = await getMirror(indexKey);
+  const idsBase = mirrorRaw ? JSON.parse(mirrorRaw) : [];
+  const ops = await getIndexOpsFor(indexKey);
+  let ids = [...idsBase];
+  for (const op of ops) {
+    if (op.op === "add" && !ids.includes(op.id)) ids = [op.id, ...ids];
+    else if (op.op === "remove") ids = ids.filter((x) => x !== op.id);
+  }
+  return JSON.stringify(ids);
 }
 
 async function storageGetInterno(key) {
@@ -424,10 +494,41 @@ export async function buscarGlobal(texto) {
 
 export async function storageSet(key, value) {
   try {
-    return await conReintento(() => storageSetInterno(key, value), key, "set");
+    const ok = await conReintento(() => storageSetInterno(key, value), key, "set");
+    setMirror(key, value);
+    return ok;
   } catch (e) {
-    return false;
+    if (!esErrorDeConexion(e)) return false;
+    if (INDEX_TABLES[key]) {
+      await encolarCambioDeIndiceOffline(key, value);
+    } else {
+      await queueSnapshot(key, value);
+    }
+    // Se devuelve como si hubiera funcionado: el dato ya quedó a salvo en
+    // este dispositivo (IndexedDB) y se sube solo apenas vuelva la señal —
+    // que la pantalla avise "no se pudo guardar" aquí sería falso y
+    // confundiría más de lo que ayuda.
+    return true;
   }
+}
+
+// "indice-clientes"/"indice-documentos" no son una lista guardada aparte:
+// son la tabla real de clientes/documentos consultada y comparada contra
+// lo que se le pasa para decidir qué marcar como borrado (ver
+// syncIndexTable). Repetir esa comparación completa tal cual se veía
+// offline, más tarde, podría borrar algo que otro dispositivo agregó
+// mientras este no tenía señal — así que en vez de guardar la lista
+// entera, se guarda solo QUÉ cambió puntualmente (qué id se agregó o se
+// quitó), para aplicarlo sobre la lista real del servidor al sincronizar.
+async function encolarCambioDeIndiceOffline(key, value) {
+  const nuevosIds = value ? JSON.parse(value) : [];
+  const mirrorRaw = await getMirror(key);
+  const idsAntes = mirrorRaw ? JSON.parse(mirrorRaw) : [];
+  const agregados = nuevosIds.filter((id) => !idsAntes.includes(id));
+  const quitados = idsAntes.filter((id) => !nuevosIds.includes(id));
+  for (const id of agregados) await queueIndexOp(key, "add", id);
+  for (const id of quitados) await queueIndexOp(key, "remove", id);
+  await setMirror(key, value);
 }
 
 // Los reintentos son seguros aquí porque todas las escrituras son upsert
@@ -479,4 +580,47 @@ async function storageSetInterno(key, value) {
       .upsert({ key, despacho_id: despachoActualId, value, updated_at: new Date().toISOString() });
     if (error) throw error;
     return true;
+}
+
+// Modo offline ------------------------------------------------------------
+// Todo lo que se guarda sin conexión (ver storageSet más arriba) queda en
+// una cola local en IndexedDB. Esto es lo que la vacía apenas hay señal, y
+// lo que deja mostrar en pantalla "sin conexión, N cambios sin subir".
+
+export function cambiosSinSincronizar(fn) {
+  return onCambioCola(fn);
+}
+
+export async function contarCambiosSinSincronizar() {
+  return contarPendientes();
+}
+
+async function aplicarIndexOpPendiente(indexKey, op, id) {
+  if (op !== "remove") return; // "add" no necesita nada aparte: el propio registro (cliente:ID/documento:ID) ya lo hace aparecer
+  const table = INDEX_TABLES[indexKey];
+  const { error } = await supabase.from(table).update({ eliminado_en: new Date().toISOString() }).eq("despacho_id", despachoActualId).eq("id", id);
+  if (error) throw error;
+}
+
+export async function sincronizarCambiosPendientes() {
+  if (!despachoActualId) return; // sin sesión activa todavía, nada que sincronizar
+  await sincronizarCola({
+    aplicarSnapshot: (key, value) => storageSetInterno(key, value),
+    aplicarIndexOp: aplicarIndexOpPendiente,
+  });
+}
+
+let sincronizacionIniciada = false;
+// Se llama una sola vez (desde App.jsx, al iniciar sesión) — intenta subir
+// lo pendiente apenas vuelve la conexión, y de vez en cuando por si el
+// evento "online" del navegador no se dispara (pasa a veces al volver de
+// modo avión o cambiar de wifi a datos).
+export function iniciarSincronizacionOffline() {
+  if (sincronizacionIniciada || typeof window === "undefined") return;
+  sincronizacionIniciada = true;
+  window.addEventListener("online", () => sincronizarCambiosPendientes());
+  sincronizarCambiosPendientes();
+  setInterval(() => {
+    if (navigator.onLine) sincronizarCambiosPendientes();
+  }, 30000);
 }
