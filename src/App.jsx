@@ -1179,7 +1179,7 @@ function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-const APP_VERSION = "1.95.0";
+const APP_VERSION = "1.95.1";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -6698,6 +6698,36 @@ function PantallaCargaInicial() {
   );
 }
 
+// Mismo espíritu que PantallaCargaInicial (logo + spinner, no una pantalla
+// en blanco) pero para adentro de la app — cada pestaña que se carga con
+// React.lazy (ver PRECARGA_TAB) muestra esto mientras descarga su chunk, en
+// vez del spinner genérico y chiquito de antes. El fondo es claro y con
+// menos altura porque aquí sí sigue viéndose el menú lateral al lado.
+function CargandoSeccion() {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 14, padding: "70px 0" }}>
+      <div style={{ display: "inline-flex", alignItems: "center", gap: 10 }}>
+        <div style={{ width: 36, height: 36, borderRadius: 10, background: COLORS.navy, display: "flex", alignItems: "center", justifyContent: "center", color: "#FFFFFF", flexShrink: 0 }}>
+          <IconoNomos size={19} />
+        </div>
+        <span style={{ fontFamily: "Inter, sans-serif", fontSize: 17, fontWeight: 800, letterSpacing: 1.2, color: COLORS.headingText, lineHeight: 1 }}>Nomos</span>
+      </div>
+      <span
+        style={{
+          width: 18,
+          height: 18,
+          borderRadius: "50%",
+          border: `2.5px solid ${COLORS.border}`,
+          borderTopColor: COLORS.accentBright,
+          display: "inline-block",
+          animation: "drx-spin 0.7s linear infinite",
+        }}
+      />
+      <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.muted, margin: 0 }}>Cargando…</p>
+    </div>
+  );
+}
+
 function InsigniaPlataforma({ grande }) {
   const tamañoIcono = grande ? 26 : 15;
   const cajaIcono = grande ? 46 : 28;
@@ -10255,63 +10285,63 @@ function App() {
             )}
             {tab === "agenda" && puedeVer("agenda") && (
               <TabErrorBoundary nombre="agenda">
-                <Suspense fallback={<Spinner />}>
+                <Suspense fallback={<CargandoSeccion />}>
                   <AgendaTab />
                 </Suspense>
               </TabErrorBoundary>
             )}
             {tab === "clientes" && puedeVer("clientes") && (
               <TabErrorBoundary nombre="clientes">
-                <Suspense fallback={<Spinner />}>
+                <Suspense fallback={<CargandoSeccion />}>
                   <ClientesTab usuarioActual={usuarioActual} onIrARegistrarPago={irARegistrarPago} />
                 </Suspense>
               </TabErrorBoundary>
             )}
             {tab === "vigilancia" && puedeVer("vigilancia") && (
               <TabErrorBoundary nombre="vigilancia">
-                <Suspense fallback={<Spinner />}>
+                <Suspense fallback={<CargandoSeccion />}>
                   <VigilanciaTab />
                 </Suspense>
               </TabErrorBoundary>
             )}
             {tab === "contabilidad" && puedeVer("contabilidad") && (
               <TabErrorBoundary nombre="contabilidad">
-                <Suspense fallback={<Spinner />}>
+                <Suspense fallback={<CargandoSeccion />}>
                   <ContabilidadTab usuarioActual={usuarioActual} clienteInicialPago={clienteParaPago} onClienteInicialPagoConsumido={() => setClienteParaPago(null)} />
                 </Suspense>
               </TabErrorBoundary>
             )}
             {tab === "calculadora" && puedeVer("calculadora") && (
               <TabErrorBoundary nombre="calculadora">
-                <Suspense fallback={<Spinner />}>
+                <Suspense fallback={<CargandoSeccion />}>
                   <CalculadoraTab usuarioActual={usuarioActual} />
                 </Suspense>
               </TabErrorBoundary>
             )}
             {tab === "contenido" && puedeVer("contenido") && (
               <TabErrorBoundary nombre="contenido">
-                <Suspense fallback={<Spinner />}>
+                <Suspense fallback={<CargandoSeccion />}>
                   <ContenidoTab />
                 </Suspense>
               </TabErrorBoundary>
             )}
             {tab === "documentos" && puedeVer("documentos") && (
               <TabErrorBoundary nombre="documentos">
-                <Suspense fallback={<Spinner />}>
+                <Suspense fallback={<CargandoSeccion />}>
                   <DocumentosTab usuarioActual={usuarioActual} />
                 </Suspense>
               </TabErrorBoundary>
             )}
             {tab === "reportes" && puedeVer("reportes") && (
               <TabErrorBoundary nombre="reportes">
-                <Suspense fallback={<Spinner />}>
+                <Suspense fallback={<CargandoSeccion />}>
                   <ReportesTab />
                 </Suspense>
               </TabErrorBoundary>
             )}
             {tab === "usuarios" && usuarioActual.rol === "Administrador" && (
               <TabErrorBoundary nombre="usuarios">
-                <Suspense fallback={<Spinner />}>
+                <Suspense fallback={<CargandoSeccion />}>
                   <UsuariosPermisosTab
                     usuarioActual={usuarioActual}
                     onDespachoRenombrado={(nuevoNombre) => setUsuarioActual((prev) => (prev ? { ...prev, despachoNombre: nuevoNombre } : prev))}
@@ -10321,7 +10351,7 @@ function App() {
             )}
             {tab === "plataforma" && usuarioActual.es_superadmin && (
               <TabErrorBoundary nombre="plataforma">
-                <Suspense fallback={<Spinner />}>
+                <Suspense fallback={<CargandoSeccion />}>
                   <PlataformaTab />
                 </Suspense>
               </TabErrorBoundary>
