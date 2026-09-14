@@ -19,6 +19,10 @@ const UsuariosPermisosTab = lazy(() => import("./tabs/UsuariosPermisosTab.jsx"))
 // alguien que ya inició sesión — mismo motivo que las pestañas de arriba.
 const LandingPage = lazy(() => import("./views/LandingPage.jsx"));
 const VistaFirma = lazy(() => import("./views/VistaFirma.jsx"));
+const VistaPortalCliente = lazy(() => import("./views/VistaPortalCliente.jsx"));
+const PoliticaPrivacidad = lazy(() => import("./views/PoliticaPrivacidad.jsx"));
+const TerminosUso = lazy(() => import("./views/TerminosUso.jsx"));
+const VistaDiagnostico = lazy(() => import("./views/VistaDiagnostico.jsx"));
 import { supabase } from "./lib/supabaseClient";
 import { contrasenaFiltrada } from "./lib/pwnedPassword.js";
 import {
@@ -1210,7 +1214,7 @@ export function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-const APP_VERSION = "1.99.0";
+export const APP_VERSION = "1.100.0";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -4807,192 +4811,9 @@ export async function consultarRamaJudicial(radicado) {
   return data;
 }
 
-function VistaPortalCliente() {
-  const [codigo, setCodigo] = useState("");
-  const [cliente, setCliente] = useState(null);
-  const [buscando, setBuscando] = useState(false);
-  const [notFound, setNotFound] = useState(false);
-
-  const [procesoInfo, setProcesoInfo] = useState(null);
-  const [consultandoProceso, setConsultandoProceso] = useState(false);
-  const [errorProceso, setErrorProceso] = useState("");
-
-  const buscar = async () => {
-    const code = codigo.trim();
-    if (!code) return;
-    setBuscando(true);
-    setNotFound(false);
-    setCliente(null);
-    setProcesoInfo(null);
-    const { data, error } = await supabase.rpc("obtener_portal_cliente", { p_id: code });
-    setBuscando(false);
-    if (error || !data) {
-      setNotFound(true);
-      return;
-    }
-    setCliente(data);
-  };
-
-  const consultarProceso = async () => {
-    if (!cliente?.radicado) return;
-    setConsultandoProceso(true);
-    setErrorProceso("");
-    try {
-      const data = await consultarRamaJudicial(cliente.radicado);
-      setProcesoInfo(data);
-    } catch (e) {
-      setErrorProceso("No pudimos consultar el proceso en este momento. Intenta de nuevo en un rato.");
-    }
-    setConsultandoProceso(false);
-  };
-
-  const totalPagado = (cliente?.pagos || []).reduce((sum, p) => sum + (Number(p.valor) || 0), 0);
-  const valorTotal = Number(cliente?.valorTotal) || 0;
-  const saldo = valorTotal > 0 ? valorTotal - totalPagado : null;
-
-  return (
-    <div style={{ maxWidth: 760, margin: "0 auto", padding: "0 20px 40px" }}>
-      <div style={{ background: COLORS.navy, margin: "0 -20px 28px", padding: "24px 20px", display: "flex", alignItems: "center", gap: 14 }}>
-        <div style={{ width: 48, height: 48, borderRadius: 12, background: "#FFFFFF", display: "flex", alignItems: "center", justifyContent: "center", color: COLORS.navy, flexShrink: 0 }}>
-          <IconoNomos size={26} />
-        </div>
-        <div>
-          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, letterSpacing: 1.5, color: "#9FB6D6", textTransform: "uppercase", margin: 0 }}>Nomos</p>
-          <h1 style={{ fontFamily: "Inter, sans-serif", fontSize: 24, fontWeight: 700, color: "#FFFFFF", margin: "4px 0 0" }}>Portal del cliente</h1>
-        </div>
-      </div>
-
-      {!cliente && (
-        <Card>
-          <Field label="Código de acceso (te lo compartió tu abogado)">
-            <input
-              className="drx-input"
-              style={{ ...inputStyle, fontWeight: 700, fontSize: 16, fontFamily: "monospace", textAlign: "center" }}
-              value={codigo}
-              onChange={(e) => setCodigo(e.target.value)}
-              placeholder="Código de acceso"
-              onKeyDown={(e) => e.key === "Enter" && buscar()}
-            />
-          </Field>
-          {notFound && (
-            <p style={{ color: "#B42318", fontSize: 13, marginTop: 10, fontFamily: "Inter, sans-serif" }}>
-              No encontramos ninguna cuenta con ese código. Verifícalo con tu abogado.
-            </p>
-          )}
-          <button className="drx-btn-primary" style={{ ...buttonPrimary, marginTop: 14 }} onClick={buscar} disabled={buscando}>
-            {buscando ? "Buscando..." : "Ver mi información"}
-          </button>
-        </Card>
-      )}
-
-      {cliente && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          <Card>
-            <h2 style={{ fontFamily: "Inter, sans-serif", fontSize: 19, fontWeight: 700, margin: 0, color: COLORS.ink }}>Hola, {cliente.nombre}</h2>
-            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted, margin: "4px 0 0" }}>
-              {cliente.tipoProceso} · {cliente.areaProceso}
-            </p>
-          </Card>
-
-          {cliente.radicado && (
-            <Card>
-              <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, fontWeight: 700, color: COLORS.ink, marginBottom: 8 }}>Estado del proceso</p>
-              <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.muted, marginBottom: 12 }}>Radicado: {cliente.radicado}</p>
-              <button className="drx-btn-primary" style={buttonPrimary} onClick={consultarProceso} disabled={consultandoProceso}>
-                {consultandoProceso ? "Consultando..." : "Consultar estado actual"}
-              </button>
-              {errorProceso && <p style={{ color: "#B42318", fontSize: 12.5, marginTop: 10, fontFamily: "Inter, sans-serif" }}>{errorProceso}</p>}
-              {procesoInfo && (
-                <div style={{ marginTop: 14 }}>
-                  {procesoInfo.encontrado ? (
-                    <>
-                      <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.muted, marginBottom: 6 }}>{procesoInfo.proceso?.despacho}</p>
-                      {procesoInfo.ultimaActuacion ? (
-                        <div style={{ background: COLORS.accentSoft, borderRadius: 8, padding: 12 }}>
-                          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, fontWeight: 700, color: COLORS.ink, margin: 0 }}>
-                            {procesoInfo.ultimaActuacion.actuacion}
-                          </p>
-                          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, margin: "4px 0 0" }}>
-                            {new Date(procesoInfo.ultimaActuacion.fecha).toLocaleDateString("es-CO", { dateStyle: "long" })}
-                          </p>
-                          {procesoInfo.ultimaActuacion.anotacion && (
-                            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.inkSoft, margin: "6px 0 0" }}>
-                              {procesoInfo.ultimaActuacion.anotacion}
-                            </p>
-                          )}
-                        </div>
-                      ) : (
-                        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.muted }}>Sin actuaciones registradas todavía.</p>
-                      )}
-                    </>
-                  ) : (
-                    <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.muted }}>No encontramos este radicado en la Rama Judicial.</p>
-                  )}
-                </div>
-              )}
-            </Card>
-          )}
-
-          {valorTotal > 0 && (
-            <Card>
-              <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, fontWeight: 700, color: COLORS.ink, marginBottom: 8 }}>Estado de cuenta</p>
-              <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted, margin: 0 }}>
-                Total acordado: {formatoCOP(valorTotal)} · Pagado: {formatoCOP(totalPagado)}
-              </p>
-              <p
-                style={{
-                  display: "inline-block",
-                  marginTop: 8,
-                  fontFamily: "Inter, sans-serif",
-                  fontSize: 12.5,
-                  fontWeight: 700,
-                  padding: "3px 10px",
-                  borderRadius: 20,
-                  background: saldo <= 0 ? "#DCFCE7" : "#EFF6FF",
-                  color: saldo <= 0 ? "#166534" : "#1D4ED8",
-                }}
-              >
-                {saldo <= 0 ? "Al día" : `Saldo del plan: ${formatoCOP(saldo)}`}
-              </p>
-            </Card>
-          )}
-
-          {cliente.pagos?.length > 0 && (
-            <Card>
-              <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, fontWeight: 700, color: COLORS.ink, marginBottom: 10 }}>Pagos registrados</p>
-              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                {[...cliente.pagos]
-                  .sort((a, b) => new Date(b.fecha) - new Date(a.fecha))
-                  .map((p, i) => (
-                    <div key={i} style={{ display: "flex", justifyContent: "space-between", fontFamily: "Inter, sans-serif", fontSize: 12.5 }}>
-                      <span style={{ color: COLORS.muted }}>
-                        {new Date(p.fecha).toLocaleDateString("es-CO", { dateStyle: "medium" })} · {p.concepto || "Pago"}
-                      </span>
-                      <span style={{ color: COLORS.ink, fontWeight: 600 }}>{formatoCOP(p.valor)}</span>
-                    </div>
-                  ))}
-              </div>
-            </Card>
-          )}
-
-          {cliente.documentos?.length > 0 && (
-            <Card>
-              <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, fontWeight: 700, color: COLORS.ink, marginBottom: 10 }}>Documentos</p>
-              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                {cliente.documentos.map((d, i) => (
-                  <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontFamily: "Inter, sans-serif", fontSize: 12.5 }}>
-                    <span style={{ color: COLORS.ink }}>{d.titulo}</span>
-                    <span style={{ color: d.firmado ? "#166534" : "#B45309", fontWeight: 700 }}>{d.firmado ? "Firmado" : "Pendiente de firma"}</span>
-                  </div>
-                ))}
-              </div>
-            </Card>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
+// VistaPortalCliente vive en src/views/VistaPortalCliente.jsx y se carga
+// con lazy() — es el portal público (#portal) donde un cliente consulta
+// su propio caso, algo que el despacho (ya logueado) nunca ve.
 
 export const ESTADOS_VIGILANCIA = ["En trámite", "Con novedad", "Pendiente de revisión", "Finalizado"];
 
@@ -6684,80 +6505,9 @@ export const SEGURIDAD_LANDING = [
   { titulo: "Firma verificable", texto: "Cada firma queda con huella digital." },
 ];
 
-function PoliticaPrivacidad() {
-  const { oscuro, alternar } = useTema();
-  return (
-    <div className={oscuro ? "drx-tema-oscuro" : "drx-tema-claro"} style={{ background: COLORS.bg, minHeight: "100%" }}>
-      <GlobalStyle />
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "18px 24px", maxWidth: 760, margin: "0 auto" }}>
-        <InsigniaPlataforma />
-        <BotonTema oscuro={oscuro} onClick={alternar} />
-      </div>
-      <div style={{ maxWidth: 760, margin: "0 auto", padding: "10px 24px 60px" }}>
-        <h1 style={{ fontFamily: "Inter, sans-serif", fontSize: 26, fontWeight: 800, color: COLORS.headingText, marginBottom: 8 }}>
-          Política de tratamiento de datos personales
-        </h1>
-        <div
-          style={{
-            background: "#FEF3E2",
-            border: "1px solid #FCE3B8",
-            borderRadius: 10,
-            padding: "12px 16px",
-            marginBottom: 24,
-            fontFamily: "Inter, sans-serif",
-            fontSize: 12.5,
-            color: "#92400E",
-            lineHeight: 1.6,
-          }}
-        >
-          <strong>Borrador de referencia.</strong> Este texto cubre los elementos que exige la Ley 1581 de 2012 (habeas
-          data), pero cada despacho debe revisarlo y ajustarlo con su propio abogado antes de publicarlo como su
-          política definitiva — especialmente el nombre del responsable, sus datos de contacto y el detalle de las
-          finalidades según lo que realmente hace con la información.
-        </div>
-
-        {[
-          {
-            t: "1. Responsable del tratamiento",
-            c: `${getNombreDespacho()}, en su calidad de despacho de abogados, es responsable del tratamiento de los datos personales que recolecta a través de esta plataforma para la gestión de sus clientes y procesos.`,
-          },
-          {
-            t: "2. Finalidad del tratamiento",
-            c: "Los datos personales (nombre, identificación, contacto, información del proceso judicial, información de pagos y documentos) se usan exclusivamente para: prestar el servicio de representación o asesoría legal contratado, hacer seguimiento a los procesos judiciales, gestionar cobros y pagos, comunicarse con el cliente, y cumplir obligaciones legales o contractuales derivadas de la relación.",
-          },
-          {
-            t: "3. Derechos del titular de los datos",
-            c: "Como titular de tus datos personales tienes derecho a: conocer, actualizar y rectificar tus datos; solicitar prueba de la autorización otorgada; ser informado sobre el uso que se les ha dado; presentar quejas ante la Superintendencia de Industria y Comercio (SIC) por infracciones a la ley; revocar la autorización y/o solicitar la supresión del dato cuando no exista un deber legal o contractual que lo impida; y acceder de forma gratuita a tus datos.",
-          },
-          {
-            t: "4. Cómo ejercer tus derechos",
-            c: "Puedes ejercer estos derechos escribiendo directamente al despacho, por los medios de contacto que te compartió tu abogado (correo o WhatsApp). El despacho debe responder dentro de los términos que establece la ley.",
-          },
-          {
-            t: "5. Seguridad de la información",
-            c: "La información se almacena con controles técnicos de seguridad: autenticación de usuarios, cifrado de la conexión (HTTPS), registro de auditoría de accesos y cambios, y acceso restringido únicamente al personal autorizado del despacho.",
-          },
-          {
-            t: "6. Vigencia",
-            c: "Esta política aplica mientras exista una relación contractual o legal entre el titular y el despacho, y durante el tiempo adicional necesario para atender obligaciones legales, contables o de defensa judicial.",
-          },
-        ].map((s) => (
-          <div key={s.t} style={{ marginBottom: 18 }}>
-            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 14.5, fontWeight: 700, color: COLORS.headingText, marginBottom: 6 }}>{s.t}</p>
-            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.inkSoft, lineHeight: 1.7, margin: 0 }}>{s.c}</p>
-          </div>
-        ))}
-
-        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, color: COLORS.muted, marginTop: 30 }}>
-          Última actualización: {new Date().toLocaleDateString("es-CO", { dateStyle: "long" })}.
-        </p>
-        <a href="/" style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.accentBright }}>
-          ← Volver al inicio
-        </a>
-      </div>
-    </div>
-  );
-}
+// PoliticaPrivacidad y TerminosUso viven en src/views/ y se cargan con
+// lazy() — páginas legales públicas, casi nunca vistas por un despacho
+// que ya inició sesión.
 
 // Página de diagnóstico pública (#diagnostico) — sin necesitar iniciar
 // sesión ni salir de Nomos para ir a revisar Supabase/Vercel a mano.
@@ -6766,271 +6516,10 @@ function PoliticaPrivacidad() {
 // el login se queda pegado sin explicación, esto dice enseguida si es
 // "el proyecto de Supabase está pausado", "faltan las variables de entorno
 // en Vercel" o algo distinto, sin depender de tener acceso a esos paneles.
-function VistaDiagnostico() {
-  const [resultados, setResultados] = useState(null);
-  const [correoPrueba, setCorreoPrueba] = useState("");
-  const [contrasenaPrueba, setContrasenaPrueba] = useState("");
-  const [probando, setProbando] = useState(false);
-  const [resultadoLogin, setResultadoLogin] = useState(null);
+// VistaDiagnostico vive en src/views/VistaDiagnostico.jsx (lazy) — pantalla
+// de diagnóstico técnico (#diagnostico), de uso muy poco frecuente.
 
-  const probarLogin = async () => {
-    if (!correoPrueba.trim() || !contrasenaPrueba.trim()) return;
-    setProbando(true);
-    setResultadoLogin(null);
-    const t0 = Date.now();
-    try {
-      const { data, error } = await supabase.auth.signInWithPassword({ email: correoPrueba.trim(), password: contrasenaPrueba });
-      const ms = Date.now() - t0;
-      if (error) {
-        setResultadoLogin({ ok: false, texto: `Supabase respondió con error después de ${ms} ms:\n"${error.message}" (status ${error.status || "?"})` });
-      } else if (data?.user) {
-        setResultadoLogin({ ok: true, texto: `¡Funcionó! Sesión creada en ${ms} ms para ${data.user.email}. El problema entonces está en la pantalla normal de login, no en la conexión — avísame.` });
-        // Se cierra de una vez para no dejar una sesión de prueba abierta
-        // en esta pantalla, que no está pensada para usarse como panel.
-        await supabase.auth.signOut();
-      } else {
-        setResultadoLogin({ ok: false, texto: `Respuesta rara después de ${ms} ms: no hubo error pero tampoco llegó un usuario.` });
-      }
-    } catch (e) {
-      const ms = Date.now() - t0;
-      setResultadoLogin({ ok: false, texto: `Se rompió con una excepción después de ${ms} ms:\n"${e.message}"` });
-    }
-    setProbando(false);
-  };
-
-  useEffect(() => {
-    (async () => {
-      const url = import.meta.env.VITE_SUPABASE_URL || "";
-      const key = import.meta.env.VITE_SUPABASE_ANON_KEY || "";
-      const pruebas = [];
-
-      if (!url || !key || url.includes("TU-PROYECTO") || url.includes("placeholder")) {
-        setResultados([
-          {
-            nombre: "Variables de entorno",
-            ok: false,
-            detalle:
-              "VITE_SUPABASE_URL o VITE_SUPABASE_ANON_KEY no están configuradas en Vercel (o siguen con el valor de ejemplo). Hay que ponerlas en Project Settings → Environment Variables y volver a desplegar.",
-          },
-        ]);
-        return;
-      }
-
-      pruebas.push({ nombre: "URL configurada", ok: true, detalle: url.replace(/^https:\/\//, "") });
-
-      try {
-        const t0 = Date.now();
-        const resp = await fetch(`${url}/auth/v1/settings`, { headers: { apikey: key } });
-        const ms = Date.now() - t0;
-        if (resp.ok) {
-          pruebas.push({ nombre: "Conexión con Supabase Auth", ok: true, detalle: `Respondió en ${ms} ms.` });
-        } else {
-          pruebas.push({
-            nombre: "Conexión con Supabase Auth",
-            ok: false,
-            detalle: `Respondió con error ${resp.status}. Si el proyecto está pausado en Supabase, esto es justo lo que se ve — entra a supabase.com y busca un botón "Restore project".`,
-          });
-        }
-      } catch (e) {
-        pruebas.push({
-          nombre: "Conexión con Supabase Auth",
-          ok: false,
-          detalle: `No se pudo contactar (${e.message}). Puede ser que el proyecto esté pausado, la URL esté mal, o no haya internet en este momento.`,
-        });
-      }
-
-      try {
-        const { error } = await supabase.from("perfiles").select("id", { count: "exact", head: true }).limit(1);
-        pruebas.push(
-          error
-            ? { nombre: "Conexión con la base de datos", ok: false, detalle: error.message }
-            : { nombre: "Conexión con la base de datos", ok: true, detalle: "Responde con normalidad." }
-        );
-      } catch (e) {
-        pruebas.push({ nombre: "Conexión con la base de datos", ok: false, detalle: e.message });
-      }
-
-      setResultados(pruebas);
-    })();
-  }, []);
-
-  const todoBien = resultados && resultados.every((p) => p.ok);
-
-  return (
-    <div style={{ background: COLORS.bg, minHeight: "100%", padding: 24 }}>
-      <GlobalStyle />
-      <div style={{ maxWidth: 480, margin: "40px auto" }}>
-        <Card>
-          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 16, fontWeight: 800, color: COLORS.headingText, margin: "0 0 4px" }}>
-            Diagnóstico de Nomos
-          </p>
-          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, margin: "0 0 18px" }}>
-            v{APP_VERSION} · {new Date().toLocaleString("es-CO", { dateStyle: "medium", timeStyle: "short" })}
-          </p>
-          {!resultados && <Spinner texto="Revisando la conexión…" />}
-          {resultados && (
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              {resultados.map((p) => (
-                <div
-                  key={p.nombre}
-                  style={{
-                    background: p.ok ? "#F0FDF4" : "#FEF2F2",
-                    border: `1px solid ${p.ok ? "#BBF7D0" : "#F2B8B5"}`,
-                    borderRadius: 10,
-                    padding: "10px 14px",
-                  }}
-                >
-                  <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, fontWeight: 700, color: p.ok ? "#166534" : "#B42318", margin: 0 }}>
-                    {p.ok ? "✓" : "✕"} {p.nombre}
-                  </p>
-                  <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: p.ok ? "#166534" : "#B42318", margin: "4px 0 0", lineHeight: 1.5 }}>
-                    {p.detalle}
-                  </p>
-                </div>
-              ))}
-              {todoBien && (
-                <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.muted, marginTop: 4 }}>
-                  Todo responde bien — si el login sigue sin funcionar, el problema es otra cosa, no la conexión.
-                </p>
-              )}
-            </div>
-          )}
-
-          <div style={{ marginTop: 20, paddingTop: 18, borderTop: `1px solid ${COLORS.border}` }}>
-            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, fontWeight: 700, color: COLORS.headingText, margin: "0 0 4px" }}>
-              Probar inicio de sesión aquí mismo
-            </p>
-            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, color: COLORS.muted, margin: "0 0 12px" }}>
-              Esto llama a Supabase directamente y te muestra el error real, sin pasar por el resto de la app.
-            </p>
-            <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 10 }}>
-              <input
-                type="email"
-                className="drx-input"
-                style={inputStyle}
-                placeholder="Correo"
-                value={correoPrueba}
-                onChange={(e) => setCorreoPrueba(e.target.value)}
-                autoCapitalize="none"
-              />
-              <input
-                type="password"
-                className="drx-input"
-                style={inputStyle}
-                placeholder="Contraseña"
-                value={contrasenaPrueba}
-                onChange={(e) => setContrasenaPrueba(e.target.value)}
-              />
-            </div>
-            <button
-              className="drx-btn-primary"
-              style={{ ...buttonPrimary, width: "100%" }}
-              onClick={probarLogin}
-              disabled={probando || !correoPrueba.trim() || !contrasenaPrueba.trim()}
-            >
-              {probando ? "Probando…" : "Probar"}
-            </button>
-            {resultadoLogin && (
-              <p
-                style={{
-                  fontFamily: "monospace",
-                  fontSize: 12,
-                  whiteSpace: "pre-wrap",
-                  color: resultadoLogin.ok ? "#166534" : "#B42318",
-                  background: resultadoLogin.ok ? "#F0FDF4" : "#FEF2F2",
-                  border: `1px solid ${resultadoLogin.ok ? "#BBF7D0" : "#F2B8B5"}`,
-                  borderRadius: 8,
-                  padding: "10px 12px",
-                  marginTop: 12,
-                }}
-              >
-                {resultadoLogin.texto}
-              </p>
-            )}
-          </div>
-        </Card>
-      </div>
-    </div>
-  );
-}
-
-function TerminosUso() {
-  const { oscuro, alternar } = useTema();
-  return (
-    <div className={oscuro ? "drx-tema-oscuro" : "drx-tema-claro"} style={{ background: COLORS.bg, minHeight: "100%" }}>
-      <GlobalStyle />
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "18px 24px", maxWidth: 760, margin: "0 auto" }}>
-        <InsigniaPlataforma />
-        <BotonTema oscuro={oscuro} onClick={alternar} />
-      </div>
-      <div style={{ maxWidth: 760, margin: "0 auto", padding: "10px 24px 60px" }}>
-        <h1 style={{ fontFamily: "Inter, sans-serif", fontSize: 26, fontWeight: 800, color: COLORS.headingText, marginBottom: 8 }}>
-          Términos de uso y propiedad intelectual
-        </h1>
-        <div
-          style={{
-            background: "#FEF3E2",
-            border: "1px solid #FCE3B8",
-            borderRadius: 10,
-            padding: "12px 16px",
-            marginBottom: 24,
-            fontFamily: "Inter, sans-serif",
-            fontSize: 12.5,
-            color: "#92400E",
-            lineHeight: 1.6,
-          }}
-        >
-          <strong>Borrador de referencia.</strong> Este texto está pensado para dar un punto de partida legalmente
-          sólido, no para publicarse tal cual sin que un abogado (tú) lo revise y lo ajuste con los datos definitivos
-          de la empresa antes de considerarlo vinculante frente a terceros.
-        </div>
-
-        {[
-          {
-            t: "1. Aceptación",
-            c: "Al acceder o usar Nomos, el usuario acepta estos términos. Si actúa en representación de un despacho, declara tener autorización para vincularlo a estas condiciones.",
-          },
-          {
-            t: "2. Propiedad intelectual",
-            c: "El software, su código fuente, diseño de interfaz, marca, logotipo, textos, estructura de funcionalidades y demás elementos de Nomos son propiedad de su desarrollador y están protegidos por la Ley 23 de 1982 (derechos de autor en Colombia, que protege el software como obra literaria) y la Decisión Andina 351 de 1993 (régimen común sobre derecho de autor de la Comunidad Andina, vinculante para Colombia). Queda prohibida su reproducción, distribución o modificación sin autorización expresa.",
-          },
-          {
-            t: "3. Usos prohibidos",
-            c: "Está expresamente prohibido: (a) realizar ingeniería inversa del software o sus funcionalidades; (b) hacer scraping, extracción automatizada o recolección masiva del contenido o la estructura de la plataforma; (c) usar el contenido, diseño o funcionamiento de Nomos para entrenar modelos de inteligencia artificial; y (d) copiar, imitar o replicar sustancialmente el producto, su marca o su modelo de negocio con el fin de crear un producto competidor.",
-          },
-          {
-            t: "4. Competencia desleal",
-            c: "La copia o imitación sustancial del funcionamiento, diseño o modelo de negocio de Nomos, aprovechando indebidamente el esfuerzo ajeno, puede constituir un acto de competencia desleal bajo la Ley 256 de 1996, sin perjuicio de las acciones civiles y penales que correspondan por infracción a los derechos de autor.",
-          },
-          {
-            t: "5. Consecuencias del incumplimiento",
-            c: "El incumplimiento de estos términos puede dar lugar a la suspensión inmediata del acceso a la plataforma y al ejercicio de las acciones legales disponibles ante las autoridades competentes en Colombia.",
-          },
-          {
-            t: "6. Disponibilidad del servicio",
-            c: "Nomos se presta \"tal cual\" (as is). Se hacen esfuerzos razonables por mantener la disponibilidad y seguridad del servicio, pero no se garantiza una disponibilidad del 100%, especialmente para las integraciones que dependen de servicios de terceros no oficiales (por ejemplo, la consulta a la Rama Judicial).",
-          },
-          {
-            t: "7. Ley aplicable y jurisdicción",
-            c: "Estos términos se rigen por las leyes de la República de Colombia. Cualquier controversia se someterá a los jueces competentes de Colombia.",
-          },
-        ].map((s) => (
-          <div key={s.t} style={{ marginBottom: 18 }}>
-            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 14.5, fontWeight: 700, color: COLORS.headingText, marginBottom: 6 }}>{s.t}</p>
-            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.inkSoft, lineHeight: 1.7, margin: 0 }}>{s.c}</p>
-          </div>
-        ))}
-
-        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, color: COLORS.muted, marginTop: 30 }}>
-          Última actualización: {new Date().toLocaleDateString("es-CO", { dateStyle: "long" })}.
-        </p>
-        <a href="/" style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.accentBright }}>
-          ← Volver al inicio
-        </a>
-      </div>
-    </div>
-  );
-}
+// TerminosUso vive en src/views/TerminosUso.jsx (lazy).
 
 // LandingPage vive en su propio archivo y se carga con lazy() (como las
 // pestañas) — es la página pública de mercadeo, ~900 líneas que un usuario
@@ -8688,7 +8177,9 @@ function App() {
     return (
       <div style={{ background: COLORS.bg, minHeight: "100%" }}>
         <GlobalStyle />
-        <VistaPortalCliente />
+        <Suspense fallback={<CargandoSeccion />}>
+          <VistaPortalCliente />
+        </Suspense>
         <p style={{ textAlign: "center", paddingBottom: 24 }}>
           <button
             onClick={() => setModoPortal(false)}
@@ -8702,15 +8193,27 @@ function App() {
   }
 
   if (isPrivacidadView) {
-    return <PoliticaPrivacidad />;
+    return (
+      <Suspense fallback={<PantallaCargaInicial />}>
+        <PoliticaPrivacidad />
+      </Suspense>
+    );
   }
 
   if (isTerminosView) {
-    return <TerminosUso />;
+    return (
+      <Suspense fallback={<PantallaCargaInicial />}>
+        <TerminosUso />
+      </Suspense>
+    );
   }
 
   if (isDiagnosticoView) {
-    return <VistaDiagnostico />;
+    return (
+      <Suspense fallback={<PantallaCargaInicial />}>
+        <VistaDiagnostico />
+      </Suspense>
+    );
   }
 
   if (!sesionCargada) {
