@@ -38,7 +38,7 @@ import {
   enviarRecordatorioPago,
   enviarRecordatorioPagoGrupo,
   ensureJsPDF,
-  LOGO_SRC,
+  obtenerLogoBase64,
   useReferenciadores,
   useAbogadosAsociados,
   useValorConRetraso,
@@ -137,7 +137,7 @@ async function generarCuentaDeCobroPdf({ cliente, pago, datosResponsable, numero
   // arriba, para que la cuenta de cobro se vea igual de institucional.
   try {
     const logoSize = 56;
-    pdf.addImage(LOGO_SRC, "PNG", pageWidth / 2 - logoSize / 2, y, logoSize, logoSize);
+    pdf.addImage(await obtenerLogoBase64(), "PNG", pageWidth / 2 - logoSize / 2, y, logoSize, logoSize);
     y += logoSize + 24;
   } catch (e) {
     // Si por lo que sea el logo no carga (formato inesperado), el PDF se
@@ -249,7 +249,7 @@ async function generarCuentaDeCobroComisionDocx({ contacto, tipoContacto, client
       new Paragraph({
         alignment: AlignmentType.CENTER,
         spacing: { after: 120 },
-        children: [new ImageRun({ type: "png", data: base64ImagenALogo(LOGO_SRC), transformation: { width: 60, height: 60 } })],
+        children: [new ImageRun({ type: "png", data: base64ImagenALogo(await obtenerLogoBase64()), transformation: { width: 60, height: 60 } })],
       }),
     ];
   } catch (e) {
@@ -478,7 +478,7 @@ async function generarAcuerdoPagoDocx(datos) {
       new Paragraph({
         alignment: AlignmentType.CENTER,
         spacing: { after: 120 },
-        children: [new ImageRun({ type: "png", data: base64ImagenALogo(LOGO_SRC), transformation: { width: 60, height: 60 } })],
+        children: [new ImageRun({ type: "png", data: base64ImagenALogo(await obtenerLogoBase64()), transformation: { width: 60, height: 60 } })],
       }),
     ];
   } catch (e) {
@@ -596,7 +596,7 @@ async function generarResumenFiscalPdf({ anio, nombreDespacho, ingresosBruto, re
 
   try {
     const logoSize = 44;
-    pdf.addImage(LOGO_SRC, "PNG", pageWidth / 2 - logoSize / 2, y, logoSize, logoSize);
+    pdf.addImage(await obtenerLogoBase64(), "PNG", pageWidth / 2 - logoSize / 2, y, logoSize, logoSize);
     y += logoSize + 18;
   } catch (e) {
     // nunca debe bloquear el resumen por esto

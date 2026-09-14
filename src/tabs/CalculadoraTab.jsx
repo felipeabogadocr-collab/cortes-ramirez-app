@@ -14,7 +14,7 @@ import { storageGet, storageSet, getNombreDespacho } from "../lib/storage";
 import { numeroEnLetras } from "../lib/numeroEnLetras.js";
 import {
   COLORS, uid, registrarAuditoria, useIndex, Field, inputStyle, CampoDinero, buttonPrimary,
-  buttonGhost, Card, EncabezadoSeccion, Icono, formatoCOP, LOGO_SRC, useReferenciadores,
+  buttonGhost, Card, EncabezadoSeccion, Icono, formatoCOP, obtenerLogoBase64, useReferenciadores,
   useAbogadosAsociados, SelectorComision, AREAS_PROCESO, tiposProcesoDeArea,
   calcularProximaFechaPorFrecuencia, numeroWhatsappCliente, ensureJsPDF,
 } from "../App.jsx";
@@ -243,7 +243,7 @@ async function generarContratoServiciosDocx(datos) {
       new Paragraph({
         alignment: AlignmentType.CENTER,
         spacing: { after: 120 },
-        children: [new ImageRun({ type: "png", data: base64ImagenALogo(LOGO_SRC), transformation: { width: 60, height: 60 } })],
+        children: [new ImageRun({ type: "png", data: base64ImagenALogo(await obtenerLogoBase64()), transformation: { width: 60, height: 60 } })],
       }),
     ];
   } catch (e) {
@@ -323,7 +323,7 @@ async function generarContratoServiciosPdf(datos) {
 
   try {
     const logoSize = 40;
-    pdf.addImage(LOGO_SRC, "PNG", pageWidth / 2 - logoSize / 2, y, logoSize, logoSize);
+    pdf.addImage(await obtenerLogoBase64(), "PNG", pageWidth / 2 - logoSize / 2, y, logoSize, logoSize);
     y += logoSize + 10;
   } catch (e) {
     // el PDF se genera igual sin logo

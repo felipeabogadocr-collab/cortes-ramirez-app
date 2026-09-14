@@ -5,7 +5,7 @@ import {
   inputStyle, buttonPrimary, buttonGhost, Card, EncabezadoSeccion, Icono, EstadoVacio,
   EstadoBadge, SelloFirma, DocumentoTextoConFirmas, calcularEstado, sha256Hex,
   archivoDemasiadoGrande, TAMANO_MAX_ARCHIVO_MB, ensureMammoth, ensureJsPDF,
-  registrarAuditoria, LOGO_SRC, exportarCSV,
+  registrarAuditoria, obtenerLogoBase64, exportarCSV,
 } from "../App.jsx";
 
 const INDICATIVOS = [
@@ -43,7 +43,7 @@ async function descargarPdfFirmado(doc) {
 
   try {
     const logoSize = 40;
-    pdf.addImage(LOGO_SRC, "PNG", pageWidth / 2 - logoSize / 2, y - 30, logoSize, logoSize);
+    pdf.addImage(await obtenerLogoBase64(), "PNG", pageWidth / 2 - logoSize / 2, y - 30, logoSize, logoSize);
     y += logoSize - 12;
   } catch (e) {
     // el PDF se genera igual sin logo
