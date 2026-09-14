@@ -2061,6 +2061,7 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
 
   const [fechaDatosLimpios, setFechaDatosLimpios] = useState(null);
   const [mesFlujoExpandido, setMesFlujoExpandido] = useState(null);
+  const [cuentaSaldoExpandida, setCuentaSaldoExpandida] = useState(null);
   // Contabilidad se había vuelto una sola página larguísima (resumen, egresos,
   // ingresos y clientes todo revuelto en el mismo scroll) — se separa en
   // pestañas internas para que cada cosa tenga su propio lugar y no haya
@@ -2462,19 +2463,29 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
   // solo Nu sigue siendo la cuenta del despacho para este seguimiento.
   const CUENTAS_SALDO = ["Nu"];
   const saldoPorCuenta = Object.fromEntries(CUENTAS_SALDO.map((c) => [c, 0]));
+  const movimientosPorCuenta = Object.fromEntries(CUENTAS_SALDO.map((c) => [c, []]));
   ids.forEach((id) => {
     (clientes[id]?.pagos || []).forEach((p) => {
-      if (saldoPorCuenta[p.medioPago] !== undefined) saldoPorCuenta[p.medioPago] += Number(p.valor) || 0;
+      if (saldoPorCuenta[p.medioPago] !== undefined) {
+        saldoPorCuenta[p.medioPago] += Number(p.valor) || 0;
+        movimientosPorCuenta[p.medioPago].push({ fecha: p.fecha, tipo: "Abono de cliente", concepto: clientes[id]?.nombre || "Cliente", valor: Number(p.valor) || 0 });
+      }
     });
   });
   otrosIngresos.forEach((i) => {
-    if (saldoPorCuenta[i.medioPago] !== undefined) saldoPorCuenta[i.medioPago] += Number(i.valor) || 0;
+    if (saldoPorCuenta[i.medioPago] !== undefined) {
+      saldoPorCuenta[i.medioPago] += Number(i.valor) || 0;
+      movimientosPorCuenta[i.medioPago].push({ fecha: i.fecha, tipo: "Otro ingreso", concepto: i.concepto || "Sin concepto", valor: Number(i.valor) || 0 });
+    }
   });
   let egresosSinCuenta = 0;
   egresos.forEach((e) => {
-    if (saldoPorCuenta[e.medioPago] !== undefined) saldoPorCuenta[e.medioPago] -= Number(e.valor) || 0;
-    else egresosSinCuenta += 1;
+    if (saldoPorCuenta[e.medioPago] !== undefined) {
+      saldoPorCuenta[e.medioPago] -= Number(e.valor) || 0;
+      movimientosPorCuenta[e.medioPago].push({ fecha: e.fecha, tipo: "Egreso", concepto: e.concepto || "Sin concepto", valor: -(Number(e.valor) || 0) });
+    } else egresosSinCuenta += 1;
   });
+  CUENTAS_SALDO.forEach((c) => movimientosPorCuenta[c].sort((a, b) => new Date(b.fecha) - new Date(a.fecha)));
   const hayDatosSaldoCuenta = CUENTAS_SALDO.some((c) => saldoPorCuenta[c] !== 0);
 
   // Retorno de inversión: no hay forma de saber qué ingresos exactos vino
@@ -2958,35 +2969,74 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
             Según lo que has registrado con cada medio de pago — no es el saldo real del banco/billetera, es lo que debería haber si todo entró y salió de ahí. Solo Nu, porque Nequi y Daviplata son de uso personal.
           </p>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10 }}>
-            {[{ nombre: "Nu", color: "#820AD1" }].map((cuenta) => (
-              <div key={cuenta.nombre} style={{ display: "flex", alignItems: "center", gap: 10, background: COLORS.surfaceSoft, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: 12 }}>
-                <span
-                  style={{
-                    width: 34,
-                    height: 34,
-                    borderRadius: "50%",
-                    background: cuenta.color,
-                    color: "#fff",
-                    flexShrink: 0,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontFamily: "Inter, sans-serif",
-                    fontWeight: 800,
-                    fontSize: 13,
-                  }}
+            {[{ nombre: "Nu", color: "#820AD1" }].map((cuenta) => {
+              const abierta = cuentaSaldoExpandida === cuenta.nombre;
+              return (
+                <button
+                  key={cuenta.nombre}
+                  onClick={() => setCuentaSaldoExpandida(abierta ? null : cuenta.nombre)}
+                  style={{ display: "flex", alignItems: "center", gap: 10, background: COLORS.surfaceSoft, border: `1px solid ${abierta ? COLORS.navy : COLORS.border}`, borderRadius: 10, padding: 12, cursor: "pointer", textAlign: "left", width: "100%" }}
                 >
-                  {cuenta.nombre[0]}
-                </span>
-                <div>
-                  <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, fontWeight: 700, color: COLORS.muted, margin: 0 }}>{cuenta.nombre}</p>
-                  <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, fontWeight: 800, color: saldoPorCuenta[cuenta.nombre] >= 0 ? COLORS.navy : "#B42318", margin: "2px 0 0" }}>
-                    {formatoCOP(saldoPorCuenta[cuenta.nombre])}
-                  </p>
-                </div>
-              </div>
-            ))}
+                  <span
+                    style={{
+                      width: 34,
+                      height: 34,
+                      borderRadius: "50%",
+                      background: cuenta.color,
+                      color: "#fff",
+                      flexShrink: 0,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontFamily: "Inter, sans-serif",
+                      fontWeight: 800,
+                      fontSize: 13,
+                    }}
+                  >
+                    {cuenta.nombre[0]}
+                  </span>
+                  <div>
+                    <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, fontWeight: 700, color: COLORS.muted, margin: 0 }}>{cuenta.nombre}</p>
+                    <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, fontWeight: 800, color: saldoPorCuenta[cuenta.nombre] >= 0 ? COLORS.navy : "#B42318", margin: "2px 0 0" }}>
+                      {formatoCOP(saldoPorCuenta[cuenta.nombre])}
+                    </p>
+                  </div>
+                </button>
+              );
+            })}
           </div>
+          {cuentaSaldoExpandida && (
+            <div style={{ marginTop: 12, border: `1px solid ${COLORS.border}`, borderRadius: 10, overflow: "hidden" }}>
+              {movimientosPorCuenta[cuentaSaldoExpandida].length === 0 ? (
+                <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, padding: 12, margin: 0 }}>No hay movimientos registrados con {cuentaSaldoExpandida}.</p>
+              ) : (
+                movimientosPorCuenta[cuentaSaldoExpandida].map((mov, i) => (
+                  <div
+                    key={i}
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      gap: 10,
+                      padding: "9px 12px",
+                      borderTop: i === 0 ? "none" : `1px solid ${COLORS.border}`,
+                      background: i % 2 === 0 ? "#fff" : COLORS.surfaceSoft,
+                    }}
+                  >
+                    <div>
+                      <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, fontWeight: 700, color: COLORS.ink, margin: 0 }}>{mov.concepto}</p>
+                      <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11, color: COLORS.muted, margin: "1px 0 0" }}>
+                        {mov.tipo} · {new Date(mov.fecha).toLocaleDateString("es-CO", { day: "numeric", month: "short", year: "numeric" })}
+                      </p>
+                    </div>
+                    <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, fontWeight: 800, color: mov.valor >= 0 ? "#12805C" : "#B42318", margin: 0, whiteSpace: "nowrap" }}>
+                      {mov.valor >= 0 ? "+" : "−"} {formatoCOP(Math.abs(mov.valor))}
+                    </p>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
           <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11, color: COLORS.muted, marginTop: 10 }}>
             {egresosSinCuenta > 0
               ? `${egresosSinCuenta} egreso${egresosSinCuenta !== 1 ? "s" : ""} sin cuenta asignada no están contados aquí — edítalos para elegir de qué cuenta salieron y afinar el número.`
