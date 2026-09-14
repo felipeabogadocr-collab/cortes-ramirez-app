@@ -1,10 +1,11 @@
+import { useEffect } from "react";
 import {
   COLORS, formatoCOP, exportarCSV, buttonGhost, Card, EncabezadoSeccion, Icono, EstadoVacio,
   Spinner, GraficaBarras, GraficaBarrasAgrupadas, COLOR_AREA_PROCESO, COLOR_ESTADO_VIGILANCIA,
   ESTADOS_VIGILANCIA, useDatosReportes,
 } from "../App.jsx";
 
-export default function ReportesTab() {
+export default function ReportesTab({ onListo }) {
   const {
     cargando,
     usuarios,
@@ -31,6 +32,10 @@ export default function ReportesTab() {
     ticketPromedio,
     listaClientes,
   } = useDatosReportes();
+
+  useEffect(() => {
+    if (!cargando) onListo?.();
+  }, [cargando]);
 
   if (cargando) {
     return (

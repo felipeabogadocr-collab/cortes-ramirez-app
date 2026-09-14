@@ -1179,7 +1179,7 @@ function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-const APP_VERSION = "1.96.0";
+const APP_VERSION = "1.97.0";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -3467,9 +3467,16 @@ function ProximoEventoResumen({ onIr }) {
   );
 }
 
-function ResumenTab({ nombre, usuarioId, usuarioActual, onIr }) {
+function ResumenTab({ nombre, usuarioId, usuarioActual, onIr, onListo }) {
   const r = useResumenGeneral();
   const rep = useDatosReportes();
+  // Resumen ya muestra sus propias tarjetas con su carga progresiva (cada
+  // una llena su dato apenas llega, no espera a que todo esté listo) — no
+  // tiene sentido bloquear la pantalla de carga de afuera hasta que TODO
+  // termine, así que avisa "listo" de una vez al montar.
+  useEffect(() => {
+    onListo?.();
+  }, []);
   const versiculo = fraseDelDia(VERSICULOS);
   const tareasPendientes = r.clientesInactivos + r.docsFaltaAbogado + r.pagosPendientes + r.procesosConNovedad;
   // Se usa en dos tarjetas de abajo (el veredicto y, aparte, la alerta de
@@ -9602,27 +9609,46 @@ function App() {
   const [errorCargaPerfil, setErrorCargaPerfil] = useState(null);
   const [cambiandoUsuario, setCambiandoUsuario] = useState(false);
   const [tab, setTab] = useState("resumen");
-  // Con la precarga en hover, el chunk de casi cualquier pestaña ya está
-  // en caché para cuando se hace clic — lo cual es bueno para la
-  // velocidad, pero significaba que la pantalla de carga con el logo
-  // (CargandoSeccion) casi nunca se alcanzaba a ver: el contenido nuevo
-  // aparecía tan de golpe que no se sentía como que "cargó" nada, solo
-  // como un salto brusco. tabMostrado sigue a "tab" con un respiro mínimo
-  // (~350ms) mostrando esa pantalla de carga a propósito, para que cambiar
-  // de sección se sienta consistente sin importar si el chunk ya estaba en
-  // caché o no. El menú lateral resalta la pestaña elegida al instante
-  // (usa "tab", no "tabMostrado") — solo el contenido de la derecha espera.
-  const [tabMostrado, setTabMostrado] = useState("resumen");
+  // Con la precarga en hover, el chunk de casi cualquier pestaña ya está en
+  // caché para cuando se hace clic, así que la pantalla de carga con el
+  // logo (CargandoSeccion) casi nunca se alcanzaba a ver — pero eso no
+  // significa que los DATOS de esa pestaña (la lista de clientes, de
+  // documentos, etc.) ya estén listos: esos se piden aparte, adentro de
+  // cada pestaña, y antes se veía la pantalla vacía/poblándose de a poco
+  // justo después del salto.
+  //
+  // La pestaña nueva se monta de una (para que arranque a pedir sus datos),
+  // pero queda oculta con CSS y encima se ve CargandoSeccion, hasta que se
+  // cumplen DOS cosas: un mínimo de ~350ms (para que no sea un parpadeo
+  // cuando todo ya estaba listo) y que la pestaña avise "onListo" (sus
+  // datos ya cargaron). Un tope de seguridad de 6s evita quedarse pegado en
+  // carga para siempre si alguna pestaña no llega a avisar. El menú
+  // lateral resalta la pestaña elegida al instante — solo el contenido de
+  // la derecha espera.
   const [cambiandoTab, setCambiandoTab] = useState(false);
+  const minimoListoRef = useRef(true);
+  const datosListosRef = useRef(true);
   useEffect(() => {
-    if (tab === tabMostrado) return;
     setCambiandoTab(true);
-    const espera = setTimeout(() => {
-      setTabMostrado(tab);
-      setCambiandoTab(false);
+    minimoListoRef.current = false;
+    datosListosRef.current = false;
+    const minimo = setTimeout(() => {
+      minimoListoRef.current = true;
+      if (datosListosRef.current) setCambiandoTab(false);
     }, 350);
-    return () => clearTimeout(espera);
+    const tope = setTimeout(() => {
+      datosListosRef.current = true;
+      setCambiandoTab(false);
+    }, 6000);
+    return () => {
+      clearTimeout(minimo);
+      clearTimeout(tope);
+    };
   }, [tab]);
+  const marcarDatosListos = useCallback(() => {
+    datosListosRef.current = true;
+    if (minimoListoRef.current) setCambiandoTab(false);
+  }, []);
   // Cada pestaña (menos Resumen) se carga con React.lazy para no meter todo
   // el código de la app en un solo bundle — el costo es que la primera vez
   // que alguien la abre hay un mini-salto mientras descarga su chunk. Al
@@ -10298,91 +10324,93 @@ function App() {
               </button>
             </div>
           )}
-          <div key={tabMostrado} className="drx-tab-transition" style={{ maxWidth: 760, margin: "0 auto" }}>
-            {cambiandoTab ? (
-              <CargandoSeccion />
-            ) : (
-              <>
-                {tabMostrado === "resumen" && puedeVer("resumen") && (
-                  <TabErrorBoundary nombre="resumen">
-                    <ResumenTab nombre={usuarioActual.nombre} usuarioId={usuarioActual.id} usuarioActual={usuarioActual} onIr={setTab} />
-                  </TabErrorBoundary>
-                )}
-                {tabMostrado === "agenda" && puedeVer("agenda") && (
-                  <TabErrorBoundary nombre="agenda">
-                    <Suspense fallback={<CargandoSeccion />}>
-                      <AgendaTab />
-                    </Suspense>
-                  </TabErrorBoundary>
-                )}
-                {tabMostrado === "clientes" && puedeVer("clientes") && (
-                  <TabErrorBoundary nombre="clientes">
-                    <Suspense fallback={<CargandoSeccion />}>
-                      <ClientesTab usuarioActual={usuarioActual} onIrARegistrarPago={irARegistrarPago} />
-                    </Suspense>
-                  </TabErrorBoundary>
-                )}
-                {tabMostrado === "vigilancia" && puedeVer("vigilancia") && (
-                  <TabErrorBoundary nombre="vigilancia">
-                    <Suspense fallback={<CargandoSeccion />}>
-                      <VigilanciaTab />
-                    </Suspense>
-                  </TabErrorBoundary>
-                )}
-                {tabMostrado === "contabilidad" && puedeVer("contabilidad") && (
-                  <TabErrorBoundary nombre="contabilidad">
-                    <Suspense fallback={<CargandoSeccion />}>
-                      <ContabilidadTab usuarioActual={usuarioActual} clienteInicialPago={clienteParaPago} onClienteInicialPagoConsumido={() => setClienteParaPago(null)} />
-                    </Suspense>
-                  </TabErrorBoundary>
-                )}
-                {tabMostrado === "calculadora" && puedeVer("calculadora") && (
-                  <TabErrorBoundary nombre="calculadora">
-                    <Suspense fallback={<CargandoSeccion />}>
-                      <CalculadoraTab usuarioActual={usuarioActual} />
-                    </Suspense>
-                  </TabErrorBoundary>
-                )}
-                {tabMostrado === "contenido" && puedeVer("contenido") && (
-                  <TabErrorBoundary nombre="contenido">
-                    <Suspense fallback={<CargandoSeccion />}>
-                      <ContenidoTab />
-                    </Suspense>
-                  </TabErrorBoundary>
-                )}
-                {tabMostrado === "documentos" && puedeVer("documentos") && (
-                  <TabErrorBoundary nombre="documentos">
-                    <Suspense fallback={<CargandoSeccion />}>
-                      <DocumentosTab usuarioActual={usuarioActual} />
-                    </Suspense>
-                  </TabErrorBoundary>
-                )}
-                {tabMostrado === "reportes" && puedeVer("reportes") && (
-                  <TabErrorBoundary nombre="reportes">
-                    <Suspense fallback={<CargandoSeccion />}>
-                      <ReportesTab />
-                    </Suspense>
-                  </TabErrorBoundary>
-                )}
-                {tabMostrado === "usuarios" && usuarioActual.rol === "Administrador" && (
-                  <TabErrorBoundary nombre="usuarios">
-                    <Suspense fallback={<CargandoSeccion />}>
-                      <UsuariosPermisosTab
-                        usuarioActual={usuarioActual}
-                        onDespachoRenombrado={(nuevoNombre) => setUsuarioActual((prev) => (prev ? { ...prev, despachoNombre: nuevoNombre } : prev))}
-                      />
-                    </Suspense>
-                  </TabErrorBoundary>
-                )}
-                {tabMostrado === "plataforma" && usuarioActual.es_superadmin && (
-                  <TabErrorBoundary nombre="plataforma">
-                    <Suspense fallback={<CargandoSeccion />}>
-                      <PlataformaTab />
-                    </Suspense>
-                  </TabErrorBoundary>
-                )}
-              </>
-            )}
+          <div key={tab} className="drx-tab-transition" style={{ maxWidth: 760, margin: "0 auto" }}>
+            {cambiandoTab && <CargandoSeccion />}
+            {/* El contenido se monta siempre (para que arranque a pedir sus
+                datos y pueda avisar "onListo" cuanto antes) — mientras
+                cambiandoTab es true, queda oculto con CSS (no desmontado)
+                debajo de CargandoSeccion. */}
+            <div style={{ display: cambiandoTab ? "none" : "block" }}>
+              {tab === "resumen" && puedeVer("resumen") && (
+                <TabErrorBoundary nombre="resumen">
+                  <ResumenTab nombre={usuarioActual.nombre} usuarioId={usuarioActual.id} usuarioActual={usuarioActual} onIr={setTab} onListo={marcarDatosListos} />
+                </TabErrorBoundary>
+              )}
+              {tab === "agenda" && puedeVer("agenda") && (
+                <TabErrorBoundary nombre="agenda">
+                  <Suspense fallback={<CargandoSeccion />}>
+                    <AgendaTab onListo={marcarDatosListos} />
+                  </Suspense>
+                </TabErrorBoundary>
+              )}
+              {tab === "clientes" && puedeVer("clientes") && (
+                <TabErrorBoundary nombre="clientes">
+                  <Suspense fallback={<CargandoSeccion />}>
+                    <ClientesTab usuarioActual={usuarioActual} onIrARegistrarPago={irARegistrarPago} onListo={marcarDatosListos} />
+                  </Suspense>
+                </TabErrorBoundary>
+              )}
+              {tab === "vigilancia" && puedeVer("vigilancia") && (
+                <TabErrorBoundary nombre="vigilancia">
+                  <Suspense fallback={<CargandoSeccion />}>
+                    <VigilanciaTab onListo={marcarDatosListos} />
+                  </Suspense>
+                </TabErrorBoundary>
+              )}
+              {tab === "contabilidad" && puedeVer("contabilidad") && (
+                <TabErrorBoundary nombre="contabilidad">
+                  <Suspense fallback={<CargandoSeccion />}>
+                    <ContabilidadTab usuarioActual={usuarioActual} clienteInicialPago={clienteParaPago} onClienteInicialPagoConsumido={() => setClienteParaPago(null)} onListo={marcarDatosListos} />
+                  </Suspense>
+                </TabErrorBoundary>
+              )}
+              {tab === "calculadora" && puedeVer("calculadora") && (
+                <TabErrorBoundary nombre="calculadora">
+                  <Suspense fallback={<CargandoSeccion />}>
+                    <CalculadoraTab usuarioActual={usuarioActual} onListo={marcarDatosListos} />
+                  </Suspense>
+                </TabErrorBoundary>
+              )}
+              {tab === "contenido" && puedeVer("contenido") && (
+                <TabErrorBoundary nombre="contenido">
+                  <Suspense fallback={<CargandoSeccion />}>
+                    <ContenidoTab onListo={marcarDatosListos} />
+                  </Suspense>
+                </TabErrorBoundary>
+              )}
+              {tab === "documentos" && puedeVer("documentos") && (
+                <TabErrorBoundary nombre="documentos">
+                  <Suspense fallback={<CargandoSeccion />}>
+                    <DocumentosTab usuarioActual={usuarioActual} onListo={marcarDatosListos} />
+                  </Suspense>
+                </TabErrorBoundary>
+              )}
+              {tab === "reportes" && puedeVer("reportes") && (
+                <TabErrorBoundary nombre="reportes">
+                  <Suspense fallback={<CargandoSeccion />}>
+                    <ReportesTab onListo={marcarDatosListos} />
+                  </Suspense>
+                </TabErrorBoundary>
+              )}
+              {tab === "usuarios" && usuarioActual.rol === "Administrador" && (
+                <TabErrorBoundary nombre="usuarios">
+                  <Suspense fallback={<CargandoSeccion />}>
+                    <UsuariosPermisosTab
+                      usuarioActual={usuarioActual}
+                      onDespachoRenombrado={(nuevoNombre) => setUsuarioActual((prev) => (prev ? { ...prev, despachoNombre: nuevoNombre } : prev))}
+                      onListo={marcarDatosListos}
+                    />
+                  </Suspense>
+                </TabErrorBoundary>
+              )}
+              {tab === "plataforma" && usuarioActual.es_superadmin && (
+                <TabErrorBoundary nombre="plataforma">
+                  <Suspense fallback={<CargandoSeccion />}>
+                    <PlataformaTab onListo={marcarDatosListos} />
+                  </Suspense>
+                </TabErrorBoundary>
+              )}
+            </div>
           </div>
         </div>
 

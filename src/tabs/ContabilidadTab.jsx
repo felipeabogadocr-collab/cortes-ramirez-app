@@ -2099,7 +2099,7 @@ function OtroIngresoCard({ ingreso, onEditar, onEliminar, mediosPago = MEDIOS_PA
   );
 }
 
-export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onClienteInicialPagoConsumido }) {
+export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onClienteInicialPagoConsumido, onListo }) {
   const { ids, cargado } = useIndex("indice-clientes", false);
   const [clientes, setClientes] = useState({});
   // Lista simple {id, nombre} para el selector "cliente asociado" de un
@@ -2341,7 +2341,8 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
   const cargar = useCallback(async () => {
     const entries = await obtenerClientesPorId(ids);
     setClientes(entries);
-  }, [ids]);
+    if (cargado) onListo?.();
+  }, [ids, cargado]);
 
   useEffect(() => {
     cargar();

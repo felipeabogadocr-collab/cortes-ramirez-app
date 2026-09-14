@@ -73,9 +73,12 @@ function PanelErroresCliente() {
   );
 }
 
-export default function PlataformaTab() {
+export default function PlataformaTab({ onListo }) {
   const [despachos, setDespachos] = useState([]);
   const [cargando, setCargando] = useState(true);
+  useEffect(() => {
+    if (!cargando) onListo?.();
+  }, [cargando]);
   const [error, setError] = useState("");
   const [cambiando, setCambiando] = useState(null);
   const [filtro, setFiltro] = useState("");

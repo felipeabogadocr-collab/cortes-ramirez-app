@@ -382,9 +382,12 @@ function PanelContactosComision({ usuarioActual, titulo, icono, descripcion, hoo
   );
 }
 
-export default function UsuariosPermisosTab({ usuarioActual, onDespachoRenombrado }) {
+export default function UsuariosPermisosTab({ usuarioActual, onDespachoRenombrado, onListo }) {
   const usuarioActualId = usuarioActual.id;
-  const { usuarios, crear: crearUsuario, actualizar, eliminar: eliminarUsuario } = useUsuariosDespacho();
+  const { usuarios, cargado: usuariosCargados, crear: crearUsuario, actualizar, eliminar: eliminarUsuario } = useUsuariosDespacho();
+  useEffect(() => {
+    if (usuariosCargados) onListo?.();
+  }, [usuariosCargados]);
   const [mostrarForm, setMostrarForm] = useState(false);
   const [nombre, setNombre] = useState("");
   const [email, setEmail] = useState("");

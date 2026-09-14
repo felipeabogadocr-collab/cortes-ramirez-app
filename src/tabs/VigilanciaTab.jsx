@@ -186,8 +186,8 @@ function CargaMasivaNovedades({ onAgregar }) {
   );
 }
 
-export default function VigilanciaTab() {
-  const { ids } = useIndex("indice-clientes", false);
+export default function VigilanciaTab({ onListo }) {
+  const { ids, cargado: idsCargados } = useIndex("indice-clientes", false);
   const [clientes, setClientes] = useState({});
   const [consultando, setConsultando] = useState(null);
   const [resultados, setResultados] = useState({});
@@ -217,7 +217,8 @@ export default function VigilanciaTab() {
   const cargar = useCallback(async () => {
     const entries = await obtenerClientesPorId(ids);
     setClientes(entries);
-  }, [ids]);
+    if (idsCargados) onListo?.();
+  }, [ids, idsCargados]);
 
   useEffect(() => {
     cargar();

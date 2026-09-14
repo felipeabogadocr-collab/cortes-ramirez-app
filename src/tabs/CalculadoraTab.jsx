@@ -391,7 +391,7 @@ const CONTRATANTE_INICIAL = { nombre: "", cedula: "", telefono: "" };
 const ABOGADO2_INICIAL = { nombre: "", documento: "", tp: "" };
 const PROCESO_INICIAL = { numero: "", despacho: "", etapa: "" };
 
-export default function CalculadoraTab({ usuarioActual }) {
+export default function CalculadoraTab({ usuarioActual, onListo }) {
   // Mismos datos que usa Contabilidad para la cuenta de cobro ("Datos para
   // cuenta de cobro") — se leen aquí también porque el contrato necesita
   // el nombre/cédula/T.P. de quien firma como abogado principal, y así los
@@ -401,6 +401,7 @@ export default function CalculadoraTab({ usuarioActual }) {
     (async () => {
       const raw = await storageGet("perfil-abogado", false);
       setDatosResponsable(raw ? JSON.parse(raw) : {});
+      onListo?.();
     })();
   }, []);
 

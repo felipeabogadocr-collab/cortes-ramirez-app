@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   COLORS, EncabezadoSeccion, Card, buttonPrimary, buttonGhost, Field, inputStyle,
   Icono, IconoCampana, EstadoVacio, useConfirmarDialogo, useEventosAgenda, diasHasta, urgenciaTermino,
@@ -106,8 +106,11 @@ function EventoAgendaCard({ evento, onEliminar, onCompletar, pasado }) {
   );
 }
 
-export default function AgendaTab() {
+export default function AgendaTab({ onListo }) {
   const { ids, eventos, cargado, crear, eliminar, actualizar } = useEventosAgenda();
+  useEffect(() => {
+    if (cargado) onListo?.();
+  }, [cargado]);
   const [mostrarForm, setMostrarForm] = useState(false);
   const [form, setForm] = useState({ titulo: "", fecha: "", hora: "", notas: "", esTermino: false, clienteRelacionado: "" });
   const [permisoNotif, setPermisoNotif] = useState(typeof Notification !== "undefined" ? Notification.permission : "unsupported");

@@ -425,7 +425,7 @@ function PlanDePago({ planPago, onChange }) {
   );
 }
 
-export default function ClientesTab({ usuarioActual, onIrARegistrarPago }) {
+export default function ClientesTab({ usuarioActual, onIrARegistrarPago, onListo }) {
   const { ids, cargado, addId, removeId } = useIndex("indice-clientes", false);
   const { usuarios: abogadosDespacho } = useUsuariosDespacho();
   const [clientes, setClientes] = useState({});
@@ -459,8 +459,13 @@ export default function ClientesTab({ usuarioActual, onIrARegistrarPago }) {
     (async () => {
       const entries = await obtenerClientesPorId(ids);
       setClientes(entries);
+      // Avisa "ya está listo" solo cuando los DATOS de los clientes ya
+      // cargaron, no solo la lista de ids — así la pantalla de carga de
+      // afuera se queda hasta que de verdad haya algo que mostrar, en vez
+      // de desaparecer y dejar ver la lista poblándose de a poco.
+      if (cargado) onListo?.();
     })();
-  }, [ids]);
+  }, [ids, cargado]);
 
   const copiar = (texto, etiqueta) => {
     navigator.clipboard?.writeText(texto);

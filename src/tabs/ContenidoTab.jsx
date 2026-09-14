@@ -79,6 +79,7 @@ async function generarIdeasCalendario(tema, estrategia) {
 function useContenido() {
   const { ids, addId, removeId } = useIndex("indice-contenido", true);
   const [items, setItems] = useState({});
+  const [cargado, setCargado] = useState(false);
 
   const cargar = useCallback(async () => {
     const valores = await obtenerValoresPorClaves(ids.map((id) => `contenido:${id}`));
@@ -88,6 +89,7 @@ function useContenido() {
       if (raw) entries[id] = JSON.parse(raw);
     });
     setItems(entries);
+    setCargado(true);
   }, [ids]);
 
   useEffect(() => {
@@ -118,7 +120,7 @@ function useContenido() {
     });
   };
 
-  return { items, crear, actualizar, eliminar };
+  return { items, crear, actualizar, eliminar, cargado };
 }
 
 function useIdeasContenido() {
@@ -407,11 +409,14 @@ function CommunityManagerIA({ estrategia, onGuardarIdeas }) {
   );
 }
 
-export default function ContenidoTab() {
-  const { items, crear, actualizar, eliminar } = useContenido();
+export default function ContenidoTab({ onListo }) {
+  const { items, crear, actualizar, eliminar, cargado } = useContenido();
   const { usuarios } = useUsuariosDespacho();
   const { ideas, agregarVarias, eliminar: eliminarIdea } = useIdeasContenido();
   const { estrategia, cargado: estrategiaCargada, guardar: guardarEstrategia } = useEstrategiaContenido();
+  useEffect(() => {
+    if (cargado) onListo?.();
+  }, [cargado]);
 
   const [mesActual, setMesActual] = useState(() => {
     const d = new Date();

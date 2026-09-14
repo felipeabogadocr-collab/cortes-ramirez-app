@@ -237,7 +237,7 @@ C.C. [C.C.]`,
   },
 ];
 
-export default function DocumentosTab({ usuarioActual }) {
+export default function DocumentosTab({ usuarioActual, onListo }) {
   const { ids, cargado, addId, removeId } = useIndex("indice-documentos", true);
   const [docs, setDocs] = useState({});
   const [form, setForm] = useState(FORM_DOC_INICIAL);
@@ -256,7 +256,8 @@ export default function DocumentosTab({ usuarioActual }) {
   const cargar = useCallback(async () => {
     const entries = await obtenerDocumentosPorId(ids);
     setDocs(entries);
-  }, [ids]);
+    if (cargado) onListo?.();
+  }, [ids, cargado]);
 
   useEffect(() => {
     cargar();
