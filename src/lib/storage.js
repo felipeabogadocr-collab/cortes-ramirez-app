@@ -486,7 +486,7 @@ export async function firmarDocumentoPublico(id, data) {
 // instante, no tiene sentido impedirle firmar por eso.
 export async function registrarEventoDocumentoPublico(id, tipoEvento, extra) {
   try {
-    await fetch("/api/documentos/evento", {
+    await fetch("/api/documentos/firmar", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ codigo: id, tipoEvento, ...extra }),
