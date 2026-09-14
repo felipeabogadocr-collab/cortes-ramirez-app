@@ -2295,7 +2295,7 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
 
   const proximosPagos = ids
     .map((id) => ({ id, c: clientes[id] }))
-    .filter(({ c }) => c?.proximoPago?.fecha && !c.procesoPausado)
+    .filter(({ c }) => c?.proximoPago?.fecha && !c.procesoPausado && !c.esClienteAdministrativo)
     .map(({ id, c }) => ({ id, c, dias: diasHasta(c.proximoPago.fecha) }))
     .filter(({ dias }) => dias !== null && dias <= DIAS_AVISO_PROXIMO_PAGO)
     .sort((a, b) => a.dias - b.dias);
@@ -3395,7 +3395,11 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
           // plan de 4 cuotas, por ejemplo, siempre tiene saldo pendiente
           // hasta la última, y eso no es un atraso.
           const diasParaProximoPago = c.proximoPago?.fecha ? diasHasta(c.proximoPago.fecha) : null;
-          const clienteAtrasado = saldo > 0 && diasParaProximoPago !== null && diasParaProximoPago < 0;
+          // Una bolsa administrativa (ej. "Pagos pendientes por clasificar")
+          // no es un cliente real esperando cobro — nunca debería mostrar
+          // "Atrasado" ni ofrecer un acuerdo de pago, igual que ya se
+          // excluye de la concentración de cartera y el ranking.
+          const clienteAtrasado = !c.esClienteAdministrativo && saldo > 0 && diasParaProximoPago !== null && diasParaProximoPago < 0;
 
           return (
             <Card key={id} style={{ borderLeft: "4px solid #F43F5E" }}>

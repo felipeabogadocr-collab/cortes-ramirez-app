@@ -1176,7 +1176,7 @@ function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-const APP_VERSION = "1.83.1";
+const APP_VERSION = "1.84.0";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -1543,7 +1543,11 @@ async function calcularResumenOperacion() {
     // avisos de pago — el abogado lo pausó a propósito.
     if (dias !== null && dias >= DIAS_ALERTA_INACTIVIDAD && c.estadoVigilancia !== "Finalizado" && !c.procesoPausado) clientesInactivos++;
     else clientesActivos++;
-    if (c.proximoPago?.fecha && !c.procesoPausado) {
+    // Una bolsa administrativa (ej. "Pagos pendientes por clasificar") no
+    // es un cliente real esperando que le cobren — no debería generar
+    // alertas de pago próximo/atrasado, igual que ya no cuenta en la
+    // concentración de cartera ni en el ranking de clientes.
+    if (c.proximoPago?.fecha && !c.procesoPausado && !c.esClienteAdministrativo) {
       const diasPago = diasHasta(c.proximoPago.fecha);
       if (diasPago !== null && diasPago <= DIAS_AVISO_PROXIMO_PAGO) pagosPendientes++;
       if (diasPago !== null && diasPago < 0) pagosAtrasados++;
@@ -5505,7 +5509,7 @@ export function useDatosReportes() {
   // que no debería sumar aquí (sí suma en carteraPendienteTotal, que es el
   // total sin cobrar todavía, atrasado o no).
   const carteraAtrasadaTotal = listaClientes.reduce((sum, c) => {
-    if (c.procesoPausado || !c.proximoPago?.fecha) return sum;
+    if (c.procesoPausado || !c.proximoPago?.fecha || c.esClienteAdministrativo) return sum;
     const totalPagado = (c.pagos || []).reduce((s, p) => s + (Number(p.valor) || 0), 0);
     const valorTotal = Number(c.valorTotal) || 0;
     const saldo = valorTotal > 0 ? valorTotal - totalPagado : 0;
@@ -5993,7 +5997,7 @@ function useNotificacionesPanel(prefs) {
       if (dias !== null && dias >= DIAS_ALERTA_INACTIVIDAD && !c.procesoPausado) {
         inactivos.push({ nombre: c.nombre, dias });
       }
-      if (c.proximoPago?.fecha && !c.procesoPausado) {
+      if (c.proximoPago?.fecha && !c.procesoPausado && !c.esClienteAdministrativo) {
         const diasPago = diasHasta(c.proximoPago.fecha);
         if (diasPago !== null && diasPago <= DIAS_AVISO_PROXIMO_PAGO) {
           pendientesPago.push({ cliente: c, dias: diasPago });
