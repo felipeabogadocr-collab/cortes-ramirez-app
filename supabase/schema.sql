@@ -476,3 +476,66 @@ create policy "cada despacho actualiza sus propios avatares" on storage.objects
 -- le avisa al superadmin que hay que revisar y activar.
 alter table despachos add column if not exists prueba_hasta timestamptz;
 alter table despachos add column if not exists pago_reportado_en timestamptz;
+
+-- Cadena de custodia de la firma electrónica (Ley 527 de 1999) ------------
+-- Registro de auditoría propio de "Firmar documentos", separado de la
+-- tabla "auditoria" general (esa es para acciones administrativas del
+-- despacho; esta es evidencia legal de cada documento firmado). Cada fila
+-- es un hecho puntual — visto, consentimiento aceptado, firmado — con su
+-- propio timestamp, IP y user-agent. A propósito NUNCA se otorga permiso de
+-- UPDATE ni DELETE sobre esta tabla a nadie (ni siquiera al Administrador
+-- del despacho): una vez insertada, una fila queda para siempre, para que
+-- el registro sea defendible como prueba ante un juzgado — si alguien
+-- pudiera editar o borrar una fila, dejaría de servir como evidencia.
+-- Los eventos del firmante público (#firmar, sin sesión) los inserta el
+-- servidor con la llave service_role (api/documentos/firmar.js y
+-- api/documentos/evento.js) — así la IP real queda capturada del lado del
+-- servidor, donde el navegador no la puede falsificar. El evento de firma
+-- del abogado (con sesión, dentro de la app) lo inserta el propio
+-- navegador autenticado, sin IP (limitación conocida: capturarla también
+-- ahí requeriría pasar esa firma por un endpoint de servidor aparte).
+
+create table if not exists documento_eventos (
+  id bigserial primary key,
+  despacho_id uuid references despachos (id),
+  documento_id text not null,
+  tipo_evento text not null check (tipo_evento in ('documento_visualizado', 'consentimiento_aceptado', 'documento_firmado')),
+  firmante_nombre text,
+  firmante_documento_id text,
+  rol text,
+  ip text,
+  user_agent text,
+  hash_documento text,
+  detalle jsonb,
+  creado_en timestamptz not null default now()
+);
+
+create index if not exists documento_eventos_documento_idx on documento_eventos (documento_id, creado_en);
+create index if not exists documento_eventos_despacho_idx on documento_eventos (despacho_id, creado_en desc);
+
+alter table documento_eventos enable row level security;
+
+-- Solo lectura (y solo del propio despacho) para exportar el log desde la
+-- app. La inserción normal la hacen las funciones de servidor (llave
+-- service_role, que se salta RLS) — la política de insert de aquí abajo
+-- es solo para el caso del abogado firmando CON sesión dentro de la app.
+drop policy if exists "mismo despacho lee eventos de documento" on documento_eventos;
+create policy "mismo despacho lee eventos de documento" on documento_eventos
+  for select
+  using (despacho_id = mi_despacho_id());
+
+drop policy if exists "mismo despacho inserta eventos de documento" on documento_eventos;
+create policy "mismo despacho inserta eventos de documento" on documento_eventos
+  for insert
+  with check (despacho_id = mi_despacho_id());
+
+-- A propósito: no existe ningún "for update" ni "for delete" — con RLS
+-- activado y sin política que lo permita, Postgres deniega ambas
+-- operaciones a cualquier cliente normal (anon o authenticated), incluido
+-- el propio Administrador del despacho. La llave service_role (usada solo
+-- en los endpoints de servidor) sí puede saltarse RLS por diseño de
+-- Supabase — la garantía real de "nadie edita esto" es que ningún código
+-- de esta app llama nunca UPDATE ni DELETE sobre esta tabla, ni desde el
+-- navegador ni desde el servidor; solo se inserta. Quien administre la
+-- base de datos directamente en Supabase (fuera de la app) sí podría
+-- editarla — eso ya escapa a lo que el software puede impedir por sí solo.

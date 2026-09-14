@@ -1,11 +1,11 @@
 import { useState, useEffect, useCallback } from "react";
-import { storageGet, storageSet, getNombreDespacho, obtenerDocumentosPorId } from "../lib/storage";
+import { storageGet, storageSet, getNombreDespacho, obtenerDocumentosPorId, registrarEventoDocumentoDespacho, obtenerEventosDocumento } from "../lib/storage";
 import {
   COLORS, uid, diasDesde, useAvisoAntesDeSalir, useConfirmarDialogo, useIndex, Field,
   inputStyle, buttonPrimary, buttonGhost, Card, EncabezadoSeccion, Icono, EstadoVacio,
   EstadoBadge, SelloFirma, DocumentoTextoConFirmas, calcularEstado, sha256Hex,
   archivoDemasiadoGrande, TAMANO_MAX_ARCHIVO_MB, ensureMammoth, ensureJsPDF,
-  registrarAuditoria, LOGO_SRC,
+  registrarAuditoria, LOGO_SRC, exportarCSV,
 } from "../App.jsx";
 
 const INDICATIVOS = [
@@ -426,11 +426,56 @@ export default function DocumentosTab({ usuarioActual }) {
     setPreviewAbogado({ x: 55, y: 82, textoFirma: "" });
   };
 
+  // Traducciones legibles para la exportación — el nombre técnico del
+  // evento no le dice nada a un abogado ni a un juez revisando el log.
+  const NOMBRE_EVENTO = {
+    documento_creado: "Documento creado",
+    documento_visualizado: "Documento visualizado por el firmante",
+    consentimiento_aceptado: "Consentimiento de firma aceptado",
+    documento_firmado: "Documento firmado",
+  };
+
+  const [exportandoLogId, setExportandoLogId] = useState(null);
+  const exportarLogAuditoria = async (d, id) => {
+    setExportandoLogId(id);
+    try {
+      const eventos = await obtenerEventosDocumento(id);
+      // El log siempre empieza con la creación del documento — ese dato ya
+      // vive en el propio documento (creadoEn), no hace falta un evento
+      // aparte para algo que Postgres registra solo al insertar la fila.
+      const filas = [
+        { tipo_evento: "documento_creado", firmante_nombre: null, firmante_documento_id: null, rol: null, ip: null, user_agent: null, hash_documento: null, creado_en: d.creadoEn || null },
+        ...eventos,
+      ];
+      exportarCSV(
+        `auditoria-${d.titulo || "documento"}-${id}.csv`,
+        [
+          { titulo: "Evento", valor: (e) => NOMBRE_EVENTO[e.tipo_evento] || e.tipo_evento },
+          { titulo: "Fecha y hora (Colombia)", valor: (e) => (e.creado_en ? new Date(e.creado_en).toLocaleString("es-CO", { dateStyle: "full", timeStyle: "medium", timeZone: "America/Bogota" }) : "") },
+          { titulo: "Firmante", valor: (e) => e.firmante_nombre || "" },
+          { titulo: "Identificación", valor: (e) => e.firmante_documento_id || "" },
+          { titulo: "Rol", valor: (e) => e.rol || "" },
+          { titulo: "Dirección IP", valor: (e) => e.ip || "" },
+          { titulo: "Navegador/dispositivo", valor: (e) => e.user_agent || "" },
+          { titulo: "Hash SHA-256 del documento", valor: (e) => e.hash_documento || "" },
+        ],
+        filas
+      );
+    } catch (e) {
+      console.error("No se pudo exportar el log de auditoría:", e);
+    }
+    setExportandoLogId(null);
+  };
+
   const confirmarFirmaAbogado = async (id) => {
     if (!nombreAbogado.trim()) return;
     await storageSet("perfil-abogado", JSON.stringify({ nombre: nombreAbogado.trim(), registro: registroAbogado.trim() }), false);
     const raw = await storageGet(`documento:${id}`, true);
     const d = raw ? JSON.parse(raw) : docs[id];
+    // Mismo hash de integridad que se le exige a la firma del cliente (Ley
+    // 527 de 1999, art. 7) — antes solo el cliente lo tenía, y la firma del
+    // abogado quedaba sin esa evidencia de integridad.
+    const hashDocumento = await sha256Hex(d.tipoDocumento === "pdf" ? d.archivoPdfBase64 || "" : d.contenido || "");
     const nuevaFirma = {
       nombre: nombreAbogado.trim(),
       tipoId: "Tarjeta profesional",
@@ -440,11 +485,21 @@ export default function DocumentosTab({ usuarioActual }) {
       y: previewAbogado.y,
       firmadoEn: new Date().toISOString(),
       rol: "abogado",
+      hashDocumento,
     };
     const updated = { ...d, firmantes: [...(d.firmantes || []), nuevaFirma] };
     await storageSet(`documento:${id}`, JSON.stringify(updated), true);
     setDocs((prev) => ({ ...prev, [id]: updated }));
     registrarAuditoria(usuarioActual, "firmar_documento", "documento", id, { nombre: updated.titulo });
+    // Cadena de custodia: mismo evento "documento_firmado" que el firmante
+    // público, pero insertado con sesión (sin IP — ver nota en storage.js).
+    registrarEventoDocumentoDespacho(id, "documento_firmado", {
+      firmante_nombre: nuevaFirma.textoFirma,
+      firmante_documento_id: nuevaFirma.numeroId,
+      rol: "abogado",
+      hash_documento: hashDocumento,
+      detalle: { titulo: updated.titulo },
+    });
     setFirmandoDocId(null);
     setPreviewAbogado(null);
   };
@@ -826,6 +881,15 @@ export default function DocumentosTab({ usuarioActual }) {
                       Firmar documento
                     </button>
                   )}
+                  <button
+                    className="drx-btn-ghost"
+                    style={{ ...buttonGhost, padding: "6px 14px", fontSize: 12.5 }}
+                    onClick={() => exportarLogAuditoria(d, id)}
+                    disabled={exportandoLogId === id}
+                    title="Cronología completa: creación, visualización, consentimiento y firma, con IP y hash de cada paso"
+                  >
+                    <Icono tipo="documento" size={13} style={{ marginRight: 4, verticalAlign: -2 }} /> {exportandoLogId === id ? "Generando…" : "Log de auditoría (Excel)"}
+                  </button>
                   {estado === "listo" && (
                     <>
                       <button className="drx-btn-ghost" style={{ ...buttonGhost, padding: "6px 14px", fontSize: 12.5 }} onClick={() => descargarPdfFirmado(d)}>

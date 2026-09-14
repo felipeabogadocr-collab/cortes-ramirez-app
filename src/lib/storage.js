@@ -477,6 +477,66 @@ export async function firmarDocumentoPublico(id, data) {
   return json;
 }
 
+// Cadena de custodia de la firma electrónica: registra "documento_visualizado"
+// (el firmante abrió el documento) y "consentimiento_aceptado" (aceptó la
+// casilla ANTES de firmar, como evento propio con su propio timestamp,
+// separado de la firma en sí). El evento "documento_firmado" lo registra el
+// propio servidor dentro de firmarDocumentoPublico, no aquí. Es informativo
+// (no bloquea el flujo de firma si falla): si el firmante no tiene señal un
+// instante, no tiene sentido impedirle firmar por eso.
+export async function registrarEventoDocumentoPublico(id, tipoEvento, extra) {
+  try {
+    await fetch("/api/documentos/evento", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ codigo: id, tipoEvento, ...extra }),
+    });
+  } catch (e) {
+    console.warn("No se pudo registrar el evento de auditoría:", e);
+  }
+}
+
+// Mismo registro, pero para cuando quien firma es el abogado DENTRO de la
+// app (con sesión) — no pasa por el servidor porque no hace falta capturar
+// la IP de una acción ya autenticada de la misma forma (la sesión de
+// Supabase ya identifica quién es); se inserta directo, igual que el resto
+// de la auditoría del despacho.
+export async function registrarEventoDocumentoDespacho(id, tipoEvento, detalle) {
+  if (!despachoActualId) return;
+  try {
+    await supabase.from("documento_eventos").insert({
+      despacho_id: despachoActualId,
+      documento_id: id,
+      tipo_evento: tipoEvento,
+      firmante_nombre: detalle?.firmante_nombre || null,
+      firmante_documento_id: detalle?.firmante_documento_id || null,
+      rol: detalle?.rol || null,
+      hash_documento: detalle?.hash_documento || null,
+      detalle: detalle?.detalle || null,
+    });
+  } catch (e) {
+    console.warn("No se pudo registrar el evento de auditoría:", e);
+  }
+}
+
+// Trae el log de auditoría completo de un documento (para exportarlo) — solo
+// lo puede leer alguien autenticado del mismo despacho (RLS), ordenado
+// cronológicamente como pide la cadena de custodia.
+export async function obtenerEventosDocumento(id) {
+  if (!despachoActualId) return [];
+  const { data, error } = await supabase
+    .from("documento_eventos")
+    .select("tipo_evento, firmante_nombre, firmante_documento_id, rol, ip, user_agent, hash_documento, creado_en")
+    .eq("despacho_id", despachoActualId)
+    .eq("documento_id", id)
+    .order("creado_en", { ascending: true });
+  if (error) {
+    console.warn("No se pudo leer el log de auditoría:", error);
+    return [];
+  }
+  return data || [];
+}
+
 // Búsqueda global ---------------------------------------------------------
 
 export async function buscarGlobal(texto) {

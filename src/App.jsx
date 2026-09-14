@@ -556,6 +556,9 @@ import {
   contarCambiosSinSincronizar,
   eliminarDefinitivo,
   firmarDocumentoPublico,
+  registrarEventoDocumentoPublico,
+  registrarEventoDocumentoDespacho,
+  obtenerEventosDocumento,
   subirReciboImagen,
   obtenerUrlReciboImagen,
   subirFotoPerfil,
@@ -1176,7 +1179,7 @@ function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-const APP_VERSION = "1.93.0";
+const APP_VERSION = "1.94.0";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -4074,6 +4077,10 @@ function VistaFirma() {
       return;
     }
     setDoc({ id: code, firmantes: [], ...parsed });
+    // Evento propio de la cadena de custodia: el firmante abrió el
+    // documento. Va por el servidor (captura la IP real) y no bloquea nada
+    // si falla — es informativo, no un requisito para poder seguir.
+    registrarEventoDocumentoPublico(code, "documento_visualizado");
   };
 
   const empezarColocacion = () => {
@@ -4086,6 +4093,10 @@ function VistaFirma() {
       return;
     }
     setError("");
+    // Evento propio, separado de la firma en sí: quedó un registro con su
+    // propio timestamp de que aceptó la casilla de consentimiento ANTES de
+    // colocar la firma — no se infiere ni se asume, queda su propio hecho.
+    registrarEventoDocumentoPublico(doc.id, "consentimiento_aceptado", { nombre: nombre.trim(), numeroId: numeroId.trim() });
     setTextoFirma(nombre.trim());
     setPreview({ x: 55, y: 80, textoFirma: nombre.trim(), tipoId, numeroId: numeroId.trim() });
     setColocando(true);

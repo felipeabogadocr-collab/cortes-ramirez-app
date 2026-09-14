@@ -43,15 +43,38 @@ export default async function handler(req, res) {
   }
   const dataConIp = { ...data, firmantes };
 
-  const { error } = await admin
+  const { data: filaActualizada, error } = await admin
     .from("documentos")
     .update({ data: dataConIp, updated_at: new Date().toISOString() })
     .eq("id", codigo)
-    .is("eliminado_en", null);
+    .is("eliminado_en", null)
+    .select("despacho_id")
+    .maybeSingle();
 
   if (error) {
     console.error("Error guardando firma:", error);
     return res.status(500).json({ error: "No se pudo guardar la firma" });
+  }
+
+  // Cadena de custodia (Ley 527 de 1999): fila aparte, append-only, con la
+  // misma IP y el mismo hash que se acaban de guardar en la firma — si
+  // esta inserción fallara, la firma ya quedó guardada arriba de todas
+  // formas (no se bloquea el flujo del firmante por esto).
+  const ultimaFirma = firmantes[firmantes.length - 1];
+  if (filaActualizada?.despacho_id) {
+    const { error: errorEvento } = await admin.from("documento_eventos").insert({
+      despacho_id: filaActualizada.despacho_id,
+      documento_id: codigo,
+      tipo_evento: "documento_firmado",
+      firmante_nombre: ultimaFirma?.textoFirma || ultimaFirma?.nombre || null,
+      firmante_documento_id: ultimaFirma?.numeroId || null,
+      rol: ultimaFirma?.rol || null,
+      ip,
+      user_agent: req.headers["user-agent"] || null,
+      hash_documento: ultimaFirma?.hashDocumento || null,
+      detalle: { titulo: data.titulo || null },
+    });
+    if (errorEvento) console.error("Error registrando evento de firma:", errorEvento);
   }
 
   return res.status(200).json({ ok: true, ip });
