@@ -2801,7 +2801,7 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
         {[
           { id: "resumen", etiqueta: "📊 Resumen" },
           { id: "egresos", etiqueta: "− Egresos" },
-          { id: "ingresos", etiqueta: "+ Otros ingresos" },
+          { id: "ingresos", etiqueta: "+ Ingresos" },
           { id: "clientes", etiqueta: "👤 Clientes y pagos" },
         ].map((v) => (
           <button
