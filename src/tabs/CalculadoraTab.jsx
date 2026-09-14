@@ -257,12 +257,11 @@ async function generarContratoServiciosDocx(datos) {
         properties: { page: { margin: { top: 900, bottom: 900, left: 1100, right: 1100 } } },
         children: [
           ...logo,
-          new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 4 }, children: [run(getNombreDespacho(), { bold: true, size: 28, color: AZUL_MARCA })] }),
           new Paragraph({
             alignment: AlignmentType.CENTER,
             spacing: { after: 260 },
             border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: "E2E8F0", space: 10 } },
-            children: [run("Abogados & Asociados", { size: 18, color: GRIS_TEXTO, italics: true })],
+            children: [run(getNombreDespacho(), { bold: true, size: 28, color: AZUL_MARCA })],
           }),
           new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 320 }, children: [run(c.encabezado, { bold: true, size: 30, color: AZUL_MARCA })] }),
 

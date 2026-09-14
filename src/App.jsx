@@ -1176,7 +1176,7 @@ function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-const APP_VERSION = "1.92.1";
+const APP_VERSION = "1.93.0";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -4267,7 +4267,7 @@ Certificado generado: ${new Date().toLocaleString("es-CO", { dateStyle: "full", 
                 </button>
                 <a
                   href={`https://wa.me/${NUMERO_WHATSAPP_DESPACHO}?text=${encodeURIComponent(
-                    `Hola, tengo una duda sobre la firma del documento "${doc.titulo}".`
+                    `Hola, tengo un problema técnico para firmar el documento "${doc.titulo}" en Nomos.`
                   )}`}
                   target="_blank"
                   rel="noreferrer"
@@ -4282,7 +4282,14 @@ Certificado generado: ${new Date().toLocaleString("es-CO", { dateStyle: "full", 
                     gap: 6,
                   }}
                 >
-                  <Icono tipo="chat" size={14} style={{ marginRight: 4, verticalAlign: -2 }} /> ¿Tienes dudas? Escríbenos
+                  {/* Este es soporte TÉCNICO de la plataforma Nomos (no del
+                      despacho que envió el documento) — cada documento no
+                      sabe a qué WhatsApp pertenece "su" despacho, así que
+                      redirigir esto al despacho requeriría guardarlo en cada
+                      documento al crearlo. Por ahora, para no hacerle creer a
+                      un cliente de OTRO despacho que le está escribiendo al
+                      suyo, el botón se etiqueta como lo que realmente es. */}
+                  <Icono tipo="chat" size={14} style={{ marginRight: 4, verticalAlign: -2 }} /> ¿Problema técnico para firmar? Soporte Nomos
                 </a>
               </div>
             </div>
@@ -5940,6 +5947,46 @@ export function useOtrosIngresos() {
   };
 
   return { ingresos, cargado, crear, editar, eliminar };
+}
+
+// Las cuentas/medios de pago (Nequi, Nu, Bancolombia...) eran una lista fija
+// igual para cualquier despacho que use Nomos — pero cada despacho tiene sus
+// propias cuentas reales, así que ahora cada uno guarda y edita la suya.
+// "cuentasSaldo" es el subconjunto de esas cuentas que se quiere ver en
+// "Saldo esperado por cuenta" (algunas cuentas registradas pueden ser de uso
+// personal, no del despacho, y no tiene sentido calcularles saldo ahí).
+export const MEDIOS_PAGO_POR_DEFECTO = ["Nequi", "Daviplata", "Nu", "Cuenta bancaria", "Llave"];
+export function useMediosPago() {
+  const [mediosPago, setMediosPagoState] = useState(MEDIOS_PAGO_POR_DEFECTO);
+  const [cuentasSaldo, setCuentasSaldoState] = useState(null); // null = todavía no se sabe
+  const [cargado, setCargado] = useState(false);
+
+  const cargar = useCallback(async () => {
+    const [rawMedios, rawCuentasSaldo] = await Promise.all([storageGet("medios-pago-despacho", false), storageGet("cuentas-saldo-despacho", false)]);
+    const medios = rawMedios ? JSON.parse(rawMedios) : MEDIOS_PAGO_POR_DEFECTO;
+    setMediosPagoState(medios);
+    // Sin configurar todavía: por defecto solo se sigue el saldo de "Nu" si
+    // existe entre las cuentas del despacho (lo más común hoy), o todas si
+    // no — cada despacho lo ajusta a su gusto desde Configuración.
+    setCuentasSaldoState(rawCuentasSaldo ? JSON.parse(rawCuentasSaldo) : medios.includes("Nu") ? ["Nu"] : medios);
+    setCargado(true);
+  }, []);
+
+  useEffect(() => {
+    cargar();
+  }, [cargar]);
+
+  const guardarMediosPago = async (lista) => {
+    setMediosPagoState(lista);
+    await storageSet("medios-pago-despacho", JSON.stringify(lista), false);
+  };
+
+  const guardarCuentasSaldo = async (lista) => {
+    setCuentasSaldoState(lista);
+    await storageSet("cuentas-saldo-despacho", JSON.stringify(lista), false);
+  };
+
+  return { mediosPago, cuentasSaldo: cuentasSaldo || [], cargado, guardarMediosPago, guardarCuentasSaldo };
 }
 
 export function fechaHoyISO() {

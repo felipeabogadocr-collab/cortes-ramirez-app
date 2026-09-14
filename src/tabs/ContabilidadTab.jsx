@@ -42,9 +42,17 @@ import {
   useReferenciadores,
   useAbogadosAsociados,
   useValorConRetraso,
+  useMediosPago,
 } from "../App.jsx";
 
-const MEDIOS_PAGO = ["Nequi", "Daviplata", "Nu", "Cuenta bancaria", "Llave"];
+// Lista de arranque para un despacho nuevo — cada despacho la puede editar
+// desde Configuración de Contabilidad (agregar/quitar cuentas propias), así
+// que esto ya NO es la lista real de nadie, solo la semilla inicial.
+const MEDIOS_PAGO_DEFECTO = ["Nequi", "Daviplata", "Nu", "Cuenta bancaria", "Llave"];
+// Paleta genérica para las tarjetas de "Saldo esperado por cuenta" — antes
+// era un color fijo para "Nu" nada más; ahora que cualquier despacho puede
+// tener cualquier cantidad de cuentas propias, se recorre esta lista.
+const COLORES_CUENTA = ["#820AD1", "#0B84B5", "#B5730A", "#0A8F63", "#C31C48", "#6D4FD1"];
 
 // Flechita de comparación contra el mes anterior en las tarjetas de resumen
 // — subeEsBueno invierte los colores para Egresos, donde subir es la mala
@@ -259,12 +267,11 @@ async function generarCuentaDeCobroComisionDocx({ contacto, tipoContacto, client
         properties: { page: { margin: { top: 900, bottom: 900, left: 1000, right: 1000 } } },
         children: [
           ...logo,
-          new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 4 }, children: [new TextRun({ text: nombreDespacho, bold: true, size: 24, color: AZUL_MARCA })] }),
           new Paragraph({
             alignment: AlignmentType.CENTER,
             spacing: { after: 260 },
             border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: "E2E8F0", space: 10 } },
-            children: [new TextRun({ text: "Cortés Ramírez Abogados", size: 16, color: GRIS_TEXTO, italics: true })],
+            children: [new TextRun({ text: nombreDespacho, bold: true, size: 24, color: AZUL_MARCA })],
           }),
           new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 4 }, children: [new TextRun({ text: "CUENTA DE COBRO", bold: true, size: 32, color: AZUL_MARCA })] }),
           new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 320 }, children: [new TextRun({ text: `No. ${numero}`, size: 18, color: GRIS_TEXTO })] }),
@@ -485,12 +492,11 @@ async function generarAcuerdoPagoDocx(datos) {
         properties: { page: { margin: { top: 900, bottom: 900, left: 1100, right: 1100 } } },
         children: [
           ...logo,
-          new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 4 }, children: [run(getNombreDespacho(), { bold: true, size: 28, color: AZUL_MARCA })] }),
           new Paragraph({
             alignment: AlignmentType.CENTER,
             spacing: { after: 260 },
             border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: "E2E8F0", space: 10 } },
-            children: [run("Abogados & Asociados", { size: 18, color: GRIS_TEXTO, italics: true })],
+            children: [run(getNombreDespacho(), { bold: true, size: 28, color: AZUL_MARCA })],
           }),
           new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 320 }, children: [run(c.encabezado, { bold: true, size: 30, color: AZUL_MARCA })] }),
 
@@ -1002,6 +1008,98 @@ function PanelAhorro({ ahorro, onGuardar }) {
   );
 }
 
+// Antes "Nequi", "Daviplata" y "Nu" eran las únicas cuentas posibles para
+// cualquier despacho que usara Nomos — fijas en el código, iguales para
+// todos. Cada despacho tiene sus propias cuentas reales, así que aquí se
+// pueden agregar/quitar/renombrar, y elegir cuáles de ellas son cuentas del
+// despacho (para "Saldo esperado por cuenta") en vez de personales.
+function PanelMediosPago({ mediosPago, cuentasSaldo, onGuardarMedios, onGuardarCuentasSaldo }) {
+  const [abierto, setAbierto] = useState(false);
+  const [nuevaCuenta, setNuevaCuenta] = useState("");
+  const [guardando, setGuardando] = useState(false);
+
+  const agregar = async () => {
+    const nombre = nuevaCuenta.trim();
+    if (!nombre || mediosPago.includes(nombre)) return;
+    setGuardando(true);
+    await onGuardarMedios([...mediosPago, nombre]);
+    setNuevaCuenta("");
+    setGuardando(false);
+  };
+
+  const quitar = async (nombre) => {
+    setGuardando(true);
+    await onGuardarMedios(mediosPago.filter((m) => m !== nombre));
+    if (cuentasSaldo.includes(nombre)) await onGuardarCuentasSaldo(cuentasSaldo.filter((c) => c !== nombre));
+    setGuardando(false);
+  };
+
+  const alternarCuentaDespacho = async (nombre) => {
+    setGuardando(true);
+    const siguiente = cuentasSaldo.includes(nombre) ? cuentasSaldo.filter((c) => c !== nombre) : [...cuentasSaldo, nombre];
+    await onGuardarCuentasSaldo(siguiente);
+    setGuardando(false);
+  };
+
+  return (
+    <Card style={{ marginBottom: 20 }}>
+      <button
+        onClick={() => setAbierto((a) => !a)}
+        style={{ background: "none", border: "none", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%", padding: 0 }}
+      >
+        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 14, fontWeight: 700, color: COLORS.ink, margin: 0, display: "flex", alignItems: "center", gap: 6 }}>
+          Cuentas y medios de pago
+        </p>
+        <span style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.muted }}>{abierto ? "Ocultar ▲" : "Editar ▼"}</span>
+      </button>
+      {!abierto && (
+        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, marginTop: 6 }}>
+          {mediosPago.join(" · ")} — {cuentasSaldo.length > 0 ? `${cuentasSaldo.join(", ")} cuenta${cuentasSaldo.length !== 1 ? "n" : ""} para el saldo esperado.` : "ninguna cuenta seguida en el saldo esperado."}
+        </p>
+      )}
+      {abierto && (
+        <div style={{ marginTop: 14 }}>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, marginBottom: 10 }}>
+            Estas son las cuentas que aparecen al registrar un pago, un egreso o un otro ingreso. Marca "cuenta del despacho" en las que quieras ver en "Saldo esperado por cuenta" (deja sin marcar las de uso personal).
+          </p>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 14 }}>
+            {mediosPago.map((m) => (
+              <div key={m} style={{ display: "flex", alignItems: "center", gap: 10, background: COLORS.surfaceSoft, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "8px 12px" }}>
+                <span style={{ fontFamily: "Inter, sans-serif", fontSize: 13, fontWeight: 600, color: COLORS.ink, flex: 1 }}>{m}</span>
+                <label style={{ display: "flex", alignItems: "center", gap: 5, fontFamily: "Inter, sans-serif", fontSize: 11.5, color: COLORS.inkSoft, cursor: "pointer" }}>
+                  <input type="checkbox" checked={cuentasSaldo.includes(m)} onChange={() => alternarCuentaDespacho(m)} disabled={guardando} />
+                  Cuenta del despacho
+                </label>
+                <button
+                  className="drx-btn-ghost"
+                  style={{ ...buttonGhost, padding: "4px 10px", fontSize: 11.5, color: "#B42318", borderColor: "#F2B8B5" }}
+                  onClick={() => quitar(m)}
+                  disabled={guardando}
+                >
+                  Quitar
+                </button>
+              </div>
+            ))}
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <input
+              className="drx-input"
+              style={{ ...inputStyle, maxWidth: 220 }}
+              value={nuevaCuenta}
+              onChange={(e) => setNuevaCuenta(e.target.value)}
+              placeholder="Ej: Bancolombia"
+              onKeyDown={(e) => e.key === "Enter" && agregar()}
+            />
+            <button className="drx-btn-primary" style={buttonPrimary} onClick={agregar} disabled={guardando || !nuevaCuenta.trim()}>
+              + Agregar cuenta
+            </button>
+          </div>
+        </div>
+      )}
+    </Card>
+  );
+}
+
 // Antes había 5 tarjetas de configuración apiladas arriba de Contabilidad,
 // cada una con su propio abrir/cerrar — ocupaban espacio por encima de lo
 // que sí se usa a diario (pagos, saldos) aunque casi nunca se tocan
@@ -1023,12 +1121,13 @@ function PanelConfiguracionContabilidad(props) {
       </button>
       {!abierto && (
         <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, marginTop: 6 }}>
-          Datos para cuenta de cobro, calidad de los datos, meta de recaudo, presupuesto y ahorro — todo lo que se configura una vez, en un solo lugar.
+          Datos para cuenta de cobro, cuentas y medios de pago, calidad de los datos, meta de recaudo, presupuesto y ahorro — todo lo que se configura una vez, en un solo lugar.
         </p>
       )}
       {abierto && (
         <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 14 }}>
           <PanelDatosCuentaCobro datos={props.datosResponsable} onGuardar={props.guardarDatosResponsable} />
+          <PanelMediosPago mediosPago={props.mediosPago} cuentasSaldo={props.cuentasSaldo} onGuardarMedios={props.guardarMediosPago} onGuardarCuentasSaldo={props.guardarCuentasSaldo} />
           <PanelDatosLimpios fecha={props.fechaDatosLimpios} onGuardar={props.guardarFechaDatosLimpios} />
           <PanelMetaRecaudo meta={props.metaRecaudo} onGuardar={props.guardarMetaRecaudo} />
           <PanelPresupuesto presupuesto={props.presupuesto} onGuardar={props.guardarPresupuesto} />
@@ -1197,9 +1296,9 @@ function AcuerdoPagoForm({ cliente, clienteId, saldo, datosResponsable, usuarioA
   );
 }
 
-function FormularioPago({ cliente, onRegistrar }) {
+function FormularioPago({ cliente, onRegistrar, mediosPago = MEDIOS_PAGO_DEFECTO }) {
   const hoyStr = new Date().toISOString().slice(0, 10);
-  const [medioPago, setMedioPago] = useState(MEDIOS_PAGO[0]);
+  const [medioPago, setMedioPago] = useState(mediosPago[0]);
   const [valor, setValor] = useState("");
   const [fechaPago, setFechaPago] = useState(hoyStr);
   const [concepto, setConcepto] = useState("");
@@ -1244,7 +1343,7 @@ function FormularioPago({ cliente, onRegistrar }) {
       <div className="drx-grid-form" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
         <Field label="Medio de pago">
           <select className="drx-input" style={inputStyle} value={medioPago} onChange={(e) => setMedioPago(e.target.value)}>
-            {MEDIOS_PAGO.map((m) => (
+            {mediosPago.map((m) => (
               <option key={m} value={m}>
                 {m}
               </option>
@@ -1327,7 +1426,7 @@ function useUrlRecibo(reciboImagen) {
   return url;
 }
 
-function ReciboCard({ cliente, pago, onEditar, onEliminar, datosResponsable, porcentajeAhorro, referenciadores, abogadosAsociados }) {
+function ReciboCard({ cliente, pago, onEditar, onEliminar, datosResponsable, porcentajeAhorro, referenciadores, abogadosAsociados, mediosPago = MEDIOS_PAGO_DEFECTO }) {
   const [copiado, setCopiado] = useState(false);
   const [editando, setEditando] = useState(false);
   const [medioPago, setMedioPago] = useState(pago.medioPago);
@@ -1424,7 +1523,7 @@ function ReciboCard({ cliente, pago, onEditar, onEliminar, datosResponsable, por
         <div className="drx-grid-form" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
           <Field label="Medio de pago">
             <select className="drx-input" style={inputStyle} value={medioPago} onChange={(e) => setMedioPago(e.target.value)}>
-              {MEDIOS_PAGO.map((m) => (
+              {mediosPago.map((m) => (
                 <option key={m} value={m}>
                   {m}
                 </option>
@@ -1619,7 +1718,7 @@ const ORDEN_CONTABILIDAD = [
   { valor: "ultimoPago", etiqueta: "Último pago (más reciente primero)" },
 ];
 
-function FormularioEgreso({ onRegistrar }) {
+function FormularioEgreso({ onRegistrar, mediosPago = MEDIOS_PAGO_DEFECTO }) {
   const hoyStr = new Date().toISOString().slice(0, 10);
   const [concepto, setConcepto] = useState("");
   const [categoria, setCategoria] = useState(CATEGORIAS_EGRESO[0]);
@@ -1669,7 +1768,7 @@ function FormularioEgreso({ onRegistrar }) {
         <Field label="¿De qué cuenta salió? (opcional)">
           <select className="drx-input" style={{ ...inputStyle, maxWidth: 220 }} value={medioPago} onChange={(e) => setMedioPago(e.target.value)}>
             <option value="">Sin especificar</option>
-            {MEDIOS_PAGO.map((m) => (
+            {mediosPago.map((m) => (
               <option key={m} value={m}>
                 {m}
               </option>
@@ -1693,7 +1792,7 @@ function FormularioEgreso({ onRegistrar }) {
   );
 }
 
-function EgresoCard({ egreso, onEditar, onEliminar, clientesDisponibles }) {
+function EgresoCard({ egreso, onEditar, onEliminar, clientesDisponibles, mediosPago = MEDIOS_PAGO_DEFECTO }) {
   const [editando, setEditando] = useState(false);
   const [concepto, setConcepto] = useState(egreso.concepto);
   const [categoria, setCategoria] = useState(egreso.categoria);
@@ -1755,7 +1854,7 @@ function EgresoCard({ egreso, onEditar, onEliminar, clientesDisponibles }) {
           <Field label="¿De qué cuenta salió? (opcional)">
             <select className="drx-input" style={{ ...inputStyle, maxWidth: 220 }} value={medioPago} onChange={(e) => setMedioPago(e.target.value)}>
               <option value="">Sin especificar</option>
-              {MEDIOS_PAGO.map((m) => (
+              {mediosPago.map((m) => (
                 <option key={m} value={m}>
                   {m}
                 </option>
@@ -1840,7 +1939,7 @@ function IngresoUnificadoCard({ movimiento, onVerCliente }) {
   );
 }
 
-function FormularioOtroIngreso({ onRegistrar }) {
+function FormularioOtroIngreso({ onRegistrar, mediosPago = MEDIOS_PAGO_DEFECTO }) {
   const hoyStr = new Date().toISOString().slice(0, 10);
   const [concepto, setConcepto] = useState("");
   const [categoria, setCategoria] = useState(CATEGORIAS_OTRO_INGRESO[0]);
@@ -1888,7 +1987,7 @@ function FormularioOtroIngreso({ onRegistrar }) {
         <Field label="¿A qué cuenta entró? (opcional)">
           <select className="drx-input" style={{ ...inputStyle, maxWidth: 220 }} value={medioPago} onChange={(e) => setMedioPago(e.target.value)}>
             <option value="">Sin especificar</option>
-            {MEDIOS_PAGO.map((m) => (
+            {mediosPago.map((m) => (
               <option key={m} value={m}>
                 {m}
               </option>
@@ -1908,7 +2007,7 @@ function FormularioOtroIngreso({ onRegistrar }) {
   );
 }
 
-function OtroIngresoCard({ ingreso, onEditar, onEliminar }) {
+function OtroIngresoCard({ ingreso, onEditar, onEliminar, mediosPago = MEDIOS_PAGO_DEFECTO }) {
   const [editando, setEditando] = useState(false);
   const [concepto, setConcepto] = useState(ingreso.concepto);
   const [categoria, setCategoria] = useState(ingreso.categoria);
@@ -1954,7 +2053,7 @@ function OtroIngresoCard({ ingreso, onEditar, onEliminar }) {
           <Field label="¿A qué cuenta entró? (opcional)">
             <select className="drx-input" style={{ ...inputStyle, maxWidth: 220 }} value={medioPago} onChange={(e) => setMedioPago(e.target.value)}>
               <option value="">Sin especificar</option>
-              {MEDIOS_PAGO.map((m) => (
+              {mediosPago.map((m) => (
                 <option key={m} value={m}>
                   {m}
                 </option>
@@ -2051,6 +2150,7 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
   const [mesFiltroIngresoTotal, setMesFiltroIngresoTotal] = useState("Todos");
   const { egresos, crear: crearEgreso, editar: editarEgreso, eliminar: eliminarEgresoBase, recategorizarMasivo } = useEgresos();
   const { ingresos: otrosIngresos, crear: crearOtroIngreso, editar: editarOtroIngreso, eliminar: eliminarOtroIngresoBase } = useOtrosIngresos();
+  const { mediosPago, cuentasSaldo, guardarMediosPago, guardarCuentasSaldo } = useMediosPago();
   const { contactos: referenciadores } = useReferenciadores();
   const { contactos: abogadosAsociados } = useAbogadosAsociados();
   const { confirmar, ConfirmarDialogo } = useConfirmarDialogo();
@@ -2511,10 +2611,9 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
   // registrado con esa cuenta entró y salió de ahí. Solo cuenta lo que
   // tiene "medio de pago" puesto; lo que no lo tiene queda fuera y se
   // avisa aparte, para no mostrar un número que parece exacto sin serlo.
-  // Nequi y Daviplata pasaron a ser de uso personal (no del despacho), así
-  // que ya no tiene sentido calcularles un saldo "esperado" del negocio —
-  // solo Nu sigue siendo la cuenta del despacho para este seguimiento.
-  const CUENTAS_SALDO = ["Nu"];
+  // Cada despacho elige en Configuración cuáles de sus cuentas quiere ver
+  // aquí (algunas pueden ser de uso personal, no del despacho).
+  const CUENTAS_SALDO = cuentasSaldo;
   const saldoPorCuenta = Object.fromEntries(CUENTAS_SALDO.map((c) => [c, 0]));
   const movimientosPorCuenta = Object.fromEntries(CUENTAS_SALDO.map((c) => [c, []]));
   ids.forEach((id) => {
@@ -2754,6 +2853,10 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
         guardarPresupuesto={guardarPresupuesto}
         ahorro={ahorro}
         guardarAhorro={guardarAhorro}
+        mediosPago={mediosPago}
+        cuentasSaldo={cuentasSaldo}
+        guardarMediosPago={guardarMediosPago}
+        guardarCuentasSaldo={guardarCuentasSaldo}
       />
 
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 20 }}>
@@ -2799,6 +2902,7 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
           {pagoRapidoClienteId && clientes[pagoRapidoClienteId] && (
             <FormularioPago
               cliente={clientes[pagoRapidoClienteId]}
+              mediosPago={mediosPago}
               onRegistrar={async (datos) => {
                 await registrarPago(pagoRapidoClienteId, datos);
                 setPagoRapidoClienteId("");
@@ -2812,7 +2916,7 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
         <Card style={{ marginBottom: 20, borderLeft: "4px solid #F43F5E" }}>
           <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, fontWeight: 700, color: COLORS.ink, marginBottom: 4 }}>Registrar egreso</p>
           <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, marginBottom: 14 }}>Arriendo, nómina, servicios y demás salidas de dinero del despacho.</p>
-          <FormularioEgreso onRegistrar={registrarEgreso} />
+          <FormularioEgreso onRegistrar={registrarEgreso} mediosPago={mediosPago} />
         </Card>
       )}
       {modoRegistro === "ingreso" && (
@@ -2821,7 +2925,7 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
           <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, marginBottom: 14 }}>
             Para plata que entra sin ser el pago de un cliente puntual — rendimientos, reembolsos, algo administrativo o que no sabes bien cómo clasificar.
           </p>
-          <FormularioOtroIngreso onRegistrar={registrarOtroIngreso} />
+          <FormularioOtroIngreso onRegistrar={registrarOtroIngreso} mediosPago={mediosPago} />
         </Card>
       )}
 
@@ -3102,10 +3206,11 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
         <Card style={{ marginBottom: 20 }}>
           <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, fontWeight: 700, color: COLORS.ink, marginBottom: 4 }}>Saldo esperado por cuenta</p>
           <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, marginBottom: 14 }}>
-            Según lo que has registrado con cada medio de pago — no es el saldo real del banco/billetera, es lo que debería haber si todo entró y salió de ahí. Solo Nu, porque Nequi y Daviplata son de uso personal.
+            Según lo que has registrado con cada medio de pago — no es el saldo real del banco/billetera, es lo que debería haber si todo entró y salió de ahí. Elige qué cuentas seguir aquí en Configuración de Contabilidad.
           </p>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10 }}>
-            {[{ nombre: "Nu", color: "#820AD1" }].map((cuenta) => {
+            {cuentasSaldo.map((nombre, i) => {
+              const cuenta = { nombre, color: COLORES_CUENTA[i % COLORES_CUENTA.length] };
               const abierta = cuentaSaldoExpandida === cuenta.nombre;
               return (
                 <button
@@ -3176,7 +3281,7 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
           <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11, color: COLORS.muted, marginTop: 10 }}>
             {egresosSinCuenta > 0
               ? `${egresosSinCuenta} egreso${egresosSinCuenta !== 1 ? "s" : ""} sin cuenta asignada no están contados aquí — edítalos para elegir de qué cuenta salieron y afinar el número.`
-              : "Nota: no se usa el logo real de Nu (es marca de terceros) — el círculo morado es solo para identificarla rápido."}
+              : "Nota: los círculos de color son solo para identificar cada cuenta rápido — no son los logos reales de esas marcas."}
           </p>
         </Card>
       )}
@@ -3351,7 +3456,7 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
             <select className="drx-input" style={{ ...inputStyle, maxWidth: 180 }} value={cuentaFiltroEgreso} onChange={(e) => setCuentaFiltroEgreso(e.target.value)}>
               <option value="Todas">Todas las cuentas</option>
               <option value="Sin especificar">Sin especificar</option>
-              {MEDIOS_PAGO.map((m) => (
+              {mediosPago.map((m) => (
                 <option key={m} value={m}>
                   {m}
                 </option>
@@ -3370,7 +3475,7 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
         {egresosFiltrados.length > 0 ? (
           <div style={{ marginTop: 12 }}>
             {egresosFiltrados.map((e) => (
-              <EgresoCard key={e.id} egreso={e} onEditar={(cambios) => editarEgreso(e.id, cambios)} onEliminar={() => eliminarEgreso(e)} clientesDisponibles={clientesParaSelector} />
+              <EgresoCard key={e.id} egreso={e} onEditar={(cambios) => editarEgreso(e.id, cambios)} onEliminar={() => eliminarEgreso(e)} clientesDisponibles={clientesParaSelector} mediosPago={mediosPago} />
             ))}
           </div>
         ) : (
@@ -3444,7 +3549,7 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
             <select className="drx-input" style={{ ...inputStyle, maxWidth: 180 }} value={cuentaFiltroIngresoTotal} onChange={(e) => setCuentaFiltroIngresoTotal(e.target.value)}>
               <option value="Todas">Todas las cuentas</option>
               <option value="Sin especificar">Sin especificar</option>
-              {MEDIOS_PAGO.map((m) => (
+              {mediosPago.map((m) => (
                 <option key={m} value={m}>
                   {m}
                 </option>
@@ -3531,7 +3636,7 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
         {otrosIngresosFiltrados.length > 0 ? (
           <div style={{ marginTop: 12 }}>
             {otrosIngresosFiltrados.map((i) => (
-              <OtroIngresoCard key={i.id} ingreso={i} onEditar={(cambios) => editarOtroIngreso(i.id, cambios)} onEliminar={() => eliminarOtroIngreso(i)} />
+              <OtroIngresoCard key={i.id} ingreso={i} onEditar={(cambios) => editarOtroIngreso(i.id, cambios)} onEliminar={() => eliminarOtroIngreso(i)} mediosPago={mediosPago} />
             ))}
           </div>
         ) : (
@@ -3753,10 +3858,10 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
                 </div>
               </div>
 
-              {formAbiertoId === id && <FormularioPago cliente={c} onRegistrar={(datos) => registrarPago(id, datos)} />}
+              {formAbiertoId === id && <FormularioPago cliente={c} mediosPago={mediosPago} onRegistrar={(datos) => registrarPago(id, datos)} />}
               {egresoAbiertoId === id && (
                 <div style={{ marginTop: 12, borderTop: `1px solid ${COLORS.border}`, paddingTop: 14 }}>
-                  <FormularioEgreso onRegistrar={async (datos) => { await registrarEgreso({ ...datos, clienteId: id }); setEgresoAbiertoId(null); }} />
+                  <FormularioEgreso mediosPago={mediosPago} onRegistrar={async (datos) => { await registrarEgreso({ ...datos, clienteId: id }); setEgresoAbiertoId(null); }} />
                 </div>
               )}
               {acuerdoAbiertoId === id && clienteAtrasado && (
@@ -3788,6 +3893,7 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
                         porcentajeAhorro={porcentajeAhorro}
                         referenciadores={referenciadores}
                         abogadosAsociados={abogadosAsociados}
+                        mediosPago={mediosPago}
                       />
                     ))}
                     {ordenados.length > 3 && (
@@ -3812,7 +3918,7 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
                 return (
                   <div>
                     {egresosCliente.map((e) => (
-                      <EgresoCard key={e.id} egreso={e} onEditar={(cambios) => editarEgreso(e.id, cambios)} onEliminar={() => eliminarEgreso(e)} clientesDisponibles={clientesParaSelector} />
+                      <EgresoCard key={e.id} egreso={e} onEditar={(cambios) => editarEgreso(e.id, cambios)} onEliminar={() => eliminarEgreso(e)} clientesDisponibles={clientesParaSelector} mediosPago={mediosPago} />
                     ))}
                   </div>
                 );
