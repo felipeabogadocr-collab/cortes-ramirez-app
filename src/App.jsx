@@ -1176,7 +1176,7 @@ function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-const APP_VERSION = "1.87.0";
+const APP_VERSION = "1.88.0";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -5958,12 +5958,31 @@ function useNotificacionesPanel(prefs) {
   const notifPrefs = prefs || notificacionesPorDefecto();
 
   const cargar = useCallback(async () => {
-    const revision = (await storageGet("ultima-revision-firmas", false)) || "1970-01-01T00:00:00.000Z";
-
-    const idsDocsRaw = await storageGet("indice-documentos", true);
+    // Las 4 lecturas de abajo son independientes entre sí (firmas, clientes
+    // y contenido no dependen unas de otras) — antes se pedían una detrás de
+    // otra, cada una esperando a que la anterior termine, sumando ~7 viajes
+    // de ida y vuelta al servidor en fila para poder mostrar la campana de
+    // notificaciones. Pedirlas todas a la vez con Promise.all corta eso a 2
+    // rondas (primero los índices, luego los datos que dependen de ellos),
+    // sin cambiar qué se calcula ni qué se muestra.
+    const [revisionRaw, idsDocsRaw, idsClientesRaw, idsContenidoRaw] = await Promise.all([
+      storageGet("ultima-revision-firmas", false),
+      storageGet("indice-documentos", true),
+      storageGet("indice-clientes", false),
+      storageGet("indice-contenido", true),
+    ]);
+    const revision = revisionRaw || "1970-01-01T00:00:00.000Z";
     const idsDocs = idsDocsRaw ? JSON.parse(idsDocsRaw) : [];
+    const idsClientes = idsClientesRaw ? JSON.parse(idsClientesRaw) : [];
+    const idsContenido = idsContenidoRaw ? JSON.parse(idsContenidoRaw) : [];
+
+    const [docsNotif, clientesNotif, contenidoNotifValores] = await Promise.all([
+      obtenerDocumentosPorId(idsDocs),
+      obtenerClientesPorId(idsClientes),
+      obtenerValoresPorClaves(idsContenido.map((id) => `contenido:${id}`)),
+    ]);
+
     const nuevasFirmas = [];
-    const docsNotif = await obtenerDocumentosPorId(idsDocs);
     for (const id of idsDocs) {
       const d = docsNotif[id];
       if (!d) continue;
@@ -5975,8 +5994,6 @@ function useNotificacionesPanel(prefs) {
     }
     setFirmasNuevas(nuevasFirmas);
 
-    const idsClientesRaw = await storageGet("indice-clientes", false);
-    const idsClientes = idsClientesRaw ? JSON.parse(idsClientesRaw) : [];
     const inactivos = [];
     const pendientesPago = [];
     const novedades = [];
@@ -5989,7 +6006,6 @@ function useNotificacionesPanel(prefs) {
     // configurado (o se marque a propósito como "sin cobro") desde el
     // principio.
     const sinPago = [];
-    const clientesNotif = await obtenerClientesPorId(idsClientes);
     for (const id of idsClientes) {
       const c = clientesNotif[id];
       if (!c) continue;
@@ -6019,12 +6035,9 @@ function useNotificacionesPanel(prefs) {
     setClientesSinRadicado(sinRadicado);
     setClientesSinPago(sinPago);
 
-    const idsContenidoRaw = await storageGet("indice-contenido", true);
-    const idsContenido = idsContenidoRaw ? JSON.parse(idsContenidoRaw) : [];
     const hoyISO = fechaHoyISO();
     const pendientesHoy = [];
     const vencidos = [];
-    const contenidoNotifValores = await obtenerValoresPorClaves(idsContenido.map((id) => `contenido:${id}`));
     for (const id of idsContenido) {
       const raw = contenidoNotifValores[`contenido:${id}`];
       if (!raw) continue;
