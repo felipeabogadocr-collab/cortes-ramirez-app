@@ -1179,7 +1179,7 @@ function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-const APP_VERSION = "1.94.0";
+const APP_VERSION = "1.95.0";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -6658,6 +6658,46 @@ function IconoNomos({ size = 16 }) {
   );
 }
 
+// Antes, mientras se verificaba la sesión (getUser + perfil, un par de
+// viajes al servidor — ver cargarPerfilActual), la pantalla se quedaba
+// completamente en blanco: sin logo, sin ningún indicio de que algo estaba
+// pasando. Se sentía como que la app "no cargaba", cuando en realidad sí
+// estaba trabajando. Esta pantalla se ve solo ese instante inicial.
+function PantallaCargaInicial() {
+  return (
+    <div
+      style={{
+        minHeight: "100vh",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 18,
+        background: `linear-gradient(155deg, ${COLORS.navy} 0%, ${COLORS.navyDeep} 100%)`,
+      }}
+    >
+      <div style={{ display: "inline-flex", alignItems: "center", gap: 12 }}>
+        <div style={{ width: 48, height: 48, borderRadius: 13, background: "#FFFFFF", display: "flex", alignItems: "center", justifyContent: "center", color: COLORS.navy, flexShrink: 0 }}>
+          <IconoNomos size={26} />
+        </div>
+        <span style={{ fontFamily: "Inter, sans-serif", fontSize: 26, fontWeight: 800, letterSpacing: 2, color: "#FFFFFF", lineHeight: 1 }}>Nomos</span>
+      </div>
+      <span
+        style={{
+          width: 22,
+          height: 22,
+          borderRadius: "50%",
+          border: "2.5px solid rgba(255,255,255,0.25)",
+          borderTopColor: "#FFFFFF",
+          display: "inline-block",
+          animation: "drx-spin 0.7s linear infinite",
+        }}
+      />
+      <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: "#CFE0D6", margin: 0 }}>Cargando…</p>
+    </div>
+  );
+}
+
 function InsigniaPlataforma({ grande }) {
   const tamañoIcono = grande ? 26 : 15;
   const cajaIcono = grande ? 46 : 28;
@@ -9821,7 +9861,12 @@ function App() {
   }
 
   if (!sesionCargada) {
-    return <div style={{ background: COLORS.bg, minHeight: "100%" }} />;
+    return (
+      <>
+        <GlobalStyle />
+        <PantallaCargaInicial />
+      </>
+    );
   }
 
   if (modoRecuperacion) {
