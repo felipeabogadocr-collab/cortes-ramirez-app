@@ -4,19 +4,44 @@ import { registerSW } from "virtual:pwa-register";
 import App from "./App.jsx";
 import "./index.css";
 
+const LLAVE_RECARGA_CHUNK = "nomos-recarga-por-chunk";
+
 // Sin esto, el "autoUpdate" del plugin PWA no hacía nada por sí solo: el
-// service worker nuevo se instalaba en segundo plano pero la pestaña ya
-// abierta se quedaba corriendo el código viejo indefinidamente hasta que el
-// usuario cerrara TODAS las pestañas — en la práctica, nunca. registerSW()
-// revisa si hay una versión nueva al cargar y cada hora mientras la pestaña
-// sigue abierta, y en cuanto la encuentra recarga la página sola.
+// service worker nuevo se instalaba en segundo plano (y sí quedaba
+// "activo" para próximas pestañas), pero la pestaña YA abierta seguía
+// corriendo el código viejo en memoria — nada la obligaba a recargar, así
+// que alguien con Nomos abierto de antes podía quedarse horas viendo la
+// versión vieja (y el sello de "Actualizado ..." abajo del todo) aunque ya
+// hubiera una nueva en el servidor, sin más aviso que ese sello.
+//
+// - registration.update() revisa si hay una versión nueva: al cargar, cada
+//   hora, y también cada vez que se vuelve a esta pestaña (por si alguien
+//   la dejó abierta en segundo plano y el despliegue pasó mientras tanto —
+//   así no toca esperarse hasta una hora completa para que se entere).
+// - "controllerchange" es el aviso de que el service worker nuevo YA tomó
+//   control de esta pestaña (autoUpdate lo activa solo, sin preguntar) —
+//   ahí es el momento exacto de recargar, una sola vez (mismo candado de
+//   sessionStorage que usa el aviso de "vite:preloadError" más abajo, para
+//   no recargar dos veces por el mismo despliegue).
 registerSW({
   immediate: true,
   onRegisteredSW(swUrl, registration) {
     if (!registration) return;
-    setInterval(() => registration.update(), 60 * 60 * 1000);
+    const revisar = () => registration.update();
+    setInterval(revisar, 60 * 60 * 1000);
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "visible") revisar();
+    });
   },
 });
+
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (sessionStorage.getItem(LLAVE_RECARGA_CHUNK)) return;
+    sessionStorage.setItem(LLAVE_RECARGA_CHUNK, "1");
+    window.location.reload();
+  });
+}
 
 // Lo de arriba cubre "hay versión nueva disponible" — esto cubre el caso
 // más molesto en la práctica: alguien ya tenía Nomos abierto ANTES de un
@@ -30,7 +55,6 @@ registerSW({
 // bastaba con recargar. Ahora se recarga sola, una sola vez (el
 // sessionStorage evita un bucle infinito si el problema fuera otro y
 // persistiera después de recargar).
-const LLAVE_RECARGA_CHUNK = "nomos-recarga-por-chunk";
 window.addEventListener("vite:preloadError", () => {
   if (sessionStorage.getItem(LLAVE_RECARGA_CHUNK)) return;
   sessionStorage.setItem(LLAVE_RECARGA_CHUNK, "1");
