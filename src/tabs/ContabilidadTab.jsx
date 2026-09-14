@@ -2045,6 +2045,8 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
   const [categoriaFiltroOtroIngreso, setCategoriaFiltroOtroIngreso] = useState("Todas");
   const [filtroIngresoTotal, setFiltroIngresoTotal] = useState("");
   const [categoriaFiltroIngresoTotal, setCategoriaFiltroIngresoTotal] = useState("Todas");
+  const [cuentaFiltroIngresoTotal, setCuentaFiltroIngresoTotal] = useState("Todas");
+  const [mesFiltroIngresoTotal, setMesFiltroIngresoTotal] = useState("Todos");
   const { egresos, crear: crearEgreso, editar: editarEgreso, eliminar: eliminarEgresoBase, recategorizarMasivo } = useEgresos();
   const { ingresos: otrosIngresos, crear: crearOtroIngreso, editar: editarOtroIngreso, eliminar: eliminarOtroIngresoBase } = useOtrosIngresos();
   const { contactos: referenciadores } = useReferenciadores();
@@ -2678,13 +2680,25 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
     return [...deClientes, ...otros].sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
   }, [ids, clientes, otrosIngresos]);
 
+  // Meses con al menos un ingreso registrado, más recientes primero — para
+  // el filtro "Mes" del dropdown, en vez de una lista fija que no encaje
+  // con los datos reales del despacho.
+  const mesesConIngresos = useMemo(() => {
+    const claves = new Set(todosLosIngresos.map((i) => i.fecha?.slice(0, 7)).filter(Boolean));
+    return [...claves]
+      .sort((a, b) => b.localeCompare(a))
+      .map((clave) => ({ clave, etiqueta: new Date(`${clave}-01T12:00:00`).toLocaleDateString("es-CO", { month: "long", year: "numeric" }) }));
+  }, [todosLosIngresos]);
+
   const filtroIngresoTotalConRetraso = useValorConRetraso(filtroIngresoTotal);
   const todosLosIngresosFiltrados = useMemo(
     () =>
       todosLosIngresos
         .filter((i) => categoriaFiltroIngresoTotal === "Todas" || i.categoria === categoriaFiltroIngresoTotal)
+        .filter((i) => cuentaFiltroIngresoTotal === "Todas" || (i.medioPago || "Sin especificar") === cuentaFiltroIngresoTotal)
+        .filter((i) => mesFiltroIngresoTotal === "Todos" || i.fecha?.slice(0, 7) === mesFiltroIngresoTotal)
         .filter((i) => !filtroIngresoTotalConRetraso.trim() || i.concepto.toLowerCase().includes(filtroIngresoTotalConRetraso.trim().toLowerCase())),
-    [todosLosIngresos, categoriaFiltroIngresoTotal, filtroIngresoTotalConRetraso]
+    [todosLosIngresos, categoriaFiltroIngresoTotal, cuentaFiltroIngresoTotal, mesFiltroIngresoTotal, filtroIngresoTotalConRetraso]
   );
 
   // Filtrar y ordenar es O(n log n) sobre todos los clientes — sin memoizar,
@@ -3375,6 +3389,23 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
               {CATEGORIAS_OTRO_INGRESO.map((c) => (
                 <option key={c} value={c}>
                   {c}
+                </option>
+              ))}
+            </select>
+            <select className="drx-input" style={{ ...inputStyle, maxWidth: 180 }} value={cuentaFiltroIngresoTotal} onChange={(e) => setCuentaFiltroIngresoTotal(e.target.value)}>
+              <option value="Todas">Todas las cuentas</option>
+              <option value="Sin especificar">Sin especificar</option>
+              {MEDIOS_PAGO.map((m) => (
+                <option key={m} value={m}>
+                  {m}
+                </option>
+              ))}
+            </select>
+            <select className="drx-input" style={{ ...inputStyle, maxWidth: 180 }} value={mesFiltroIngresoTotal} onChange={(e) => setMesFiltroIngresoTotal(e.target.value)}>
+              <option value="Todos">Todos los meses</option>
+              {mesesConIngresos.map((m) => (
+                <option key={m.clave} value={m.clave}>
+                  {m.etiqueta}
                 </option>
               ))}
             </select>
