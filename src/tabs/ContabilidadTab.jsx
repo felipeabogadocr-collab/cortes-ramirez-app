@@ -1810,6 +1810,36 @@ function EgresoCard({ egreso, onEditar, onEliminar, clientesDisponibles }) {
   );
 }
 
+// Tarjeta de solo lectura para "Todos los ingresos" — junta pagos de
+// clientes y otros ingresos en el mismo formato visual que EgresoCard. No
+// tiene editar/eliminar: un pago de cliente se corrige desde la tarjeta de
+// ese cliente en "Clientes y pagos" (donde además queda ligado al saldo del
+// plan), y un otro ingreso desde su propia tarjeta en "Otros ingresos" — acá
+// es solo para ver todo junto y buscar rápido.
+function IngresoUnificadoCard({ movimiento, onVerCliente }) {
+  return (
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap", background: COLORS.surfaceSoft, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: 12, marginTop: 10 }}>
+      <div>
+        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11, fontWeight: 700, color: "#166534", background: "#DCFCE7", display: "inline-block", padding: "2px 8px", borderRadius: 20, margin: "0 0 4px" }}>
+          {movimiento.esPagoCliente ? "+ ABONO" : "+ INGRESO"}
+        </p>
+        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, fontWeight: 600, color: "#166534", margin: 0 }}>
+          + {formatoCOP(movimiento.valor)} · {movimiento.concepto}
+        </p>
+        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, margin: "3px 0 0" }}>
+          {movimiento.categoria} · {new Date(movimiento.fecha).toLocaleDateString("es-CO", { dateStyle: "medium" })}
+          {movimiento.medioPago ? ` · ${movimiento.medioPago}` : ""}
+        </p>
+      </div>
+      {movimiento.esPagoCliente && (
+        <button className="drx-btn-ghost" style={{ ...buttonGhost, padding: "5px 12px", fontSize: 12 }} onClick={() => onVerCliente(movimiento.clienteId)}>
+          Ver cliente
+        </button>
+      )}
+    </div>
+  );
+}
+
 function FormularioOtroIngreso({ onRegistrar }) {
   const hoyStr = new Date().toISOString().slice(0, 10);
   const [concepto, setConcepto] = useState("");
@@ -2013,6 +2043,8 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
   const [categoriaFiltroEgreso, setCategoriaFiltroEgreso] = useState("Todas");
   const [filtroOtroIngreso, setFiltroOtroIngreso] = useState("");
   const [categoriaFiltroOtroIngreso, setCategoriaFiltroOtroIngreso] = useState("Todas");
+  const [filtroIngresoTotal, setFiltroIngresoTotal] = useState("");
+  const [categoriaFiltroIngresoTotal, setCategoriaFiltroIngresoTotal] = useState("Todas");
   const { egresos, crear: crearEgreso, editar: editarEgreso, eliminar: eliminarEgresoBase, recategorizarMasivo } = useEgresos();
   const { ingresos: otrosIngresos, crear: crearOtroIngreso, editar: editarOtroIngreso, eliminar: eliminarOtroIngresoBase } = useOtrosIngresos();
   const { contactos: referenciadores } = useReferenciadores();
@@ -2612,6 +2644,47 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
         .filter((i) => !filtroOtroIngresoConRetraso.trim() || i.concepto.toLowerCase().includes(filtroOtroIngresoConRetraso.trim().toLowerCase()))
         .sort((a, b) => new Date(b.fecha) - new Date(a.fecha)),
     [otrosIngresos, categoriaFiltroOtroIngreso, filtroOtroIngresoConRetraso]
+  );
+
+  // Un ingreso es un ingreso venga de donde venga — antes había que entrar a
+  // "Clientes y pagos" para ver los abonos de clientes y a "Otros ingresos"
+  // para ver el resto, sin una sola lista con todo junto (a diferencia de
+  // Egresos, que sí tiene una lista única con buscador y filtro). Esta junta
+  // los pagos de todos los clientes con los otros ingresos en el mismo
+  // formato de tarjeta que Egresos.
+  const todosLosIngresos = useMemo(() => {
+    const deClientes = ids.flatMap((id) =>
+      (clientes[id]?.pagos || []).map((p) => ({
+        id: `pago:${id}:${p.id}`,
+        fecha: p.fecha,
+        valor: Number(p.valor) || 0,
+        medioPago: p.medioPago || "",
+        categoria: "Pago de cliente",
+        concepto: p.concepto ? `${clientes[id]?.nombre || "Cliente"} — ${p.concepto}` : clientes[id]?.nombre || "Cliente",
+        esPagoCliente: true,
+        clienteId: id,
+        clienteNombre: clientes[id]?.nombre || "",
+      }))
+    );
+    const otros = otrosIngresos.map((i) => ({
+      id: `otro:${i.id}`,
+      fecha: i.fecha,
+      valor: Number(i.valor) || 0,
+      medioPago: i.medioPago || "",
+      categoria: i.categoria,
+      concepto: i.concepto,
+      esPagoCliente: false,
+    }));
+    return [...deClientes, ...otros].sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+  }, [ids, clientes, otrosIngresos]);
+
+  const filtroIngresoTotalConRetraso = useValorConRetraso(filtroIngresoTotal);
+  const todosLosIngresosFiltrados = useMemo(
+    () =>
+      todosLosIngresos
+        .filter((i) => categoriaFiltroIngresoTotal === "Todas" || i.categoria === categoriaFiltroIngresoTotal)
+        .filter((i) => !filtroIngresoTotalConRetraso.trim() || i.concepto.toLowerCase().includes(filtroIngresoTotalConRetraso.trim().toLowerCase())),
+    [todosLosIngresos, categoriaFiltroIngresoTotal, filtroIngresoTotalConRetraso]
   );
 
   // Filtrar y ordenar es O(n log n) sobre todos los clientes — sin memoizar,
@@ -3257,6 +3330,75 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
           <GraficaBarras datos={categoriasOtroIngresoOrdenadas.map(([categoria, valor]) => ({ etiqueta: categoria, valor }))} color="#10B981" formatoValor={formatoCOP} />
         </Card>
       )}
+
+      <Card style={{ marginBottom: 20 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 8, marginBottom: 4 }}>
+          <div>
+            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, fontWeight: 700, color: COLORS.ink, margin: 0 }}>Todos los ingresos</p>
+            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, margin: "4px 0 0" }}>
+              Pagos de clientes y otros ingresos, todos juntos — igual que la lista de Egresos.
+            </p>
+          </div>
+          {todosLosIngresos.length > 0 && (
+            <button
+              className="drx-btn-ghost"
+              style={{ ...buttonGhost, fontSize: 12, padding: "5px 12px" }}
+              onClick={() =>
+                exportarCSV(
+                  "todos-los-ingresos.csv",
+                  [
+                    { titulo: "Fecha", valor: (i) => new Date(i.fecha).toLocaleDateString("es-CO") },
+                    { titulo: "Categoría", valor: (i) => i.categoria },
+                    { titulo: "Concepto", valor: (i) => i.concepto },
+                    { titulo: "Valor", valor: (i) => i.valor },
+                  ],
+                  todosLosIngresosFiltrados
+                )
+              }
+            >
+              Exportar Excel
+            </button>
+          )}
+        </div>
+        {todosLosIngresos.length > 0 && (
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 14 }}>
+            <input
+              className="drx-input"
+              style={{ ...inputStyle, maxWidth: 260, flex: 1, minWidth: 160 }}
+              placeholder="Buscar por concepto o cliente..."
+              value={filtroIngresoTotal}
+              onChange={(e) => setFiltroIngresoTotal(e.target.value)}
+            />
+            <select className="drx-input" style={{ ...inputStyle, maxWidth: 220 }} value={categoriaFiltroIngresoTotal} onChange={(e) => setCategoriaFiltroIngresoTotal(e.target.value)}>
+              <option value="Todas">Todas las categorías</option>
+              <option value="Pago de cliente">Pago de cliente</option>
+              {CATEGORIAS_OTRO_INGRESO.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+        {todosLosIngresosFiltrados.length > 0 ? (
+          <div style={{ marginTop: 12 }}>
+            {todosLosIngresosFiltrados.map((mov) => (
+              <IngresoUnificadoCard
+                key={mov.id}
+                movimiento={mov}
+                onVerCliente={(clienteId) => {
+                  setVistaContabilidad("clientes");
+                  setFiltro(clientes[clienteId]?.nombre || "");
+                }}
+              />
+            ))}
+          </div>
+        ) : (
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted, marginTop: 10 }}>
+            {todosLosIngresos.length === 0 ? "Todavía no hay ningún ingreso registrado." : "Ningún ingreso coincide con el filtro."}
+          </p>
+        )}
+      </Card>
 
       <Card id="seccion-otros-ingresos" style={{ marginBottom: 20 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 8, marginBottom: 4 }}>
