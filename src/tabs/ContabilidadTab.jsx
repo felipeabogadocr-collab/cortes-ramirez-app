@@ -2811,31 +2811,48 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
         </Card>
       )}
 
-      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 18, borderBottom: `1px solid ${COLORS.border}`, paddingBottom: 10 }}>
+      <div
+        style={{
+          display: "inline-flex",
+          gap: 4,
+          flexWrap: "wrap",
+          marginBottom: 20,
+          padding: 5,
+          background: COLORS.surfaceSoft,
+          border: `1px solid ${COLORS.border}`,
+          borderRadius: 16,
+          boxShadow: "0 1px 2px rgba(16,24,40,0.04)",
+        }}
+      >
         {[
           { id: "resumen", etiqueta: "📊 Resumen" },
           { id: "egresos", etiqueta: "− Egresos" },
           { id: "ingresos", etiqueta: "+ Ingresos" },
           { id: "clientes", etiqueta: "👤 Clientes y pagos" },
-        ].map((v) => (
-          <button
-            key={v.id}
-            onClick={() => setVistaContabilidad(v.id)}
-            style={{
-              fontFamily: "Inter, sans-serif",
-              fontSize: 13,
-              fontWeight: 700,
-              padding: "8px 16px",
-              borderRadius: 20,
-              border: `1px solid ${vistaContabilidad === v.id ? COLORS.navy : COLORS.border}`,
-              background: vistaContabilidad === v.id ? COLORS.navy : "transparent",
-              color: vistaContabilidad === v.id ? "#fff" : COLORS.inkSoft,
-              cursor: "pointer",
-            }}
-          >
-            {v.etiqueta}
-          </button>
-        ))}
+        ].map((v) => {
+          const activa = vistaContabilidad === v.id;
+          return (
+            <button
+              key={v.id}
+              className="drx-tab"
+              onClick={() => setVistaContabilidad(v.id)}
+              style={{
+                fontFamily: "Inter, sans-serif",
+                fontSize: 13,
+                fontWeight: 700,
+                padding: "9px 18px",
+                borderRadius: 12,
+                border: "none",
+                background: activa ? `linear-gradient(135deg, ${COLORS.navy}, ${COLORS.navyDeep})` : "transparent",
+                color: activa ? "#fff" : COLORS.inkSoft,
+                boxShadow: activa ? "0 4px 12px rgba(11,61,46,0.35)" : "none",
+                cursor: "pointer",
+              }}
+            >
+              {v.etiqueta}
+            </button>
+          );
+        })}
       </div>
 
       {vistaContabilidad === "resumen" && (
