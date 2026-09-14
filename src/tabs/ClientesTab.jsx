@@ -106,8 +106,18 @@ function SelectorPagador({ pagador, onChange }) {
 // arriendo con dos arrendatarios, una sucesión entre varios herederos, una
 // sociedad con varios socios. Esto deja agregar a las demás personas
 // involucradas sin tener que crear un "cliente" aparte por cada una.
+// Roles típicos de "otra persona del proceso" — un desplegable es más
+// rápido que escribir a mano, y evita que el mismo rol quede escrito de
+// formas distintas ("obligado solidario" vs "Obligado Solidario..."). Si
+// no calza ninguno, "Otro" deja escribirlo libre.
+const ROLES_OTRAS_PERSONAS = ["Obligado solidario", "Cliente solidario", "Cónyuge", "Socio", "Heredero", "Codemandante", "Codemandado"];
+
 function EditorOtrasPersonas({ personas, onChange }) {
   const lista = personas || [];
+  // Ids de filas donde se eligió "Otro" y se está escribiendo el rol libre
+  // — aparte del valor guardado, porque mientras se escribe puede estar
+  // vacío y no hay forma de distinguir eso de "recién agregado, sin rol".
+  const [rolLibre, setRolLibre] = useState({});
 
   const agregar = () => onChange([...lista, { id: uid(), nombre: "", telefono: "", rol: "" }]);
   const quitar = (id) => onChange(lista.filter((p) => p.id !== id));
@@ -123,16 +133,50 @@ function EditorOtrasPersonas({ personas, onChange }) {
           + Agregar persona
         </button>
       </div>
-      {lista.map((p) => (
-        <div key={p.id} className="drx-grid-form" style={{ display: "grid", gridTemplateColumns: "1.3fr 1fr 1fr auto", gap: 8, marginTop: 8, alignItems: "center" }}>
-          <input className="drx-input" style={{ ...inputStyle, padding: "8px 10px", fontSize: 13 }} value={p.nombre} onChange={(e) => actualizar(p.id, "nombre", e.target.value)} placeholder="Nombre completo" />
-          <input className="drx-input" style={{ ...inputStyle, padding: "8px 10px", fontSize: 13 }} value={p.telefono} onChange={(e) => actualizar(p.id, "telefono", e.target.value)} placeholder="Teléfono (opcional)" />
-          <input className="drx-input" style={{ ...inputStyle, padding: "8px 10px", fontSize: 13 }} value={p.rol} onChange={(e) => actualizar(p.id, "rol", e.target.value)} placeholder="Rol (ej: cónyuge, socio)" />
-          <button onClick={() => quitar(p.id)} style={{ background: "none", border: "none", cursor: "pointer", color: COLORS.muted, display: "flex" }} title="Quitar">
-            <Icono tipo="check" size={14} style={{ transform: "rotate(45deg)" }} />
-          </button>
-        </div>
-      ))}
+      {lista.map((p) => {
+        const esRolLibre = rolLibre[p.id] || (p.rol && !ROLES_OTRAS_PERSONAS.includes(p.rol));
+        return (
+          <div key={p.id} className="drx-grid-form" style={{ display: "grid", gridTemplateColumns: "1.3fr 1fr 1fr auto", gap: 8, marginTop: 8, alignItems: "center" }}>
+            <input className="drx-input" style={{ ...inputStyle, padding: "8px 10px", fontSize: 13 }} value={p.nombre} onChange={(e) => actualizar(p.id, "nombre", e.target.value)} placeholder="Nombre completo" />
+            <input className="drx-input" style={{ ...inputStyle, padding: "8px 10px", fontSize: 13 }} value={p.telefono} onChange={(e) => actualizar(p.id, "telefono", e.target.value)} placeholder="Teléfono (opcional)" />
+            {esRolLibre ? (
+              <input
+                className="drx-input"
+                style={{ ...inputStyle, padding: "8px 10px", fontSize: 13 }}
+                value={p.rol}
+                onChange={(e) => actualizar(p.id, "rol", e.target.value)}
+                placeholder="Escribe el rol"
+                autoFocus
+              />
+            ) : (
+              <select
+                className="drx-input"
+                style={{ ...inputStyle, padding: "8px 10px", fontSize: 13 }}
+                value={p.rol || ""}
+                onChange={(e) => {
+                  if (e.target.value === "Otro") {
+                    setRolLibre((prev) => ({ ...prev, [p.id]: true }));
+                    actualizar(p.id, "rol", "");
+                  } else {
+                    actualizar(p.id, "rol", e.target.value);
+                  }
+                }}
+              >
+                <option value="">Rol (opcional)</option>
+                {ROLES_OTRAS_PERSONAS.map((r) => (
+                  <option key={r} value={r}>
+                    {r}
+                  </option>
+                ))}
+                <option value="Otro">Otro...</option>
+              </select>
+            )}
+            <button onClick={() => quitar(p.id)} style={{ background: "none", border: "none", cursor: "pointer", color: COLORS.muted, display: "flex" }} title="Quitar">
+              <Icono tipo="check" size={14} style={{ transform: "rotate(45deg)" }} />
+            </button>
+          </div>
+        );
+      })}
     </div>
   );
 }
