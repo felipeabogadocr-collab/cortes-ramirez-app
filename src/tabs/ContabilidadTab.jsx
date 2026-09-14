@@ -2382,6 +2382,14 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
   const categoriasEgresoOrdenadas = Object.entries(porCategoriaEgresoTotal).sort((a, b) => b[1] - a[1]);
   const categoriaMayorGasto = categoriasEgresoOrdenadas[0] || null;
 
+  const porCategoriaOtroIngresoTotal = {};
+  otrosIngresos.forEach((i) => {
+    const valor = Number(i.valor) || 0;
+    porCategoriaOtroIngresoTotal[i.categoria] = (porCategoriaOtroIngresoTotal[i.categoria] || 0) + valor;
+  });
+  const categoriasOtroIngresoOrdenadas = Object.entries(porCategoriaOtroIngresoTotal).sort((a, b) => b[1] - a[1]);
+  const categoriaMayorOtroIngreso = categoriasOtroIngresoOrdenadas[0] || null;
+
   const presupuestoValor = Number(presupuesto?.valor) || 0;
   const porcentajePresupuesto = presupuestoValor > 0 ? (egresoMes / presupuestoValor) * 100 : 0;
   const colorPresupuesto = porcentajePresupuesto >= 100 ? "#B42318" : porcentajePresupuesto >= 80 ? "#B45309" : "#166534";
@@ -3231,6 +3239,16 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
 
       {vistaContabilidad === "ingresos" && (
         <>
+      {categoriasOtroIngresoOrdenadas.length > 0 && (
+        <Card style={{ marginBottom: 20 }}>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, fontWeight: 700, color: COLORS.ink, marginBottom: 4 }}>Otros ingresos por categoría</p>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, marginBottom: 14 }}>
+            Histórico completo · La que más aporta: <strong style={{ color: COLORS.headingText }}>{categoriaMayorOtroIngreso?.[0]}</strong> ({formatoCOP(categoriaMayorOtroIngreso?.[1] || 0)})
+          </p>
+          <GraficaBarras datos={categoriasOtroIngresoOrdenadas.map(([categoria, valor]) => ({ etiqueta: categoria, valor }))} color="#10B981" formatoValor={formatoCOP} />
+        </Card>
+      )}
+
       <Card id="seccion-otros-ingresos" style={{ marginBottom: 20 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 8, marginBottom: 4 }}>
           <div>
