@@ -2839,10 +2839,10 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
         }}
       >
         {[
-          { id: "resumen", etiqueta: "📊 Resumen" },
-          { id: "egresos", etiqueta: "− Egresos" },
-          { id: "ingresos", etiqueta: "+ Ingresos" },
-          { id: "clientes", etiqueta: "👤 Clientes y pagos" },
+          { id: "resumen", etiqueta: "Resumen" },
+          { id: "egresos", etiqueta: "Egresos" },
+          { id: "ingresos", etiqueta: "Ingresos" },
+          { id: "clientes", etiqueta: "Clientes y pagos" },
         ].map((v) => {
           const activa = vistaContabilidad === v.id;
           return (
@@ -2852,9 +2852,10 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
               onClick={() => setVistaContabilidad(v.id)}
               style={{
                 fontFamily: "Inter, sans-serif",
-                fontSize: 13,
+                fontSize: 12.5,
                 fontWeight: 700,
-                padding: "9px 18px",
+                letterSpacing: "0.02em",
+                padding: "9px 20px",
                 borderRadius: 12,
                 border: "none",
                 background: activa ? `linear-gradient(135deg, ${COLORS.navy}, ${COLORS.navyDeep})` : "transparent",
