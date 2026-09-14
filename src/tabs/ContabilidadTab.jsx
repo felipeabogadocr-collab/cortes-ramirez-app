@@ -2382,12 +2382,21 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
   const categoriasEgresoOrdenadas = Object.entries(porCategoriaEgresoTotal).sort((a, b) => b[1] - a[1]);
   const categoriaMayorGasto = categoriasEgresoOrdenadas[0] || null;
 
+  // Ingreso es ingreso, venga de donde venga — un pago de cliente y un
+  // "otro ingreso" (rendimientos, reembolsos, etc.) son ambos plata que
+  // entró al despacho. Por eso esta gráfica junta las dos fuentes en vez de
+  // mostrar solo la de "otros ingresos": los pagos de clientes se agrupan
+  // en una sola categoría ("Pagos de clientes", porque un pago individual
+  // no tiene categoría propia como sí la tienen los otros ingresos) y se
+  // suman a las categorías de otros ingresos.
   const porCategoriaOtroIngresoTotal = {};
   otrosIngresos.forEach((i) => {
     const valor = Number(i.valor) || 0;
     porCategoriaOtroIngresoTotal[i.categoria] = (porCategoriaOtroIngresoTotal[i.categoria] || 0) + valor;
   });
-  const categoriasOtroIngresoOrdenadas = Object.entries(porCategoriaOtroIngresoTotal).sort((a, b) => b[1] - a[1]);
+  const porCategoriaIngresoTotal = { ...porCategoriaOtroIngresoTotal };
+  if (recaudadoTotal > 0) porCategoriaIngresoTotal["Pagos de clientes"] = recaudadoTotal;
+  const categoriasOtroIngresoOrdenadas = Object.entries(porCategoriaIngresoTotal).sort((a, b) => b[1] - a[1]);
   const categoriaMayorOtroIngreso = categoriasOtroIngresoOrdenadas[0] || null;
 
   const presupuestoValor = Number(presupuesto?.valor) || 0;
@@ -3241,9 +3250,9 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
         <>
       {categoriasOtroIngresoOrdenadas.length > 0 && (
         <Card style={{ marginBottom: 20 }}>
-          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, fontWeight: 700, color: COLORS.ink, marginBottom: 4 }}>Otros ingresos por categoría</p>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, fontWeight: 700, color: COLORS.ink, marginBottom: 4 }}>Ingresos por categoría</p>
           <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, marginBottom: 14 }}>
-            Histórico completo · La que más aporta: <strong style={{ color: COLORS.headingText }}>{categoriaMayorOtroIngreso?.[0]}</strong> ({formatoCOP(categoriaMayorOtroIngreso?.[1] || 0)})
+            Histórico completo · Incluye pagos de clientes y otros ingresos (rendimientos, reembolsos, etc.) · La que más aporta: <strong style={{ color: COLORS.headingText }}>{categoriaMayorOtroIngreso?.[0]}</strong> ({formatoCOP(categoriaMayorOtroIngreso?.[1] || 0)})
           </p>
           <GraficaBarras datos={categoriasOtroIngresoOrdenadas.map(([categoria, valor]) => ({ etiqueta: categoria, valor }))} color="#10B981" formatoValor={formatoCOP} />
         </Card>
