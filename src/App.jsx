@@ -1179,7 +1179,7 @@ function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-const APP_VERSION = "1.95.3";
+const APP_VERSION = "1.96.0";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -9602,6 +9602,27 @@ function App() {
   const [errorCargaPerfil, setErrorCargaPerfil] = useState(null);
   const [cambiandoUsuario, setCambiandoUsuario] = useState(false);
   const [tab, setTab] = useState("resumen");
+  // Con la precarga en hover, el chunk de casi cualquier pestaña ya está
+  // en caché para cuando se hace clic — lo cual es bueno para la
+  // velocidad, pero significaba que la pantalla de carga con el logo
+  // (CargandoSeccion) casi nunca se alcanzaba a ver: el contenido nuevo
+  // aparecía tan de golpe que no se sentía como que "cargó" nada, solo
+  // como un salto brusco. tabMostrado sigue a "tab" con un respiro mínimo
+  // (~350ms) mostrando esa pantalla de carga a propósito, para que cambiar
+  // de sección se sienta consistente sin importar si el chunk ya estaba en
+  // caché o no. El menú lateral resalta la pestaña elegida al instante
+  // (usa "tab", no "tabMostrado") — solo el contenido de la derecha espera.
+  const [tabMostrado, setTabMostrado] = useState("resumen");
+  const [cambiandoTab, setCambiandoTab] = useState(false);
+  useEffect(() => {
+    if (tab === tabMostrado) return;
+    setCambiandoTab(true);
+    const espera = setTimeout(() => {
+      setTabMostrado(tab);
+      setCambiandoTab(false);
+    }, 350);
+    return () => clearTimeout(espera);
+  }, [tab]);
   // Cada pestaña (menos Resumen) se carga con React.lazy para no meter todo
   // el código de la app en un solo bundle — el costo es que la primera vez
   // que alguien la abre hay un mini-salto mientras descarga su chunk. Al
@@ -10277,84 +10298,90 @@ function App() {
               </button>
             </div>
           )}
-          <div key={tab} className="drx-tab-transition" style={{ maxWidth: 760, margin: "0 auto" }}>
-            {tab === "resumen" && puedeVer("resumen") && (
-              <TabErrorBoundary nombre="resumen">
-                <ResumenTab nombre={usuarioActual.nombre} usuarioId={usuarioActual.id} usuarioActual={usuarioActual} onIr={setTab} />
-              </TabErrorBoundary>
-            )}
-            {tab === "agenda" && puedeVer("agenda") && (
-              <TabErrorBoundary nombre="agenda">
-                <Suspense fallback={<CargandoSeccion />}>
-                  <AgendaTab />
-                </Suspense>
-              </TabErrorBoundary>
-            )}
-            {tab === "clientes" && puedeVer("clientes") && (
-              <TabErrorBoundary nombre="clientes">
-                <Suspense fallback={<CargandoSeccion />}>
-                  <ClientesTab usuarioActual={usuarioActual} onIrARegistrarPago={irARegistrarPago} />
-                </Suspense>
-              </TabErrorBoundary>
-            )}
-            {tab === "vigilancia" && puedeVer("vigilancia") && (
-              <TabErrorBoundary nombre="vigilancia">
-                <Suspense fallback={<CargandoSeccion />}>
-                  <VigilanciaTab />
-                </Suspense>
-              </TabErrorBoundary>
-            )}
-            {tab === "contabilidad" && puedeVer("contabilidad") && (
-              <TabErrorBoundary nombre="contabilidad">
-                <Suspense fallback={<CargandoSeccion />}>
-                  <ContabilidadTab usuarioActual={usuarioActual} clienteInicialPago={clienteParaPago} onClienteInicialPagoConsumido={() => setClienteParaPago(null)} />
-                </Suspense>
-              </TabErrorBoundary>
-            )}
-            {tab === "calculadora" && puedeVer("calculadora") && (
-              <TabErrorBoundary nombre="calculadora">
-                <Suspense fallback={<CargandoSeccion />}>
-                  <CalculadoraTab usuarioActual={usuarioActual} />
-                </Suspense>
-              </TabErrorBoundary>
-            )}
-            {tab === "contenido" && puedeVer("contenido") && (
-              <TabErrorBoundary nombre="contenido">
-                <Suspense fallback={<CargandoSeccion />}>
-                  <ContenidoTab />
-                </Suspense>
-              </TabErrorBoundary>
-            )}
-            {tab === "documentos" && puedeVer("documentos") && (
-              <TabErrorBoundary nombre="documentos">
-                <Suspense fallback={<CargandoSeccion />}>
-                  <DocumentosTab usuarioActual={usuarioActual} />
-                </Suspense>
-              </TabErrorBoundary>
-            )}
-            {tab === "reportes" && puedeVer("reportes") && (
-              <TabErrorBoundary nombre="reportes">
-                <Suspense fallback={<CargandoSeccion />}>
-                  <ReportesTab />
-                </Suspense>
-              </TabErrorBoundary>
-            )}
-            {tab === "usuarios" && usuarioActual.rol === "Administrador" && (
-              <TabErrorBoundary nombre="usuarios">
-                <Suspense fallback={<CargandoSeccion />}>
-                  <UsuariosPermisosTab
-                    usuarioActual={usuarioActual}
-                    onDespachoRenombrado={(nuevoNombre) => setUsuarioActual((prev) => (prev ? { ...prev, despachoNombre: nuevoNombre } : prev))}
-                  />
-                </Suspense>
-              </TabErrorBoundary>
-            )}
-            {tab === "plataforma" && usuarioActual.es_superadmin && (
-              <TabErrorBoundary nombre="plataforma">
-                <Suspense fallback={<CargandoSeccion />}>
-                  <PlataformaTab />
-                </Suspense>
-              </TabErrorBoundary>
+          <div key={tabMostrado} className="drx-tab-transition" style={{ maxWidth: 760, margin: "0 auto" }}>
+            {cambiandoTab ? (
+              <CargandoSeccion />
+            ) : (
+              <>
+                {tabMostrado === "resumen" && puedeVer("resumen") && (
+                  <TabErrorBoundary nombre="resumen">
+                    <ResumenTab nombre={usuarioActual.nombre} usuarioId={usuarioActual.id} usuarioActual={usuarioActual} onIr={setTab} />
+                  </TabErrorBoundary>
+                )}
+                {tabMostrado === "agenda" && puedeVer("agenda") && (
+                  <TabErrorBoundary nombre="agenda">
+                    <Suspense fallback={<CargandoSeccion />}>
+                      <AgendaTab />
+                    </Suspense>
+                  </TabErrorBoundary>
+                )}
+                {tabMostrado === "clientes" && puedeVer("clientes") && (
+                  <TabErrorBoundary nombre="clientes">
+                    <Suspense fallback={<CargandoSeccion />}>
+                      <ClientesTab usuarioActual={usuarioActual} onIrARegistrarPago={irARegistrarPago} />
+                    </Suspense>
+                  </TabErrorBoundary>
+                )}
+                {tabMostrado === "vigilancia" && puedeVer("vigilancia") && (
+                  <TabErrorBoundary nombre="vigilancia">
+                    <Suspense fallback={<CargandoSeccion />}>
+                      <VigilanciaTab />
+                    </Suspense>
+                  </TabErrorBoundary>
+                )}
+                {tabMostrado === "contabilidad" && puedeVer("contabilidad") && (
+                  <TabErrorBoundary nombre="contabilidad">
+                    <Suspense fallback={<CargandoSeccion />}>
+                      <ContabilidadTab usuarioActual={usuarioActual} clienteInicialPago={clienteParaPago} onClienteInicialPagoConsumido={() => setClienteParaPago(null)} />
+                    </Suspense>
+                  </TabErrorBoundary>
+                )}
+                {tabMostrado === "calculadora" && puedeVer("calculadora") && (
+                  <TabErrorBoundary nombre="calculadora">
+                    <Suspense fallback={<CargandoSeccion />}>
+                      <CalculadoraTab usuarioActual={usuarioActual} />
+                    </Suspense>
+                  </TabErrorBoundary>
+                )}
+                {tabMostrado === "contenido" && puedeVer("contenido") && (
+                  <TabErrorBoundary nombre="contenido">
+                    <Suspense fallback={<CargandoSeccion />}>
+                      <ContenidoTab />
+                    </Suspense>
+                  </TabErrorBoundary>
+                )}
+                {tabMostrado === "documentos" && puedeVer("documentos") && (
+                  <TabErrorBoundary nombre="documentos">
+                    <Suspense fallback={<CargandoSeccion />}>
+                      <DocumentosTab usuarioActual={usuarioActual} />
+                    </Suspense>
+                  </TabErrorBoundary>
+                )}
+                {tabMostrado === "reportes" && puedeVer("reportes") && (
+                  <TabErrorBoundary nombre="reportes">
+                    <Suspense fallback={<CargandoSeccion />}>
+                      <ReportesTab />
+                    </Suspense>
+                  </TabErrorBoundary>
+                )}
+                {tabMostrado === "usuarios" && usuarioActual.rol === "Administrador" && (
+                  <TabErrorBoundary nombre="usuarios">
+                    <Suspense fallback={<CargandoSeccion />}>
+                      <UsuariosPermisosTab
+                        usuarioActual={usuarioActual}
+                        onDespachoRenombrado={(nuevoNombre) => setUsuarioActual((prev) => (prev ? { ...prev, despachoNombre: nuevoNombre } : prev))}
+                      />
+                    </Suspense>
+                  </TabErrorBoundary>
+                )}
+                {tabMostrado === "plataforma" && usuarioActual.es_superadmin && (
+                  <TabErrorBoundary nombre="plataforma">
+                    <Suspense fallback={<CargandoSeccion />}>
+                      <PlataformaTab />
+                    </Suspense>
+                  </TabErrorBoundary>
+                )}
+              </>
             )}
           </div>
         </div>
