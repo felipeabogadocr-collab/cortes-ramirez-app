@@ -5,6 +5,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { storageGet, storageSet, obtenerUrlReciboImagen, getNombreDespacho, obtenerClientesPorId } from "../lib/storage";
 import { numeroEnLetras } from "../lib/numeroEnLetras.js";
+import { valorRetenido, valorNetoPago, montoAhorro, generarCuotasAcuerdoPago } from "../lib/contabilidadCalculos.js";
 import {
   COLORS,
   uid,
@@ -83,25 +84,6 @@ const OPCIONES_RETENCION = [
   { valor: "11", etiqueta: "11%" },
   { valor: "otro", etiqueta: "Otro porcentaje" },
 ];
-
-function valorRetenido(pago) {
-  const porcentaje = Number(pago?.retencionPorcentaje) || 0;
-  if (porcentaje <= 0) return 0;
-  return Math.round(((Number(pago.valor) || 0) * porcentaje) / 100);
-}
-
-function valorNetoPago(pago) {
-  return (Number(pago?.valor) || 0) - valorRetenido(pago);
-}
-
-// El ahorro sugerido se calcula sobre lo que de verdad entra a la cuenta
-// (el neto, después de la retención) — no tendría sentido sugerir apartar
-// plata que ni siquiera llega a estar en la mano.
-function montoAhorro(pago, porcentajeAhorro) {
-  const porcentaje = Number(porcentajeAhorro) || 0;
-  if (porcentaje <= 0) return 0;
-  return Math.round((valorNetoPago(pago) * porcentaje) / 100);
-}
 
 // Cuenta de cobro (distinta de la factura electrónica DIAN, que requiere un
 // proveedor tecnológico de pago): el documento tradicional que usan
@@ -363,40 +345,6 @@ async function generarCuentaDeCobroComisionDocx({ contacto, tipoContacto, client
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
-}
-
-const pad2AcuerdoPago = (n) => String(n).padStart(2, "0");
-const ultimoDiaMesAcuerdoPago = (anio, mesIndex) => new Date(anio, mesIndex + 1, 0).getDate();
-const fechaISODiaMesAcuerdoPago = (anio, mesIndex, dia) => `${anio}-${pad2AcuerdoPago(mesIndex + 1)}-${pad2AcuerdoPago(Math.min(dia, ultimoDiaMesAcuerdoPago(anio, mesIndex)))}`;
-
-// Mismo criterio que en la Calculadora de precios: si el cliente acuerda
-// pagar un día del mes distinto al de hoy, la primera cuota del acuerdo no
-// es hoy, es la próxima vez que caiga ese día.
-function calcularPrimeraFechaCuotaAcuerdo(diaPago) {
-  const hoy = new Date();
-  if (!diaPago) return fechaISODiaMesAcuerdoPago(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
-  let anio = hoy.getFullYear();
-  let mes = hoy.getMonth();
-  if (hoy.getDate() > diaPago) {
-    mes += 1;
-    if (mes > 11) {
-      mes = 0;
-      anio += 1;
-    }
-  }
-  return fechaISODiaMesAcuerdoPago(anio, mes, diaPago);
-}
-
-function generarCuotasAcuerdoPago({ valorTotal, numCuotas, diaPago }) {
-  const primera = calcularPrimeraFechaCuotaAcuerdo(diaPago);
-  const valorCuota = numCuotas > 0 ? valorTotal / numCuotas : 0;
-  const cuotas = [];
-  let fecha = primera;
-  for (let i = 0; i < numCuotas; i++) {
-    cuotas.push({ fecha, valor: valorCuota });
-    fecha = calcularProximaFechaPorFrecuencia(fecha, "Mensual");
-  }
-  return cuotas;
 }
 
 // Un acuerdo de pago es, en el fondo, una renegociación del saldo que ya
