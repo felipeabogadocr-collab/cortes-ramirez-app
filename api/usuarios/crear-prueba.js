@@ -13,6 +13,7 @@
 // cuenta; no hay borrado automático — el Administrador puede eliminarla en
 // cualquier momento desde la lista de usuarios, como a cualquier otra.
 
+import { randomInt } from "node:crypto";
 import { supabaseAdmin } from "../_lib/supabaseAdmin.js";
 import { permisosPorDefecto, notificacionesPorDefecto } from "../_lib/defaults.js";
 import { dentroDelLimite } from "../_lib/rateLimit.js";
@@ -21,8 +22,14 @@ const ROLES_VALIDOS = new Set(["Administrador", "Abogado", "Asistente"]);
 const MINUTOS_MIN = 2;
 const MINUTOS_MAX = 60;
 
+// randomInt (node:crypto) en vez de Math.random(): esto genera la
+// contraseña real de una cuenta de acceso, aunque sea temporal — un PRNG
+// no criptográfico como Math.random() no da garantías de impredecibilidad.
 function generarSufijoAleatorio() {
-  return Math.random().toString(36).slice(2, 8) + Date.now().toString(36).slice(-4);
+  const alfabeto = "abcdefghjkmnpqrstuvwxyz23456789";
+  let out = "";
+  for (let i = 0; i < 6; i++) out += alfabeto[randomInt(alfabeto.length)];
+  return out + Date.now().toString(36).slice(-4);
 }
 
 // Cumple la misma regla que validarContrasena (10+, letra y número) por
@@ -31,8 +38,8 @@ function generarContrasenaAleatoria() {
   const letras = "abcdefghjkmnpqrstuvwxyzABCDEFGHJKMNPQRSTUVWXYZ";
   const numeros = "23456789";
   let pw = "";
-  for (let i = 0; i < 10; i++) pw += letras[Math.floor(Math.random() * letras.length)];
-  for (let i = 0; i < 4; i++) pw += numeros[Math.floor(Math.random() * numeros.length)];
+  for (let i = 0; i < 10; i++) pw += letras[randomInt(letras.length)];
+  for (let i = 0; i < 4; i++) pw += numeros[randomInt(numeros.length)];
   return pw;
 }
 

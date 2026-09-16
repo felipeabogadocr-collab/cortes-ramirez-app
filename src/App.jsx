@@ -38,7 +38,20 @@ export {
   radicadosDeCliente,
 };
 
-export const uid = () => Math.random().toString(36).slice(2, 10).toUpperCase();
+// IDs de documentos/clientes/casos: son la única "llave" de enlaces públicos
+// sin sesión (firma electrónica, portal del cliente) — por eso se generan
+// con el generador criptográfico del navegador (crypto.getRandomValues), no
+// con Math.random(), que no da garantías de impredecibilidad. Se usa un
+// alfabeto de 32 símbolos sin caracteres ambiguos (sin 0/O, 1/I/L) porque
+// el código se comparte por WhatsApp para que la persona lo escriba a mano.
+const ALFABETO_UID = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+export const uid = () => {
+  const bytes = new Uint8Array(10);
+  crypto.getRandomValues(bytes);
+  let out = "";
+  for (let i = 0; i < bytes.length; i++) out += ALFABETO_UID[bytes[i] % ALFABETO_UID.length];
+  return out;
+};
 
 // Misma regla que api/_lib/defaults.js (validarContrasena) — se valida acá
 // también para no gastar una llamada de red si la contraseña ya se ve mal.
