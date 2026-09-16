@@ -1227,7 +1227,7 @@ export function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-export const APP_VERSION = "1.100.0";
+export const APP_VERSION = "1.101.0";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -3515,6 +3515,85 @@ function ProximoEventoResumen({ onIr }) {
   );
 }
 
+// Un despacho recién creado entra a un panel con las 10 pestañas vacías, sin
+// ninguna guía de por dónde empezar. Esta tarjeta muestra 3 pasos objetivos
+// (verificables con los mismos datos que ya trae ResumenTab, sin pedir nada
+// nuevo al servidor) y se oculta sola en cuanto los 3 quedan completos — no
+// hace falta que nadie la cierre a mano. Quien sí quiera ocultarla antes
+// puede hacerlo con el botón "Ocultar", que se recuerda por despacho.
+const LLAVE_CHECKLIST_INICIO = "nomos_checklist_inicio_oculto";
+
+function ChecklistPrimerosPasos({ r, onIr }) {
+  const despachoId = getDespachoActualId();
+  const [oculto, setOculto] = useState(() => {
+    if (!despachoId) return false;
+    return leerJSONLocal(LLAVE_CHECKLIST_INICIO, []).includes(despachoId);
+  });
+
+  const pasos = [
+    { texto: "Agrega tu primer cliente", hecho: r.totalClientes > 0, tab: "clientes" },
+    { texto: "Crea tu primer documento", hecho: r.docsPendientes + r.docsFaltaAbogado + r.docsListos > 0, tab: "documentos" },
+    { texto: "Invita a alguien más de tu equipo", hecho: r.totalUsuarios > 1, tab: "usuarios" },
+  ];
+  const completados = pasos.filter((p) => p.hecho).length;
+
+  if (oculto || completados === pasos.length) return null;
+
+  const ocultar = () => {
+    if (despachoId) {
+      const ocultos = leerJSONLocal(LLAVE_CHECKLIST_INICIO, []);
+      if (!ocultos.includes(despachoId)) guardarJSONLocal(LLAVE_CHECKLIST_INICIO, [...ocultos, despachoId]);
+    }
+    setOculto(true);
+  };
+
+  return (
+    <Card style={{ marginBottom: 24, borderLeft: `4px solid ${COLORS.accentBright}` }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10 }}>
+        <div>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 14, fontWeight: 700, color: COLORS.ink, margin: 0 }}>Primeros pasos en Nomos</p>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, margin: "4px 0 0" }}>{completados} de {pasos.length} completados</p>
+        </div>
+        <button
+          onClick={ocultar}
+          style={{ background: "none", border: "none", cursor: "pointer", fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, padding: 4, flexShrink: 0 }}
+        >
+          Ocultar ✕
+        </button>
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 14 }}>
+        {pasos.map((p) => (
+          <button
+            key={p.tab}
+            className="drx-btn-ghost"
+            onClick={() => onIr(p.tab)}
+            style={{ ...buttonGhost, display: "flex", alignItems: "center", gap: 10, justifyContent: "flex-start", textAlign: "left", background: COLORS.panel, opacity: p.hecho ? 0.55 : 1 }}
+          >
+            <span
+              style={{
+                width: 18,
+                height: 18,
+                borderRadius: "50%",
+                border: `2px solid ${p.hecho ? "#10B981" : COLORS.border}`,
+                background: p.hecho ? "#10B981" : "transparent",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                flexShrink: 0,
+                fontSize: 11,
+                color: "#fff",
+              }}
+            >
+              {p.hecho ? "✓" : ""}
+            </span>
+            <span style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.ink, textDecoration: p.hecho ? "line-through" : "none" }}>{p.texto}</span>
+          </button>
+        ))}
+      </div>
+    </Card>
+  );
+}
+
 function ResumenTab({ nombre, usuarioId, usuarioActual, onIr, onListo }) {
   const r = useResumenGeneral();
   const rep = useDatosReportes();
@@ -3589,6 +3668,7 @@ function ResumenTab({ nombre, usuarioId, usuarioActual, onIr, onListo }) {
         </div>
       </div>
 
+      <ChecklistPrimerosPasos r={r} onIr={onIr} />
       <ProximoEventoResumen onIr={onIr} />
       <TerminosPorVencerResumen onIr={onIr} />
 
