@@ -23,6 +23,12 @@ const URL_CONSULTA_SPOA = "https://www.fiscalia.gov.co/servicios-de-informacion-
 // usuario del despacho lo vea.
 const LLAVE_BORRADOR_CLIENTE = "borrador-cliente-nuevo";
 
+// De dónde es el cliente — la mayoría son de estas ciudades, pero el
+// despacho también lleva casos de clientes colombianos radicados en
+// España u otro país, o en otra ciudad de Colombia distinta a las 3
+// principales.
+const UBICACIONES_CLIENTE = ["Bogotá", "Medellín", "Cali", "Otra ciudad de Colombia", "España", "Otro país"];
+
 const FORM_CLIENTE_INICIAL = {
   nombre: "",
   telefono: "",
@@ -30,6 +36,8 @@ const FORM_CLIENTE_INICIAL = {
   tipoProceso: tiposProcesoDeArea(AREAS_PROCESO[0])[0],
   areaProceso: AREAS_PROCESO[0],
   radicados: [""],
+  juzgadoActual: "",
+  ubicacion: "",
   notas: "",
   planPago: null,
   valorTotal: "",
@@ -753,7 +761,9 @@ export default function ClientesTab({ usuarioActual, onIrARegistrarPago, onListo
                   { titulo: "Nombre", valor: (id) => clientes[id]?.nombre },
                   { titulo: "Teléfono", valor: (id) => clientes[id]?.telefono },
                   { titulo: "Correo", valor: (id) => clientes[id]?.email },
+                  { titulo: "Ubicación", valor: (id) => clientes[id]?.ubicacion },
                   { titulo: "Radicado(s)", valor: (id) => radicadosDeCliente(clientes[id]).join(" / ") },
+                  { titulo: "Juzgado actual", valor: (id) => clientes[id]?.juzgadoActual },
                   { titulo: "Tipo de proceso", valor: (id) => clientes[id]?.tipoProceso },
                   { titulo: "Área", valor: (id) => clientes[id]?.areaProceso },
                   { titulo: "Valor total acordado", valor: (id) => clientes[id]?.valorTotal },
@@ -795,8 +805,27 @@ export default function ClientesTab({ usuarioActual, onIrARegistrarPago, onListo
             <Field label="Correo">
               <input className="drx-input" style={inputStyle} value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
             </Field>
+            <Field label="Ubicación">
+              <select className="drx-input" style={inputStyle} value={form.ubicacion} onChange={(e) => setForm({ ...form, ubicacion: e.target.value })}>
+                <option value="">Sin especificar</option>
+                {UBICACIONES_CLIENTE.map((u) => (
+                  <option key={u} value={u}>
+                    {u}
+                  </option>
+                ))}
+              </select>
+            </Field>
             <Field label="Número(s) de radicado (opcional)">
               <EditorRadicados radicados={form.radicados} onChange={(radicados) => setForm({ ...form, radicados })} />
+            </Field>
+            <Field label="Juzgado actual (opcional)">
+              <input
+                className="drx-input"
+                style={inputStyle}
+                value={form.juzgadoActual}
+                onChange={(e) => setForm({ ...form, juzgadoActual: e.target.value })}
+                placeholder="Ej: Juzgado 12 Civil del Circuito de Bogotá"
+              />
             </Field>
             <Field label="Área del proceso">
               <select
@@ -903,8 +932,27 @@ export default function ClientesTab({ usuarioActual, onIrARegistrarPago, onListo
                   <Field label="Correo">
                     <input className="drx-input" style={inputStyle} value={formEdicion.email || ""} onChange={(e) => setFormEdicion({ ...formEdicion, email: e.target.value })} />
                   </Field>
+                  <Field label="Ubicación">
+                    <select className="drx-input" style={inputStyle} value={formEdicion.ubicacion || ""} onChange={(e) => setFormEdicion({ ...formEdicion, ubicacion: e.target.value })}>
+                      <option value="">Sin especificar</option>
+                      {UBICACIONES_CLIENTE.map((u) => (
+                        <option key={u} value={u}>
+                          {u}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
                   <Field label="Número(s) de radicado (opcional)">
                     <EditorRadicados radicados={formEdicion.radicados} onChange={(radicados) => setFormEdicion({ ...formEdicion, radicados })} />
+                  </Field>
+                  <Field label="Juzgado actual (opcional)">
+                    <input
+                      className="drx-input"
+                      style={inputStyle}
+                      value={formEdicion.juzgadoActual || ""}
+                      onChange={(e) => setFormEdicion({ ...formEdicion, juzgadoActual: e.target.value })}
+                      placeholder="Ej: Juzgado 12 Civil del Circuito de Bogotá"
+                    />
                   </Field>
                   <Field label="Área del proceso">
                     <select
@@ -1089,6 +1137,16 @@ export default function ClientesTab({ usuarioActual, onIrARegistrarPago, onListo
                     {c.areaProceso && (
                       <span style={{ fontFamily: "Inter, sans-serif", fontSize: 11, fontWeight: 600, padding: "3px 9px", borderRadius: 20, background: "#F0F0F0", color: COLORS.black, border: "1px solid #D8D8D8" }}>
                         {c.areaProceso}
+                      </span>
+                    )}
+                    {c.ubicacion && (
+                      <span style={{ fontFamily: "Inter, sans-serif", fontSize: 11, fontWeight: 600, padding: "3px 9px", borderRadius: 20, background: "#F0F0F0", color: COLORS.black, border: "1px solid #D8D8D8" }}>
+                        <Icono tipo="ubicacion" size={10} style={{ marginRight: 3, verticalAlign: -1 }} /> {c.ubicacion}
+                      </span>
+                    )}
+                    {c.juzgadoActual && (
+                      <span style={{ fontFamily: "Inter, sans-serif", fontSize: 11, fontWeight: 600, padding: "3px 9px", borderRadius: 20, background: COLORS.surfaceSoft, color: COLORS.inkSoft, border: `1px solid ${COLORS.border}` }}>
+                        {c.juzgadoActual}
                       </span>
                     )}
                     {radicadosDeCliente(c).map((r, idx) => (
