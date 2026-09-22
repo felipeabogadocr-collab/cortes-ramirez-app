@@ -1227,7 +1227,7 @@ export function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-export const APP_VERSION = "1.103.0";
+export const APP_VERSION = "1.104.0";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -6456,7 +6456,7 @@ function MedidorFuerzaContrasena({ valor }) {
 export const PLANES_PRECIO = [
   {
     nombre: "Abogado",
-    precio: "$35.000",
+    precio: "$80.000",
     periodo: "/mes (1 abogado)",
     descripcion: "Para el abogado independiente que quiere dejar el Excel y el WhatsApp desordenado.",
     caracteristicas: ["1 usuario", "Hasta 30 clientes activos", "Firma electrónica de documentos", "Vigilancia judicial automática", "Portal del cliente"],
@@ -6464,7 +6464,7 @@ export const PLANES_PRECIO = [
   },
   {
     nombre: "Despacho",
-    precio: "$89.000",
+    precio: "$120.000",
     periodo: "/mes",
     descripcion: "Para despachos con varios abogados que necesitan trabajar coordinados.",
     caracteristicas: ["Usuarios ilimitados", "Clientes ilimitados", "Todas las funciones de Abogado", "Reportes y carga de trabajo por abogado", "Roles y permisos por usuario", "Soporte prioritario"],
@@ -6702,7 +6702,7 @@ function PantallaPendienteActivacion({ usuarioActual, onCerrarSesion }) {
               Llave Bancolombia: <strong style={{ color: COLORS.ink }}>{CUENTA_PAGO_NOMOS.llave}</strong> ({CUENTA_PAGO_NOMOS.titular})
             </p>
             <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.inkSoft, margin: "0 0 4px" }}>
-              Plan Abogado $35.000/mes · Plan Despacho $89.000/mes
+              Plan Abogado $80.000/mes · Plan Despacho $120.000/mes
             </p>
             <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, margin: 0 }}>
               Pon <strong>{codigoReferencia}</strong> como referencia del pago para que lo identifiquemos rápido.
