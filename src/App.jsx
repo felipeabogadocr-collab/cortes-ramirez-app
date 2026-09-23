@@ -1227,7 +1227,7 @@ export function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-export const APP_VERSION = "1.114.0";
+export const APP_VERSION = "1.115.0";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -3342,9 +3342,16 @@ export function useEventosAgenda() {
 
   const crear = async (datos) => {
     const id = uid();
-    await storageSet(`evento:${id}`, JSON.stringify({ ...datos, creadoEn: new Date().toISOString() }), true);
+    const registro = { ...datos, creadoEn: new Date().toISOString() };
+    await storageSet(`evento:${id}`, JSON.stringify(registro), true);
     await addId(id);
-    await cargar();
+    // No basta con llamar a cargar() aquí: sigue cerrado sobre la lista de
+    // ids DE ANTES de addId (addId actualiza el estado de forma asíncrona,
+    // así que este cargar() todavía no la ve) — el evento recién creado
+    // podía tardar en aparecer, o no aparecer hasta recargar la página.
+    // Actualizando el estado local directo con el registro que ya se tiene
+    // a la mano, se ve de inmediato sin depender de esa carrera.
+    setEventos((prev) => ({ ...prev, [id]: registro }));
     return id;
   };
 
