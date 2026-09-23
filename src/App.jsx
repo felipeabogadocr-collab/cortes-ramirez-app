@@ -1227,7 +1227,7 @@ export function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-export const APP_VERSION = "1.113.0";
+export const APP_VERSION = "1.114.0";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -1527,6 +1527,8 @@ export function Icono({ tipo, size = 15, style, className }) {
       return <svg {...p}><rect x="5" y="2.5" width="14" height="19" rx="2" /><path d="M8 6.5h8M8 11h1.5M8 14.5h1.5M8 18h1.5M12.25 11h1.5M12.25 14.5h1.5M12.25 18h1.5M16.5 11h1.5M16.5 14.5v3.5" /></svg>;
     case "ubicacion":
       return <svg {...p}><path d="M12 21s7-6.5 7-11.5A7 7 0 0 0 5 9.5C5 14.5 12 21 12 21Z" /><circle cx="12" cy="9.5" r="2.3" /></svg>;
+    case "video":
+      return <svg {...p}><rect x="2.5" y="6.5" width="13" height="11" rx="2" /><path d="m15.5 10.5 5-3v9l-5-3Z" /></svg>;
     default:
       return null;
   }

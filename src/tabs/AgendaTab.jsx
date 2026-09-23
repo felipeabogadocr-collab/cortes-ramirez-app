@@ -129,7 +129,7 @@ function EventoAgendaCard({ evento, onEliminar, onCompletar, pasado }) {
                     padding: "5px 12px",
                   }}
                 >
-                  📹 Unirse por Meet
+                  <Icono tipo="video" size={13} /> Unirse por Meet
                 </a>
               )}
               {evento.googleMeetLink && (
@@ -151,7 +151,15 @@ function EventoAgendaCard({ evento, onEliminar, onCompletar, pasado }) {
                     cursor: "pointer",
                   }}
                 >
-                  {copiado ? "✓ Copiado" : "📋 Copiar invitación"}
+                  {copiado ? (
+                    <>
+                      <Icono tipo="check" size={13} /> Copiado
+                    </>
+                  ) : (
+                    <>
+                      <Icono tipo="portapapeles" size={13} /> Copiar invitación
+                    </>
+                  )}
                 </button>
               )}
               {evento.googleHtmlLink && (
@@ -173,7 +181,7 @@ function EventoAgendaCard({ evento, onEliminar, onCompletar, pasado }) {
                     padding: "5px 12px",
                   }}
                 >
-                  📅 Ver en Google Calendar
+                  <Icono tipo="calendario" size={13} /> Ver en Google Calendar
                 </a>
               )}
             </div>
@@ -389,12 +397,12 @@ export default function AgendaTab({ onListo }) {
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                fontSize: 20,
+                color: "#4285F4",
                 flexShrink: 0,
                 boxShadow: "0 1px 3px rgba(16,24,40,0.08)",
               }}
             >
-              📅
+              <Icono tipo="calendario" size={20} />
             </div>
             <div>
               <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13.5, fontWeight: 700, color: COLORS.ink, margin: 0, display: "flex", alignItems: "center", gap: 7 }}>
@@ -464,21 +472,25 @@ export default function AgendaTab({ onListo }) {
 
       {mostrarForm && (
         <Card style={{ marginBottom: 20, padding: 0, overflow: "hidden" }}>
-          <div style={{ padding: "18px 20px 14px", borderBottom: `1px solid ${COLORS.border}` }}>
+          <div style={{ padding: "18px 20px 16px", borderBottom: `1px solid ${COLORS.border}`, background: COLORS.surfaceSoft }}>
+            <label style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, fontWeight: 700, color: COLORS.muted, textTransform: "uppercase", letterSpacing: 0.4, display: "block", marginBottom: 6 }}>
+              Título <span style={{ color: "#B42318" }}>*</span>
+            </label>
             <input
               value={form.titulo}
               onChange={(e) => setForm({ ...form, titulo: e.target.value })}
-              placeholder="Agregar título"
+              placeholder="Ej: Asesoría con Juan Pérez"
               style={{
                 width: "100%",
-                border: "none",
+                border: `1.5px solid ${COLORS.border}`,
+                borderRadius: 8,
                 outline: "none",
                 fontFamily: "Inter, sans-serif",
-                fontSize: 20,
+                fontSize: 18,
                 fontWeight: 700,
                 color: COLORS.ink,
-                padding: "4px 0",
-                background: "transparent",
+                padding: "10px 12px",
+                background: "#FFFFFF",
               }}
             />
           </div>
@@ -500,7 +512,9 @@ export default function AgendaTab({ onListo }) {
 
             {googleConectado && (
               <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
-                <div style={{ width: 20, textAlign: "center", marginTop: 2 }}>📹</div>
+                <div style={{ width: 20, textAlign: "center", marginTop: 9, color: COLORS.muted }}>
+                  <Icono tipo="video" size={17} />
+                </div>
                 <div style={{ flex: 1 }}>
                   <label style={{ display: "flex", alignItems: "center", gap: 8, fontFamily: "Inter, sans-serif", fontSize: 13.5, color: COLORS.ink, cursor: "pointer" }}>
                     <input type="checkbox" checked={form.crearMeet} onChange={(e) => setForm({ ...form, crearMeet: e.target.checked })} />
