@@ -539,3 +539,50 @@ create policy "mismo despacho inserta eventos de documento" on documento_eventos
 -- navegador ni desde el servidor; solo se inserta. Quien administre la
 -- base de datos directamente en Supabase (fuera de la app) sí podría
 -- editarla — eso ya escapa a lo que el software puede impedir por sí solo.
+
+-- "Conectado ahora" (portal de superadministrador) ---------------------------
+-- Solo un indicador de presencia liviano: si el usuario tiene la app abierta
+-- ahora mismo y en qué pestaña está — NO qué escribe, NO sus datos. Se
+-- actualiza solo (ver App.jsx) cada vez que cambia de pestaña y cada minuto
+-- mientras la pestaña del navegador sigue visible.
+alter table perfiles add column if not exists ultima_actividad_en timestamptz;
+alter table perfiles add column if not exists pestana_actual text;
+
+-- La política de update existente ("administradores actualizan perfiles del
+-- mismo despacho") NO alcanza para esto: un Abogado/Asistente normal no
+-- puede actualizar ni su propia fila hoy. Se agrega una política que sí se
+-- lo permite, pero SOLO sobre su propia fila — y el trigger de abajo la
+-- acota más todavía: aunque la política deje pasar el UPDATE, cualquier
+-- cambio a un campo que no sea el latido de presencia (rol, permisos,
+-- despacho_id, etc.) se rechaza, para que nadie pueda auto-otorgarse
+-- permisos editando su propio perfil.
+drop policy if exists "usuario actualiza su propio latido de presencia" on perfiles;
+create policy "usuario actualiza su propio latido de presencia" on perfiles
+  for update
+  using (id = auth.uid())
+  with check (id = auth.uid());
+
+create or replace function limitar_autoactualizacion_perfil()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if not soy_administrador() then
+    if (to_jsonb(new) - 'ultima_actividad_en' - 'pestana_actual')
+       is distinct from
+       (to_jsonb(old) - 'ultima_actividad_en' - 'pestana_actual')
+    then
+      raise exception 'Solo puedes actualizar tu estado de conexión.';
+    end if;
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists limitar_autoactualizacion_perfil_trigger on perfiles;
+create trigger limitar_autoactualizacion_perfil_trigger
+  before update on perfiles
+  for each row
+  execute function limitar_autoactualizacion_perfil();

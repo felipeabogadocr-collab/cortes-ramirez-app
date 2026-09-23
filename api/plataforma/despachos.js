@@ -55,7 +55,22 @@ export default async function handler(req, res) {
       .order("creado_en", { ascending: false })
       .limit(100);
     if (error) return res.status(500).json({ error: error.message });
-    return res.status(200).json({ actividad: actividad || [] });
+
+    // "Conectado ahora" de cada usuario del despacho (ver el latido que
+    // manda App.jsx) — se considera conectado si su último latido fue hace
+    // menos de 2 minutos (el latido se manda cada 60s mientras la pestaña
+    // del navegador sigue visible, así que 2 min da margen sin marcar a
+    // alguien como desconectado por un latido perdido).
+    const { data: usuarios } = await admin
+      .from("perfiles")
+      .select("nombre, rol, ultima_actividad_en, pestana_actual")
+      .eq("despacho_id", req.query.actividad);
+    const HACE_2_MIN = Date.now() - 2 * 60 * 1000;
+    const conectados = (usuarios || [])
+      .filter((u) => u.ultima_actividad_en && new Date(u.ultima_actividad_en).getTime() >= HACE_2_MIN)
+      .map((u) => ({ nombre: u.nombre, rol: u.rol, pestanaActual: u.pestana_actual }));
+
+    return res.status(200).json({ actividad: actividad || [], conectados });
   }
 
   if (req.method === "GET") {

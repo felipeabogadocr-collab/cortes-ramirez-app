@@ -83,6 +83,7 @@ function PanelActividadDespacho({ despachoId }) {
   const [cargado, setCargado] = useState(false);
   const [cargando, setCargando] = useState(false);
   const [actividad, setActividad] = useState([]);
+  const [conectados, setConectados] = useState([]);
   const [errorCarga, setErrorCarga] = useState("");
 
   const cargar = useCallback(async () => {
@@ -97,6 +98,7 @@ function PanelActividadDespacho({ despachoId }) {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "No se pudo cargar la actividad.");
       setActividad(data.actividad || []);
+      setConectados(data.conectados || []);
       setCargado(true);
     } catch (e) {
       setErrorCarga(e.message);
@@ -120,6 +122,18 @@ function PanelActividadDespacho({ despachoId }) {
         <div style={{ marginTop: 10, maxHeight: 260, overflowY: "auto" }}>
           {cargando && <Spinner />}
           {errorCarga && <p style={{ color: "#B42318", fontSize: 12, fontFamily: "Inter, sans-serif" }}>{errorCarga}</p>}
+          {cargado && (
+            <div style={{ marginBottom: 10 }}>
+              <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, fontWeight: 700, color: conectados.length > 0 ? "#166534" : COLORS.muted, margin: 0 }}>
+                {conectados.length > 0 ? `🟢 ${conectados.length} conectado${conectados.length !== 1 ? "s" : ""} ahora` : "Nadie conectado ahora"}
+              </p>
+              {conectados.map((c, i) => (
+                <p key={i} style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, color: COLORS.inkSoft, margin: "2px 0 0" }}>
+                  {c.nombre} ({c.rol}) — viendo {c.pestanaActual || "…"}
+                </p>
+              ))}
+            </div>
+          )}
           {cargado && actividad.length === 0 && (
             <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted }}>Todavía no hay ninguna acción registrada — no ha usado la app.</p>
           )}

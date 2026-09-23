@@ -1227,7 +1227,7 @@ export function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-export const APP_VERSION = "1.105.0";
+export const APP_VERSION = "1.106.0";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -8007,6 +8007,24 @@ function App() {
     datosListosRef.current = true;
     if (minimoListoRef.current) setCambiandoTab(false);
   }, []);
+  // "Conectado ahora" (solo lo ve el superadministrador, en Plataforma): un
+  // indicador liviano de presencia — si la app está abierta ahora mismo y en
+  // qué pestaña, nada de qué escribe ni sus datos. Se actualiza al cambiar
+  // de pestaña y cada 60s mientras la pestaña del navegador sigue visible
+  // (para que "conectado ahora" no dependa de seguir haciendo clic). No
+  // corre en el modo público de firma ni en el portal del cliente — ahí no
+  // hay una sesión de despacho que reportar.
+  useEffect(() => {
+    if (!usuarioActual?.id || modoPublico || modoPortal) return;
+    const latir = () => {
+      supabase.from("perfiles").update({ ultima_actividad_en: new Date().toISOString(), pestana_actual: tab }).eq("id", usuarioActual.id).then(() => {});
+    };
+    latir();
+    const intervalo = setInterval(() => {
+      if (document.visibilityState === "visible") latir();
+    }, 60000);
+    return () => clearInterval(intervalo);
+  }, [tab, usuarioActual?.id, modoPublico, modoPortal]);
   // Cada pestaña (menos Resumen) se carga con React.lazy para no meter todo
   // el código de la app en un solo bundle — el costo es que la primera vez
   // que alguien la abre hay un mini-salto mientras descarga su chunk. Al
