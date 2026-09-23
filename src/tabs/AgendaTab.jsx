@@ -199,6 +199,7 @@ export default function AgendaTab({ onListo }) {
   }, [cargado]);
   const [mostrarForm, setMostrarForm] = useState(false);
   const [form, setForm] = useState({ titulo: "", fecha: "", hora: "", notas: "", crearMeet: true, invitados: "" });
+  const [errorForm, setErrorForm] = useState("");
   const [permisoNotif, setPermisoNotif] = useState(typeof Notification !== "undefined" ? Notification.permission : "unsupported");
   const [filtroTiempo, setFiltroTiempo] = useState("todos");
   const [soloTerminos, setSoloTerminos] = useState(false);
@@ -282,7 +283,15 @@ export default function AgendaTab({ onListo }) {
   };
 
   const guardar = async () => {
-    if (!form.titulo.trim() || !form.fecha || !form.hora) return;
+    const faltan = [];
+    if (!form.titulo.trim()) faltan.push("el título");
+    if (!form.fecha) faltan.push("la fecha");
+    if (!form.hora) faltan.push("la hora");
+    if (faltan.length > 0) {
+      setErrorForm(`Falta ${faltan.join(", ")}.`);
+      return;
+    }
+    setErrorForm("");
     const datosEvento = {
       titulo: form.titulo.trim(),
       fecha: form.fecha,
@@ -441,7 +450,14 @@ export default function AgendaTab({ onListo }) {
             Solo términos procesales
           </label>
         </div>
-        <button className="drx-btn-primary" style={buttonPrimary} onClick={() => setMostrarForm((v) => !v)}>
+        <button
+          className="drx-btn-primary"
+          style={buttonPrimary}
+          onClick={() => {
+            setErrorForm("");
+            setMostrarForm((v) => !v);
+          }}
+        >
           {mostrarForm ? "Cancelar" : "+ Nuevo evento"}
         </button>
       </div>
@@ -538,8 +554,22 @@ export default function AgendaTab({ onListo }) {
 
           </div>
 
-          <div style={{ padding: "14px 20px", background: COLORS.surfaceSoft, borderTop: `1px solid ${COLORS.border}`, display: "flex", justifyContent: "flex-end" }}>
-            <button className="drx-btn-primary" style={buttonPrimary} onClick={guardar} disabled={!form.titulo.trim() || !form.fecha || !form.hora}>
+          <div
+            style={{
+              padding: "14px 20px",
+              background: COLORS.surfaceSoft,
+              borderTop: `1px solid ${COLORS.border}`,
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              gap: 12,
+              flexWrap: "wrap",
+            }}
+          >
+            {errorForm && (
+              <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, fontWeight: 600, color: "#B42318", margin: 0 }}>⚠ {errorForm}</p>
+            )}
+            <button className="drx-btn-primary" style={{ ...buttonPrimary, marginLeft: "auto" }} onClick={guardar}>
               Guardar evento
             </button>
           </div>
