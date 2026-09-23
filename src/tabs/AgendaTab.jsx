@@ -53,6 +53,21 @@ const FILTROS_AGENDA = [
 function EventoAgendaCard({ evento, onEliminar, onCompletar, pasado }) {
   const fechaTexto = new Date(`${evento.fecha}T${evento.hora || "00:00"}:00`).toLocaleDateString("es-CO", { weekday: "long", day: "numeric", month: "long" });
   const urgencia = evento.esTermino && !evento.completado ? urgenciaTermino(diasHasta(evento.fecha)) : null;
+  const [copiado, setCopiado] = useState(false);
+
+  // El texto de invitación usa el título del evento como "concepto" (Ej:
+  // "Asesoría con Juan Pérez", "Reunión de equipo") — si por algún motivo
+  // no hay título, cae en "la sesión virtual" en vez de dejar el mensaje a
+  // medias.
+  const copiarInvitacion = () => {
+    const concepto = evento.titulo ? `"${evento.titulo}"` : "la sesión virtual";
+    const texto = `Te invito a ${concepto}\n📅 ${fechaTexto}${evento.hora ? ` · ${evento.hora}` : ""}\n🔗 ${evento.googleMeetLink}`;
+    navigator.clipboard.writeText(texto).then(() => {
+      setCopiado(true);
+      setTimeout(() => setCopiado(false), 1800);
+    });
+  };
+
   return (
     <Card style={{ padding: 14, opacity: pasado || evento.completado ? 0.55 : 1, borderLeft: urgencia ? `4px solid ${urgencia.color}` : undefined }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10, flexWrap: "wrap" }}>
@@ -116,6 +131,28 @@ function EventoAgendaCard({ evento, onEliminar, onCompletar, pasado }) {
                 >
                   📹 Unirse por Meet
                 </a>
+              )}
+              {evento.googleMeetLink && (
+                <button
+                  onClick={copiarInvitacion}
+                  title="Copiar mensaje de invitación con el link, para pegarlo en WhatsApp o correo"
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 6,
+                    fontFamily: "Inter, sans-serif",
+                    fontSize: 12,
+                    fontWeight: 600,
+                    color: copiado ? "#166534" : COLORS.inkSoft,
+                    background: copiado ? "#DCFCE7" : COLORS.surfaceSoft,
+                    border: `1px solid ${copiado ? "#BBF7D0" : COLORS.border}`,
+                    borderRadius: 20,
+                    padding: "5px 12px",
+                    cursor: "pointer",
+                  }}
+                >
+                  {copiado ? "✓ Copiado" : "📋 Copiar invitación"}
+                </button>
               )}
               {evento.googleHtmlLink && (
                 <a
