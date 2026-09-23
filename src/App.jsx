@@ -1227,7 +1227,7 @@ export function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-export const APP_VERSION = "1.120.0";
+export const APP_VERSION = "1.120.1";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -3325,18 +3325,33 @@ function AsistenteIA({ nombre, usuarioId, usuarioActual, onAccionCompletada }) {
 // useState, separado del useState de "eventos" de aquí — cada vez que ese
 // índice cambiaba, un useEffect disparaba una recarga completa desde el
 // servidor por su cuenta, EN PARALELO con lo que crear()/eliminar() ya
-// habían puesto en el estado local. Dos actualizaciones async de la misma
-// pantalla, sin ningún orden garantizado entre ellas, es una receta segura
-// para carreras — y así fue: la recarga automática, si terminaba después
-// del crear() que la disparó, pisaba el evento recién creado y lo hacía
-// desaparecer solo, sin ningún error visible. Aquí "ids" y "eventos" viven
-// en el MISMO lugar (un solo useState) y cada operación (crear, eliminar,
-// actualizar) es la única dueña de su propio resultado — nunca hay una
-// recarga de fondo que pueda pisar lo que la operación en curso ya sabe
-// que es cierto.
+// habían puesto en el estado local. Aquí "ids" y "eventos" viven en el
+// MISMO lugar (un solo useState) y cada operación (crear, eliminar,
+// actualizar) es la única dueña de su propio resultado.
+//
+// SEGUNDO bug, distinto, encontrado después: crear/eliminar/actualizar
+// también leían "estado" directo del cierre de React — pero un cierre
+// queda fijo al momento exacto en que se creó. Cuando en AgendaTab se
+// guarda un evento nuevo, primero se llama a crear() y, apenas responde
+// Google Calendar (un viaje de red real, no instantáneo), se llama a
+// actualizar(id, {googleEventoId...}) usando ESA MISMA función
+// "actualizar" del mismo cierre — sin importar que React ya haya vuelto
+// a renderizar de por medio, porque esta llamada en curso nunca "recoge"
+// una versión más nueva de la función a la que ya se aferró. Para ese
+// cierre viejo, "estado.eventos[id]" del evento recién creado no
+// existía todavía → el merge quedaba en {...undefined, googleEventoId...}
+// → se perdían título/fecha/hora del evento, tanto en pantalla como en
+// el servidor (por eso no era un parpadeo, sino que quedaba roto de
+// verdad). Como la lista filtra por "tiene título", el evento
+// desaparecía apenas terminaba de guardar — justo lo que se seguía
+// viendo. estadoRef es un valor mutable COMPARTIDO por todos los
+// cierres, sin importar de qué render vengan, así que leer/escribir a
+// través de él en vez del "estado" del cierre elimina el problema de
+// raíz, sin depender de cuándo decida React volver a renderizar.
 export function useEventosAgenda() {
   const [estado, setEstado] = useState({ ids: [], eventos: {} });
   const [cargado, setCargado] = useState(false);
+  const estadoRef = useRef(estado);
 
   const cargar = useCallback(async () => {
     const idsRaw = await storageGet("indice-agenda", true);
@@ -3347,7 +3362,9 @@ export function useEventosAgenda() {
       const raw = valores[`evento:${id}`];
       if (raw) mapa[id] = JSON.parse(raw);
     });
-    setEstado({ ids: idsActuales, eventos: mapa });
+    const nuevo = { ids: idsActuales, eventos: mapa };
+    estadoRef.current = nuevo;
+    setEstado(nuevo);
     setCargado(true);
   }, []);
 
@@ -3355,35 +3372,33 @@ export function useEventosAgenda() {
     cargar();
   }, [cargar]);
 
-  // crear/eliminar/actualizar leen "estado" directo del cierre (no con la
-  // forma funcional setEstado(prev => ...)) a propósito: como ya no hay
-  // ninguna recarga de fondo que pueda cambiar "estado" por su cuenta
-  // mientras esta función corre, el valor del cierre YA es el más
-  // reciente — usar la forma funcional aquí no protegería de nada más y
-  // solo complicaría leer el resultado antes de guardarlo en el servidor.
   const crear = async (datos) => {
     const id = uid();
     const registro = { ...datos, creadoEn: new Date().toISOString() };
-    const nuevosIds = [id, ...estado.ids];
+    const nuevosIds = [id, ...estadoRef.current.ids];
     await storageSet(`evento:${id}`, JSON.stringify(registro), true);
     await storageSet("indice-agenda", JSON.stringify(nuevosIds), true);
-    setEstado((prev) => ({ ids: nuevosIds, eventos: { ...prev.eventos, [id]: registro } }));
+    const nuevo = { ids: nuevosIds, eventos: { ...estadoRef.current.eventos, [id]: registro } };
+    estadoRef.current = nuevo;
+    setEstado(nuevo);
     return id;
   };
 
   const eliminar = async (id) => {
-    const nuevosIds = estado.ids.filter((x) => x !== id);
+    const nuevosIds = estadoRef.current.ids.filter((x) => x !== id);
     await storageSet("indice-agenda", JSON.stringify(nuevosIds), true);
-    setEstado((prev) => {
-      const { [id]: _quitado, ...restoEventos } = prev.eventos;
-      return { ids: nuevosIds, eventos: restoEventos };
-    });
+    const { [id]: _quitado, ...restoEventos } = estadoRef.current.eventos;
+    const nuevo = { ids: nuevosIds, eventos: restoEventos };
+    estadoRef.current = nuevo;
+    setEstado(nuevo);
   };
 
   const actualizar = async (id, cambios) => {
-    const actualizado = { ...estado.eventos[id], ...cambios };
+    const actualizado = { ...estadoRef.current.eventos[id], ...cambios };
     await storageSet(`evento:${id}`, JSON.stringify(actualizado), true);
-    setEstado((prev) => ({ ...prev, eventos: { ...prev.eventos, [id]: actualizado } }));
+    const nuevo = { ...estadoRef.current, eventos: { ...estadoRef.current.eventos, [id]: actualizado } };
+    estadoRef.current = nuevo;
+    setEstado(nuevo);
   };
 
   return { ids: estado.ids, eventos: estado.eventos, cargado, crear, eliminar, actualizar, reload: cargar };
