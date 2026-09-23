@@ -282,7 +282,7 @@ export default function AgendaTab({ onListo }) {
   };
 
   const guardar = async () => {
-    if (!form.titulo.trim() || !form.fecha) return;
+    if (!form.titulo.trim() || !form.fecha || !form.hora) return;
     const datosEvento = {
       titulo: form.titulo.trim(),
       fecha: form.fecha,
@@ -449,69 +449,118 @@ export default function AgendaTab({ onListo }) {
       </div>
 
       {mostrarForm && (
-        <Card style={{ marginBottom: 20 }}>
-          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            <Field label="Título">
-              <input className="drx-input" style={inputStyle} value={form.titulo} onChange={(e) => setForm({ ...form, titulo: e.target.value })} placeholder="Ej: Audiencia con Juan Pérez" />
-            </Field>
-            <div className="drx-grid-form" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-              <Field label="Fecha">
-                <input className="drx-input" style={inputStyle} type="date" value={form.fecha} onChange={(e) => setForm({ ...form, fecha: e.target.value })} />
-              </Field>
-              <Field label="Hora (opcional)">
-                <input className="drx-input" style={inputStyle} type="time" value={form.hora} onChange={(e) => setForm({ ...form, hora: e.target.value })} />
-              </Field>
+        <Card style={{ marginBottom: 20, padding: 0, overflow: "hidden" }}>
+          <div style={{ padding: "18px 20px 14px", borderBottom: `1px solid ${COLORS.border}` }}>
+            <input
+              value={form.titulo}
+              onChange={(e) => setForm({ ...form, titulo: e.target.value })}
+              placeholder="Agregar título"
+              style={{
+                width: "100%",
+                border: "none",
+                outline: "none",
+                fontFamily: "Inter, sans-serif",
+                fontSize: 20,
+                fontWeight: 700,
+                color: COLORS.ink,
+                padding: "4px 0",
+                background: "transparent",
+              }}
+            />
+          </div>
+
+          <div style={{ padding: 20, display: "flex", flexDirection: "column", gap: 18 }}>
+            <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
+              <div style={{ width: 20, textAlign: "center", marginTop: 9, color: COLORS.muted }}>
+                <Icono tipo="reloj" size={17} />
+              </div>
+              <div className="drx-grid-form" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, flex: 1 }}>
+                <Field label="Fecha">
+                  <input className="drx-input" style={inputStyle} type="date" value={form.fecha} onChange={(e) => setForm({ ...form, fecha: e.target.value })} />
+                </Field>
+                <Field label="Hora">
+                  <input className="drx-input" style={inputStyle} type="time" value={form.hora} onChange={(e) => setForm({ ...form, hora: e.target.value })} />
+                </Field>
+              </div>
             </div>
-            <Field label="Notas (opcional)">
-              <textarea
-                className="drx-input"
-                style={{ ...inputStyle, resize: "vertical", minHeight: 60, fontFamily: "Inter, sans-serif" }}
-                value={form.notas}
-                onChange={(e) => setForm({ ...form, notas: e.target.value })}
-                placeholder="Detalles del evento..."
-              />
-            </Field>
-            <label style={{ display: "flex", alignItems: "center", gap: 8, fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.inkSoft, cursor: "pointer" }}>
-              <input type="checkbox" checked={form.esTermino} onChange={(e) => setForm({ ...form, esTermino: e.target.checked })} />
-              Es un término procesal (vencimiento legal) — recibe alertas más estrictas que un evento normal
-            </label>
-            {form.esTermino && (
-              <Field label="Cliente / proceso relacionado (opcional)">
-                <input
-                  className="drx-input"
-                  style={inputStyle}
-                  value={form.clienteRelacionado}
-                  onChange={(e) => setForm({ ...form, clienteRelacionado: e.target.value })}
-                  placeholder="Ej: Juan Pérez — Proceso 2024-00187"
-                />
-              </Field>
-            )}
 
             {googleConectado && (
-              <div style={{ background: "#F8FAFC", border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: 14 }}>
-                <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, fontWeight: 700, color: COLORS.inkSoft, margin: "0 0 10px", display: "flex", alignItems: "center", gap: 6 }}>
-                  📅 Este evento también se creará en tu Google Calendar
-                </p>
-                <label style={{ display: "flex", alignItems: "center", gap: 8, fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.inkSoft, cursor: "pointer", marginBottom: 12 }}>
-                  <input type="checkbox" checked={form.crearMeet} onChange={(e) => setForm({ ...form, crearMeet: e.target.checked })} />
-                  📹 Crear videollamada de Google Meet
-                </label>
-                <Field label="Invitar por correo (opcional)">
-                  <input
-                    className="drx-input"
-                    style={inputStyle}
-                    value={form.invitados}
-                    onChange={(e) => setForm({ ...form, invitados: e.target.value })}
-                    placeholder="cliente@correo.com, colega@correo.com"
-                  />
-                </Field>
-                <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11, color: COLORS.muted, margin: "4px 0 0" }}>
-                  Sepáralos con comas — a cada uno le llega la invitación de Google Calendar con el link del Meet.
-                </p>
+              <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
+                <div style={{ width: 20, textAlign: "center", marginTop: 2 }}>📹</div>
+                <div style={{ flex: 1 }}>
+                  <label style={{ display: "flex", alignItems: "center", gap: 8, fontFamily: "Inter, sans-serif", fontSize: 13.5, color: COLORS.ink, cursor: "pointer" }}>
+                    <input type="checkbox" checked={form.crearMeet} onChange={(e) => setForm({ ...form, crearMeet: e.target.checked })} />
+                    Agregar videollamada de Google Meet
+                  </label>
+                  {!form.crearMeet && (
+                    <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, color: COLORS.muted, margin: "3px 0 0 26px" }}>
+                      Este evento se crea en tu Google Calendar sin Meet.
+                    </p>
+                  )}
+                </div>
               </div>
             )}
 
-            <button className="drx-btn-primary" style={buttonPrimary} onClick={guardar} disabled={!form.titulo.trim() || !form.fecha}>
+            {googleConectado && (
+              <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
+                <div style={{ width: 20, textAlign: "center", marginTop: 9, color: COLORS.muted }}>
+                  <Icono tipo="persona" size={17} />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <Field label="Invitados (opcional)">
+                    <input
+                      className="drx-input"
+                      style={inputStyle}
+                      value={form.invitados}
+                      onChange={(e) => setForm({ ...form, invitados: e.target.value })}
+                      placeholder="cliente@correo.com, colega@correo.com"
+                    />
+                  </Field>
+                  <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11, color: COLORS.muted, margin: "4px 0 0" }}>
+                    Sepáralos con comas — a cada uno le llega la invitación de Google Calendar con el link.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
+              <div style={{ width: 20, textAlign: "center", marginTop: 9, color: COLORS.muted }}>
+                <Icono tipo="documento" size={17} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <textarea
+                  className="drx-input"
+                  style={{ ...inputStyle, resize: "vertical", minHeight: 60, fontFamily: "Inter, sans-serif" }}
+                  value={form.notas}
+                  onChange={(e) => setForm({ ...form, notas: e.target.value })}
+                  placeholder="Agregar descripción"
+                />
+              </div>
+            </div>
+
+            <div style={{ borderTop: `1px solid ${COLORS.border}`, paddingTop: 14 }}>
+              <label style={{ display: "flex", alignItems: "center", gap: 8, fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.inkSoft, cursor: "pointer" }}>
+                <input type="checkbox" checked={form.esTermino} onChange={(e) => setForm({ ...form, esTermino: e.target.checked })} />
+                Es un término procesal (vencimiento legal) — recibe alertas más estrictas que un evento normal
+              </label>
+              {form.esTermino && (
+                <div style={{ marginTop: 10 }}>
+                  <Field label="Cliente / proceso relacionado (opcional)">
+                    <input
+                      className="drx-input"
+                      style={inputStyle}
+                      value={form.clienteRelacionado}
+                      onChange={(e) => setForm({ ...form, clienteRelacionado: e.target.value })}
+                      placeholder="Ej: Juan Pérez — Proceso 2024-00187"
+                    />
+                  </Field>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div style={{ padding: "14px 20px", background: COLORS.surfaceSoft, borderTop: `1px solid ${COLORS.border}`, display: "flex", justifyContent: "flex-end" }}>
+            <button className="drx-btn-primary" style={buttonPrimary} onClick={guardar} disabled={!form.titulo.trim() || !form.fecha || !form.hora}>
               Guardar evento
             </button>
           </div>
