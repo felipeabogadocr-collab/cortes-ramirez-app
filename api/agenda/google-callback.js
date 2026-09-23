@@ -181,7 +181,7 @@ export default async function handler(req, res) {
     }
 
     if (accion === "crear_evento") {
-      const { titulo, fecha, hora, notas } = req.body || {};
+      const { titulo, fecha, hora, notas, crearMeet, invitados } = req.body || {};
       if (!titulo || !fecha) return res.status(400).json({ error: "Falta título o fecha." });
 
       const accessToken = await obtenerAccessTokenVigente(admin, usuario.id);
@@ -200,18 +200,33 @@ export default async function handler(req, res) {
         end = { date: finDia.toISOString().slice(0, 10) };
       }
 
+      // Correos sueltos y sin formato válido se descartan en vez de mandarlos
+      // a Google (que rechazaría todo el evento por uno solo mal escrito).
+      const attendees = Array.isArray(invitados)
+        ? invitados.map((e) => String(e || "").trim()).filter((e) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)).map((email) => ({ email }))
+        : [];
+
+      const cuerpoEvento = {
+        summary: titulo,
+        description: notas || "",
+        start,
+        end,
+      };
+      if (attendees.length > 0) cuerpoEvento.attendees = attendees;
+      if (crearMeet !== false) cuerpoEvento.conferenceData = { createRequest: { requestId: randomUUID(), conferenceSolutionKey: { type: "hangoutsMeet" } } };
+
       try {
-        const evResp = await fetch("https://www.googleapis.com/calendar/v3/calendars/primary/events?conferenceDataVersion=1", {
-          method: "POST",
-          headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
-          body: JSON.stringify({
-            summary: titulo,
-            description: notas || "",
-            start,
-            end,
-            conferenceData: { createRequest: { requestId: randomUUID(), conferenceSolutionKey: { type: "hangoutsMeet" } } },
-          }),
-        });
+        // sendUpdates=all: para que a los invitados SÍ les llegue el correo
+        // de invitación de Google Calendar — por defecto la API los agrega
+        // en silencio, sin avisarles nada.
+        const evResp = await fetch(
+          `https://www.googleapis.com/calendar/v3/calendars/primary/events?conferenceDataVersion=1&sendUpdates=${attendees.length > 0 ? "all" : "none"}`,
+          {
+            method: "POST",
+            headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+            body: JSON.stringify(cuerpoEvento),
+          }
+        );
         const evDatos = await evResp.json();
         if (!evResp.ok) {
           console.error("Error creando evento en Google Calendar:", evDatos);

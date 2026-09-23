@@ -93,15 +93,53 @@ function EventoAgendaCard({ evento, onEliminar, onCompletar, pasado }) {
             {evento.esTermino && evento.clienteRelacionado ? ` · ${evento.clienteRelacionado}` : ""}
           </p>
           {evento.notas && <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.inkSoft, margin: "6px 0 0" }}>{evento.notas}</p>}
-          {evento.googleMeetLink && (
-            <a
-              href={evento.googleMeetLink}
-              target="_blank"
-              rel="noreferrer"
-              style={{ display: "inline-flex", alignItems: "center", gap: 5, marginTop: 8, fontFamily: "Inter, sans-serif", fontSize: 12, fontWeight: 700, color: "#10B981", textDecoration: "none" }}
-            >
-              📹 Unirse por Google Meet
-            </a>
+          {(evento.googleMeetLink || evento.googleHtmlLink) && (
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
+              {evento.googleMeetLink && (
+                <a
+                  href={evento.googleMeetLink}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 6,
+                    fontFamily: "Inter, sans-serif",
+                    fontSize: 12,
+                    fontWeight: 700,
+                    color: "#FFFFFF",
+                    background: "#0B8043",
+                    textDecoration: "none",
+                    borderRadius: 20,
+                    padding: "5px 12px",
+                  }}
+                >
+                  📹 Unirse por Meet
+                </a>
+              )}
+              {evento.googleHtmlLink && (
+                <a
+                  href={evento.googleHtmlLink}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 6,
+                    fontFamily: "Inter, sans-serif",
+                    fontSize: 12,
+                    fontWeight: 600,
+                    color: "#4285F4",
+                    background: "#EAF1FE",
+                    textDecoration: "none",
+                    borderRadius: 20,
+                    padding: "5px 12px",
+                  }}
+                >
+                  📅 Ver en Google Calendar
+                </a>
+              )}
+            </div>
           )}
         </div>
         <div style={{ display: "flex", gap: 10, alignItems: "center", flexShrink: 0 }}>
@@ -123,7 +161,7 @@ export default function AgendaTab({ onListo }) {
     if (cargado) onListo?.();
   }, [cargado]);
   const [mostrarForm, setMostrarForm] = useState(false);
-  const [form, setForm] = useState({ titulo: "", fecha: "", hora: "", notas: "", esTermino: false, clienteRelacionado: "" });
+  const [form, setForm] = useState({ titulo: "", fecha: "", hora: "", notas: "", esTermino: false, clienteRelacionado: "", crearMeet: true, invitados: "" });
   const [permisoNotif, setPermisoNotif] = useState(typeof Notification !== "undefined" ? Notification.permission : "unsupported");
   const [filtroTiempo, setFiltroTiempo] = useState("todos");
   const [soloTerminos, setSoloTerminos] = useState(false);
@@ -216,8 +254,10 @@ export default function AgendaTab({ onListo }) {
       esTermino: form.esTermino,
       clienteRelacionado: form.esTermino ? form.clienteRelacionado.trim() : "",
     };
+    const invitados = form.invitados.split(/[,;\s]+/).map((e) => e.trim()).filter(Boolean);
+    const crearMeet = form.crearMeet;
     const id = await crear(datosEvento);
-    setForm({ titulo: "", fecha: "", hora: "", notas: "", esTermino: false, clienteRelacionado: "" });
+    setForm({ titulo: "", fecha: "", hora: "", notas: "", esTermino: false, clienteRelacionado: "", crearMeet: true, invitados: "" });
     setMostrarForm(false);
 
     if (googleConectado && id) {
@@ -226,7 +266,7 @@ export default function AgendaTab({ onListo }) {
         const resp = await fetch("/api/agenda/google-callback", {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-          body: JSON.stringify({ accion: "crear_evento", ...datosEvento }),
+          body: JSON.stringify({ accion: "crear_evento", ...datosEvento, crearMeet, invitados }),
         });
         const datos = await resp.json();
         if (resp.ok) {
@@ -286,24 +326,56 @@ export default function AgendaTab({ onListo }) {
         </Card>
       )}
 
-      <Card style={{ marginBottom: 20 }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
-          <div>
-            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, fontWeight: 700, color: COLORS.ink, margin: 0 }}>📅 Google Calendar</p>
-            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, margin: "3px 0 0" }}>
-              {googleConectado === null
-                ? "Verificando..."
-                : googleConectado
-                ? `Conectado (${googleEmail || "tu cuenta"}) — cada evento nuevo se crea también ahí, con Meet.`
-                : "Sin conectar — los eventos nuevos solo quedan en Nomos."}
-            </p>
+      <Card
+        style={{
+          marginBottom: 20,
+          borderLeft: `4px solid ${googleConectado ? "#10B981" : "#4285F4"}`,
+          background: googleConectado ? "linear-gradient(135deg, " + COLORS.panel + " 0%, #F0FDF4 100%)" : COLORS.panel,
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, flexWrap: "wrap" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <div
+              style={{
+                width: 40,
+                height: 40,
+                borderRadius: 10,
+                background: "#FFFFFF",
+                border: `1px solid ${COLORS.border}`,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: 20,
+                flexShrink: 0,
+                boxShadow: "0 1px 3px rgba(16,24,40,0.08)",
+              }}
+            >
+              📅
+            </div>
+            <div>
+              <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13.5, fontWeight: 700, color: COLORS.ink, margin: 0, display: "flex", alignItems: "center", gap: 7 }}>
+                Google Calendar
+                {googleConectado && (
+                  <span style={{ fontFamily: "Inter, sans-serif", fontSize: 10.5, fontWeight: 700, color: "#166534", background: "#DCFCE7", borderRadius: 20, padding: "2px 9px" }}>
+                    ● Conectado
+                  </span>
+                )}
+              </p>
+              <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, margin: "3px 0 0" }}>
+                {googleConectado === null
+                  ? "Verificando..."
+                  : googleConectado
+                  ? `${googleEmail || "tu cuenta"} — cada evento nuevo se crea también ahí, con Meet.`
+                  : "Sin conectar — los eventos nuevos solo quedan en Nomos."}
+              </p>
+            </div>
           </div>
           {googleConectado ? (
             <button className="drx-btn-ghost" style={buttonGhost} onClick={desconectarGoogle}>
               Desconectar
             </button>
           ) : (
-            <button className="drx-btn-primary" style={buttonPrimary} onClick={conectarGoogle} disabled={conectandoGoogle || googleConectado === null}>
+            <button className="drx-btn-primary" style={{ ...buttonPrimary, background: "#4285F4" }} onClick={conectarGoogle} disabled={conectandoGoogle || googleConectado === null}>
               {conectandoGoogle ? "Conectando…" : "Conectar Google Calendar"}
             </button>
           )}
@@ -377,6 +449,31 @@ export default function AgendaTab({ onListo }) {
                 />
               </Field>
             )}
+
+            {googleConectado && (
+              <div style={{ background: "#F8FAFC", border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: 14 }}>
+                <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, fontWeight: 700, color: COLORS.inkSoft, margin: "0 0 10px", display: "flex", alignItems: "center", gap: 6 }}>
+                  📅 Este evento también se creará en tu Google Calendar
+                </p>
+                <label style={{ display: "flex", alignItems: "center", gap: 8, fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.inkSoft, cursor: "pointer", marginBottom: 12 }}>
+                  <input type="checkbox" checked={form.crearMeet} onChange={(e) => setForm({ ...form, crearMeet: e.target.checked })} />
+                  📹 Crear videollamada de Google Meet
+                </label>
+                <Field label="Invitar por correo (opcional)">
+                  <input
+                    className="drx-input"
+                    style={inputStyle}
+                    value={form.invitados}
+                    onChange={(e) => setForm({ ...form, invitados: e.target.value })}
+                    placeholder="cliente@correo.com, colega@correo.com"
+                  />
+                </Field>
+                <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11, color: COLORS.muted, margin: "4px 0 0" }}>
+                  Sepáralos con comas — a cada uno le llega la invitación de Google Calendar con el link del Meet.
+                </p>
+              </div>
+            )}
+
             <button className="drx-btn-primary" style={buttonPrimary} onClick={guardar} disabled={!form.titulo.trim() || !form.fecha}>
               Guardar evento
             </button>
