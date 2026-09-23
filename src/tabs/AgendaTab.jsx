@@ -50,6 +50,18 @@ const FILTROS_AGENDA = [
   { id: "semana", nombre: "Esta semana" },
 ];
 
+// Mismos presets que trae Google Calendar por defecto para "Notificación".
+const RECORDATORIOS_GOOGLE = [
+  { minutos: "", etiqueta: "El que tenga tu Google Calendar por defecto" },
+  { minutos: "0", etiqueta: "A la hora del evento" },
+  { minutos: "5", etiqueta: "5 minutos antes" },
+  { minutos: "10", etiqueta: "10 minutos antes" },
+  { minutos: "15", etiqueta: "15 minutos antes" },
+  { minutos: "30", etiqueta: "30 minutos antes" },
+  { minutos: "60", etiqueta: "1 hora antes" },
+  { minutos: "1440", etiqueta: "1 día antes" },
+];
+
 function EventoAgendaCard({ evento, onEliminar, onCompletar, pasado }) {
   const fechaTexto = new Date(`${evento.fecha}T${evento.hora || "00:00"}:00`).toLocaleDateString("es-CO", { weekday: "long", day: "numeric", month: "long" });
   const urgencia = evento.esTermino && !evento.completado ? urgenciaTermino(diasHasta(evento.fecha)) : null;
@@ -206,7 +218,7 @@ export default function AgendaTab({ onListo }) {
     if (cargado) onListo?.();
   }, [cargado]);
   const [mostrarForm, setMostrarForm] = useState(false);
-  const [form, setForm] = useState({ titulo: "", fecha: "", hora: "", notas: "", crearMeet: true, invitados: "" });
+  const [form, setForm] = useState({ titulo: "", fecha: "", hora: "", notas: "", crearMeet: true, invitados: "", recordatorio: "30" });
   const [errorForm, setErrorForm] = useState("");
   const [permisoNotif, setPermisoNotif] = useState(typeof Notification !== "undefined" ? Notification.permission : "unsupported");
   const [filtroTiempo, setFiltroTiempo] = useState("todos");
@@ -308,8 +320,9 @@ export default function AgendaTab({ onListo }) {
     };
     const invitados = form.invitados.split(/[,;\s]+/).map((e) => e.trim()).filter(Boolean);
     const crearMeet = form.crearMeet;
+    const recordatorioMinutos = form.recordatorio === "" ? null : Number(form.recordatorio);
     const id = await crear(datosEvento);
-    setForm({ titulo: "", fecha: "", hora: "", notas: "", crearMeet: true, invitados: "" });
+    setForm({ titulo: "", fecha: "", hora: "", notas: "", crearMeet: true, invitados: "", recordatorio: "30" });
     setMostrarForm(false);
 
     if (googleConectado && id) {
@@ -318,7 +331,7 @@ export default function AgendaTab({ onListo }) {
         const resp = await fetch("/api/agenda/google-callback", {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-          body: JSON.stringify({ accion: "crear_evento", ...datosEvento, crearMeet, invitados }),
+          body: JSON.stringify({ accion: "crear_evento", ...datosEvento, crearMeet, invitados, recordatorioMinutos }),
         });
         const datos = await resp.json();
         if (resp.ok) {
@@ -341,10 +354,18 @@ export default function AgendaTab({ onListo }) {
     .filter((e) => e.titulo)
     .sort((a, b) => `${a.fecha}T${a.hora || "00:00"}`.localeCompare(`${b.fecha}T${b.hora || "00:00"}`));
 
-  const hoyISO = new Date().toISOString().slice(0, 10);
+  // OJO: .toISOString() siempre da la fecha en UTC, no en la hora local del
+  // navegador — de noche en Colombia (UTC-5), UTC ya está en el día
+  // siguiente, así que un evento de "hoy" quedaba comparado contra un "hoy"
+  // que en realidad era mañana, y se colaba a "Pasados" (o desaparecía de
+  // la vista) apenas se creaba. fechaLocalISO usa los métodos locales del
+  // navegador (getFullYear/getMonth/getDate), que si sí respetan la zona
+  // horaria real del dispositivo.
+  const fechaLocalISO = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  const hoyISO = fechaLocalISO(new Date());
   const finSemana = new Date();
   finSemana.setDate(finSemana.getDate() + (7 - finSemana.getDay()));
-  const finSemanaISO = finSemana.toISOString().slice(0, 10);
+  const finSemanaISO = fechaLocalISO(finSemana);
 
   let proximos = lista.filter((e) => e.fecha >= hoyISO);
   if (filtroTiempo === "hoy") proximos = proximos.filter((e) => e.fecha === hoyISO);
@@ -525,6 +546,30 @@ export default function AgendaTab({ onListo }) {
                       Este evento se crea en tu Google Calendar sin Meet.
                     </p>
                   )}
+                </div>
+              </div>
+            )}
+
+            {googleConectado && (
+              <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
+                <div style={{ width: 20, textAlign: "center", marginTop: 9, color: COLORS.muted }}>
+                  <IconoCampana size={15} />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <Field label="Notificación">
+                    <select
+                      className="drx-input"
+                      style={inputStyle}
+                      value={form.recordatorio}
+                      onChange={(e) => setForm({ ...form, recordatorio: e.target.value })}
+                    >
+                      {RECORDATORIOS_GOOGLE.map((r) => (
+                        <option key={r.minutos} value={r.minutos}>
+                          {r.etiqueta}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
                 </div>
               </div>
             )}

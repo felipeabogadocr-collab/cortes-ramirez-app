@@ -181,7 +181,7 @@ export default async function handler(req, res) {
     }
 
     if (accion === "crear_evento") {
-      const { titulo, fecha, hora, notas, crearMeet, invitados } = req.body || {};
+      const { titulo, fecha, hora, notas, crearMeet, invitados, recordatorioMinutos } = req.body || {};
       if (!titulo || !fecha) return res.status(400).json({ error: "Falta título o fecha." });
 
       const accessToken = await obtenerAccessTokenVigente(admin, usuario.id);
@@ -229,6 +229,15 @@ export default async function handler(req, res) {
       };
       if (attendees.length > 0) cuerpoEvento.attendees = attendees;
       if (crearMeet !== false) cuerpoEvento.conferenceData = { createRequest: { requestId: randomUUID(), conferenceSolutionKey: { type: "hangoutsMeet" } } };
+      // recordatorioMinutos llega como null cuando el abogado elige "el que
+      // tenga tu Google Calendar por defecto" — en ese caso NO se manda
+      // "reminders" en absoluto, para que Google aplique su propio default
+      // en vez de forzar uno. 0 es válido (recordar justo a la hora del
+      // evento), por eso se compara explícito contra null/undefined y no
+      // con un simple "if (recordatorioMinutos)".
+      if (recordatorioMinutos !== null && recordatorioMinutos !== undefined && !Number.isNaN(recordatorioMinutos)) {
+        cuerpoEvento.reminders = { useDefault: false, overrides: [{ method: "popup", minutes: recordatorioMinutos }] };
+      }
 
       try {
         // sendUpdates=all: para que a los invitados SÍ les llegue el correo
