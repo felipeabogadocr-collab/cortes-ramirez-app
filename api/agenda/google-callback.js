@@ -30,6 +30,35 @@ const REDIRECT_URI = "https://cortes-ramirez-app.vercel.app/api/agenda/google-ca
 const SCOPES = ["https://www.googleapis.com/auth/calendar.events", "https://www.googleapis.com/auth/userinfo.email"].join(" ");
 const ZONA_HORARIA = "America/Bogota";
 
+// Bogotá es siempre UTC-5 (Colombia no tiene horario de verano), así que el
+// offset queda fijo. new Date("YYYY-MM-DDTHH:MM:00") SIN offset es
+// ambiguo — lo interpreta según la zona horaria del SERVIDOR (Vercel corre
+// en UTC), no la del abogado, así que un evento de las 9pm terminaba
+// guardado a las 4pm. Aquí se arma el string con el offset -05:00 puesto a
+// mano, sin pasar por esa interpretación ambigua. Date.UTC() se usa solo
+// para sumar la hora de duración (y hacer rodar el día si cruza
+// medianoche) de forma segura, tratando la hora local como si fuera UTC
+// (un truco común: no representa el instante real, solo sirve para la
+// aritmética).
+function construirRangoFecha(fecha, hora) {
+  if (!hora) {
+    const finDia = new Date(`${fecha}T00:00:00`);
+    finDia.setDate(finDia.getDate() + 1);
+    return { start: { date: fecha }, end: { date: finDia.toISOString().slice(0, 10) } };
+  }
+  const [anio, mes, dia] = fecha.split("-").map(Number);
+  const [h, m] = hora.split(":").map(Number);
+  const pad = (n) => String(n).padStart(2, "0");
+  const formatoConOffset = (d) =>
+    `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}T${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:00-05:00`;
+  const inicioArtificial = new Date(Date.UTC(anio, mes - 1, dia, h, m));
+  const finArtificial = new Date(inicioArtificial.getTime() + 60 * 60 * 1000);
+  return {
+    start: { dateTime: formatoConOffset(inicioArtificial), timeZone: ZONA_HORARIA },
+    end: { dateTime: formatoConOffset(finArtificial), timeZone: ZONA_HORARIA },
+  };
+}
+
 function firmarEstado(usuarioId) {
   const firma = createHmac("sha256", process.env.GOOGLE_CLIENT_SECRET || "").update(usuarioId).digest("hex");
   return `${usuarioId}.${firma}`;
@@ -180,40 +209,15 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok: true });
     }
 
-    if (accion === "crear_evento") {
-      const { titulo, fecha, hora, notas, crearMeet, invitados, recordatorioMinutos } = req.body || {};
+    if (accion === "crear_evento" || accion === "actualizar_evento") {
+      const { titulo, fecha, hora, notas, crearMeet, invitados, recordatorioMinutos, googleEventoId } = req.body || {};
       if (!titulo || !fecha) return res.status(400).json({ error: "Falta título o fecha." });
+      if (accion === "actualizar_evento" && !googleEventoId) return res.status(400).json({ error: "Falta el id del evento de Google." });
 
       const accessToken = await obtenerAccessTokenVigente(admin, usuario.id);
       if (!accessToken) return res.status(409).json({ error: "no_conectado" });
 
-      let start, end;
-      if (hora) {
-        // Bogotá es siempre UTC-5 (Colombia no tiene horario de verano), así
-        // que el offset queda fijo. new Date("YYYY-MM-DDTHH:MM:00") SIN
-        // offset es ambiguo — lo interpreta según la zona horaria del
-        // SERVIDOR (Vercel corre en UTC), no la del abogado, así que un
-        // evento de las 9pm terminaba guardado a las 4pm. Aquí se arma el
-        // string con el offset -05:00 puesto a mano, sin pasar por esa
-        // interpretación ambigua. Date.UTC() se usa solo para sumar la hora
-        // de duración (y hacer rodar el día si cruza medianoche) de forma
-        // segura, tratando la hora local como si fuera UTC (un truco común:
-        // no representa el instante real, solo sirve para la aritmética).
-        const [anio, mes, dia] = fecha.split("-").map(Number);
-        const [h, m] = hora.split(":").map(Number);
-        const pad = (n) => String(n).padStart(2, "0");
-        const formatoConOffset = (d) =>
-          `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}T${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:00-05:00`;
-        const inicioArtificial = new Date(Date.UTC(anio, mes - 1, dia, h, m));
-        const finArtificial = new Date(inicioArtificial.getTime() + 60 * 60 * 1000);
-        start = { dateTime: formatoConOffset(inicioArtificial), timeZone: ZONA_HORARIA };
-        end = { dateTime: formatoConOffset(finArtificial), timeZone: ZONA_HORARIA };
-      } else {
-        const finDia = new Date(`${fecha}T00:00:00`);
-        finDia.setDate(finDia.getDate() + 1);
-        start = { date: fecha };
-        end = { date: finDia.toISOString().slice(0, 10) };
-      }
+      const { start, end } = construirRangoFecha(fecha, hora);
 
       // Correos sueltos y sin formato válido se descartan en vez de mandarlos
       // a Google (que rechazaría todo el evento por uno solo mal escrito).
@@ -239,22 +243,28 @@ export default async function handler(req, res) {
         cuerpoEvento.reminders = { useDefault: false, overrides: [{ method: "popup", minutes: recordatorioMinutos }] };
       }
 
+      const esActualizacion = accion === "actualizar_evento";
+      const url = esActualizacion
+        ? `https://www.googleapis.com/calendar/v3/calendars/primary/events/${encodeURIComponent(googleEventoId)}?conferenceDataVersion=1&sendUpdates=${attendees.length > 0 ? "all" : "none"}`
+        : `https://www.googleapis.com/calendar/v3/calendars/primary/events?conferenceDataVersion=1&sendUpdates=${attendees.length > 0 ? "all" : "none"}`;
+
       try {
         // sendUpdates=all: para que a los invitados SÍ les llegue el correo
-        // de invitación de Google Calendar — por defecto la API los agrega
-        // en silencio, sin avisarles nada.
-        const evResp = await fetch(
-          `https://www.googleapis.com/calendar/v3/calendars/primary/events?conferenceDataVersion=1&sendUpdates=${attendees.length > 0 ? "all" : "none"}`,
-          {
-            method: "POST",
-            headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
-            body: JSON.stringify(cuerpoEvento),
-          }
-        );
+        // de invitación/actualización de Google Calendar — por defecto la
+        // API los agrega/cambia en silencio, sin avisarles nada. PATCH (no
+        // PUT) para actualizar: solo reemplaza los campos que se mandan,
+        // así que si crearMeet queda en false en una edición, el Meet que
+        // ya existiera simplemente se deja como estaba (no se manda a
+        // borrar aparte).
+        const evResp = await fetch(url, {
+          method: esActualizacion ? "PATCH" : "POST",
+          headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+          body: JSON.stringify(cuerpoEvento),
+        });
         const evDatos = await evResp.json();
         if (!evResp.ok) {
-          console.error("Error creando evento en Google Calendar:", evDatos);
-          return res.status(502).json({ error: "No se pudo crear el evento en Google Calendar." });
+          console.error(`Error ${esActualizacion ? "actualizando" : "creando"} evento en Google Calendar:`, evDatos);
+          return res.status(502).json({ error: `No se pudo ${esActualizacion ? "actualizar" : "crear"} el evento en Google Calendar.` });
         }
         return res.status(200).json({
           googleEventoId: evDatos.id,
@@ -262,8 +272,48 @@ export default async function handler(req, res) {
           googleMeetLink: evDatos.hangoutLink || null,
         });
       } catch (e) {
-        console.error("Error creando evento en Google Calendar:", e);
-        return res.status(502).json({ error: "No se pudo crear el evento en Google Calendar." });
+        console.error(`Error ${esActualizacion ? "actualizando" : "creando"} evento en Google Calendar:`, e);
+        return res.status(502).json({ error: `No se pudo ${esActualizacion ? "actualizar" : "crear"} el evento en Google Calendar.` });
+      }
+    }
+
+    if (accion === "consultar_evento") {
+      // Para "traer" a Nomos un cambio que se hizo directo en Google
+      // Calendar (moverlo de hora, cambiar el título, borrarlo) — se
+      // consulta bajo pedido (al abrir Agenda, o con un botón "Sincronizar"),
+      // no con un watch en tiempo real: eso necesitaría registrar un canal
+      // de notificaciones push con Google (dominio verificado, renovarlo
+      // cada semana) — mucha infraestructura nueva para lo que aporta.
+      const { googleEventoId } = req.body || {};
+      if (!googleEventoId) return res.status(400).json({ error: "Falta el id del evento de Google." });
+
+      const accessToken = await obtenerAccessTokenVigente(admin, usuario.id);
+      if (!accessToken) return res.status(409).json({ error: "no_conectado" });
+
+      try {
+        const evResp = await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events/${encodeURIComponent(googleEventoId)}`, {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        });
+        if (evResp.status === 404 || evResp.status === 410) return res.status(200).json({ estado: "borrado" });
+        const evDatos = await evResp.json();
+        if (!evResp.ok) return res.status(502).json({ error: "No se pudo consultar el evento en Google Calendar." });
+        if (evDatos.status === "cancelled") return res.status(200).json({ estado: "borrado" });
+
+        const inicio = evDatos.start?.dateTime || evDatos.start?.date;
+        const esSoloFecha = !evDatos.start?.dateTime;
+        const fechaInicio = new Date(inicio);
+        return res.status(200).json({
+          estado: "vigente",
+          titulo: evDatos.summary || "",
+          notas: evDatos.description || "",
+          fecha: esSoloFecha ? evDatos.start.date : fechaInicio.toLocaleDateString("en-CA", { timeZone: ZONA_HORARIA }),
+          hora: esSoloFecha ? "" : fechaInicio.toLocaleTimeString("en-GB", { timeZone: ZONA_HORARIA, hour: "2-digit", minute: "2-digit" }),
+          googleHtmlLink: evDatos.htmlLink || null,
+          googleMeetLink: evDatos.hangoutLink || null,
+        });
+      } catch (e) {
+        console.error("Error consultando evento en Google Calendar:", e);
+        return res.status(502).json({ error: "No se pudo consultar el evento en Google Calendar." });
       }
     }
 

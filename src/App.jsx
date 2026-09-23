@@ -1227,7 +1227,7 @@ export function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-export const APP_VERSION = "1.118.0";
+export const APP_VERSION = "1.119.0";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -3320,81 +3320,73 @@ function AsistenteIA({ nombre, usuarioId, usuarioActual, onAccionCompletada }) {
   );
 }
 
+// A propósito NO usa useIndex (el helper genérico que sí usan
+// clientes/documentos/contenido): ese helper guarda sus ids en su propio
+// useState, separado del useState de "eventos" de aquí — cada vez que ese
+// índice cambiaba, un useEffect disparaba una recarga completa desde el
+// servidor por su cuenta, EN PARALELO con lo que crear()/eliminar() ya
+// habían puesto en el estado local. Dos actualizaciones async de la misma
+// pantalla, sin ningún orden garantizado entre ellas, es una receta segura
+// para carreras — y así fue: la recarga automática, si terminaba después
+// del crear() que la disparó, pisaba el evento recién creado y lo hacía
+// desaparecer solo, sin ningún error visible. Aquí "ids" y "eventos" viven
+// en el MISMO lugar (un solo useState) y cada operación (crear, eliminar,
+// actualizar) es la única dueña de su propio resultado — nunca hay una
+// recarga de fondo que pueda pisar lo que la operación en curso ya sabe
+// que es cierto.
 export function useEventosAgenda() {
-  const { ids, addId, removeId } = useIndex("indice-agenda", true);
-  const [eventos, setEventos] = useState({});
+  const [estado, setEstado] = useState({ ids: [], eventos: {} });
   const [cargado, setCargado] = useState(false);
-  // Si se crea un evento justo después de entrar a Agenda, puede haber DOS
-  // cargar() en vuelo a la vez: la de la carga inicial (con la lista de ids
-  // de antes) y la que dispara addId() (con la lista ya actualizada). Si la
-  // más VIEJA termina después que la nueva (nada garantiza el orden de dos
-  // promesas), su resultado —desactualizado— pisaba el de la nueva y el
-  // evento recién creado desaparecía solo. cargarSeqRef numera cada
-  // cargar(): si para cuando una termina ya arrancó otra más nueva, esa
-  // respuesta vieja se descarta en vez de aplicarse.
-  const cargarSeqRef = useRef(0);
 
   const cargar = useCallback(async () => {
-    const miSecuencia = ++cargarSeqRef.current;
-    const valores = await obtenerValoresPorClaves(ids.map((id) => `evento:${id}`));
-    if (miSecuencia !== cargarSeqRef.current) return;
+    const idsRaw = await storageGet("indice-agenda", true);
+    const idsActuales = idsRaw ? JSON.parse(idsRaw) : [];
+    const valores = await obtenerValoresPorClaves(idsActuales.map((id) => `evento:${id}`));
     const mapa = {};
-    ids.forEach((id) => {
+    idsActuales.forEach((id) => {
       const raw = valores[`evento:${id}`];
       if (raw) mapa[id] = JSON.parse(raw);
     });
-    // Se combina con lo que ya había en vez de reemplazarlo entero: si esta
-    // consulta llega a fallar o a devolver algo parcial, no se borra de la
-    // pantalla un evento que ya se sabía que existía (ej. uno recién creado
-    // por crear(), que ya quedó puesto en el estado local sin depender de
-    // esta misma consulta). Sí se descarta cualquier id que ya no esté en
-    // el índice actual (borrado desde otro dispositivo/sesión) — eliminar()
-    // además lo quita al instante por su cuenta en este mismo dispositivo.
-    setEventos((prev) => {
-      const idsVigentes = new Set(ids);
-      const conservados = {};
-      for (const [id, valor] of Object.entries(prev)) {
-        if (idsVigentes.has(id)) conservados[id] = valor;
-      }
-      return { ...conservados, ...mapa };
-    });
+    setEstado({ ids: idsActuales, eventos: mapa });
     setCargado(true);
-  }, [ids]);
+  }, []);
 
   useEffect(() => {
     cargar();
   }, [cargar]);
 
+  // crear/eliminar/actualizar leen "estado" directo del cierre (no con la
+  // forma funcional setEstado(prev => ...)) a propósito: como ya no hay
+  // ninguna recarga de fondo que pueda cambiar "estado" por su cuenta
+  // mientras esta función corre, el valor del cierre YA es el más
+  // reciente — usar la forma funcional aquí no protegería de nada más y
+  // solo complicaría leer el resultado antes de guardarlo en el servidor.
   const crear = async (datos) => {
     const id = uid();
     const registro = { ...datos, creadoEn: new Date().toISOString() };
+    const nuevosIds = [id, ...estado.ids];
     await storageSet(`evento:${id}`, JSON.stringify(registro), true);
-    await addId(id);
-    // No basta con llamar a cargar() aquí: sigue cerrado sobre la lista de
-    // ids DE ANTES de addId (addId actualiza el estado de forma asíncrona,
-    // así que este cargar() todavía no la ve) — el evento recién creado
-    // podía tardar en aparecer, o no aparecer hasta recargar la página.
-    // Actualizando el estado local directo con el registro que ya se tiene
-    // a la mano, se ve de inmediato sin depender de esa carrera.
-    setEventos((prev) => ({ ...prev, [id]: registro }));
+    await storageSet("indice-agenda", JSON.stringify(nuevosIds), true);
+    setEstado((prev) => ({ ids: nuevosIds, eventos: { ...prev.eventos, [id]: registro } }));
     return id;
   };
 
   const eliminar = async (id) => {
-    await removeId(id);
-    setEventos((prev) => {
-      const { [id]: _quitado, ...resto } = prev;
-      return resto;
+    const nuevosIds = estado.ids.filter((x) => x !== id);
+    await storageSet("indice-agenda", JSON.stringify(nuevosIds), true);
+    setEstado((prev) => {
+      const { [id]: _quitado, ...restoEventos } = prev.eventos;
+      return { ids: nuevosIds, eventos: restoEventos };
     });
   };
 
   const actualizar = async (id, cambios) => {
-    const actualizado = { ...eventos[id], ...cambios };
+    const actualizado = { ...estado.eventos[id], ...cambios };
     await storageSet(`evento:${id}`, JSON.stringify(actualizado), true);
-    setEventos((prev) => ({ ...prev, [id]: actualizado }));
+    setEstado((prev) => ({ ...prev, eventos: { ...prev.eventos, [id]: actualizado } }));
   };
 
-  return { ids, eventos, cargado, crear, eliminar, actualizar, reload: cargar };
+  return { ids: estado.ids, eventos: estado.eventos, cargado, crear, eliminar, actualizar, reload: cargar };
 }
 
 // Revisa cada 30s si algún evento de la agenda ya se cumplió y todavía no se
