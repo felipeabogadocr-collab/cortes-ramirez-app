@@ -25,6 +25,10 @@ function estadoRamaPorRadicado(cliente, radicado) {
   return esPrimario ? cliente?.ramaJudicial || null : null;
 }
 
+function estadoFiscaliaPorRadicado(cliente, radicado) {
+  return (cliente?.fiscaliaPorRadicado || {})[radicado] || null;
+}
+
 async function explicarActuacion(actuacion, anotacion) {
   const { data: sesionData } = await supabase.auth.getSession();
   const token = sesionData?.session?.access_token;
@@ -200,6 +204,10 @@ export default function VigilanciaTab({ onListo }) {
   const [filtroEstado, setFiltroEstado] = useState("Todos");
   const [radicadoCopiado, setRadicadoCopiado] = useState("");
   const [explicacionCopiada, setExplicacionCopiada] = useState("");
+  const [mostrarFiscalia, setMostrarFiscalia] = useState(null);
+  const [textoFiscalia, setTextoFiscalia] = useState({});
+  const [resultadoFiscalia, setResultadoFiscalia] = useState({});
+  const [notificandoFiscalia, setNotificandoFiscalia] = useState(null);
   const { confirmar, ConfirmarDialogo } = useConfirmarDialogo();
 
   const copiarRadicado = (radicado, id) => {
@@ -397,6 +405,83 @@ export default function VigilanciaTab({ onListo }) {
       explicacion ? "" : null,
       "Cualquier duda, quedamos atentos por este mismo medio.",
     ].filter((linea) => linea !== null);
+    window.open(`https://wa.me/${numero}?text=${encodeURIComponent(partes.join("\n"))}`, "_blank");
+  };
+
+  // El portal de la Fiscalía no se puede consultar solo (ver la nota junto a
+  // URL_CONSULTA_SPOA), así que este flujo asume que el abogado ya abrió
+  // "Fiscalía ↗", resolvió el captcha a mano y vio la última actuación ahí —
+  // lo único que Nomos automatiza es LO DE AHÍ EN ADELANTE: comparar ese
+  // texto contra lo último que se había registrado, y armar el mensaje al
+  // cliente (de novedad, o de "sigue igual") sin que el abogado tenga que
+  // redactarlo él mismo.
+  const compararFiscalia = (id, radicado) => {
+    const clave = `${id}:${radicado}`;
+    const texto = (textoFiscalia[clave] || "").trim();
+    if (!texto) return;
+    const anterior = estadoFiscaliaPorRadicado(clientes[id], radicado);
+    const novedad = !anterior || anterior.ultimaActuacionTexto !== texto;
+    setResultadoFiscalia((prev) => ({ ...prev, [clave]: { novedad, texto } }));
+  };
+
+  const guardarComoRevisadoFiscalia = async (id, radicado) => {
+    const clave = `${id}:${radicado}`;
+    const resultado = resultadoFiscalia[clave];
+    if (!resultado) return;
+    const c = clientes[id];
+    const entradaEstado = { ultimaActuacionTexto: resultado.texto, consultadoEn: new Date().toISOString() };
+    const fiscaliaPorRadicado = { ...(c.fiscaliaPorRadicado || {}), [radicado]: entradaEstado };
+    let actualizado = { ...c, fiscaliaPorRadicado };
+    if (resultado.novedad) {
+      const nuevaEntrada = { id: uid(), fecha: new Date().toISOString(), nota: `Fiscalía (radicado ${radicado}) — ${resultado.texto}` };
+      actualizado = { ...actualizado, timeline: [...(c.timeline || []), nuevaEntrada], ultimaActuacion: new Date().toISOString(), estadoVigilancia: "Con novedad" };
+    }
+    await storageSet(`cliente:${id}`, JSON.stringify(actualizado), false);
+    setClientes((prev) => ({ ...prev, [id]: actualizado }));
+  };
+
+  // Mismo espíritu que notificarNovedadPorWhatsapp: si hay novedad, intenta
+  // traer una explicación en lenguaje sencillo con IA (sin bloquear el aviso
+  // si falla); si no hay novedad, el mensaje es distinto — le confirma al
+  // cliente que se revisó y sigue igual que la última vez, en vez de
+  // quedarse callado.
+  const notificarFiscaliaPorWhatsapp = async (id, radicado) => {
+    const clave = `${id}:${radicado}`;
+    const resultado = resultadoFiscalia[clave];
+    if (!resultado) return;
+    const c = clientes[id];
+    const numero = numeroWhatsappCliente(c?.telefono);
+    if (!numero) return;
+    setNotificandoFiscalia(clave);
+    let explicacion = "";
+    if (resultado.novedad) {
+      try {
+        explicacion = await explicarParaCliente(resultado.texto, "");
+      } catch (e) {
+        // igual que en Rama Judicial: el aviso no puede depender de que el
+        // asistente de IA esté disponible en ese momento.
+      }
+    }
+    setNotificandoFiscalia(null);
+    const partes = resultado.novedad
+      ? [
+          `*${getNombreDespacho()}*`,
+          "",
+          `Hola ${c?.nombre || ""}, le informamos una novedad en su proceso ante la Fiscalía (radicado ${radicado}):`,
+          "",
+          resultado.texto,
+          "",
+          explicacion || null,
+          explicacion ? "" : null,
+          "Cualquier duda, quedamos atentos por este mismo medio.",
+        ].filter((linea) => linea !== null)
+      : [
+          `*${getNombreDespacho()}*`,
+          "",
+          `Hola ${c?.nombre || ""}, revisamos su proceso ante la Fiscalía (radicado ${radicado}) y sigue igual que la última vez que le informamos — sin novedades por ahora.`,
+          "",
+          "Cualquier duda, quedamos atentos por este mismo medio.",
+        ];
     window.open(`https://wa.me/${numero}?text=${encodeURIComponent(partes.join("\n"))}`, "_blank");
   };
 
@@ -835,6 +920,95 @@ export default function VigilanciaTab({ onListo }) {
                                 )}
                               </button>
                             </div>
+                          )}
+                        </div>
+                      )}
+
+                      {c.areaProceso === "Penal" && (
+                        <div style={{ marginTop: 10 }}>
+                          {mostrarFiscalia === clave ? (
+                            <div style={{ background: "#fff", border: `1px solid ${COLORS.border}`, borderLeft: "3px solid #B91C1C", borderRadius: 8, padding: 12 }}>
+                              <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, fontWeight: 600, color: COLORS.muted, marginBottom: 6 }}>
+                                Pega aquí lo que muestra la Fiscalía ahora (fecha y descripción de la última actuación)
+                              </p>
+                              <textarea
+                                className="drx-input"
+                                style={{ ...inputStyle, resize: "vertical", minHeight: 60, fontFamily: "Inter, sans-serif", fontSize: 12.5 }}
+                                value={textoFiscalia[clave] || ""}
+                                onChange={(e) => setTextoFiscalia((prev) => ({ ...prev, [clave]: e.target.value }))}
+                                placeholder="Ej: 15/09/2026 - Se avoca conocimiento por parte del despacho..."
+                              />
+                              <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
+                                <button
+                                  className="drx-btn-primary"
+                                  style={{ ...buttonPrimary, fontSize: 12, padding: "6px 12px", background: "#B91C1C" }}
+                                  onClick={() => compararFiscalia(id, radicado)}
+                                  disabled={!(textoFiscalia[clave] || "").trim()}
+                                >
+                                  Comparar con la última vez
+                                </button>
+                                <button
+                                  className="drx-btn-ghost"
+                                  style={{ ...buttonGhost, fontSize: 12, padding: "6px 12px" }}
+                                  onClick={() => {
+                                    setMostrarFiscalia(null);
+                                    setResultadoFiscalia((prev) => ({ ...prev, [clave]: null }));
+                                  }}
+                                >
+                                  Cerrar
+                                </button>
+                              </div>
+
+                              {resultadoFiscalia[clave] && (
+                                <div
+                                  className="drx-fade-in"
+                                  style={{
+                                    marginTop: 10,
+                                    background: resultadoFiscalia[clave].novedad ? "#FEF2F2" : COLORS.surfaceSoft,
+                                    border: `1px solid ${resultadoFiscalia[clave].novedad ? "#F3C6C0" : COLORS.border}`,
+                                    borderRadius: 8,
+                                    padding: 10,
+                                  }}
+                                >
+                                  <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, fontWeight: 700, color: resultadoFiscalia[clave].novedad ? "#B91C1C" : COLORS.ink, margin: "0 0 4px" }}>
+                                    {resultadoFiscalia[clave].novedad ? "Hay una novedad frente a lo último registrado" : "Es igual a lo último registrado — sin novedad"}
+                                  </p>
+                                  <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
+                                    <button className="drx-btn-primary" style={{ ...buttonPrimary, fontSize: 12, padding: "6px 12px" }} onClick={() => guardarComoRevisadoFiscalia(id, radicado)}>
+                                      {resultadoFiscalia[clave].novedad ? "+ Agregar a la línea de tiempo" : "Marcar como revisado"}
+                                    </button>
+                                    {c.telefono && (
+                                      <button
+                                        className="drx-btn-primary"
+                                        style={{ ...buttonPrimary, fontSize: 12, padding: "6px 12px", background: "#1DA851" }}
+                                        onClick={() => notificarFiscaliaPorWhatsapp(id, radicado)}
+                                        disabled={notificandoFiscalia === clave}
+                                      >
+                                        {notificandoFiscalia === clave
+                                          ? "Preparando notificación…"
+                                          : resultadoFiscalia[clave].novedad
+                                          ? "Notificar novedad por WhatsApp ↗"
+                                          : "Avisar que sigue igual ↗"}
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <button
+                              className="drx-btn-ghost"
+                              style={{ ...buttonGhost, fontSize: 12.5, padding: "6px 12px", background: "#fff" }}
+                              onClick={() => setMostrarFiscalia(clave)}
+                            >
+                              <Icono tipo="documento" size={13} style={{ marginRight: 4, verticalAlign: -2 }} /> Comparar última actuación de Fiscalía
+                            </button>
+                          )}
+
+                          {estadoFiscaliaPorRadicado(c, radicado)?.consultadoEn && (
+                            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11, color: COLORS.muted, margin: "6px 0 0" }}>
+                              Fiscalía — última revisión: {new Date(estadoFiscaliaPorRadicado(c, radicado).consultadoEn).toLocaleString("es-CO", { dateStyle: "medium", timeStyle: "short" })}
+                            </p>
                           )}
                         </div>
                       )}
