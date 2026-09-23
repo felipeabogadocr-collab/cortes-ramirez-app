@@ -1227,7 +1227,7 @@ export function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-export const APP_VERSION = "1.119.0";
+export const APP_VERSION = "1.120.0";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -5534,6 +5534,29 @@ function useContactosDespacho(storageKey) {
   };
 
   return { contactos, cargado, crear, eliminar };
+}
+
+// Lista liviana de clientes (solo id + nombre) para selectores en otras
+// pestañas (ej. vincular un evento de Agenda a un cliente) — no trae el
+// resto de campos del cliente (radicados, plan de pago, etc.) porque el
+// selector no los necesita.
+export function useClientesLigero() {
+  const { ids, cargado: idsCargado } = useIndex("indice-clientes", false);
+  const [clientes, setClientes] = useState({});
+  const [cargado, setCargado] = useState(false);
+  useEffect(() => {
+    if (!idsCargado) return;
+    obtenerValoresPorClaves(ids.map((id) => `cliente:${id}`)).then((valores) => {
+      const ligero = {};
+      ids.forEach((id) => {
+        const raw = valores[`cliente:${id}`];
+        if (raw) ligero[id] = { nombre: JSON.parse(raw).nombre };
+      });
+      setClientes(ligero);
+      setCargado(true);
+    });
+  }, [ids, idsCargado]);
+  return { ids, clientes, cargado };
 }
 
 // Quien refirió al cliente al despacho — se le puede reconocer un

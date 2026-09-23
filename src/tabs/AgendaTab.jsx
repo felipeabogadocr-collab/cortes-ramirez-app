@@ -3,6 +3,7 @@ import { supabase } from "../lib/supabaseClient";
 import {
   COLORS, EncabezadoSeccion, Card, buttonPrimary, buttonGhost, Field, inputStyle,
   Icono, IconoCampana, EstadoVacio, useConfirmarDialogo, useEventosAgenda, diasHasta, urgenciaTermino,
+  useClientesLigero,
 } from "../App.jsx";
 
 function descargarICS(evento) {
@@ -62,7 +63,7 @@ const RECORDATORIOS_GOOGLE = [
   { minutos: "1440", etiqueta: "1 día antes" },
 ];
 
-function EventoAgendaCard({ evento, onEliminar, onCompletar, pasado }) {
+function EventoAgendaCard({ evento, onEliminar, onCompletar, onEditar, onSincronizar, sincronizando, pasado }) {
   const fechaTexto = new Date(`${evento.fecha}T${evento.hora || "00:00"}:00`).toLocaleDateString("es-CO", { weekday: "long", day: "numeric", month: "long" });
   const urgencia = evento.esTermino && !evento.completado ? urgenciaTermino(diasHasta(evento.fecha)) : null;
   const [copiado, setCopiado] = useState(false);
@@ -128,6 +129,7 @@ function EventoAgendaCard({ evento, onEliminar, onCompletar, pasado }) {
             {fechaTexto}
             {evento.hora ? ` · ${evento.hora}` : ""}
             {evento.esTermino && evento.clienteRelacionado ? ` · ${evento.clienteRelacionado}` : ""}
+            {evento.clienteNombre ? ` · ${evento.clienteNombre}` : ""}
           </p>
           {evento.notas && <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.inkSoft, margin: "6px 0 0" }}>{evento.notas}</p>}
           {(evento.googleMeetLink || evento.googleHtmlLink) && (
@@ -210,6 +212,21 @@ function EventoAgendaCard({ evento, onEliminar, onCompletar, pasado }) {
           )}
         </div>
         <div style={{ display: "flex", gap: 10, alignItems: "center", flexShrink: 0 }}>
+          {onEditar && (
+            <button onClick={onEditar} style={{ background: "none", border: "none", cursor: "pointer", color: COLORS.muted, display: "flex" }} title="Editar evento">
+              <Icono tipo="lapiz" size={15} />
+            </button>
+          )}
+          {onSincronizar && evento.googleEventoId && (
+            <button
+              onClick={onSincronizar}
+              disabled={sincronizando}
+              style={{ background: "none", border: "none", cursor: sincronizando ? "default" : "pointer", color: COLORS.muted, display: "flex", opacity: sincronizando ? 0.45 : 1 }}
+              title="Traer cambios hechos directo en Google Calendar"
+            >
+              <Icono tipo="refrescar" size={15} />
+            </button>
+          )}
           <button onClick={() => descargarICS(evento)} style={{ background: "none", border: "none", cursor: "pointer", color: COLORS.muted, display: "flex" }} title="Agregar a Google Calendar / Outlook (.ics)">
             <Icono tipo="calendario" size={15} />
           </button>
@@ -228,8 +245,12 @@ export default function AgendaTab({ onListo }) {
     if (cargado) onListo?.();
   }, [cargado]);
   const [mostrarForm, setMostrarForm] = useState(false);
-  const [form, setForm] = useState({ titulo: "", fecha: "", hora: "", notas: "", crearMeet: true, invitados: "", recordatorio: "30" });
+  const [editandoId, setEditandoId] = useState(null);
+  const FORM_VACIO = { titulo: "", fecha: "", hora: "", notas: "", crearMeet: true, invitados: "", recordatorio: "30", clienteId: "" };
+  const [form, setForm] = useState(FORM_VACIO);
   const [errorForm, setErrorForm] = useState("");
+  const [sincronizandoId, setSincronizandoId] = useState(null);
+  const { clientes: clientesLigero, cargado: clientesCargados } = useClientesLigero();
   const [permisoNotif, setPermisoNotif] = useState(typeof Notification !== "undefined" ? Notification.permission : "unsupported");
   const [filtroTiempo, setFiltroTiempo] = useState("todos");
   const [soloTerminos, setSoloTerminos] = useState(false);
@@ -327,21 +348,35 @@ export default function AgendaTab({ onListo }) {
       fecha: form.fecha,
       hora: form.hora,
       notas: form.notas.trim(),
+      clienteId: form.clienteId || "",
+      clienteNombre: form.clienteId ? clientesLigero[form.clienteId]?.nombre || "" : "",
     };
     const invitados = form.invitados.split(/[,;\s]+/).map((e) => e.trim()).filter(Boolean);
     const crearMeet = form.crearMeet;
     const recordatorioMinutos = form.recordatorio === "" ? null : Number(form.recordatorio);
-    const id = await crear(datosEvento);
-    setForm({ titulo: "", fecha: "", hora: "", notas: "", crearMeet: true, invitados: "", recordatorio: "30" });
+
+    const editandoAntes = editandoId;
+    const googleEventoIdAntes = editandoId ? eventos[editandoId]?.googleEventoId : null;
+
+    let id;
+    if (editandoAntes) {
+      await actualizar(editandoAntes, datosEvento);
+      id = editandoAntes;
+    } else {
+      id = await crear(datosEvento);
+    }
+    setForm(FORM_VACIO);
     setMostrarForm(false);
+    setEditandoId(null);
 
     if (googleConectado && id) {
       try {
         const token = await tokenActual();
+        const accion = googleEventoIdAntes ? "actualizar_evento" : "crear_evento";
         const resp = await fetch("/api/agenda/google-callback", {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-          body: JSON.stringify({ accion: "crear_evento", ...datosEvento, crearMeet, invitados, recordatorioMinutos }),
+          body: JSON.stringify({ accion, googleEventoId: googleEventoIdAntes, ...datosEvento, crearMeet, invitados, recordatorioMinutos }),
         });
         const datos = await resp.json();
         if (resp.ok) {
@@ -354,9 +389,74 @@ export default function AgendaTab({ onListo }) {
     }
   };
 
+  const editarClick = (id) => {
+    const e = eventos[id];
+    if (!e) return;
+    setForm({
+      titulo: e.titulo || "",
+      fecha: e.fecha || "",
+      hora: e.hora || "",
+      notas: e.notas || "",
+      crearMeet: !!e.googleMeetLink,
+      invitados: "",
+      recordatorio: "30",
+      clienteId: e.clienteId || "",
+    });
+    setEditandoId(id);
+    setErrorForm("");
+    setMostrarForm(true);
+  };
+
+  const cancelarForm = () => {
+    setErrorForm("");
+    setForm(FORM_VACIO);
+    setEditandoId(null);
+    setMostrarForm((v) => !v);
+  };
+
   const eliminarClick = async (id, titulo) => {
     if (!(await confirmar(`¿Eliminar el evento "${titulo}" de la agenda?`))) return;
     await eliminar(id);
+  };
+
+  // Trae el estado ACTUAL del evento desde Google Calendar (por si lo
+  // moviste de hora o le cambiaste el título directo en Google/el celular)
+  // y actualiza la copia de Nomos si cambió algo. No es en tiempo real —
+  // hay que pedirlo con este botón — un watch de verdad necesitaría
+  // registrar un canal de notificaciones push con Google (dominio
+  // verificado, renovarlo cada semana), demasiada infraestructura nueva
+  // para lo que aporta en un despacho chico.
+  const sincronizarClick = async (id) => {
+    const e = eventos[id];
+    if (!e?.googleEventoId) return;
+    setSincronizandoId(id);
+    try {
+      const token = await tokenActual();
+      const resp = await fetch("/api/agenda/google-callback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ accion: "consultar_evento", googleEventoId: e.googleEventoId }),
+      });
+      const datos = await resp.json();
+      if (resp.ok && datos.estado === "borrado") {
+        if (await confirmar(`"${e.titulo}" ya no existe en Google Calendar (lo borraron allá). ¿Borrarlo también de Nomos?`)) {
+          await eliminar(id);
+        }
+      } else if (resp.ok && datos.estado === "vigente") {
+        await actualizar(id, {
+          titulo: datos.titulo || e.titulo,
+          fecha: datos.fecha || e.fecha,
+          hora: datos.hora || "",
+          notas: datos.notas || "",
+          googleHtmlLink: datos.googleHtmlLink,
+          googleMeetLink: datos.googleMeetLink,
+        });
+      }
+    } catch {
+      // Silencioso: sincronizar es un "por si acaso", no algo crítico —
+      // Nomos se queda con la última versión que sí tenía.
+    }
+    setSincronizandoId(null);
   };
 
   const lista = ids
@@ -489,14 +589,7 @@ export default function AgendaTab({ onListo }) {
             Solo términos procesales
           </label>
         </div>
-        <button
-          className="drx-btn-primary"
-          style={buttonPrimary}
-          onClick={() => {
-            setErrorForm("");
-            setMostrarForm((v) => !v);
-          }}
-        >
+        <button className="drx-btn-primary" style={buttonPrimary} onClick={cancelarForm}>
           {mostrarForm ? "Cancelar" : "+ Nuevo evento"}
         </button>
       </div>
@@ -504,6 +597,9 @@ export default function AgendaTab({ onListo }) {
       {mostrarForm && (
         <Card style={{ marginBottom: 20, padding: 0, overflow: "hidden" }}>
           <div style={{ padding: "18px 20px 16px", borderBottom: `1px solid ${COLORS.border}`, background: COLORS.surfaceSoft }}>
+            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11, fontWeight: 700, color: COLORS.accentBright, textTransform: "uppercase", letterSpacing: 0.5, margin: "0 0 8px" }}>
+              {editandoId ? "Editando evento" : "Nuevo evento"}
+            </p>
             <label style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, fontWeight: 700, color: COLORS.muted, textTransform: "uppercase", letterSpacing: 0.4, display: "block", marginBottom: 6 }}>
               Título <span style={{ color: "#B42318" }}>*</span>
             </label>
@@ -537,6 +633,27 @@ export default function AgendaTab({ onListo }) {
                 </Field>
                 <Field label="Hora">
                   <input className="drx-input" style={inputStyle} type="time" value={form.hora} onChange={(e) => setForm({ ...form, hora: e.target.value })} />
+                </Field>
+              </div>
+            </div>
+
+            <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
+              <div style={{ width: 20, textAlign: "center", marginTop: 9, color: COLORS.muted }}>
+                <Icono tipo="persona" size={17} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <Field label="Cliente relacionado (opcional)">
+                  <select
+                    className="drx-input"
+                    style={inputStyle}
+                    value={form.clienteId}
+                    onChange={(e) => setForm({ ...form, clienteId: e.target.value })}
+                  >
+                    <option value="">{clientesCargados ? "Ninguno" : "Cargando..."}</option>
+                    {Object.entries(clientesLigero).map(([id, c]) => (
+                      <option key={id} value={id}>{c.nombre}</option>
+                    ))}
+                  </select>
                 </Field>
               </div>
             </div>
@@ -639,7 +756,7 @@ export default function AgendaTab({ onListo }) {
               <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, fontWeight: 600, color: "#B42318", margin: 0 }}>⚠ {errorForm}</p>
             )}
             <button className="drx-btn-primary" style={{ ...buttonPrimary, marginLeft: "auto" }} onClick={guardar}>
-              Guardar evento
+              {editandoId ? "Guardar cambios" : "Guardar evento"}
             </button>
           </div>
         </Card>
@@ -652,7 +769,15 @@ export default function AgendaTab({ onListo }) {
           <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, fontWeight: 700, color: COLORS.muted, textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 10 }}>Próximos</p>
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             {proximos.map((e) => (
-              <EventoAgendaCard key={e.id} evento={e} onEliminar={() => eliminarClick(e.id, e.titulo)} onCompletar={() => actualizar(e.id, { completado: !e.completado })} />
+              <EventoAgendaCard
+                key={e.id}
+                evento={e}
+                onEliminar={() => eliminarClick(e.id, e.titulo)}
+                onCompletar={() => actualizar(e.id, { completado: !e.completado })}
+                onEditar={() => editarClick(e.id)}
+                onSincronizar={() => sincronizarClick(e.id)}
+                sincronizando={sincronizandoId === e.id}
+              />
             ))}
           </div>
         </div>
@@ -666,7 +791,15 @@ export default function AgendaTab({ onListo }) {
               .slice()
               .reverse()
               .map((e) => (
-                <EventoAgendaCard key={e.id} evento={e} onEliminar={() => eliminarClick(e.id, e.titulo)} pasado />
+                <EventoAgendaCard
+                  key={e.id}
+                  evento={e}
+                  onEliminar={() => eliminarClick(e.id, e.titulo)}
+                  onEditar={() => editarClick(e.id)}
+                  onSincronizar={() => sincronizarClick(e.id)}
+                  sincronizando={sincronizandoId === e.id}
+                  pasado
+                />
               ))}
           </div>
         </div>
