@@ -1227,7 +1227,7 @@ export function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-export const APP_VERSION = "1.115.0";
+export const APP_VERSION = "1.116.0";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -3332,7 +3332,21 @@ export function useEventosAgenda() {
       const raw = valores[`evento:${id}`];
       if (raw) mapa[id] = JSON.parse(raw);
     });
-    setEventos(mapa);
+    // Se combina con lo que ya había en vez de reemplazarlo entero: si esta
+    // consulta llega a fallar o a devolver algo parcial, no se borra de la
+    // pantalla un evento que ya se sabía que existía (ej. uno recién creado
+    // por crear(), que ya quedó puesto en el estado local sin depender de
+    // esta misma consulta). Sí se descarta cualquier id que ya no esté en
+    // el índice actual (borrado desde otro dispositivo/sesión) — eliminar()
+    // además lo quita al instante por su cuenta en este mismo dispositivo.
+    setEventos((prev) => {
+      const idsVigentes = new Set(ids);
+      const conservados = {};
+      for (const [id, valor] of Object.entries(prev)) {
+        if (idsVigentes.has(id)) conservados[id] = valor;
+      }
+      return { ...conservados, ...mapa };
+    });
     setCargado(true);
   }, [ids]);
 
