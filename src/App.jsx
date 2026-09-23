@@ -1227,7 +1227,7 @@ export function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-export const APP_VERSION = "1.117.0";
+export const APP_VERSION = "1.118.0";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -3324,9 +3324,20 @@ export function useEventosAgenda() {
   const { ids, addId, removeId } = useIndex("indice-agenda", true);
   const [eventos, setEventos] = useState({});
   const [cargado, setCargado] = useState(false);
+  // Si se crea un evento justo después de entrar a Agenda, puede haber DOS
+  // cargar() en vuelo a la vez: la de la carga inicial (con la lista de ids
+  // de antes) y la que dispara addId() (con la lista ya actualizada). Si la
+  // más VIEJA termina después que la nueva (nada garantiza el orden de dos
+  // promesas), su resultado —desactualizado— pisaba el de la nueva y el
+  // evento recién creado desaparecía solo. cargarSeqRef numera cada
+  // cargar(): si para cuando una termina ya arrancó otra más nueva, esa
+  // respuesta vieja se descarta en vez de aplicarse.
+  const cargarSeqRef = useRef(0);
 
   const cargar = useCallback(async () => {
+    const miSecuencia = ++cargarSeqRef.current;
     const valores = await obtenerValoresPorClaves(ids.map((id) => `evento:${id}`));
+    if (miSecuencia !== cargarSeqRef.current) return;
     const mapa = {};
     ids.forEach((id) => {
       const raw = valores[`evento:${id}`];

@@ -67,6 +67,11 @@ function EventoAgendaCard({ evento, onEliminar, onCompletar, pasado }) {
   const urgencia = evento.esTermino && !evento.completado ? urgenciaTermino(diasHasta(evento.fecha)) : null;
   const [copiado, setCopiado] = useState(false);
 
+  // Un evento de HOY que ya pasó de hora se queda en "Próximos" (no salta a
+  // "Pasados" hasta el otro día) — para que no se sienta perdido, se
+  // atenúa un poco y le sale una etiqueta chiquita, sin moverlo de sección.
+  const yaPasoLaHora = !pasado && !evento.completado && evento.hora && new Date(`${evento.fecha}T${evento.hora}:00`) < new Date();
+
   // El texto de invitación usa el título del evento como "concepto" (Ej:
   // "Asesoría con Juan Pérez", "Reunión de equipo") — si por algún motivo
   // no hay título, cae en "la sesión virtual" en vez de dejar el mensaje a
@@ -81,7 +86,7 @@ function EventoAgendaCard({ evento, onEliminar, onCompletar, pasado }) {
   };
 
   return (
-    <Card style={{ padding: 14, opacity: pasado || evento.completado ? 0.55 : 1, borderLeft: urgencia ? `4px solid ${urgencia.color}` : undefined }}>
+    <Card style={{ padding: 14, opacity: pasado || evento.completado ? 0.55 : yaPasoLaHora ? 0.75 : 1, borderLeft: urgencia ? `4px solid ${urgencia.color}` : undefined }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10, flexWrap: "wrap" }}>
         {onCompletar && (
           <button
@@ -111,6 +116,11 @@ function EventoAgendaCard({ evento, onEliminar, onCompletar, pasado }) {
             {urgencia && (
               <span style={{ fontFamily: "Inter, sans-serif", fontSize: 10.5, fontWeight: 700, color: urgencia.color, background: urgencia.bg, border: `1px solid ${urgencia.color}40`, borderRadius: 20, padding: "2px 9px" }}>
                 {urgencia.etiqueta}
+              </span>
+            )}
+            {yaPasoLaHora && (
+              <span style={{ fontFamily: "Inter, sans-serif", fontSize: 10.5, fontWeight: 600, color: COLORS.muted, background: COLORS.surfaceSoft, border: `1px solid ${COLORS.border}`, borderRadius: 20, padding: "2px 9px" }}>
+                Ya pasó
               </span>
             )}
           </div>
