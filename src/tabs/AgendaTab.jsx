@@ -198,7 +198,7 @@ export default function AgendaTab({ onListo }) {
     if (cargado) onListo?.();
   }, [cargado]);
   const [mostrarForm, setMostrarForm] = useState(false);
-  const [form, setForm] = useState({ titulo: "", fecha: "", hora: "", notas: "", esTermino: false, clienteRelacionado: "", crearMeet: true, invitados: "" });
+  const [form, setForm] = useState({ titulo: "", fecha: "", hora: "", notas: "", crearMeet: true, invitados: "" });
   const [permisoNotif, setPermisoNotif] = useState(typeof Notification !== "undefined" ? Notification.permission : "unsupported");
   const [filtroTiempo, setFiltroTiempo] = useState("todos");
   const [soloTerminos, setSoloTerminos] = useState(false);
@@ -288,13 +288,11 @@ export default function AgendaTab({ onListo }) {
       fecha: form.fecha,
       hora: form.hora,
       notas: form.notas.trim(),
-      esTermino: form.esTermino,
-      clienteRelacionado: form.esTermino ? form.clienteRelacionado.trim() : "",
     };
     const invitados = form.invitados.split(/[,;\s]+/).map((e) => e.trim()).filter(Boolean);
     const crearMeet = form.crearMeet;
     const id = await crear(datosEvento);
-    setForm({ titulo: "", fecha: "", hora: "", notas: "", esTermino: false, clienteRelacionado: "", crearMeet: true, invitados: "" });
+    setForm({ titulo: "", fecha: "", hora: "", notas: "", crearMeet: true, invitados: "" });
     setMostrarForm(false);
 
     if (googleConectado && id) {
@@ -538,25 +536,6 @@ export default function AgendaTab({ onListo }) {
               </div>
             </div>
 
-            <div style={{ borderTop: `1px solid ${COLORS.border}`, paddingTop: 14 }}>
-              <label style={{ display: "flex", alignItems: "center", gap: 8, fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.inkSoft, cursor: "pointer" }}>
-                <input type="checkbox" checked={form.esTermino} onChange={(e) => setForm({ ...form, esTermino: e.target.checked })} />
-                Es un término procesal (vencimiento legal) — recibe alertas más estrictas que un evento normal
-              </label>
-              {form.esTermino && (
-                <div style={{ marginTop: 10 }}>
-                  <Field label="Cliente / proceso relacionado (opcional)">
-                    <input
-                      className="drx-input"
-                      style={inputStyle}
-                      value={form.clienteRelacionado}
-                      onChange={(e) => setForm({ ...form, clienteRelacionado: e.target.value })}
-                      placeholder="Ej: Juan Pérez — Proceso 2024-00187"
-                    />
-                  </Field>
-                </div>
-              )}
-            </div>
           </div>
 
           <div style={{ padding: "14px 20px", background: COLORS.surfaceSoft, borderTop: `1px solid ${COLORS.border}`, display: "flex", justifyContent: "flex-end" }}>
