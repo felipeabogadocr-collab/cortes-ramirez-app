@@ -1227,7 +1227,7 @@ export function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-export const APP_VERSION = "1.106.0";
+export const APP_VERSION = "1.107.0";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -3343,6 +3343,7 @@ export function useEventosAgenda() {
     await storageSet(`evento:${id}`, JSON.stringify({ ...datos, creadoEn: new Date().toISOString() }), true);
     await addId(id);
     await cargar();
+    return id;
   };
 
   const eliminar = async (id) => {
@@ -7966,7 +7967,13 @@ function App() {
   const [sesionCargada, setSesionCargada] = useState(false);
   const [errorCargaPerfil, setErrorCargaPerfil] = useState(null);
   const [cambiandoUsuario, setCambiandoUsuario] = useState(false);
-  const [tab, setTab] = useState("resumen");
+  // Si venimos de vuelta de conectar Google Calendar (ver AgendaTab), el
+  // navegador nos trae con el hash "#agenda?google=conectado" — se arranca
+  // ya en esa pestaña en vez del Resumen de siempre, para no perder al
+  // usuario justo después de autorizar.
+  const [tab, setTab] = useState(() =>
+    typeof window !== "undefined" && window.location.hash.replace("#", "").startsWith("agenda") ? "agenda" : "resumen"
+  );
   // Con la precarga en hover, el chunk de casi cualquier pestaña ya está en
   // caché para cuando se hace clic, así que la pantalla de carga con el
   // logo (CargandoSeccion) casi nunca se alcanzaba a ver — pero eso no

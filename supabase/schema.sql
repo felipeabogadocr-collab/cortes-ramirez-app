@@ -586,3 +586,29 @@ create trigger limitar_autoactualizacion_perfil_trigger
   before update on perfiles
   for each row
   execute function limitar_autoactualizacion_perfil();
+
+-- Conexión con Google Calendar ------------------------------------------------
+-- Un usuario conecta su propia cuenta de Google (OAuth) para que, al crear un
+-- evento en Agenda, se cree también en su Google Calendar real con un enlace
+-- de Meet — así le llegan las notificaciones nativas de Google, sin que Nomos
+-- tenga que reinventar avisos por correo/push. Guarda el token de acceso
+-- (dura ~1h) y el de refresco (para renovarlo solo, sin que el usuario tenga
+-- que reconectar cada hora).
+--
+-- RLS habilitado SIN ninguna política: ni el propio dueño del token puede
+-- leerlo o tocarlo desde el navegador — solo las funciones de servidor
+-- (llave service_role, que se salta RLS) leen/escriben esta tabla. Un token
+-- de Google es tan sensible como una contraseña; no tiene sentido exponerlo
+-- ni siquiera de vuelta a su propio dueño.
+create table if not exists google_calendar_conexiones (
+  usuario_id uuid primary key references auth.users (id) on delete cascade,
+  despacho_id uuid references despachos (id),
+  access_token text not null,
+  refresh_token text not null,
+  expira_en timestamptz not null,
+  email_google text,
+  creado_en timestamptz not null default now(),
+  actualizado_en timestamptz not null default now()
+);
+
+alter table google_calendar_conexiones enable row level security;

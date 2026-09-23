@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { supabase } from "../lib/supabaseClient";
 import {
   COLORS, EncabezadoSeccion, Card, buttonPrimary, buttonGhost, Field, inputStyle,
   Icono, IconoCampana, EstadoVacio, useConfirmarDialogo, useEventosAgenda, diasHasta, urgenciaTermino,
@@ -92,6 +93,16 @@ function EventoAgendaCard({ evento, onEliminar, onCompletar, pasado }) {
             {evento.esTermino && evento.clienteRelacionado ? ` · ${evento.clienteRelacionado}` : ""}
           </p>
           {evento.notas && <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.inkSoft, margin: "6px 0 0" }}>{evento.notas}</p>}
+          {evento.googleMeetLink && (
+            <a
+              href={evento.googleMeetLink}
+              target="_blank"
+              rel="noreferrer"
+              style={{ display: "inline-flex", alignItems: "center", gap: 5, marginTop: 8, fontFamily: "Inter, sans-serif", fontSize: 12, fontWeight: 700, color: "#10B981", textDecoration: "none" }}
+            >
+              📹 Unirse por Google Meet
+            </a>
+          )}
         </div>
         <div style={{ display: "flex", gap: 10, alignItems: "center", flexShrink: 0 }}>
           <button onClick={() => descargarICS(evento)} style={{ background: "none", border: "none", cursor: "pointer", color: COLORS.muted, display: "flex" }} title="Agregar a Google Calendar / Outlook (.ics)">
@@ -118,6 +129,77 @@ export default function AgendaTab({ onListo }) {
   const [soloTerminos, setSoloTerminos] = useState(false);
   const { confirmar, ConfirmarDialogo } = useConfirmarDialogo();
 
+  // Conexión con Google Calendar: una vez conectada, cada evento nuevo se
+  // crea también en el Google Calendar real del usuario (con Meet
+  // automático), para que las notificaciones lleguen por la vía nativa de
+  // Google en vez de depender solo del permiso de notificaciones del
+  // navegador (que se pierde si Nomos no está abierto).
+  const [googleConectado, setGoogleConectado] = useState(null);
+  const [googleEmail, setGoogleEmail] = useState(null);
+  const [conectandoGoogle, setConectandoGoogle] = useState(false);
+  const [avisoGoogle, setAvisoGoogle] = useState("");
+
+  const tokenActual = useCallback(async () => {
+    const { data } = await supabase.auth.getSession();
+    return data?.session?.access_token || "";
+  }, []);
+
+  const consultarEstadoGoogle = useCallback(async () => {
+    try {
+      const token = await tokenActual();
+      const resp = await fetch("/api/agenda/google-callback?estado=1", { headers: { Authorization: `Bearer ${token}` } });
+      const datos = await resp.json();
+      setGoogleConectado(!!datos.conectado);
+      setGoogleEmail(datos.email || null);
+    } catch {
+      setGoogleConectado(false);
+    }
+  }, [tokenActual]);
+
+  useEffect(() => {
+    // Al volver de autorizar en Google, esta pestaña carga con
+    // "#agenda?google=conectado" (o "=error") en el hash — se lee una vez,
+    // se avisa, y se limpia para que un refresh no repita el aviso.
+    const hash = window.location.hash.replace("#", "");
+    const [, query] = hash.split("?");
+    const parametros = new URLSearchParams(query || "");
+    if (parametros.get("google") === "conectado") setAvisoGoogle("✓ Google Calendar conectado. Los eventos nuevos ya se crean también ahí.");
+    else if (parametros.get("google") === "error") setAvisoGoogle("No se pudo conectar Google Calendar. Intenta de nuevo.");
+    if (parametros.has("google")) window.history.replaceState(null, "", "#agenda");
+    consultarEstadoGoogle();
+  }, [consultarEstadoGoogle]);
+
+  const conectarGoogle = async () => {
+    setConectandoGoogle(true);
+    try {
+      const token = await tokenActual();
+      const resp = await fetch("/api/agenda/google-callback?iniciar=1", { headers: { Authorization: `Bearer ${token}` } });
+      const datos = await resp.json();
+      if (!resp.ok || !datos.authUrl) throw new Error(datos.error || "No se pudo iniciar la conexión.");
+      window.location.href = datos.authUrl;
+    } catch (e) {
+      setAvisoGoogle(e.message || "No se pudo iniciar la conexión con Google.");
+      setConectandoGoogle(false);
+    }
+  };
+
+  const desconectarGoogle = async () => {
+    if (!(await confirmar("¿Desconectar Google Calendar? Los eventos nuevos dejarán de crearse ahí."))) return;
+    try {
+      const token = await tokenActual();
+      await fetch("/api/agenda/google-callback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ accion: "desconectar" }),
+      });
+    } catch {
+      // no crítico: si falla, el siguiente intento de crear evento en
+      // Google simplemente fallará también y avisará ahí
+    }
+    setGoogleConectado(false);
+    setGoogleEmail(null);
+  };
+
   const pedirPermiso = async () => {
     if (typeof Notification === "undefined") return;
     const resultado = await Notification.requestPermission();
@@ -126,16 +208,35 @@ export default function AgendaTab({ onListo }) {
 
   const guardar = async () => {
     if (!form.titulo.trim() || !form.fecha) return;
-    await crear({
+    const datosEvento = {
       titulo: form.titulo.trim(),
       fecha: form.fecha,
       hora: form.hora,
       notas: form.notas.trim(),
       esTermino: form.esTermino,
       clienteRelacionado: form.esTermino ? form.clienteRelacionado.trim() : "",
-    });
+    };
+    const id = await crear(datosEvento);
     setForm({ titulo: "", fecha: "", hora: "", notas: "", esTermino: false, clienteRelacionado: "" });
     setMostrarForm(false);
+
+    if (googleConectado && id) {
+      try {
+        const token = await tokenActual();
+        const resp = await fetch("/api/agenda/google-callback", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ accion: "crear_evento", ...datosEvento }),
+        });
+        const datos = await resp.json();
+        if (resp.ok) {
+          await actualizar(id, { googleEventoId: datos.googleEventoId, googleHtmlLink: datos.googleHtmlLink, googleMeetLink: datos.googleMeetLink });
+        }
+      } catch {
+        // El evento en Nomos ya quedó guardado — que Google falle no debe
+        // bloquear ni deshacer eso, solo se pierde el link de Meet.
+      }
+    }
   };
 
   const eliminarClick = async (id, titulo) => {
@@ -178,6 +279,36 @@ export default function AgendaTab({ onListo }) {
           </div>
         </Card>
       )}
+
+      {avisoGoogle && (
+        <Card style={{ marginBottom: 20, background: avisoGoogle.startsWith("✓") ? "#F0FDF4" : "#FEF2F2", border: `1px solid ${avisoGoogle.startsWith("✓") ? "#BBF7D0" : "#F3C6C0"}` }}>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: avisoGoogle.startsWith("✓") ? "#166534" : "#B42318", margin: 0 }}>{avisoGoogle}</p>
+        </Card>
+      )}
+
+      <Card style={{ marginBottom: 20 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
+          <div>
+            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, fontWeight: 700, color: COLORS.ink, margin: 0 }}>📅 Google Calendar</p>
+            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, margin: "3px 0 0" }}>
+              {googleConectado === null
+                ? "Verificando..."
+                : googleConectado
+                ? `Conectado (${googleEmail || "tu cuenta"}) — cada evento nuevo se crea también ahí, con Meet.`
+                : "Sin conectar — los eventos nuevos solo quedan en Nomos."}
+            </p>
+          </div>
+          {googleConectado ? (
+            <button className="drx-btn-ghost" style={buttonGhost} onClick={desconectarGoogle}>
+              Desconectar
+            </button>
+          ) : (
+            <button className="drx-btn-primary" style={buttonPrimary} onClick={conectarGoogle} disabled={conectandoGoogle || googleConectado === null}>
+              {conectandoGoogle ? "Conectando…" : "Conectar Google Calendar"}
+            </button>
+          )}
+        </div>
+      </Card>
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
         <div style={{ display: "flex", gap: 6 }}>
