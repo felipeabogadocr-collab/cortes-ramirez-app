@@ -189,10 +189,25 @@ export default async function handler(req, res) {
 
       let start, end;
       if (hora) {
-        const inicio = new Date(`${fecha}T${hora}:00`);
-        const fin = new Date(inicio.getTime() + 60 * 60 * 1000);
-        start = { dateTime: inicio.toISOString(), timeZone: ZONA_HORARIA };
-        end = { dateTime: fin.toISOString(), timeZone: ZONA_HORARIA };
+        // Bogotá es siempre UTC-5 (Colombia no tiene horario de verano), así
+        // que el offset queda fijo. new Date("YYYY-MM-DDTHH:MM:00") SIN
+        // offset es ambiguo — lo interpreta según la zona horaria del
+        // SERVIDOR (Vercel corre en UTC), no la del abogado, así que un
+        // evento de las 9pm terminaba guardado a las 4pm. Aquí se arma el
+        // string con el offset -05:00 puesto a mano, sin pasar por esa
+        // interpretación ambigua. Date.UTC() se usa solo para sumar la hora
+        // de duración (y hacer rodar el día si cruza medianoche) de forma
+        // segura, tratando la hora local como si fuera UTC (un truco común:
+        // no representa el instante real, solo sirve para la aritmética).
+        const [anio, mes, dia] = fecha.split("-").map(Number);
+        const [h, m] = hora.split(":").map(Number);
+        const pad = (n) => String(n).padStart(2, "0");
+        const formatoConOffset = (d) =>
+          `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}T${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:00-05:00`;
+        const inicioArtificial = new Date(Date.UTC(anio, mes - 1, dia, h, m));
+        const finArtificial = new Date(inicioArtificial.getTime() + 60 * 60 * 1000);
+        start = { dateTime: formatoConOffset(inicioArtificial), timeZone: ZONA_HORARIA };
+        end = { dateTime: formatoConOffset(finArtificial), timeZone: ZONA_HORARIA };
       } else {
         const finDia = new Date(`${fecha}T00:00:00`);
         finDia.setDate(finDia.getDate() + 1);
