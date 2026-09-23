@@ -39,6 +39,25 @@ export default async function handler(req, res) {
     return res.status(403).json({ error: "Solo el superadministrador de la plataforma puede acceder aquí." });
   }
 
+  // Actividad detallada de UN despacho (qué hizo cada usuario, no solo
+  // "última vez que entró") — reutiliza la tabla "auditoria" que ya se
+  // llena en cada acción del despacho (crear_cliente, crear_documento,
+  // etc., ver registrarAuditoria en App.jsx). Va como query param sobre el
+  // mismo GET en vez de un archivo nuevo en api/ porque el plan Hobby de
+  // Vercel tiene un límite de 12 funciones sin servidor por despliegue, y
+  // ya se está justo en ese límite (ver api/documentos/firmar.js, que por
+  // la misma razón absorbió lo que antes era api/documentos/evento.js).
+  if (req.method === "GET" && req.query?.actividad) {
+    const { data: actividad, error } = await admin
+      .from("auditoria")
+      .select("usuario_nombre, accion, entidad, entidad_id, detalle, creado_en")
+      .eq("despacho_id", req.query.actividad)
+      .order("creado_en", { ascending: false })
+      .limit(100);
+    if (error) return res.status(500).json({ error: error.message });
+    return res.status(200).json({ actividad: actividad || [] });
+  }
+
   if (req.method === "GET") {
     const { data: despachos, error } = await admin
       .from("despachos")

@@ -73,6 +73,75 @@ function PanelErroresCliente() {
   );
 }
 
+// Qué hizo cada usuario de un despacho (no solo cuándo entró por última
+// vez) — reutiliza la misma tabla "auditoria" que ya llena cada acción del
+// despacho (crear cliente, registrar pago, firmar documento, etc.) vía
+// registrarAuditoria en App.jsx. Útil sobre todo con despachos en prueba
+// gratis: ver si de verdad están usando la app antes de que se les venza.
+function PanelActividadDespacho({ despachoId }) {
+  const [abierto, setAbierto] = useState(false);
+  const [cargado, setCargado] = useState(false);
+  const [cargando, setCargando] = useState(false);
+  const [actividad, setActividad] = useState([]);
+  const [errorCarga, setErrorCarga] = useState("");
+
+  const cargar = useCallback(async () => {
+    setCargando(true);
+    setErrorCarga("");
+    try {
+      const { data: sesionData } = await supabase.auth.getSession();
+      const token = sesionData?.session?.access_token;
+      const response = await fetch(`/api/plataforma/despachos?actividad=${encodeURIComponent(despachoId)}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "No se pudo cargar la actividad.");
+      setActividad(data.actividad || []);
+      setCargado(true);
+    } catch (e) {
+      setErrorCarga(e.message);
+    }
+    setCargando(false);
+  }, [despachoId]);
+
+  useEffect(() => {
+    if (abierto && !cargado && !cargando) cargar();
+  }, [abierto, cargado, cargando, cargar]);
+
+  return (
+    <div style={{ marginTop: 10 }}>
+      <button
+        onClick={() => setAbierto((a) => !a)}
+        style={{ background: "none", border: "none", cursor: "pointer", padding: 0, fontFamily: "Inter, sans-serif", fontSize: 11.5, fontWeight: 700, color: COLORS.accentBright }}
+      >
+        {abierto ? "Ocultar actividad ▲" : "Ver actividad ▼"}
+      </button>
+      {abierto && (
+        <div style={{ marginTop: 10, maxHeight: 260, overflowY: "auto" }}>
+          {cargando && <Spinner />}
+          {errorCarga && <p style={{ color: "#B42318", fontSize: 12, fontFamily: "Inter, sans-serif" }}>{errorCarga}</p>}
+          {cargado && actividad.length === 0 && (
+            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted }}>Todavía no hay ninguna acción registrada — no ha usado la app.</p>
+          )}
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {actividad.map((a, i) => (
+              <div key={i} style={{ background: COLORS.surfaceSoft, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "6px 10px" }}>
+                <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.ink, margin: 0 }}>
+                  <strong>{a.usuario_nombre || "Usuario"}</strong> — {(a.accion || "").replaceAll("_", " ")}
+                  {a.entidad ? ` (${a.entidad})` : ""}
+                </p>
+                <p style={{ fontFamily: "Inter, sans-serif", fontSize: 10.5, color: COLORS.muted, margin: "2px 0 0" }}>
+                  {new Date(a.creado_en).toLocaleString("es-CO", { dateStyle: "medium", timeStyle: "short" })}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function PlataformaTab({ onListo }) {
   const [despachos, setDespachos] = useState([]);
   const [cargando, setCargando] = useState(true);
@@ -254,6 +323,7 @@ export default function PlataformaTab({ onListo }) {
                         </span>
                       )}
                     </p>
+                    <PanelActividadDespacho despachoId={d.id} />
                   </div>
                   <div style={{ display: "flex", gap: 8 }}>
                     <button
@@ -294,6 +364,7 @@ export default function PlataformaTab({ onListo }) {
                     <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, fontWeight: 600, color: d.ultimaActividad && new Date(d.ultimaActividad).getTime() >= HACE_7_DIAS ? "#166534" : "#B45309", margin: "2px 0 0" }}>
                       {textoUltimaActividad(d.ultimaActividad)}
                     </p>
+                    <PanelActividadDespacho despachoId={d.id} />
                   </div>
                   <button className="drx-btn-ghost" style={buttonGhost} onClick={() => alternarActivo(d)} disabled={cambiando === d.id}>
                     {cambiando === d.id ? "…" : "Desactivar"}
