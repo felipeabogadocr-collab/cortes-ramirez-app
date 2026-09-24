@@ -3,7 +3,7 @@ import { supabase } from "../lib/supabaseClient";
 import {
   COLORS, EncabezadoSeccion, Card, buttonPrimary, buttonGhost, Field, inputStyle,
   Icono, IconoCampana, EstadoVacio, useConfirmarDialogo, useEventosAgenda, diasHasta, urgenciaTermino,
-  useClientesLigero,
+  useClientesLigero, calcularProximaFechaPorFrecuencia,
 } from "../App.jsx";
 
 function descargarICS(evento) {
@@ -58,6 +58,17 @@ const FILTROS_TAREA = [
 ];
 
 const DIAS_SEMANA = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
+
+// Mismas frecuencias que ya usa el plan de pago de un cliente
+// (calcularProximaFechaPorFrecuencia) — reutilizarla mantiene el mismo
+// vocabulario en toda la app en vez de inventar uno nuevo solo para Agenda.
+const REPETIR_OPCIONES = [
+  { id: "no", nombre: "No se repite" },
+  { id: "Semanal", nombre: "Cada semana" },
+  { id: "Quincenal", nombre: "Cada quince días" },
+  { id: "Mensual", nombre: "Cada mes" },
+];
+const REPETICIONES_OPCIONES = [2, 3, 4, 6, 8, 12];
 
 // Mismos presets que trae Google Calendar por defecto para "Notificación".
 const RECORDATORIOS_GOOGLE = [
@@ -262,7 +273,7 @@ export default function AgendaTab({ onListo }) {
   }, [cargado]);
   const [mostrarForm, setMostrarForm] = useState(false);
   const [editandoId, setEditandoId] = useState(null);
-  const FORM_VACIO = { titulo: "", fecha: "", hora: "", notas: "", crearMeet: true, invitados: "", recordatorio: "30", clienteId: "" };
+  const FORM_VACIO = { titulo: "", fecha: "", hora: "", notas: "", crearMeet: true, invitados: "", recordatorio: "30", clienteId: "", repetir: "no", repeticiones: "4" };
   const [form, setForm] = useState(FORM_VACIO);
   const [errorForm, setErrorForm] = useState("");
   const [sincronizandoId, setSincronizandoId] = useState(null);
@@ -356,6 +367,39 @@ export default function AgendaTab({ onListo }) {
 
   const REGEX_CORREO = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+  // Crea (o actualiza) UNA sola ocurrencia: en Nomos siempre, y en Google
+  // Calendar también si hay conexión. Se usa tanto para un evento suelto
+  // como para cada fecha de un evento que se repite — Nomos no maneja
+  // "series" ni RRULE de Google, cada ocurrencia es su propio evento
+  // independiente (se puede editar o borrar una sin afectar a las demás).
+  const guardarUnaOcurrencia = async ({ datosEvento, invitados, crearMeet, recordatorioMinutos, editandoAntes, googleEventoIdAntes }) => {
+    let id;
+    if (editandoAntes) {
+      await actualizar(editandoAntes, datosEvento);
+      id = editandoAntes;
+    } else {
+      id = await crear(datosEvento);
+    }
+    if (googleConectado && id) {
+      try {
+        const token = await tokenActual();
+        const accion = googleEventoIdAntes ? "actualizar_evento" : "crear_evento";
+        const resp = await fetch("/api/agenda/google-callback", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ accion, googleEventoId: googleEventoIdAntes, ...datosEvento, crearMeet, invitados, recordatorioMinutos }),
+        });
+        const datos = await resp.json();
+        if (resp.ok) {
+          await actualizar(id, { googleEventoId: datos.googleEventoId, googleHtmlLink: datos.googleHtmlLink, googleMeetLink: datos.googleMeetLink });
+        }
+      } catch {
+        // El evento en Nomos ya quedó guardado — que Google falle no debe
+        // bloquear ni deshacer eso, solo se pierde el link de Meet.
+      }
+    }
+  };
+
   const guardar = async () => {
     const invitados = form.invitados.split(/[,;\s]+/).map((e) => e.trim()).filter(Boolean);
     const faltan = [];
@@ -377,49 +421,49 @@ export default function AgendaTab({ onListo }) {
       return;
     }
     setErrorForm("");
-    const datosEvento = {
-      titulo: form.titulo.trim(),
-      fecha: form.fecha,
-      hora: form.hora,
-      notas: form.notas.trim(),
-      clienteId: form.clienteId || "",
-      clienteNombre: form.clienteId ? clientesLigero[form.clienteId]?.nombre || "" : "",
-    };
     const crearMeet = form.crearMeet;
     const recordatorioMinutos = form.recordatorio === "" ? null : Number(form.recordatorio);
-
     const editandoAntes = editandoId;
     const googleEventoIdAntes = editandoId ? eventos[editandoId]?.googleEventoId : null;
 
-    let id;
-    if (editandoAntes) {
-      await actualizar(editandoAntes, datosEvento);
-      id = editandoAntes;
-    } else {
-      id = await crear(datosEvento);
+    // Las fechas de las ocurrencias siguientes se calculan con la misma
+    // función que ya usa el plan de pago de un cliente para su próxima
+    // cuota — un evento que se repite es, ni más ni menos, la misma idea
+    // aplicada a la Agenda.
+    const fechasOcurrencias = [form.fecha];
+    if (!editandoAntes && form.repetir !== "no") {
+      let fechaAnterior = form.fecha;
+      for (let i = 1; i < Number(form.repeticiones); i++) {
+        fechaAnterior = calcularProximaFechaPorFrecuencia(fechaAnterior, form.repetir);
+        fechasOcurrencias.push(fechaAnterior);
+      }
     }
+
+    for (let i = 0; i < fechasOcurrencias.length; i++) {
+      const datosEvento = {
+        titulo: form.titulo.trim(),
+        fecha: fechasOcurrencias[i],
+        hora: form.hora,
+        notas: form.notas.trim(),
+        clienteId: form.clienteId || "",
+        clienteNombre: form.clienteId ? clientesLigero[form.clienteId]?.nombre || "" : "",
+      };
+      // Cada ocurrencia es independiente, así que solo la primera (o la
+      // que se está editando) puede reutilizar un googleEventoId existente
+      // — las siguientes de una serie nueva siempre son eventos nuevos.
+      await guardarUnaOcurrencia({
+        datosEvento,
+        invitados,
+        crearMeet,
+        recordatorioMinutos,
+        editandoAntes: i === 0 ? editandoAntes : null,
+        googleEventoIdAntes: i === 0 ? googleEventoIdAntes : null,
+      });
+    }
+
     setForm(FORM_VACIO);
     setMostrarForm(false);
     setEditandoId(null);
-
-    if (googleConectado && id) {
-      try {
-        const token = await tokenActual();
-        const accion = googleEventoIdAntes ? "actualizar_evento" : "crear_evento";
-        const resp = await fetch("/api/agenda/google-callback", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-          body: JSON.stringify({ accion, googleEventoId: googleEventoIdAntes, ...datosEvento, crearMeet, invitados, recordatorioMinutos }),
-        });
-        const datos = await resp.json();
-        if (resp.ok) {
-          await actualizar(id, { googleEventoId: datos.googleEventoId, googleHtmlLink: datos.googleHtmlLink, googleMeetLink: datos.googleMeetLink });
-        }
-      } catch {
-        // El evento en Nomos ya quedó guardado — que Google falle no debe
-        // bloquear ni deshacer eso, solo se pierde el link de Meet.
-      }
-    }
   };
 
   const editarClick = (id) => {
@@ -590,7 +634,7 @@ export default function AgendaTab({ onListo }) {
     <div>
       <EncabezadoSeccion titulo="Agenda" color="#8B5CF6" />
 
-      {permisoNotif !== "granted" && permisoNotif !== "unsupported" && (
+      {permisoNotif !== "granted" && permisoNotif !== "unsupported" && !googleConectado && (
         <Card style={{ marginBottom: 20, background: COLORS.accentSoft, border: "1px solid #C7D6EA" }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
             <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.navy, margin: 0, display: "flex", alignItems: "center", gap: 6 }}>
@@ -782,6 +826,32 @@ export default function AgendaTab({ onListo }) {
               </div>
             </div>
 
+            {!editandoId && (
+              <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
+                <div style={{ width: 20, textAlign: "center", marginTop: 9, color: COLORS.muted }}>
+                  <Icono tipo="refrescar" size={17} />
+                </div>
+                <div className="drx-grid-form" style={{ display: "grid", gridTemplateColumns: form.repetir === "no" ? "1fr" : "1fr 1fr", gap: 12, flex: 1 }}>
+                  <Field label="Repetir">
+                    <select className="drx-input" style={inputStyle} value={form.repetir} onChange={(e) => setForm({ ...form, repetir: e.target.value })}>
+                      {REPETIR_OPCIONES.map((r) => (
+                        <option key={r.id} value={r.id}>{r.nombre}</option>
+                      ))}
+                    </select>
+                  </Field>
+                  {form.repetir !== "no" && (
+                    <Field label="Cuántas veces">
+                      <select className="drx-input" style={inputStyle} value={form.repeticiones} onChange={(e) => setForm({ ...form, repeticiones: e.target.value })}>
+                        {REPETICIONES_OPCIONES.map((n) => (
+                          <option key={n} value={n}>{n} veces</option>
+                        ))}
+                      </select>
+                    </Field>
+                  )}
+                </div>
+              </div>
+            )}
+
             <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
               <div style={{ width: 20, textAlign: "center", marginTop: 9, color: COLORS.muted }}>
                 <Icono tipo="persona" size={17} />
@@ -901,7 +971,11 @@ export default function AgendaTab({ onListo }) {
               <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, fontWeight: 600, color: "#B42318", margin: 0 }}>⚠ {errorForm}</p>
             )}
             <button className="drx-btn-primary" style={{ ...buttonPrimary, marginLeft: "auto" }} onClick={guardar}>
-              {editandoId ? "Guardar cambios" : "Guardar evento"}
+              {editandoId
+                ? "Guardar cambios"
+                : !editandoId && form.repetir !== "no"
+                ? `Guardar ${form.repeticiones} eventos`
+                : "Guardar evento"}
             </button>
           </div>
         </Card>
