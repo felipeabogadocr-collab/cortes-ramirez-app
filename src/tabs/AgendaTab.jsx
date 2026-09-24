@@ -354,11 +354,24 @@ export default function AgendaTab({ onListo }) {
     setPermisoNotif(resultado);
   };
 
+  const REGEX_CORREO = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
   const guardar = async () => {
+    const invitados = form.invitados.split(/[,;\s]+/).map((e) => e.trim()).filter(Boolean);
     const faltan = [];
     if (!form.titulo.trim()) faltan.push("el título");
     if (!form.fecha) faltan.push("la fecha");
     if (!form.hora) faltan.push("la hora");
+    // El correo del invitado es obligatorio solo al CREAR un evento nuevo,
+    // y solo cuando hay Google Calendar conectado (sin conexión ni siquiera
+    // existe el campo). Al editar uno ya existente se deja opcional: Google
+    // no le devuelve a Nomos la lista de invitados de un evento ya creado,
+    // así que ese campo siempre arranca vacío al editar — exigirlo ahí
+    // bloquearía corregir hasta un simple error de dedo en el título.
+    if (googleConectado && !editandoId) {
+      if (invitados.length === 0) faltan.push("el correo del invitado");
+      else if (!invitados.every((correo) => REGEX_CORREO.test(correo))) faltan.push("un correo válido del invitado");
+    }
     if (faltan.length > 0) {
       setErrorForm(`Falta ${faltan.join(", ")}.`);
       return;
@@ -372,7 +385,6 @@ export default function AgendaTab({ onListo }) {
       clienteId: form.clienteId || "",
       clienteNombre: form.clienteId ? clientesLigero[form.clienteId]?.nombre || "" : "",
     };
-    const invitados = form.invitados.split(/[,;\s]+/).map((e) => e.trim()).filter(Boolean);
     const crearMeet = form.crearMeet;
     const recordatorioMinutos = form.recordatorio === "" ? null : Number(form.recordatorio);
 
@@ -761,10 +773,10 @@ export default function AgendaTab({ onListo }) {
                 <Icono tipo="reloj" size={17} />
               </div>
               <div className="drx-grid-form" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, flex: 1 }}>
-                <Field label="Fecha">
+                <Field label={<>Fecha <span style={{ color: "#B42318" }}>*</span></>}>
                   <input className="drx-input" style={inputStyle} type="date" value={form.fecha} onChange={(e) => setForm({ ...form, fecha: e.target.value })} />
                 </Field>
-                <Field label="Hora">
+                <Field label={<>Hora <span style={{ color: "#B42318" }}>*</span></>}>
                   <input className="drx-input" style={inputStyle} type="time" value={form.hora} onChange={(e) => setForm({ ...form, hora: e.target.value })} />
                 </Field>
               </div>
@@ -840,7 +852,7 @@ export default function AgendaTab({ onListo }) {
                   <Icono tipo="persona" size={17} />
                 </div>
                 <div style={{ flex: 1 }}>
-                  <Field label="Invitados (opcional)">
+                  <Field label={editandoId ? "Correo del invitado (opcional)" : <>Correo del invitado <span style={{ color: "#B42318" }}>*</span></>}>
                     <input
                       className="drx-input"
                       style={inputStyle}
@@ -933,6 +945,8 @@ export default function AgendaTab({ onListo }) {
               return (
                 <button
                   key={fechaCelda}
+                  className="drx-dia-mes"
+                  title={eventosDia.length > 0 ? `${eventosDia.length} evento${eventosDia.length !== 1 ? "s" : ""} — clic para ver o agregar` : "Clic para agregar un evento este día"}
                   onClick={() => setDiaSeleccionadoMes(seleccionado ? null : fechaCelda)}
                   style={{
                     background: seleccionado ? "#F3EEFE" : "#FFFFFF",
@@ -994,11 +1008,24 @@ export default function AgendaTab({ onListo }) {
             })}
           </div>
 
+          {!diaSeleccionadoMes && (
+            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, textAlign: "center", margin: "12px 0 0" }}>
+              Toca un día para ver o agregar sus eventos.
+            </p>
+          )}
+
           {diaSeleccionadoMes && (
             <div style={{ marginTop: 16 }}>
-              <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, fontWeight: 700, color: COLORS.muted, textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 10 }}>
-                {etiquetaFecha(diaSeleccionadoMes)}
-              </p>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10, gap: 10, flexWrap: "wrap" }}>
+                <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, fontWeight: 700, color: COLORS.muted, textTransform: "uppercase", letterSpacing: 0.4, margin: 0 }}>
+                  {etiquetaFecha(diaSeleccionadoMes)}
+                </p>
+                {!mostrarForm && (
+                  <button className="drx-btn-ghost" style={{ ...buttonGhost, padding: "5px 12px", fontSize: 12, color: "#6D4FD1", borderColor: "#D9CEF5" }} onClick={abrirNuevoEvento}>
+                    + Agregar evento este día
+                  </button>
+                )}
+              </div>
               {eventosDelDiaSeleccionado.length === 0 ? (
                 <EstadoVacio icono={<Icono tipo="calendario" size={22} />} texto="Sin eventos este día." />
               ) : (

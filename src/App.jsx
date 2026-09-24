@@ -771,6 +771,8 @@ export const GlobalStyle = () => (
     .drx-chip-vigilancia { transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease; }
     .drx-chip-vigilancia:hover { transform: translateY(-1px); border-color: ${COLORS.accentBright} !important; }
     .drx-senal-clicable:hover { background: ${COLORS.surfaceSoft} !important; }
+    .drx-dia-mes { transition: background .12s ease; }
+    .drx-dia-mes:hover { background: #F6F3FD !important; }
     .drx-chip-vigilancia:active { transform: translateY(0) scale(0.97); }
     /* El calendario que se despliega al hacer clic es del navegador — eso no
        se puede re-diseñar (por seguridad, ningún navegador deja tocar ese
@@ -1227,7 +1229,7 @@ export function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-export const APP_VERSION = "1.123.0";
+export const APP_VERSION = "1.123.1";
 
 function SelloVersion({ oscuro }) {
   return (
