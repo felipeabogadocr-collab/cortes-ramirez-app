@@ -1242,7 +1242,7 @@ export function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-export const APP_VERSION = "1.129.0";
+export const APP_VERSION = "1.130.0";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -1588,9 +1588,33 @@ export function BotonTema({ oscuro, onClick }) {
   );
 }
 
+// Antes esta función pedía cada dato UNO DETRÁS DE OTRO (índice de
+// clientes, clientes, índice de documentos, documentos, índice de
+// contenido, contenido, perfiles) — siete viajes de ida y vuelta al
+// servidor en fila, aunque ninguno depende del resultado de otro. Con
+// cada viaje tardando su ratico, eso se sentía como Resumen (y cualquier
+// pestaña que espere esto) tardando mucho en cargar. Pedirlos todos a la
+// vez con Promise.all — primero los tres índices más los perfiles,
+// después los tres datos en bloque que dependen de esos índices — baja
+// esto a solo DOS rondas en paralelo en vez de siete en fila.
 async function calcularResumenOperacion() {
-  const idsClientesRaw = await storageGet("indice-clientes", false);
+  const [idsClientesRaw, idsDocsRaw, idsContenidoRaw, perfilesRes] = await Promise.all([
+    storageGet("indice-clientes", false),
+    storageGet("indice-documentos", true),
+    storageGet("indice-contenido", true),
+    supabase.from("perfiles").select("rol"),
+  ]);
   const idsClientes = idsClientesRaw ? JSON.parse(idsClientesRaw) : [];
+  const idsDocs = idsDocsRaw ? JSON.parse(idsDocsRaw) : [];
+  const idsContenido = idsContenidoRaw ? JSON.parse(idsContenidoRaw) : [];
+  const usuariosDespacho = perfilesRes.data || [];
+
+  const [clientesResumen, docsResumen, contenidoResumenValores] = await Promise.all([
+    obtenerClientesPorId(idsClientes),
+    obtenerDocumentosPorId(idsDocs),
+    obtenerValoresPorClaves(idsContenido.map((id) => `contenido:${id}`)),
+  ]);
+
   let clientesInactivos = 0;
   let clientesActivos = 0;
   let pagosPendientes = 0;
@@ -1613,7 +1637,6 @@ async function calcularResumenOperacion() {
   inicioSemana.setDate(inicioHoy.getDate() - 6);
   const inicioMes = new Date(ahora.getFullYear(), ahora.getMonth(), 1);
 
-  const clientesResumen = await obtenerClientesPorId(idsClientes);
   for (const id of idsClientes) {
     const c = clientesResumen[id];
     if (!c) continue;
@@ -1653,12 +1676,9 @@ async function calcularResumenOperacion() {
     });
   }
 
-  const idsDocsRaw = await storageGet("indice-documentos", true);
-  const idsDocs = idsDocsRaw ? JSON.parse(idsDocsRaw) : [];
   let docsPendientes = 0;
   let docsFaltaAbogado = 0;
   let docsListos = 0;
-  const docsResumen = await obtenerDocumentosPorId(idsDocs);
   for (const id of idsDocs) {
     const d = docsResumen[id];
     if (!d) continue;
@@ -1668,12 +1688,9 @@ async function calcularResumenOperacion() {
     else docsListos++;
   }
 
-  const idsContenidoRaw = await storageGet("indice-contenido", true);
-  const idsContenido = idsContenidoRaw ? JSON.parse(idsContenidoRaw) : [];
   const hoyISO = fechaHoyISO();
   let contenidoPendienteHoy = 0;
   let contenidoVencido = 0;
-  const contenidoResumenValores = await obtenerValoresPorClaves(idsContenido.map((id) => `contenido:${id}`));
   for (const id of idsContenido) {
     const raw = contenidoResumenValores[`contenido:${id}`];
     if (!raw) continue;
@@ -1683,8 +1700,6 @@ async function calcularResumenOperacion() {
     else if (it.fecha < hoyISO) contenidoVencido++;
   }
 
-  const { data: perfilesData } = await supabase.from("perfiles").select("rol");
-  const usuariosDespacho = perfilesData || [];
   const totalUsuarios = usuariosDespacho.length;
   const totalAdministradores = usuariosDespacho.filter((u) => u.rol === "Administrador").length;
   const totalAbogados = usuariosDespacho.filter((u) => u.rol === "Abogado").length;
