@@ -65,6 +65,13 @@ const RECORDATORIOS_GOOGLE = [
 
 function EventoAgendaCard({ evento, onEliminar, onCompletar, onEditar, onSincronizar, sincronizando, pasado }) {
   const fechaTexto = new Date(`${evento.fecha}T${evento.hora || "00:00"}:00`).toLocaleDateString("es-CO", { weekday: "long", day: "numeric", month: "long" });
+  // Con el encabezado de día nuevo (Hoy / Mañana / día de la semana) arriba
+  // de cada grupo, repetir la fecha completa en cada tarjeta ya es
+  // redundante — aquí solo se muestra la hora, en formato de 12 horas, más
+  // parecida a como se ve en un calendario real.
+  const horaTexto = evento.hora
+    ? new Date(`${evento.fecha}T${evento.hora}:00`).toLocaleTimeString("es-CO", { hour: "numeric", minute: "2-digit", hour12: true })
+    : "Todo el día";
   const urgencia = evento.esTermino && !evento.completado ? urgenciaTermino(diasHasta(evento.fecha)) : null;
   const [copiado, setCopiado] = useState(false);
 
@@ -125,9 +132,8 @@ function EventoAgendaCard({ evento, onEliminar, onCompletar, onEditar, onSincron
               </span>
             )}
           </div>
-          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, margin: "4px 0 0", textTransform: "capitalize" }}>
-            {fechaTexto}
-            {evento.hora ? ` · ${evento.hora}` : ""}
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.muted, margin: "4px 0 0" }}>
+            <strong style={{ color: COLORS.ink, fontWeight: 700 }}>{horaTexto}</strong>
             {evento.esTermino && evento.clienteRelacionado ? ` · ${evento.clienteRelacionado}` : ""}
             {evento.clienteNombre ? ` · ${evento.clienteNombre}` : ""}
           </p>
@@ -486,6 +492,29 @@ export default function AgendaTab({ onListo }) {
     pasados = pasados.filter((e) => e.esTermino);
   }
 
+  // Vista tipo "agenda de calendario": en vez de una lista plana, los
+  // eventos se agrupan por día con un encabezado propio (Hoy / Mañana /
+  // día de la semana), igual que la vista "Agenda" de Google Calendar —
+  // más fácil de escanear de un vistazo que solo fecha+hora pegados en
+  // cada tarjeta.
+  const mananaISO = fechaLocalISO(new Date(Date.now() + 24 * 60 * 60 * 1000));
+  const etiquetaFecha = (fechaISO) => {
+    if (fechaISO === hoyISO) return "Hoy";
+    if (fechaISO === mananaISO) return "Mañana";
+    return new Date(`${fechaISO}T12:00:00`).toLocaleDateString("es-CO", { weekday: "long", day: "numeric", month: "long" });
+  };
+  const agruparPorFecha = (arr) => {
+    const grupos = [];
+    arr.forEach((e) => {
+      const ultimo = grupos[grupos.length - 1];
+      if (ultimo && ultimo.fecha === e.fecha) ultimo.eventos.push(e);
+      else grupos.push({ fecha: e.fecha, eventos: [e] });
+    });
+    return grupos;
+  };
+  const gruposProximos = agruparPorFecha(proximos);
+  const gruposPasados = agruparPorFecha(pasados.slice().reverse());
+
   return (
     <div>
       <EncabezadoSeccion titulo="Agenda" color="#8B5CF6" />
@@ -589,8 +618,25 @@ export default function AgendaTab({ onListo }) {
             Solo términos procesales
           </label>
         </div>
-        <button className="drx-btn-primary" style={buttonPrimary} onClick={cancelarForm}>
-          {mostrarForm ? "Cancelar" : "+ Nuevo evento"}
+        <button
+          className="drx-btn-primary"
+          style={{
+            ...buttonPrimary,
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 8,
+            background: mostrarForm ? buttonPrimary.background : "linear-gradient(135deg, #8B5CF6 0%, #6D4FD1 100%)",
+            boxShadow: mostrarForm ? buttonPrimary.boxShadow : "0 4px 16px rgba(109,79,209,0.35), inset 0 1px 0 rgba(255,255,255,0.18)",
+          }}
+          onClick={cancelarForm}
+        >
+          {mostrarForm ? (
+            "Cancelar"
+          ) : (
+            <>
+              <span style={{ fontSize: 17, lineHeight: 1, fontWeight: 400 }}>+</span> Nuevo evento
+            </>
+          )}
         </button>
       </div>
 
@@ -764,44 +810,66 @@ export default function AgendaTab({ onListo }) {
 
       {cargado && lista.length === 0 && <EstadoVacio icono={<Icono tipo="calendario" size={26} />} texto="No tienes eventos en tu agenda todavía." />}
 
-      {proximos.length > 0 && (
+      {gruposProximos.length > 0 && (
         <div style={{ marginBottom: 24 }}>
-          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, fontWeight: 700, color: COLORS.muted, textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 10 }}>Próximos</p>
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {proximos.map((e) => (
-              <EventoAgendaCard
-                key={e.id}
-                evento={e}
-                onEliminar={() => eliminarClick(e.id, e.titulo)}
-                onCompletar={() => actualizar(e.id, { completado: !e.completado })}
-                onEditar={() => editarClick(e.id)}
-                onSincronizar={() => sincronizarClick(e.id)}
-                sincronizando={sincronizandoId === e.id}
-              />
-            ))}
-          </div>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, fontWeight: 700, color: COLORS.muted, textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 4 }}>Próximos</p>
+          {gruposProximos.map((grupo, i) => (
+            <div key={grupo.fecha}>
+              <div style={{ display: "flex", alignItems: "baseline", gap: 9, margin: i === 0 ? "10px 0 10px" : "20px 0 10px" }}>
+                <span style={{ fontFamily: "Inter, sans-serif", fontSize: 13.5, fontWeight: 800, color: grupo.fecha === hoyISO ? "#6D4FD1" : COLORS.ink, textTransform: "capitalize", whiteSpace: "nowrap" }}>
+                  {etiquetaFecha(grupo.fecha)}
+                </span>
+                {grupo.fecha === hoyISO && (
+                  <span style={{ fontFamily: "Inter, sans-serif", fontSize: 10, fontWeight: 700, color: "#FFFFFF", background: "#8B5CF6", borderRadius: 20, padding: "1px 8px", flexShrink: 0 }}>
+                    HOY
+                  </span>
+                )}
+                <span style={{ flex: 1, height: 1, background: COLORS.border }} />
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {grupo.eventos.map((e) => (
+                  <EventoAgendaCard
+                    key={e.id}
+                    evento={e}
+                    onEliminar={() => eliminarClick(e.id, e.titulo)}
+                    onCompletar={() => actualizar(e.id, { completado: !e.completado })}
+                    onEditar={() => editarClick(e.id)}
+                    onSincronizar={() => sincronizarClick(e.id)}
+                    sincronizando={sincronizandoId === e.id}
+                  />
+                ))}
+              </div>
+            </div>
+          ))}
         </div>
       )}
 
-      {pasados.length > 0 && (
+      {gruposPasados.length > 0 && (
         <div>
-          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, fontWeight: 700, color: COLORS.muted, textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 10 }}>Pasados</p>
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {pasados
-              .slice()
-              .reverse()
-              .map((e) => (
-                <EventoAgendaCard
-                  key={e.id}
-                  evento={e}
-                  onEliminar={() => eliminarClick(e.id, e.titulo)}
-                  onEditar={() => editarClick(e.id)}
-                  onSincronizar={() => sincronizarClick(e.id)}
-                  sincronizando={sincronizandoId === e.id}
-                  pasado
-                />
-              ))}
-          </div>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, fontWeight: 700, color: COLORS.muted, textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 4 }}>Pasados</p>
+          {gruposPasados.map((grupo, i) => (
+            <div key={grupo.fecha}>
+              <div style={{ display: "flex", alignItems: "baseline", gap: 9, margin: i === 0 ? "10px 0 10px" : "20px 0 10px" }}>
+                <span style={{ fontFamily: "Inter, sans-serif", fontSize: 13, fontWeight: 700, color: COLORS.muted, textTransform: "capitalize", whiteSpace: "nowrap" }}>
+                  {etiquetaFecha(grupo.fecha)}
+                </span>
+                <span style={{ flex: 1, height: 1, background: COLORS.border }} />
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {grupo.eventos.map((e) => (
+                  <EventoAgendaCard
+                    key={e.id}
+                    evento={e}
+                    onEliminar={() => eliminarClick(e.id, e.titulo)}
+                    onEditar={() => editarClick(e.id)}
+                    onSincronizar={() => sincronizarClick(e.id)}
+                    sincronizando={sincronizandoId === e.id}
+                    pasado
+                  />
+                ))}
+              </div>
+            </div>
+          ))}
         </div>
       )}
       {ConfirmarDialogo}
