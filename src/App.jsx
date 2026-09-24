@@ -1,5 +1,13 @@
 import { useState, useEffect, useRef, useCallback, useMemo, Fragment, Component, lazy, Suspense } from "react";
-import logoNomosUrl from "./assets/logo-nomos.png";
+// Dos copias del mismo logo, a propósito: la pantalla (<img>, el <canvas>
+// del recibo) usa el WebP — mismos píxeles exactos (sin pérdida), pero 43%
+// más liviano, y se descarga en CADA visita a la app. El PNG original se
+// deja intacto y solo se usa para incrustarlo en PDF/Word (jsPDF.addImage
+// SÍ soporta WebP, pero la librería "docx" no — cambiar el formato ahí
+// habría roto los contratos en Word), y ese solo se descarga cuando
+// alguien de verdad genera un recibo o documento, no en cada carga.
+import logoNomosUrl from "./assets/logo-nomos-pantalla.webp";
+import logoNomosDocUrl from "./assets/logo-nomos.png";
 
 // Contabilidad es, de lejos, la pestaña más pesada de la app (formularios de
 // pago/egresos/otros ingresos, recibos, gráficas...) — cargarla solo cuando
@@ -85,16 +93,17 @@ export const LOGO_SRC = logoNomosUrl;
 // El PNG del logo vive como archivo aparte (src/assets/logo-nomos.png) en
 // vez de un string base64 de ~76KB incrustado en este archivo — antes se
 // descargaba y parseaba ese texto en CADA carga de la app, aunque nadie
-// mirara nunca un PDF o Word ese día. LOGO_SRC (una URL normal, cacheable
-// por el navegador) sirve tal cual para <img src=...> y para cargar en un
-// <canvas> (el recibo de pago). Donde sí hace falta el base64 completo de
-// verdad (jsPDF.addImage, ImageRun de docx — ambos lo piden de forma
-// síncrona) se usa obtenerLogoBase64(), que lo trae una sola vez con
+// mirara nunca un PDF o Word ese día. LOGO_SRC (el WebP liviano, una URL
+// normal cacheable por el navegador) sirve tal cual para <img src=...> y
+// para cargar en un <canvas> (el recibo de pago). Donde sí hace falta el
+// base64 completo de verdad (jsPDF.addImage, ImageRun de docx — ambos lo
+// piden de forma síncrona) se usa obtenerLogoBase64(), que trae el PNG
+// original (no el WebP: docx no soporta ese formato) una sola vez con
 // fetch() y lo deja en caché en memoria para las siguientes veces.
 let logoBase64Promise = null;
 export function obtenerLogoBase64() {
   if (!logoBase64Promise) {
-    logoBase64Promise = fetch(logoNomosUrl)
+    logoBase64Promise = fetch(logoNomosDocUrl)
       .then((r) => r.blob())
       .then(
         (blob) =>
@@ -1233,7 +1242,7 @@ export function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-export const APP_VERSION = "1.128.1";
+export const APP_VERSION = "1.129.0";
 
 function SelloVersion({ oscuro }) {
   return (

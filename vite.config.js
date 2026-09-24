@@ -36,7 +36,12 @@ export default defineConfig({
       manifest: false, // ya servimos public/manifest.webmanifest directamente
       includeAssets: ["favicon-32.png", "apple-touch-icon.png", "icon-192.png", "icon-512.png"],
       workbox: {
-        globPatterns: ["**/*.{js,css,html,png,svg,woff2}"],
+        // "webp" se agregó junto con el logo liviano del recibo — sin esto,
+        // ese archivo no quedaba precacheado como el PNG que reemplazó, y
+        // generar un recibo por primera vez estando sin conexión habría
+        // fallado (la promesa de "funciona sin internet" ya no se cumplía
+        // para ese caso puntual).
+        globPatterns: ["**/*.{js,css,html,png,webp,svg,woff2}"],
         navigateFallbackDenylist: [/^\/api\//],
       },
     }),
