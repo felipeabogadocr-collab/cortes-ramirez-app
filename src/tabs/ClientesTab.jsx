@@ -1397,7 +1397,7 @@ export default function ClientesTab({ usuarioActual, onIrARegistrarPago, onListo
             bottom: 24,
             right: 24,
             zIndex: 200,
-            background: "#4A7C6D",
+            background: "#3E7C7C",
             color: "#FFFFFF",
             padding: "12px 18px",
             borderRadius: 10,

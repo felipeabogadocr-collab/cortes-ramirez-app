@@ -2067,6 +2067,14 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
   const [acuerdoAbiertoId, setAcuerdoAbiertoId] = useState(null);
   const { addId: addIdDocumentoAcuerdo } = useIndex("indice-documentos", true);
   const [filtro, setFiltro] = useState("");
+  // Desde la lista de "Próximos pagos por vencer" de arriba, clic en el
+  // nombre del cliente hace lo mismo que si lo hubieras buscado a mano: lo
+  // filtra en la lista de abajo y se desplaza hasta ahí — para no tener que
+  // escribir el nombre de nuevo solo para ver su ficha completa.
+  const irAClienteDesdeRecordatorio = (nombre) => {
+    setFiltro(nombre);
+    document.getElementById("seccion-clientes")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
   const [soloPendientes, setSoloPendientes] = useState(false);
   const [orden, setOrden] = useState("nombre");
   const [expandidos, setExpandidos] = useState({});
@@ -3654,7 +3662,13 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
                   }}
                 >
                   <div>
-                    <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, fontWeight: 600, color: vencido ? "#B42318" : "#92400E", margin: 0 }}>
+                    <p
+                      onClick={() => irAClienteDesdeRecordatorio(c.nombre)}
+                      title="Ver la ficha completa de este cliente"
+                      style={{ fontFamily: "Inter, sans-serif", fontSize: 13, fontWeight: 600, color: vencido ? "#B42318" : "#92400E", margin: 0, cursor: "pointer", textDecoration: "underline", textDecorationColor: "transparent", textUnderlineOffset: 3 }}
+                      onMouseEnter={(e) => (e.currentTarget.style.textDecorationColor = "currentcolor")}
+                      onMouseLeave={(e) => (e.currentTarget.style.textDecorationColor = "transparent")}
+                    >
                       {c.nombre} {vencido && <span style={{ marginLeft: 6, fontSize: 10.5, fontWeight: 800, textTransform: "uppercase", letterSpacing: 0.5 }}>Vencido</span>}
                     </p>
                     <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, color: vencido ? "#B42318" : "#B45309", margin: "2px 0 0" }}>
