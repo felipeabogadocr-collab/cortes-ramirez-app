@@ -113,15 +113,18 @@ export function obtenerLogoBase64() {
 export const COLORS = {
   bg: "var(--drx-bg)",
   panel: "var(--drx-panel)",
-  navy: "#0B3D2E",
-  navyDeep: "#042E22",
+  // Antes era un verde bosque muy oscuro (#0B3D2E) — a pedido de Felipe se
+  // suavizó a este verde salvia, más tranquilo y menos pesado visualmente,
+  // manteniendo la misma familia de color (verde = confianza/crecimiento).
+  navy: "#4A7C6D",
+  navyDeep: "#345A4F",
   ink: "var(--drx-ink)",
   inkSoft: "var(--drx-ink-soft)",
   muted: "var(--drx-muted)",
   border: "var(--drx-border)",
   headingText: "var(--drx-heading)",
   surfaceSoft: "var(--drx-surface-soft)",
-  accent: "#0B3D2E",
+  accent: "#4A7C6D",
   accentBright: "#16A34A",
   accentSoft: "#E3F5EA",
   black: "#0B0B0C",
@@ -312,7 +315,7 @@ export function generarReciboImagen(clienteId, cliente, pago) {
     // (la barra lateral, "Nomos" en el login, etc.) — un serif decorativo
     // aparte solo desentonaba con la marca real.
     const SANS = "'Inter', Arial, sans-serif";
-    const VERDE = "#0B3D2E";
+    const VERDE = "#4A7C6D";
     const DORADO = "#B8912F";
 
     // Sombra suave debajo de la tarjeta, como si flotara sobre el fondo.
@@ -735,7 +738,7 @@ export const GlobalStyle = () => (
       --drx-ink-soft: #3B4657;
       --drx-muted: #6B7480;
       --drx-border: #DFE3EA;
-      --drx-heading: #0B3D2E;
+      --drx-heading: #4A7C6D;
       --drx-surface-soft: #FAFAF8;
     }
     .drx-tema-oscuro {
@@ -1229,7 +1232,7 @@ export function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-export const APP_VERSION = "1.125.2";
+export const APP_VERSION = "1.126.0";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -6143,7 +6146,7 @@ function ModalNotificaciones({
             <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.muted, marginBottom: 18 }}>Todos los clientes tienen actuaciones recientes.</p>
           )}
 
-          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, fontWeight: 700, color: "#0B3D2E", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 10 }}>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, fontWeight: 700, color: "#4A7C6D", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 10 }}>
             <Icono tipo="tarjeta" size={14} style={{ marginRight: 4, verticalAlign: -2 }} /> Pagos pendientes
           </p>
           {pagosPendientes.length > 0 ? (
@@ -7836,7 +7839,7 @@ function IndicadorSincronizacion() {
         left: 0,
         right: 0,
         zIndex: 3900,
-        background: enLinea ? "#0B3D2E" : "#92400E",
+        background: enLinea ? "#4A7C6D" : "#92400E",
         color: "#fff",
         textAlign: "center",
         padding: "6px 12px",
@@ -7944,7 +7947,7 @@ export class TabErrorBoundary extends Component {
               padding: "8px 18px",
               borderRadius: 10,
               border: "none",
-              background: "#0B3D2E",
+              background: "#4A7C6D",
               color: "#fff",
               cursor: "pointer",
             }}
@@ -8019,7 +8022,7 @@ class ErrorBoundary extends Component {
               padding: "10px 22px",
               borderRadius: 10,
               border: "none",
-              background: "#0B3D2E",
+              background: "#4A7C6D",
               color: "#fff",
               cursor: "pointer",
             }}
