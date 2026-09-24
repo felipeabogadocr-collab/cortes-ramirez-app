@@ -45,11 +45,19 @@ function descargarICS(evento) {
   URL.revokeObjectURL(url);
 }
 
-const FILTROS_AGENDA = [
-  { id: "todos", nombre: "Todos" },
-  { id: "hoy", nombre: "Hoy" },
-  { id: "semana", nombre: "Esta semana" },
+// Filtro por estado de la tarea, como en Google Tasks/Calendar — se calcula
+// solo con datos que YA existen en cada evento (fecha + completado), sin
+// agregar ningún campo nuevo: "vencida" es una próxima que ya pasó de fecha
+// sin marcarse completada, no un estado aparte que alguien tenga que
+// mantener a mano.
+const FILTROS_TAREA = [
+  { id: "todas", nombre: "Todas" },
+  { id: "proximas", nombre: "Próximas" },
+  { id: "vencidas", nombre: "Vencidas" },
+  { id: "cumplidas", nombre: "Cumplidas" },
 ];
+
+const DIAS_SEMANA = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
 
 // Mismos presets que trae Google Calendar por defecto para "Notificación".
 const RECORDATORIOS_GOOGLE = [
@@ -260,8 +268,13 @@ export default function AgendaTab({ onListo }) {
   const [sincronizandoId, setSincronizandoId] = useState(null);
   const { clientes: clientesLigero, cargado: clientesCargados } = useClientesLigero();
   const [permisoNotif, setPermisoNotif] = useState(typeof Notification !== "undefined" ? Notification.permission : "unsupported");
-  const [filtroTiempo, setFiltroTiempo] = useState("todos");
-  const [soloTerminos, setSoloTerminos] = useState(false);
+  const [filtroTarea, setFiltroTarea] = useState("todas");
+  const [vista, setVista] = useState("agenda");
+  const [mesVisto, setMesVisto] = useState(() => {
+    const d = new Date();
+    return { anio: d.getFullYear(), mes: d.getMonth() };
+  });
+  const [diaSeleccionadoMes, setDiaSeleccionadoMes] = useState(null);
   const { confirmar, ConfirmarDialogo } = useConfirmarDialogo();
 
   // Conexión con Google Calendar: una vez conectada, cada evento nuevo se
@@ -419,7 +432,17 @@ export default function AgendaTab({ onListo }) {
     setErrorForm("");
     setForm(FORM_VACIO);
     setEditandoId(null);
-    setMostrarForm((v) => !v);
+    setMostrarForm(false);
+  };
+
+  // Si venís de la vista Mes con un día elegido, "+ Nuevo evento" arranca
+  // el formulario con esa fecha ya puesta — igual que en Google Calendar,
+  // donde hacer clic en un día del mes abre el evento nuevo ya fechado ahí.
+  const abrirNuevoEvento = () => {
+    setErrorForm("");
+    setEditandoId(null);
+    setForm(vista === "mes" && diaSeleccionadoMes ? { ...FORM_VACIO, fecha: diaSeleccionadoMes } : FORM_VACIO);
+    setMostrarForm(true);
   };
 
   const eliminarClick = async (id, titulo) => {
@@ -481,18 +504,20 @@ export default function AgendaTab({ onListo }) {
   // horaria real del dispositivo.
   const fechaLocalISO = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   const hoyISO = fechaLocalISO(new Date());
-  const finSemana = new Date();
-  finSemana.setDate(finSemana.getDate() + (7 - finSemana.getDay()));
-  const finSemanaISO = fechaLocalISO(finSemana);
 
-  let proximos = lista.filter((e) => e.fecha >= hoyISO);
-  if (filtroTiempo === "hoy") proximos = proximos.filter((e) => e.fecha === hoyISO);
-  else if (filtroTiempo === "semana") proximos = proximos.filter((e) => e.fecha <= finSemanaISO);
-  let pasados = lista.filter((e) => e.fecha < hoyISO);
-  if (soloTerminos) {
-    proximos = proximos.filter((e) => e.esTermino);
-    pasados = pasados.filter((e) => e.esTermino);
-  }
+  // "Vencida" no es un campo aparte que alguien tenga que marcar a mano: es
+  // simplemente una próxima a la que ya se le pasó la fecha sin completarse
+  // — se calcula sola con lo que el evento ya tiene (fecha + completado).
+  const cumpleFiltroTarea = (e) => {
+    if (filtroTarea === "cumplidas") return !!e.completado;
+    if (filtroTarea === "vencidas") return !e.completado && e.fecha < hoyISO;
+    if (filtroTarea === "proximas") return !e.completado && e.fecha >= hoyISO;
+    return true;
+  };
+  const listaFiltrada = lista.filter(cumpleFiltroTarea);
+
+  let proximos = listaFiltrada.filter((e) => e.fecha >= hoyISO);
+  let pasados = listaFiltrada.filter((e) => e.fecha < hoyISO);
 
   // Vista tipo "agenda de calendario": en vez de una lista plana, los
   // eventos se agrupan por día con un encabezado propio (Hoy / Mañana /
@@ -516,6 +541,38 @@ export default function AgendaTab({ onListo }) {
   };
   const gruposProximos = agruparPorFecha(proximos);
   const gruposPasados = agruparPorFecha(pasados.slice().reverse());
+
+  // Vista Mes: una grilla de 6 semanas (42 días, siempre empezando en
+  // lunes) como la de Google Calendar. Se arma a partir de la MISMA lista
+  // ya filtrada por tarea — nunca de datos aparte — para que lo que se ve
+  // en Mes y en Agenda sea siempre exactamente lo mismo, solo presentado
+  // distinto.
+  const eventosPorDiaMes = {};
+  listaFiltrada.forEach((e) => {
+    (eventosPorDiaMes[e.fecha] ||= []).push(e);
+  });
+  const primerDiaMes = new Date(mesVisto.anio, mesVisto.mes, 1);
+  const offsetLunes = (primerDiaMes.getDay() + 6) % 7;
+  const inicioGrillaMes = new Date(mesVisto.anio, mesVisto.mes, 1 - offsetLunes);
+  const diasGrillaMes = Array.from({ length: 42 }, (_, i) => {
+    const d = new Date(inicioGrillaMes);
+    d.setDate(inicioGrillaMes.getDate() + i);
+    return d;
+  });
+  const nombreMesVisto = new Date(mesVisto.anio, mesVisto.mes, 1).toLocaleDateString("es-CO", { month: "long", year: "numeric" });
+  const cambiarMes = (delta) => {
+    setDiaSeleccionadoMes(null);
+    setMesVisto((prev) => {
+      const d = new Date(prev.anio, prev.mes + delta, 1);
+      return { anio: d.getFullYear(), mes: d.getMonth() };
+    });
+  };
+  const irAHoy = () => {
+    const d = new Date();
+    setMesVisto({ anio: d.getFullYear(), mes: d.getMonth() });
+    setDiaSeleccionadoMes(hoyISO);
+  };
+  const eventosDelDiaSeleccionado = diaSeleccionadoMes ? eventosPorDiaMes[diaSeleccionadoMes] || [] : [];
 
   return (
     <div>
@@ -596,29 +653,37 @@ export default function AgendaTab({ onListo }) {
         </div>
       </Card>
 
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
-        <div style={{ display: "flex", gap: 6 }}>
-          {FILTROS_AGENDA.map((f) => (
-            <button
-              key={f.id}
-              onClick={() => setFiltroTiempo(f.id)}
-              className="drx-btn-ghost"
-              style={{
-                ...buttonGhost,
-                padding: "6px 14px",
-                fontSize: 12.5,
-                background: filtroTiempo === f.id ? COLORS.navy : COLORS.panel,
-                color: filtroTiempo === f.id ? "#FFFFFF" : COLORS.inkSoft,
-                borderColor: filtroTiempo === f.id ? COLORS.navy : COLORS.border,
-              }}
-            >
-              {f.nombre}
-            </button>
-          ))}
-          <label style={{ display: "flex", alignItems: "center", gap: 6, fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.inkSoft, cursor: "pointer", marginLeft: 4 }}>
-            <input type="checkbox" checked={soloTerminos} onChange={(e) => setSoloTerminos(e.target.checked)} />
-            Solo términos procesales
-          </label>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, flexWrap: "wrap", gap: 10 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <div style={{ display: "flex", gap: 3, background: COLORS.surfaceSoft, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: 3 }}>
+            {[
+              { id: "agenda", nombre: "Agenda" },
+              { id: "mes", nombre: "Mes" },
+            ].map((v) => (
+              <button
+                key={v.id}
+                onClick={() => setVista(v.id)}
+                className="drx-btn-ghost"
+                style={{
+                  border: "none",
+                  borderRadius: 7,
+                  padding: "6px 14px",
+                  fontSize: 12.5,
+                  fontFamily: "Inter, sans-serif",
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  background: vista === v.id ? "#FFFFFF" : "transparent",
+                  color: vista === v.id ? "#6D4FD1" : COLORS.inkSoft,
+                  boxShadow: vista === v.id ? "0 1px 3px rgba(16,24,40,0.12)" : "none",
+                }}
+              >
+                {v.nombre}
+              </button>
+            ))}
+          </div>
+          <span style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, fontWeight: 700, color: COLORS.muted, background: COLORS.surfaceSoft, border: `1px solid ${COLORS.border}`, borderRadius: 20, padding: "4px 11px" }}>
+            {listaFiltrada.length} evento{listaFiltrada.length !== 1 ? "s" : ""}
+          </span>
         </div>
         <button
           className="drx-btn-primary"
@@ -630,7 +695,7 @@ export default function AgendaTab({ onListo }) {
             background: mostrarForm ? buttonPrimary.background : "linear-gradient(135deg, #8B5CF6 0%, #6D4FD1 100%)",
             boxShadow: mostrarForm ? buttonPrimary.boxShadow : "0 4px 16px rgba(109,79,209,0.35), inset 0 1px 0 rgba(255,255,255,0.18)",
           }}
-          onClick={cancelarForm}
+          onClick={mostrarForm ? cancelarForm : abrirNuevoEvento}
         >
           {mostrarForm ? (
             "Cancelar"
@@ -640,6 +705,26 @@ export default function AgendaTab({ onListo }) {
             </>
           )}
         </button>
+      </div>
+
+      <div style={{ display: "flex", gap: 6, marginBottom: 16, flexWrap: "wrap" }}>
+        {FILTROS_TAREA.map((f) => (
+          <button
+            key={f.id}
+            onClick={() => setFiltroTarea(f.id)}
+            className="drx-btn-ghost"
+            style={{
+              ...buttonGhost,
+              padding: "6px 14px",
+              fontSize: 12.5,
+              background: filtroTarea === f.id ? COLORS.navy : COLORS.panel,
+              color: filtroTarea === f.id ? "#FFFFFF" : COLORS.inkSoft,
+              borderColor: filtroTarea === f.id ? COLORS.navy : COLORS.border,
+            }}
+          >
+            {f.nombre}
+          </button>
+        ))}
       </div>
 
       {mostrarForm && (
@@ -812,7 +897,133 @@ export default function AgendaTab({ onListo }) {
 
       {cargado && lista.length === 0 && <EstadoVacio icono={<Icono tipo="calendario" size={26} />} texto="No tienes eventos en tu agenda todavía." />}
 
-      {gruposProximos.length > 0 && (
+      {cargado && lista.length > 0 && listaFiltrada.length === 0 && (
+        <EstadoVacio icono={<Icono tipo="calendario" size={26} />} texto="Ningún evento coincide con este filtro." />
+      )}
+
+      {vista === "mes" && (
+        <div style={{ marginBottom: 24 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12, gap: 10, flexWrap: "wrap" }}>
+            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, fontWeight: 800, color: COLORS.ink, margin: 0, textTransform: "capitalize" }}>{nombreMesVisto}</p>
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <button className="drx-btn-ghost" style={{ ...buttonGhost, padding: "5px 10px", fontSize: 13 }} onClick={() => cambiarMes(-1)} title="Mes anterior">
+                ‹
+              </button>
+              <button className="drx-btn-ghost" style={{ ...buttonGhost, padding: "5px 12px", fontSize: 12 }} onClick={irAHoy}>
+                Hoy
+              </button>
+              <button className="drx-btn-ghost" style={{ ...buttonGhost, padding: "5px 10px", fontSize: 13 }} onClick={() => cambiarMes(1)} title="Mes siguiente">
+                ›
+              </button>
+            </div>
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 1, background: COLORS.border, border: `1px solid ${COLORS.border}`, borderRadius: 10, overflow: "hidden" }}>
+            {DIAS_SEMANA.map((d) => (
+              <div key={d} style={{ background: COLORS.surfaceSoft, padding: "7px 4px", textAlign: "center", fontFamily: "Inter, sans-serif", fontSize: 10.5, fontWeight: 700, color: COLORS.muted, textTransform: "uppercase" }}>
+                {d}
+              </div>
+            ))}
+            {diasGrillaMes.map((d) => {
+              const fechaCelda = fechaLocalISO(d);
+              const eventosDia = eventosPorDiaMes[fechaCelda] || [];
+              const fueraDeMes = d.getMonth() !== mesVisto.mes;
+              const esHoy = fechaCelda === hoyISO;
+              const seleccionado = fechaCelda === diaSeleccionadoMes;
+              return (
+                <button
+                  key={fechaCelda}
+                  onClick={() => setDiaSeleccionadoMes(seleccionado ? null : fechaCelda)}
+                  style={{
+                    background: seleccionado ? "#F3EEFE" : "#FFFFFF",
+                    border: "none",
+                    cursor: "pointer",
+                    minHeight: 74,
+                    padding: "6px 5px",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 3,
+                    alignItems: "flex-start",
+                    opacity: fueraDeMes ? 0.4 : 1,
+                    textAlign: "left",
+                  }}
+                >
+                  <span
+                    style={{
+                      fontFamily: "Inter, sans-serif",
+                      fontSize: 11.5,
+                      fontWeight: esHoy ? 800 : 600,
+                      color: esHoy ? "#FFFFFF" : COLORS.ink,
+                      background: esHoy ? "#8B5CF6" : "transparent",
+                      borderRadius: "50%",
+                      width: 20,
+                      height: 20,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    {d.getDate()}
+                  </span>
+                  {eventosDia.slice(0, 2).map((e) => (
+                    <span
+                      key={e.id}
+                      style={{
+                        fontFamily: "Inter, sans-serif",
+                        fontSize: 9.5,
+                        fontWeight: 600,
+                        color: e.completado ? COLORS.muted : "#6D4FD1",
+                        background: e.completado ? COLORS.surfaceSoft : "#EEE9FC",
+                        borderRadius: 4,
+                        padding: "1px 4px",
+                        width: "100%",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                        textDecoration: e.completado ? "line-through" : "none",
+                      }}
+                    >
+                      {e.titulo}
+                    </span>
+                  ))}
+                  {eventosDia.length > 2 && (
+                    <span style={{ fontFamily: "Inter, sans-serif", fontSize: 9.5, fontWeight: 700, color: COLORS.muted }}>+{eventosDia.length - 2} más</span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
+          {diaSeleccionadoMes && (
+            <div style={{ marginTop: 16 }}>
+              <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, fontWeight: 700, color: COLORS.muted, textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 10 }}>
+                {etiquetaFecha(diaSeleccionadoMes)}
+              </p>
+              {eventosDelDiaSeleccionado.length === 0 ? (
+                <EstadoVacio icono={<Icono tipo="calendario" size={22} />} texto="Sin eventos este día." />
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  {eventosDelDiaSeleccionado.map((e) => (
+                    <EventoAgendaCard
+                      key={e.id}
+                      evento={e}
+                      onEliminar={() => eliminarClick(e.id, e.titulo)}
+                      onCompletar={() => actualizar(e.id, { completado: !e.completado })}
+                      onEditar={() => editarClick(e.id)}
+                      onSincronizar={() => sincronizarClick(e.id)}
+                      sincronizando={sincronizandoId === e.id}
+                      googleConectado={googleConectado}
+                      pasado={diaSeleccionadoMes < hoyISO}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {vista === "agenda" && gruposProximos.length > 0 && (
         <div style={{ marginBottom: 24 }}>
           <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, fontWeight: 700, color: COLORS.muted, textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 4 }}>Próximos</p>
           {gruposProximos.map((grupo, i) => (
@@ -847,7 +1058,7 @@ export default function AgendaTab({ onListo }) {
         </div>
       )}
 
-      {gruposPasados.length > 0 && (
+      {vista === "agenda" && gruposPasados.length > 0 && (
         <div>
           <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, fontWeight: 700, color: COLORS.muted, textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 4 }}>Pasados</p>
           {gruposPasados.map((grupo, i) => (
