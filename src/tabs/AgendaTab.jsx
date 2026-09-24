@@ -715,34 +715,39 @@ export default function AgendaTab({ onListo }) {
       </Card>
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, flexWrap: "wrap", gap: 10 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-          <div style={{ display: "flex", gap: 3, background: COLORS.surfaceSoft, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: 3 }}>
-            {[
-              { id: "agenda", nombre: "Agenda" },
-              { id: "mes", nombre: "Mes" },
-            ].map((v) => (
-              <button
-                key={v.id}
-                onClick={() => setVista(v.id)}
-                className="drx-btn-ghost"
-                style={{
-                  border: "none",
-                  borderRadius: 7,
-                  padding: "6px 14px",
-                  fontSize: 12.5,
-                  fontFamily: "Inter, sans-serif",
-                  fontWeight: 700,
-                  cursor: "pointer",
-                  background: vista === v.id ? "#FFFFFF" : "transparent",
-                  color: vista === v.id ? "#6D4FD1" : COLORS.inkSoft,
-                  boxShadow: vista === v.id ? "0 1px 3px rgba(16,24,40,0.12)" : "none",
-                }}
-              >
-                {v.nombre}
-              </button>
-            ))}
+        <div style={{ display: "flex", alignItems: "flex-end", gap: 12, flexWrap: "wrap" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+            <span style={{ fontFamily: "Inter, sans-serif", fontSize: 10.5, fontWeight: 700, color: COLORS.muted, textTransform: "uppercase", letterSpacing: 0.6 }}>
+              Vista — cómo ver tu calendario
+            </span>
+            <div style={{ display: "flex", gap: 3, background: COLORS.surfaceSoft, border: `1.5px solid ${COLORS.border}`, borderRadius: 10, padding: 3 }}>
+              {[
+                { id: "agenda", nombre: "Agenda" },
+                { id: "mes", nombre: "Mes" },
+              ].map((v) => (
+                <button
+                  key={v.id}
+                  onClick={() => setVista(v.id)}
+                  className="drx-btn-ghost"
+                  style={{
+                    border: "none",
+                    borderRadius: 7,
+                    padding: "6px 16px",
+                    fontSize: 12.5,
+                    fontFamily: "Inter, sans-serif",
+                    fontWeight: 700,
+                    cursor: "pointer",
+                    background: vista === v.id ? "linear-gradient(135deg, #8B5CF6 0%, #6D4FD1 100%)" : "transparent",
+                    color: vista === v.id ? "#FFFFFF" : COLORS.inkSoft,
+                    boxShadow: vista === v.id ? "0 2px 6px rgba(109,79,209,0.35)" : "none",
+                  }}
+                >
+                  {v.nombre}
+                </button>
+              ))}
+            </div>
           </div>
-          <span style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, fontWeight: 700, color: COLORS.muted, background: COLORS.surfaceSoft, border: `1px solid ${COLORS.border}`, borderRadius: 20, padding: "4px 11px" }}>
+          <span style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, fontWeight: 700, color: COLORS.muted, background: COLORS.surfaceSoft, border: `1px solid ${COLORS.border}`, borderRadius: 20, padding: "5px 11px", marginBottom: 3 }}>
             {listaFiltrada.length} evento{listaFiltrada.length !== 1 ? "s" : ""}
           </span>
         </div>
