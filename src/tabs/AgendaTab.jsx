@@ -63,7 +63,7 @@ const RECORDATORIOS_GOOGLE = [
   { minutos: "1440", etiqueta: "1 día antes" },
 ];
 
-function EventoAgendaCard({ evento, onEliminar, onCompletar, onEditar, onSincronizar, sincronizando, pasado }) {
+function EventoAgendaCard({ evento, onEliminar, onCompletar, onEditar, onSincronizar, sincronizando, pasado, googleConectado }) {
   const fechaTexto = new Date(`${evento.fecha}T${evento.hora || "00:00"}:00`).toLocaleDateString("es-CO", { weekday: "long", day: "numeric", month: "long" });
   // Con el encabezado de día nuevo (Hoy / Mañana / día de la semana) arriba
   // de cada grupo, repetir la fecha completa en cada tarjeta ya es
@@ -233,9 +233,11 @@ function EventoAgendaCard({ evento, onEliminar, onCompletar, onEditar, onSincron
               <Icono tipo="refrescar" size={15} />
             </button>
           )}
-          <button onClick={() => descargarICS(evento)} style={{ background: "none", border: "none", cursor: "pointer", color: COLORS.muted, display: "flex" }} title="Agregar a Google Calendar / Outlook (.ics)">
-            <Icono tipo="calendario" size={15} />
-          </button>
+          {!googleConectado && (
+            <button onClick={() => descargarICS(evento)} style={{ background: "none", border: "none", cursor: "pointer", color: COLORS.muted, display: "flex" }} title="Agregar a Google Calendar / Outlook (.ics)">
+              <Icono tipo="calendario" size={15} />
+            </button>
+          )}
           <button onClick={onEliminar} style={{ background: "none", border: "none", cursor: "pointer", color: COLORS.muted, display: "flex" }} title="Eliminar evento">
             <Icono tipo="papelera" size={15} />
           </button>
@@ -836,6 +838,7 @@ export default function AgendaTab({ onListo }) {
                     onEditar={() => editarClick(e.id)}
                     onSincronizar={() => sincronizarClick(e.id)}
                     sincronizando={sincronizandoId === e.id}
+                    googleConectado={googleConectado}
                   />
                 ))}
               </div>
@@ -864,6 +867,7 @@ export default function AgendaTab({ onListo }) {
                     onEditar={() => editarClick(e.id)}
                     onSincronizar={() => sincronizarClick(e.id)}
                     sincronizando={sincronizandoId === e.id}
+                    googleConectado={googleConectado}
                     pasado
                   />
                 ))}
