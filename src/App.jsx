@@ -1229,7 +1229,7 @@ export function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-export const APP_VERSION = "1.123.1";
+export const APP_VERSION = "1.124.0";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -6737,7 +6737,7 @@ function PantallaPendienteActivacion({ usuarioActual, onCerrarSesion }) {
       <Card style={{ maxWidth: 460, width: "100%", textAlign: "center" }}>
         <InsigniaPlataforma grande />
         <h1 style={{ fontFamily: "Inter, sans-serif", fontSize: 20, fontWeight: 800, color: COLORS.headingText, margin: "0 0 10px" }}>
-          {pruebaVencida ? "Tu prueba gratis de 7 días terminó" : "Tu cuenta está casi lista"}
+          {pruebaVencida ? "Tu demo de 3 horas terminó" : "Tu cuenta está casi lista"}
         </h1>
         <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted, lineHeight: 1.6, marginBottom: 20 }}>
           {pruebaVencida
@@ -7667,32 +7667,44 @@ function saludarPorVoz(nombre) {
 // cuenta días después cuando el dato ya no estaba. Este aviso global
 // escucha esos fallos (storage.js los emite como evento) y avisa de una
 // vez, para que el usuario sepa que debe revisar su conexión y reintentar.
-// Recordatorio discreto de cuántos días de prueba gratis quedan — sin esto,
-// alguien podía llegar al día 8 sin ninguna señal previa y encontrarse la
-// pantalla de "actívate" de sorpresa. Se puede cerrar por esta sesión (no
-// para siempre, para que no se olvide del todo).
+// Recordatorio discreto de cuánto tiempo de demo queda — sin esto, alguien
+// podía llegar al final de la demo sin ninguna señal previa y encontrarse
+// la pantalla de "actívate" de sorpresa. Se puede cerrar por esta sesión
+// (no para siempre, para que no se olvide del todo). Como la demo dura
+// horas y no días, se necesita un contador que se actualice solo mientras
+// la pestaña sigue abierta — por eso el setInterval, que antes no hacía
+// falta cuando esto medía en días.
 function AvisoPruebaGratis({ pruebaHasta }) {
   const [cerrado, setCerrado] = useState(false);
+  const [, forzarRender] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => forzarRender((n) => n + 1), 60000);
+    return () => clearInterval(id);
+  }, []);
   if (!pruebaHasta || cerrado) return null;
-  const diasRestantes = Math.ceil((new Date(pruebaHasta).getTime() - Date.now()) / (24 * 60 * 60 * 1000));
-  if (diasRestantes > 3 || diasRestantes < 0) return null;
+  const minutosRestantes = Math.ceil((new Date(pruebaHasta).getTime() - Date.now()) / (60 * 1000));
+  if (minutosRestantes > 180 || minutosRestantes < 0) return null;
+  const urgente = minutosRestantes <= 30;
+  const horas = Math.floor(minutosRestantes / 60);
+  const minutos = minutosRestantes % 60;
+  const textoTiempo = horas > 0 ? `${horas} h ${minutos} min` : `${minutos} min`;
   return (
     <div
       style={{
-        position: "sticky", top: 0, zIndex: 50, background: diasRestantes <= 1 ? "#FEF2F2" : "#FEF3E2",
-        borderBottom: `1px solid ${diasRestantes <= 1 ? "#F2B8B5" : "#FCE3B8"}`,
+        position: "sticky", top: 0, zIndex: 50, background: urgente ? "#FEF2F2" : "#FEF3E2",
+        borderBottom: `1px solid ${urgente ? "#F2B8B5" : "#FCE3B8"}`,
         padding: "9px 16px", display: "flex", alignItems: "center", justifyContent: "center", gap: 10, flexWrap: "wrap",
       }}
     >
-      <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: diasRestantes <= 1 ? "#B42318" : "#92400E", margin: 0, fontWeight: 600 }}>
-        {diasRestantes <= 0
-          ? "Tu prueba gratis termina hoy."
-          : `Te quedan ${diasRestantes} día${diasRestantes === 1 ? "" : "s"} de prueba gratis.`}{" "}
+      <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: urgente ? "#B42318" : "#92400E", margin: 0, fontWeight: 600 }}>
+        {minutosRestantes <= 1
+          ? "Tu demo termina en menos de un minuto."
+          : `Te quedan ${textoTiempo} de demo.`}{" "}
         Al vencer verás cómo activar tu plan para seguir usándola sin cortes.
       </p>
       <button
         onClick={() => setCerrado(true)}
-        style={{ background: "none", border: "none", cursor: "pointer", color: diasRestantes <= 1 ? "#B42318" : "#92400E", fontSize: 14, lineHeight: 1, padding: 0 }}
+        style={{ background: "none", border: "none", cursor: "pointer", color: urgente ? "#B42318" : "#92400E", fontSize: 14, lineHeight: 1, padding: 0 }}
         title="Ocultar por ahora"
       >
         ✕
@@ -8269,10 +8281,10 @@ function App() {
     }
     setDespachoActual(perfil?.despacho_id || null, perfil?.despachos?.nombre || "");
     if (perfil?.despacho_id) iniciarSincronizacionOffline();
-    // Un despacho nace "activo" con 7 días de prueba (prueba_hasta) — si esa
-    // fecha ya pasó y nadie lo activó de verdad (lo que limpia prueba_hasta,
-    // ver api/plataforma/despachos.js), vuelve a tratarse como pendiente de
-    // activar aunque el flag "activo" siga en true.
+    // Un despacho nace "activo" con una demo de 3 horas (prueba_hasta) — si
+    // esa fecha ya pasó y nadie lo activó de verdad (lo que limpia
+    // prueba_hasta, ver api/plataforma/despachos.js), vuelve a tratarse como
+    // pendiente de activar aunque el flag "activo" siga en true.
     const pruebaVencida = perfil?.despachos?.prueba_hasta && new Date(perfil.despachos.prueba_hasta).getTime() <= Date.now();
     const usuario = perfil
       ? {

@@ -292,7 +292,7 @@ export default function PlataformaTab({ onListo }) {
           color: "#92400E",
         }}
       >
-        Solo tú ves esta pestaña. Los despachos nuevos entran con 7 días de prueba gratis — aquí activas el acceso cuando
+        Solo tú ves esta pestaña. Los despachos nuevos entran con una demo gratis de 3 horas — aquí activas el acceso cuando
         confirmes que pagaron (mira si dice "Reportó pago"), o desactivas uno que dejó de pagar.
       </div>
 
@@ -328,7 +328,7 @@ export default function PlataformaTab({ onListo }) {
                     <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11, margin: "4px 0 0", display: "flex", gap: 6, flexWrap: "wrap" }}>
                       {d.prueba_hasta && (
                         <span style={{ color: pruebaVencida(d) ? "#B42318" : "#166534", fontWeight: 700 }}>
-                          {pruebaVencida(d) ? "Prueba vencida" : "En prueba gratis"}
+                          {pruebaVencida(d) ? "Demo vencida" : "En demo (3h)"}
                         </span>
                       )}
                       {d.pago_reportado_en && (
