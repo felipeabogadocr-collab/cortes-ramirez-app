@@ -9,6 +9,26 @@ export default defineConfig({
   define: {
     __BUILD_TIME__: JSON.stringify(new Date().toISOString()),
   },
+  build: {
+    rollupOptions: {
+      output: {
+        // Sin esto, TODO el código (el de React/Supabase, que casi nunca
+        // cambia, junto con el de App.jsx, que cambia en casi cada
+        // despliegue) vivía en un solo archivo — así que cada actualización
+        // de Nomos obligaba a volver a descargar ese archivo entero de
+        // nuevo, aunque el 60% de su contenido (las librerías) fuera
+        // idéntico al despliegue anterior. Separarlas en su propio archivo
+        // deja que el navegador las guarde en caché de verdad: después de
+        // este cambio, actualizar Nomos solo baja lo que de verdad cambió.
+        manualChunks(id) {
+          if (id.includes("node_modules")) {
+            if (id.includes("@supabase")) return "vendor-supabase";
+            if (id.includes("react-dom") || id.includes("/react/") || id.includes("/scheduler/")) return "vendor-react";
+          }
+        },
+      },
+    },
+  },
   plugins: [
     react(),
     VitePWA({
