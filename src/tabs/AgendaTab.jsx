@@ -632,7 +632,12 @@ export default function AgendaTab({ onListo }) {
 
   return (
     <div>
-      <EncabezadoSeccion titulo="Agenda" color="#8B5CF6" />
+      <EncabezadoSeccion
+        titulo="Agenda"
+        color="#8B5CF6"
+        icono={<Icono tipo="calendario" size={19} />}
+        subtitulo="Tus eventos y asesorías, todo en un solo lugar — sin perder ni una."
+      />
 
       {permisoNotif !== "granted" && permisoNotif !== "unsupported" && !googleConectado && (
         <Card style={{ marginBottom: 20, background: COLORS.accentSoft, border: "1px solid #C7D6EA" }}>
@@ -742,14 +747,16 @@ export default function AgendaTab({ onListo }) {
           </span>
         </div>
         <button
-          className="drx-btn-primary"
+          className="drx-btn-primary drx-cta-shine"
           style={{
             ...buttonPrimary,
             display: "inline-flex",
             alignItems: "center",
-            gap: 8,
+            gap: 9,
+            padding: "13px 24px",
+            fontSize: 15,
             background: mostrarForm ? buttonPrimary.background : "linear-gradient(135deg, #8B5CF6 0%, #6D4FD1 100%)",
-            boxShadow: mostrarForm ? buttonPrimary.boxShadow : "0 4px 16px rgba(109,79,209,0.35), inset 0 1px 0 rgba(255,255,255,0.18)",
+            boxShadow: mostrarForm ? buttonPrimary.boxShadow : "0 6px 20px rgba(109,79,209,0.4), inset 0 1px 0 rgba(255,255,255,0.18)",
           }}
           onClick={mostrarForm ? cancelarForm : abrirNuevoEvento}
         >
@@ -757,7 +764,7 @@ export default function AgendaTab({ onListo }) {
             "Cancelar"
           ) : (
             <>
-              <span style={{ fontSize: 17, lineHeight: 1, fontWeight: 400 }}>+</span> Nuevo evento
+              <span style={{ fontSize: 19, lineHeight: 1, fontWeight: 400 }}>+</span> Nuevo evento
             </>
           )}
         </button>

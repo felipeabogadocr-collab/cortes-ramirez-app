@@ -1229,7 +1229,7 @@ export function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-export const APP_VERSION = "1.125.0";
+export const APP_VERSION = "1.125.1";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -1255,9 +1255,13 @@ function SelloVersion({ oscuro }) {
   );
 }
 
-export function EncabezadoSeccion({ titulo, color }) {
+// icono y subtitulo son opcionales — los tabs que no los pasan se ven
+// exactamente igual que antes; se agregaron para que Agenda (y cualquier
+// otro que lo pida después) pueda tener un encabezado más vestido, sin
+// tocar el de las demás pestañas.
+export function EncabezadoSeccion({ titulo, color, icono, subtitulo }) {
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 26 }}>
+    <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: subtitulo ? 22 : 26 }}>
       <div
         style={{
           width: 38,
@@ -1266,8 +1270,14 @@ export function EncabezadoSeccion({ titulo, color }) {
           flexShrink: 0,
           background: `linear-gradient(135deg, ${color}, ${color}CC)`,
           boxShadow: `0 6px 16px ${color}40`,
+          display: icono ? "flex" : undefined,
+          alignItems: icono ? "center" : undefined,
+          justifyContent: icono ? "center" : undefined,
+          color: icono ? "#FFFFFF" : undefined,
         }}
-      />
+      >
+        {icono}
+      </div>
       <div>
         <div style={{ width: 30, height: 3, borderRadius: 2, background: `linear-gradient(90deg, ${color}, transparent)`, marginBottom: 6 }} />
         <h2
@@ -1282,6 +1292,9 @@ export function EncabezadoSeccion({ titulo, color }) {
         >
           {titulo}
         </h2>
+        {subtitulo && (
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.muted, margin: "4px 0 0" }}>{subtitulo}</p>
+        )}
       </div>
     </div>
   );
