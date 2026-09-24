@@ -1233,7 +1233,7 @@ export function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-export const APP_VERSION = "1.128.0";
+export const APP_VERSION = "1.128.1";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -1760,35 +1760,39 @@ function useResumenGeneral() {
 // notaba. Así, "3 de 5 clientes inactivos" pesa lo que debe pesar (60%),
 // y "3 de 60" también — sigue siendo estricto con problemas reales, pero
 // ya no castiga por tener pocos datos cargados todavía.
+//
+// SEGUNDO ajuste, a pedido de Felipe: cada categoría escala LINEAL desde 0
+// hasta su tope máximo, y el tope solo se alcanza cuando el 100% de los
+// clientes tiene ese problema — antes, el tope se alcanzaba con un
+// multiplicador más agresivo que la proporción real (ej. pagos atrasados
+// llegaba al tope con apenas 47% de clientes afectados), así que en un
+// despacho con varios problemas del mismo tipo, arreglar UNO no movía el
+// puntaje nada — solo se notaba una vez se bajaba del umbral del tope. Con
+// escala lineal, cada corrección individual SIEMPRE se refleja en el
+// puntaje, aunque el despacho siga en rojo hasta que se resuelvan todos.
 function diagnosticoOperacion(r) {
   let puntaje = 100;
   const razones = [];
   const sugerencias = [];
   const baseClientes = Math.max(1, r.totalClientes);
 
-  // Los topes y multiplicadores de aquí abajo se suavizaron una vez más: un
-  // despacho recién empezando a cargar datos (pocos clientes, apenas
-  // configurando pagos) se hundía al fondo de inmediato aunque no hubiera
-  // ningún problema real todavía — sigue siendo estricto con problemas de
-  // verdad (varios pagos atrasados, procesos con novedad sin revisar), pero
-  // ya no castiga tan duro por estar recién comenzando.
   if (r.clientesInactivos > 0) {
-    const proporcion = r.clientesInactivos / baseClientes;
-    puntaje -= Math.round(Math.min(20, proporcion * 32));
+    const proporcion = Math.min(1, r.clientesInactivos / baseClientes);
+    puntaje -= Math.round(20 * proporcion);
     razones.push(`${r.clientesInactivos} cliente${r.clientesInactivos !== 1 ? "s" : ""} sin novedades hace más de ${DIAS_ALERTA_INACTIVIDAD} días`);
     sugerencias.push("Ponte al día con los clientes sin actividad reciente — un mensaje corto ya ayuda.");
   }
   // Solo los pagos YA ATRASADOS bajan el puntaje — un pago próximo a vencer
   // (todavía dentro del plazo) es flujo de caja normal, no un problema.
   if (r.pagosAtrasados > 0) {
-    const proporcion = r.pagosAtrasados / baseClientes;
-    puntaje -= Math.round(Math.min(18, proporcion * 38));
+    const proporcion = Math.min(1, r.pagosAtrasados / baseClientes);
+    puntaje -= Math.round(18 * proporcion);
     razones.push(`${r.pagosAtrasados} pago${r.pagosAtrasados !== 1 ? "s" : ""} atrasado${r.pagosAtrasados !== 1 ? "s" : ""}`);
     sugerencias.push("Envía los recordatorios de los pagos atrasados desde Contabilidad.");
   }
   if (r.procesosConNovedad > 0) {
-    const proporcion = r.procesosConNovedad / baseClientes;
-    puntaje -= Math.round(Math.min(13, proporcion * 24));
+    const proporcion = Math.min(1, r.procesosConNovedad / baseClientes);
+    puntaje -= Math.round(13 * proporcion);
     razones.push(`${r.procesosConNovedad} proceso${r.procesosConNovedad !== 1 ? "s" : ""} con novedad en vigilancia judicial`);
     sugerencias.push("Revisa los procesos marcados con novedad en Vigilancia judicial.");
   }
