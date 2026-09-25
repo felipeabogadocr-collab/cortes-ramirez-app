@@ -14,6 +14,7 @@ import {
   NUMERO_WHATSAPP_DESPACHO,
   sha256Hex,
   DocumentoTextoConFirmas,
+  calcularEstado,
 } from "../App.jsx";
 
 function DocumentoConFirmas({ doc, previewFirmante, onMovePreview }) {

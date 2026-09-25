@@ -8,6 +8,7 @@ import {
   buttonPrimary,
   inputStyle,
   consultarRamaJudicial,
+  formatoCOP,
 } from "../App.jsx";
 
 export default function VistaPortalCliente() {
