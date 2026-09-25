@@ -161,6 +161,13 @@ export const TIPOS_PROCESO_POR_AREA = {
   Comercial: ["Ordinario", "Verbal", "Ejecutivo", "Arbitraje", "Otro"],
   Administrativo: ["Nulidad y restablecimiento del derecho", "Reparación directa", "Nulidad simple", "Otro"],
   Constitucional: ["Tutela", "Acción de cumplimiento", "Acción popular", "Habeas corpus", "Otro"],
+  // A pedido de un abogado del despacho (Dieto Merchan) vía WhatsApp: el
+  // régimen de insolvencia de persona natural no comerciante (Ley 1564 de
+  // 2012, Código General del Proceso) es un trámite distinto al de la
+  // insolvencia empresarial (Ley 1116 de 2006, que se divide en
+  // reorganización — el "acuerdo" — o liquidación judicial) — no encajaban
+  // bien forzados dentro de Civil ni de Comercial.
+  Concursal: ["Reorganización empresarial", "Liquidación judicial", "Insolvencia de persona natural no comerciante", "Otro"],
   Otro: ["Otro"],
 };
 export function tiposProcesoDeArea(area) {
@@ -170,7 +177,7 @@ export function tiposProcesoDeArea(area) {
 // IA (que puede no conocer el área todavía al crear un cliente) — la lista
 // completa de todos los tipos posibles, sin repetir "Otro".
 export const TIPOS_PROCESO = [...new Set(Object.values(TIPOS_PROCESO_POR_AREA).flat())];
-export const AREAS_PROCESO = ["Civil", "Penal", "Laboral", "Familia", "Comercial", "Administrativo", "Constitucional", "Otro"];
+export const AREAS_PROCESO = ["Civil", "Penal", "Laboral", "Familia", "Comercial", "Administrativo", "Constitucional", "Concursal", "Otro"];
 export const COLOR_AREA_PROCESO = {
   Civil: "#2F80ED",
   Penal: "#DC2626",
@@ -179,6 +186,7 @@ export const COLOR_AREA_PROCESO = {
   Comercial: "#10B981",
   Administrativo: "#0EA5E9",
   Constitucional: "#6B7480",
+  Concursal: "#78350F",
   Otro: "#14B8A6",
 };
 export const DIAS_ALERTA_INACTIVIDAD = 8;
@@ -1242,7 +1250,7 @@ export function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-export const APP_VERSION = "1.130.0";
+export const APP_VERSION = "1.131.0";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -2182,9 +2190,9 @@ const TOOLS_ASISTENTE = [
         tipoProceso: {
           type: "string",
           description:
-            "El trámite específico, ajustado al área del caso — cada área tiene su propia clasificación, no son intercambiables. Civil/Comercial: Ordinario, Verbal, Verbal sumario, Ejecutivo, Declarativo. Penal: Indagación, Imputación, Acusación, Juicio oral, Ejecución de penas. Laboral: Ordinario laboral, Ejecutivo laboral, Fuero sindical. Familia: Divorcio o cesación de efectos civiles, Custodia y alimentos, Sucesión, Verbal. Administrativo: Nulidad y restablecimiento del derecho, Reparación directa, Nulidad simple. Constitucional: Tutela, Acción de cumplimiento, Acción popular, Habeas corpus. Si no encaja en ninguna, usa Otro.",
+            "El trámite específico, ajustado al área del caso — cada área tiene su propia clasificación, no son intercambiables. Civil/Comercial: Ordinario, Verbal, Verbal sumario, Ejecutivo, Declarativo. Penal: Indagación, Imputación, Acusación, Juicio oral, Ejecución de penas. Laboral: Ordinario laboral, Ejecutivo laboral, Fuero sindical. Familia: Divorcio o cesación de efectos civiles, Custodia y alimentos, Sucesión, Verbal. Administrativo: Nulidad y restablecimiento del derecho, Reparación directa, Nulidad simple. Constitucional: Tutela, Acción de cumplimiento, Acción popular, Habeas corpus. Concursal: Reorganización empresarial, Liquidación judicial, Insolvencia de persona natural no comerciante. Si no encaja en ninguna, usa Otro.",
         },
-        areaProceso: { type: "string", description: "Civil, Penal, Laboral, Familia, Comercial, Administrativo, Constitucional u Otro" },
+        areaProceso: { type: "string", description: "Civil, Penal, Laboral, Familia, Comercial, Administrativo, Constitucional, Concursal u Otro" },
         radicado: { type: "string" },
         notas: { type: "string" },
         otras_personas: {
