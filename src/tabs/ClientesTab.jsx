@@ -1330,6 +1330,20 @@ export default function ClientesTab({ usuarioActual, onIrARegistrarPago, onListo
                   <button
                     className="drx-btn-ghost"
                     style={buttonGhost}
+                    title="Copiar solo el código de acceso al portal"
+                    onClick={() => copiar(id, `portal-${id}`)}
+                  >
+                    {copiado === `portal-${id}` ? (
+                      "✓ Copiado"
+                    ) : (
+                      <>
+                        <Icono tipo="portapapeles" size={13} style={{ marginRight: 4, verticalAlign: -2 }} /> Copiar código
+                      </>
+                    )}
+                  </button>
+                  <button
+                    className="drx-btn-ghost"
+                    style={buttonGhost}
                     title="Copiar nombre, teléfono, correo y radicado"
                     onClick={() => {
                       const radicados = radicadosDeCliente(c);
