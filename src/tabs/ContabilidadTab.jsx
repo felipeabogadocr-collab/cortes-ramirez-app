@@ -49,7 +49,7 @@ import {
 // Lista de arranque para un despacho nuevo — cada despacho la puede editar
 // desde Configuración de Contabilidad (agregar/quitar cuentas propias), así
 // que esto ya NO es la lista real de nadie, solo la semilla inicial.
-const MEDIOS_PAGO_DEFECTO = ["Nequi", "Daviplata", "Nu", "Cuenta bancaria", "Llave"];
+const MEDIOS_PAGO_DEFECTO = ["Efectivo", "Efectivo y transacción", "Nequi", "Daviplata", "Nu", "Cuenta bancaria", "Llave"];
 // Paleta genérica para las tarjetas de "Saldo esperado por cuenta" — antes
 // era un color fijo para "Nu" nada más; ahora que cualquier despacho puede
 // tener cualquier cantidad de cuentas propias, se recorre esta lista.

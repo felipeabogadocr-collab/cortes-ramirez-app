@@ -1308,7 +1308,7 @@ export function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-export const APP_VERSION = "1.137.0";
+export const APP_VERSION = "1.138.0";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -2277,7 +2277,7 @@ const TOOLS_ASISTENTE = [
       type: "object",
       properties: {
         nombre_cliente: { type: "string", description: "Nombre del cliente que hizo el pago" },
-        medio_pago: { type: "string", description: "Nequi, Daviplata, Nu, Cuenta bancaria o Llave" },
+        medio_pago: { type: "string", description: "Efectivo, Efectivo y transacción, Nequi, Daviplata, Nu, Cuenta bancaria o Llave" },
         valor: { type: "number", description: "Valor pagado en pesos colombianos" },
         concepto: { type: "string" },
       },
@@ -5761,7 +5761,7 @@ export function useOtrosIngresos() {
 // "cuentasSaldo" es el subconjunto de esas cuentas que se quiere ver en
 // "Saldo esperado por cuenta" (algunas cuentas registradas pueden ser de uso
 // personal, no del despacho, y no tiene sentido calcularles saldo ahí).
-export const MEDIOS_PAGO_POR_DEFECTO = ["Nequi", "Daviplata", "Nu", "Cuenta bancaria", "Llave"];
+export const MEDIOS_PAGO_POR_DEFECTO = ["Efectivo", "Efectivo y transacción", "Nequi", "Daviplata", "Nu", "Cuenta bancaria", "Llave"];
 export function useMediosPago() {
   const [mediosPago, setMediosPagoState] = useState(MEDIOS_PAGO_POR_DEFECTO);
   const [cuentasSaldo, setCuentasSaldoState] = useState(null); // null = todavía no se sabe
