@@ -376,6 +376,16 @@ create policy "administradores renombran su despacho" on despachos
   using (soy_administrador() and id = mi_despacho_id())
   with check (id = mi_despacho_id());
 
+-- Logo y celular propios de cada despacho — antes todos los despachos
+-- (tenants) veían el mismo logo de Cortés Ramírez Abogados incrustado en
+-- la app en sus cuentas de cobro, recibos y contratos. logo_ruta guarda la
+-- ruta dentro del bucket "logos" (ver más abajo); la misma política de
+-- arriba ("administradores renombran su despacho") ya cubre actualizar
+-- estas dos columnas, al ser una política por fila sin restricción de
+-- columna.
+alter table despachos add column if not exists logo_ruta text;
+alter table despachos add column if not exists celular text;
+
 -- Almacenamiento de recibos de pago -----------------------------------------
 -- Antes cada recibo (una imagen generada en canvas) se guardaba completo en
 -- base64 dentro de la fila del cliente — con el tiempo eso llena el límite
@@ -404,6 +414,32 @@ create policy "cada despacho actualiza sus propios recibos" on storage.objects
   for update
   using (bucket_id = 'recibos' and (storage.foldername(name))[1] = mi_despacho_id()::text)
   with check (bucket_id = 'recibos' and (storage.foldername(name))[1] = mi_despacho_id()::text);
+
+-- Almacenamiento del logo del despacho ---------------------------------------
+-- Mismo patrón que "recibos": bucket privado, una carpeta por despacho_id
+-- (un solo archivo "logo.png" adentro). Se usa para las cuentas de cobro,
+-- los recibos de pago y los contratos que genera cada despacho — antes
+-- todos mostraban el mismo logo fijo de Cortés Ramírez Abogados.
+
+insert into storage.buckets (id, name, public)
+values ('logos', 'logos', false)
+on conflict (id) do nothing;
+
+drop policy if exists "cada despacho sube su propio logo" on storage.objects;
+create policy "cada despacho sube su propio logo" on storage.objects
+  for insert
+  with check (bucket_id = 'logos' and (storage.foldername(name))[1] = mi_despacho_id()::text);
+
+drop policy if exists "cada despacho lee su propio logo" on storage.objects;
+create policy "cada despacho lee su propio logo" on storage.objects
+  for select
+  using (bucket_id = 'logos' and (storage.foldername(name))[1] = mi_despacho_id()::text);
+
+drop policy if exists "cada despacho actualiza su propio logo" on storage.objects;
+create policy "cada despacho actualiza su propio logo" on storage.objects
+  for update
+  using (bucket_id = 'logos' and (storage.foldername(name))[1] = mi_despacho_id()::text)
+  with check (bucket_id = 'logos' and (storage.foldername(name))[1] = mi_despacho_id()::text);
 
 -- Reporte de errores del cliente ---------------------------------------------
 -- Antes, si la interfaz se caía con un error inesperado (el ErrorBoundary lo

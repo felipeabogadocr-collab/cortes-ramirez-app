@@ -14,12 +14,28 @@ import { queueSnapshot, getMirror, getPendingSnapshot, setMirror, queueIndexOp, 
 
 let despachoActualId = null;
 let despachoActualNombre = "";
-export function setDespachoActual(id, nombre) {
+let despachoActualLogoRuta = null;
+let despachoActualCelular = "";
+export function setDespachoActual(id, nombre, logoRuta, celular) {
   despachoActualId = id || null;
   despachoActualNombre = nombre || "";
+  despachoActualLogoRuta = logoRuta || null;
+  despachoActualCelular = celular || "";
 }
 export function getDespachoActualId() {
   return despachoActualId;
+}
+export function getLogoRutaDespacho() {
+  return despachoActualLogoRuta;
+}
+export function setLogoRutaDespachoLocal(ruta) {
+  despachoActualLogoRuta = ruta || null;
+}
+export function getCelularDespacho() {
+  return despachoActualCelular;
+}
+export function setCelularDespachoLocal(celular) {
+  despachoActualCelular = celular || "";
 }
 
 // Recibos de pago (imágenes generadas en canvas) --------------------------
@@ -42,6 +58,31 @@ export async function obtenerUrlReciboImagen(ruta) {
   const { data, error } = await supabase.storage.from("recibos").download(ruta);
   if (error) throw error;
   return URL.createObjectURL(data);
+}
+
+// Logo del despacho ---------------------------------------------------------
+// Cada despacho (tenant) puede subir su propio logo para que aparezca en
+// SUS cuentas de cobro, recibos y contratos — antes todos los despachos
+// veían el mismo logo de Cortés Ramírez Abogados incrustado en la app,
+// cosa que no tenía sentido para un despacho distinto usando Nomos. Mismo
+// patrón que "recibos"/"avatares": bucket privado, una carpeta por
+// despacho_id, siempre se sube como PNG (el archivo que suba el usuario,
+// sea cual sea su formato original, se convierte a PNG en el navegador
+// antes de llegar aquí — ver convertirImagenAPngBlob en App.jsx).
+
+export async function subirLogoDespacho(blob) {
+  if (!despachoActualId) throw new Error("Sin despacho activo");
+  const ruta = `${despachoActualId}/logo.png`;
+  const { error } = await supabase.storage.from("logos").upload(ruta, blob, { contentType: "image/png", upsert: true });
+  if (error) throw error;
+  return ruta;
+}
+
+export async function descargarLogoDespachoBlob(ruta) {
+  if (!ruta) return null;
+  const { data, error } = await supabase.storage.from("logos").download(ruta);
+  if (error) throw error;
+  return data;
 }
 
 // Foto de perfil de un usuario — mismo patrón que los recibos: se sube al

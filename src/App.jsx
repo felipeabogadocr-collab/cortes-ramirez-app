@@ -94,28 +94,76 @@ export const LOGO_SRC = logoNomosUrl;
 // vez de un string base64 de ~76KB incrustado en este archivo — antes se
 // descargaba y parseaba ese texto en CADA carga de la app, aunque nadie
 // mirara nunca un PDF o Word ese día. LOGO_SRC (el WebP liviano, una URL
-// normal cacheable por el navegador) sirve tal cual para <img src=...> y
-// para cargar en un <canvas> (el recibo de pago). Donde sí hace falta el
-// base64 completo de verdad (jsPDF.addImage, ImageRun de docx — ambos lo
-// piden de forma síncrona) se usa obtenerLogoBase64(), que trae el PNG
-// original (no el WebP: docx no soporta ese formato) una sola vez con
-// fetch() y lo deja en caché en memoria para las siguientes veces.
-let logoBase64Promise = null;
+// normal cacheable por el navegador) sirve tal cual para <img src=...>.
+// Donde sí hace falta el base64 completo de verdad (jsPDF.addImage,
+// ImageRun de docx, el canvas del recibo de pago — los tres lo piden de
+// forma síncrona o ya decodificado) se usa obtenerLogoBase64(). Primero
+// intenta el logo PROPIO del despacho (subido desde "Mi despacho"), y si
+// el despacho no tiene uno todavía, cae al logo de Nomos — así cada
+// despacho ve su propia marca en sus cuentas de cobro, recibos y
+// contratos, en vez del mismo logo fijo para todos. Se cachea en memoria
+// por ruta de logo, para no volver a descargarlo en cada documento que se
+// genera; limpiarCacheLogoDespacho() se llama justo después de subir uno
+// nuevo para que el siguiente documento ya use el actualizado.
+function blobADataUrl(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+let logoBase64Cache = { ruta: undefined, promise: null };
+export function limpiarCacheLogoDespacho() {
+  logoBase64Cache = { ruta: undefined, promise: null };
+}
 export function obtenerLogoBase64() {
-  if (!logoBase64Promise) {
-    logoBase64Promise = fetch(logoNomosDocUrl)
-      .then((r) => r.blob())
-      .then(
-        (blob) =>
-          new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result);
-            reader.onerror = reject;
-            reader.readAsDataURL(blob);
-          })
-      );
-  }
-  return logoBase64Promise;
+  const ruta = getLogoRutaDespacho();
+  if (logoBase64Cache.ruta === ruta && logoBase64Cache.promise) return logoBase64Cache.promise;
+  const promise = (async () => {
+    if (ruta) {
+      try {
+        const blob = await descargarLogoDespachoBlob(ruta);
+        if (blob) return await blobADataUrl(blob);
+      } catch (e) {
+        console.warn("No se pudo cargar el logo del despacho, se usa el de Nomos:", e);
+      }
+    }
+    const blob = await fetch(logoNomosDocUrl).then((r) => r.blob());
+    return await blobADataUrl(blob);
+  })();
+  logoBase64Cache = { ruta, promise };
+  return promise;
+}
+
+// Convierte cualquier imagen que el navegador pueda decodificar (PNG, JPG,
+// WEBP, GIF, BMP...) a un PNG real, dibujándola en un <canvas> — así el
+// logo que suba cada despacho sirve igual en el recibo (canvas), en el PDF
+// (jsPDF) y en el Word (docx, que no soporta WEBP ni la mayoría de
+// formatos). SVG queda afuera a propósito, igual que en las fotos de
+// perfil (archivoEsImagenValida): puede traer <script> adentro.
+export function convertirImagenAPngBlob(file) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(img, 0, 0);
+      canvas.toBlob((blob) => {
+        URL.revokeObjectURL(url);
+        if (blob) resolve(blob);
+        else reject(new Error("No se pudo convertir la imagen"));
+      }, "image/png");
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("Archivo de imagen inválido"));
+    };
+    img.src = url;
+  });
 }
 
 
@@ -578,7 +626,11 @@ export function generarReciboImagen(clienteId, cliente, pago) {
       dibujarResto(logoImg);
     };
     logoImg.onerror = () => dibujarResto(null);
-    logoImg.src = LOGO_SRC;
+    obtenerLogoBase64()
+      .then((src) => {
+        logoImg.src = src;
+      })
+      .catch(() => dibujarResto(null));
   });
 }
 
@@ -617,6 +669,10 @@ import {
   setDespachoActual,
   getDespachoActualId,
   getNombreDespacho,
+  getLogoRutaDespacho,
+  setLogoRutaDespachoLocal,
+  getCelularDespacho,
+  setCelularDespachoLocal,
   buscarGlobal,
   obtenerPapelera,
   restaurarDePapelera,
@@ -632,6 +688,8 @@ import {
   obtenerUrlReciboImagen,
   subirFotoPerfil,
   obtenerUrlFotoPerfil,
+  subirLogoDespacho,
+  descargarLogoDespachoBlob,
   obtenerClientesPorId,
   obtenerValoresPorClaves,
   obtenerDocumentosPorId,
@@ -1250,7 +1308,7 @@ export function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-export const APP_VERSION = "1.136.0";
+export const APP_VERSION = "1.137.0";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -6062,6 +6120,277 @@ function PanelSeguridad2FA({ onCerrar }) {
   );
 }
 
+// "Mi despacho": el perfil del despacho completo (no solo del usuario que
+// entró) — nombre, celular y logo propio, más quiénes son los abogados del
+// equipo. Se abre al hacer clic en la foto/nombre de abajo del menú, en vez
+// de que ese clic dispare directo el selector de archivos para la foto
+// personal (eso ahora vive adentro, como una fila más). El logo es lo que
+// resuelve que cada despacho (tenant) vea SU propia marca en las cuentas de
+// cobro, los recibos y los contratos que genera — antes todos veían el
+// mismo logo fijo de Cortés Ramírez Abogados.
+function PanelMiDespacho({ usuarioActual, fotoPerfilUrl, subiendoFotoPerfil, cambiarFotoPerfil, onCerrar, onDespachoRenombrado }) {
+  const panelRef = useRef(null);
+  const esAdmin = usuarioActual.rol === "Administrador";
+  const { usuarios: usuariosDespacho } = useUsuariosDespacho();
+  const abogados = usuariosDespacho.filter((u) => u.rol === "Abogado" || u.rol === "Administrador");
+
+  const [nombreEdit, setNombreEdit] = useState(getNombreDespacho());
+  const [editandoNombre, setEditandoNombre] = useState(false);
+  const [guardandoNombre, setGuardandoNombre] = useState(false);
+
+  const [celularEdit, setCelularEdit] = useState(getCelularDespacho());
+  const [editandoCelular, setEditandoCelular] = useState(false);
+  const [guardandoCelular, setGuardandoCelular] = useState(false);
+
+  const [logoUrl, setLogoUrl] = useState("");
+  const [subiendoLogo, setSubiendoLogo] = useState(false);
+  const [errorLogo, setErrorLogo] = useState("");
+
+  useEffect(() => {
+    let cancelado = false;
+    let urlCreada = null;
+    const ruta = getLogoRutaDespacho();
+    if (!ruta) return;
+    descargarLogoDespachoBlob(ruta)
+      .then((blob) => {
+        if (cancelado || !blob) return;
+        urlCreada = URL.createObjectURL(blob);
+        setLogoUrl(urlCreada);
+      })
+      .catch(() => {});
+    return () => {
+      cancelado = true;
+      if (urlCreada) URL.revokeObjectURL(urlCreada);
+    };
+  }, []);
+
+  useEffect(() => {
+    const alPresionarTecla = (e) => {
+      if (e.key === "Escape") onCerrar();
+    };
+    const alHacerClicAfuera = (e) => {
+      if (panelRef.current && !panelRef.current.contains(e.target)) onCerrar();
+    };
+    document.addEventListener("keydown", alPresionarTecla);
+    document.addEventListener("mousedown", alHacerClicAfuera);
+    return () => {
+      document.removeEventListener("keydown", alPresionarTecla);
+      document.removeEventListener("mousedown", alHacerClicAfuera);
+    };
+  }, [onCerrar]);
+
+  const guardarNombre = async () => {
+    if (!nombreEdit.trim()) return;
+    setGuardandoNombre(true);
+    const { error } = await supabase.from("despachos").update({ nombre: nombreEdit.trim() }).eq("id", usuarioActual.despacho_id);
+    setGuardandoNombre(false);
+    if (!error) {
+      setDespachoActual(getDespachoActualId(), nombreEdit.trim(), getLogoRutaDespacho(), getCelularDespacho());
+      onDespachoRenombrado?.(nombreEdit.trim());
+      setEditandoNombre(false);
+    }
+  };
+
+  const guardarCelular = async () => {
+    setGuardandoCelular(true);
+    const { error } = await supabase.from("despachos").update({ celular: celularEdit.trim() }).eq("id", usuarioActual.despacho_id);
+    setGuardandoCelular(false);
+    if (!error) {
+      setCelularDespachoLocal(celularEdit.trim());
+      setEditandoCelular(false);
+    }
+  };
+
+  const cambiarLogo = async (e) => {
+    const archivo = e.target.files?.[0];
+    e.target.value = "";
+    if (!archivo) return;
+    if (archivoDemasiadoGrande(archivo)) {
+      setErrorLogo(`El logo no puede pesar más de ${TAMANO_MAX_ARCHIVO_MB} MB.`);
+      return;
+    }
+    if (!(await archivoEsImagenValida(archivo))) {
+      setErrorLogo("Ese archivo no es una imagen válida (o es un formato no admitido, como SVG). Prueba con un JPG, PNG o WEBP.");
+      return;
+    }
+    setErrorLogo("");
+    setSubiendoLogo(true);
+    try {
+      const png = await convertirImagenAPngBlob(archivo);
+      const ruta = await subirLogoDespacho(png);
+      const { error } = await supabase.from("despachos").update({ logo_ruta: ruta }).eq("id", usuarioActual.despacho_id);
+      if (error) throw error;
+      setLogoRutaDespachoLocal(ruta);
+      limpiarCacheLogoDespacho();
+      setLogoUrl(URL.createObjectURL(png));
+    } catch (err) {
+      setErrorLogo("No se pudo actualizar el logo. Intenta de nuevo.");
+    }
+    setSubiendoLogo(false);
+  };
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(6,14,28,0.55)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+      <div
+        ref={panelRef}
+        className="drx-dropdown-in"
+        style={{
+          background: COLORS.panel, borderRadius: 16, border: `1px solid ${COLORS.border}`, width: 460, maxWidth: "100%",
+          maxHeight: "85vh", overflowY: "auto", boxShadow: "0 20px 50px rgba(11,61,46,0.25)", padding: 24,
+        }}
+      >
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 17, fontWeight: 800, color: COLORS.headingText, margin: 0, display: "flex", alignItems: "center", gap: 8 }}>
+            <Icono tipo="edificio" size={18} /> Mi despacho
+          </p>
+          <button onClick={onCerrar} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: COLORS.muted }}>
+            ✕
+          </button>
+        </div>
+
+        <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 18 }}>
+          <label
+            title={esAdmin ? "Cambiar el logo del despacho" : "Solo el Administrador puede cambiarlo"}
+            style={{
+              width: 64, height: 64, borderRadius: 12, flexShrink: 0, border: `1px solid ${COLORS.border}`, background: COLORS.surfaceSoft,
+              display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden",
+              cursor: esAdmin ? (subiendoLogo ? "wait" : "pointer") : "default", opacity: subiendoLogo ? 0.6 : 1,
+            }}
+          >
+            {logoUrl ? (
+              <img src={logoUrl} alt="Logo del despacho" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+            ) : (
+              <Icono tipo="imagen" size={22} style={{ color: COLORS.muted }} />
+            )}
+            {esAdmin && <input type="file" accept="image/*" onChange={cambiarLogo} disabled={subiendoLogo} style={{ display: "none" }} />}
+          </label>
+          <div>
+            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, fontWeight: 700, color: COLORS.headingText, margin: 0 }}>Logo del despacho</p>
+            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, color: COLORS.muted, margin: "3px 0 0", lineHeight: 1.4 }}>
+              {esAdmin
+                ? "Aparece en tus cuentas de cobro, recibos y contratos. Sube cualquier formato (JPG, PNG, WEBP...) — Nomos lo ajusta solo."
+                : "Solo el Administrador puede cambiarlo."}
+            </p>
+          </div>
+        </div>
+        {errorLogo && (
+          <p style={{ color: "#B42318", fontSize: 12.5, marginTop: -10, marginBottom: 14, fontFamily: "Inter, sans-serif" }}>{errorLogo}</p>
+        )}
+
+        <div style={{ marginBottom: 14 }}>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, fontWeight: 700, color: COLORS.muted, textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 6 }}>
+            Nombre completo de la firma
+          </p>
+          {editandoNombre ? (
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <input className="drx-input" style={{ ...inputStyle, flex: 1, minWidth: 160 }} value={nombreEdit} onChange={(e) => setNombreEdit(e.target.value)} autoFocus />
+              <button className="drx-btn-primary" style={{ ...buttonPrimary, padding: "8px 14px" }} onClick={guardarNombre} disabled={guardandoNombre || !nombreEdit.trim()}>
+                {guardandoNombre ? "..." : "Guardar"}
+              </button>
+              <button
+                className="drx-btn-ghost"
+                style={{ ...buttonGhost, padding: "8px 14px" }}
+                onClick={() => {
+                  setNombreEdit(getNombreDespacho());
+                  setEditandoNombre(false);
+                }}
+              >
+                Cancelar
+              </button>
+            </div>
+          ) : (
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+              <p style={{ fontFamily: "Inter, sans-serif", fontSize: 14.5, fontWeight: 700, color: COLORS.ink, margin: 0 }}>{getNombreDespacho()}</p>
+              {esAdmin && (
+                <button onClick={() => setEditandoNombre(true)} style={{ background: "none", border: "none", color: COLORS.accentBright, fontSize: 12, cursor: "pointer", fontFamily: "Inter, sans-serif", fontWeight: 600 }}>
+                  Editar
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+
+        <div style={{ marginBottom: 18 }}>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, fontWeight: 700, color: COLORS.muted, textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 6 }}>
+            Número celular
+          </p>
+          {editandoCelular ? (
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <input
+                className="drx-input"
+                style={{ ...inputStyle, flex: 1, minWidth: 160 }}
+                value={celularEdit}
+                onChange={(e) => setCelularEdit(e.target.value)}
+                placeholder="Ej: 3001234567"
+                autoFocus
+              />
+              <button className="drx-btn-primary" style={{ ...buttonPrimary, padding: "8px 14px" }} onClick={guardarCelular} disabled={guardandoCelular}>
+                {guardandoCelular ? "..." : "Guardar"}
+              </button>
+              <button
+                className="drx-btn-ghost"
+                style={{ ...buttonGhost, padding: "8px 14px" }}
+                onClick={() => {
+                  setCelularEdit(getCelularDespacho());
+                  setEditandoCelular(false);
+                }}
+              >
+                Cancelar
+              </button>
+            </div>
+          ) : (
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+              <p style={{ fontFamily: "Inter, sans-serif", fontSize: 14.5, fontWeight: 700, color: celularEdit ? COLORS.ink : COLORS.muted, margin: 0 }}>
+                {celularEdit || "Sin registrar"}
+              </p>
+              {esAdmin && (
+                <button onClick={() => setEditandoCelular(true)} style={{ background: "none", border: "none", color: COLORS.accentBright, fontSize: 12, cursor: "pointer", fontFamily: "Inter, sans-serif", fontWeight: 600 }}>
+                  Editar
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+
+        <div style={{ marginBottom: 18 }}>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, fontWeight: 700, color: COLORS.muted, textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 8 }}>
+            Abogados del equipo
+          </p>
+          {abogados.length === 0 ? (
+            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.muted, margin: 0 }}>
+              Aún no hay abogados registrados — se agregan desde "Usuarios y permisos".
+            </p>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {abogados.map((a) => (
+                <div key={a.id} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <AvatarIniciales nombre={a.nombre} size={28} />
+                  <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.ink, margin: 0 }}>
+                    {a.nombre} <span style={{ color: COLORS.muted, fontSize: 11.5 }}>· {a.rol}</span>
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div style={{ borderTop: `1px solid ${COLORS.border}`, paddingTop: 16, display: "flex", alignItems: "center", gap: 10 }}>
+          <label title="Cambiar tu foto de perfil" style={{ position: "relative", cursor: subiendoFotoPerfil ? "wait" : "pointer", display: "flex", opacity: subiendoFotoPerfil ? 0.6 : 1 }}>
+            <AvatarIniciales nombre={usuarioActual.nombre} size={36} fotoUrl={fotoPerfilUrl} />
+            <input type="file" accept="image/*" onChange={cambiarFotoPerfil} disabled={subiendoFotoPerfil} style={{ display: "none" }} />
+          </label>
+          <div>
+            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, fontWeight: 700, color: COLORS.ink, margin: 0 }}>{usuarioActual.nombre}</p>
+            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, color: COLORS.muted, margin: "2px 0 0" }}>
+              {subiendoFotoPerfil ? "Subiendo..." : "Clic en tu foto para cambiarla"}
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ModalNotificaciones({
   firmasNuevas,
   clientesInactivos,
@@ -8187,6 +8516,7 @@ function App() {
   const [mostrarNotificaciones, setMostrarNotificaciones] = useState(false);
   const [sidebarMovilAbierta, setSidebarMovilAbierta] = useState(false);
   const [mostrarSeguridad2FA, setMostrarSeguridad2FA] = useState(false);
+  const [mostrarMiDespacho, setMostrarMiDespacho] = useState(false);
   const [fotoPerfilUrl, setFotoPerfilUrl] = useState("");
   const [subiendoFotoPerfil, setSubiendoFotoPerfil] = useState(false);
   // Atajo directo desde la tarjeta de un cliente en Clientes hasta el
@@ -8307,7 +8637,7 @@ function App() {
     }
     const { data: perfil, error: errorPerfil } = await supabase
       .from("perfiles")
-      .select("*, despachos(nombre, activo, prueba_hasta, pago_reportado_en)")
+      .select("*, despachos(nombre, activo, prueba_hasta, pago_reportado_en, logo_ruta, celular)")
       .eq("id", user.id)
       .maybeSingle();
     if (errorPerfil) {
@@ -8332,7 +8662,7 @@ function App() {
       setUsuarioActual(null);
       return;
     }
-    setDespachoActual(perfil?.despacho_id || null, perfil?.despachos?.nombre || "");
+    setDespachoActual(perfil?.despacho_id || null, perfil?.despachos?.nombre || "", perfil?.despachos?.logo_ruta || null, perfil?.despachos?.celular || "");
     if (perfil?.despacho_id) iniciarSincronizacionOffline();
     // Un despacho nace "activo" con una demo de 3 horas (prueba_hasta) — si
     // esa fecha ya pasó y nadie lo activó de verdad (lo que limpia
@@ -8683,19 +9013,21 @@ function App() {
         </div>
 
         <div style={{ borderTop: "1px solid #3A5A82", paddingTop: 14, marginTop: 14 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
-            <label
-              title="Cambiar foto de perfil"
-              style={{ position: "relative", cursor: subiendoFotoPerfil ? "wait" : "pointer", display: "flex", opacity: subiendoFotoPerfil ? 0.6 : 1 }}
-            >
-              <AvatarIniciales nombre={usuarioActual.nombre} fotoUrl={fotoPerfilUrl} />
-              <input type="file" accept="image/*" onChange={cambiarFotoPerfil} disabled={subiendoFotoPerfil} style={{ display: "none" }} />
-            </label>
+          <button
+            onClick={() => setMostrarMiDespacho(true)}
+            title="Ver mi perfil"
+            style={{
+              background: "none", border: "none", padding: 0, cursor: "pointer", textAlign: "left",
+              display: "flex", alignItems: "center", gap: 10, marginBottom: 10, width: "100%",
+            }}
+          >
+            <AvatarIniciales nombre={usuarioActual.nombre} fotoUrl={fotoPerfilUrl} />
             <div>
-              <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: "#FFFFFF", fontWeight: 700, margin: 0 }}>{usuarioActual.nombre}</p>
+              <p style={{ fontFamily: "Inter, sans-serif", fontSize: 10.5, fontWeight: 700, color: "#9FB6D6", textTransform: "uppercase", letterSpacing: 0.4, margin: 0 }}>Mi perfil</p>
+              <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: "#FFFFFF", fontWeight: 700, margin: "1px 0 0" }}>{usuarioActual.nombre}</p>
               <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11, color: "#9FB6D6", margin: 0 }}>{usuarioActual.rol}</p>
             </div>
-          </div>
+          </button>
           <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
             <button
               onClick={() => setCambiandoUsuario(true)}
@@ -8719,6 +9051,16 @@ function App() {
         </div>
       </div>
       {mostrarSeguridad2FA && <PanelSeguridad2FA onCerrar={() => setMostrarSeguridad2FA(false)} />}
+      {mostrarMiDespacho && (
+        <PanelMiDespacho
+          usuarioActual={usuarioActual}
+          fotoPerfilUrl={fotoPerfilUrl}
+          subiendoFotoPerfil={subiendoFotoPerfil}
+          cambiarFotoPerfil={cambiarFotoPerfil}
+          onCerrar={() => setMostrarMiDespacho(false)}
+          onDespachoRenombrado={(nuevoNombre) => setUsuarioActual((prev) => (prev ? { ...prev, despachoNombre: nuevoNombre } : prev))}
+        />
+      )}
 
       <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", position: "relative", zIndex: 1 }}>
         <div
