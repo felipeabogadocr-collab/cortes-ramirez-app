@@ -1,3 +1,5 @@
+import { IconLock, IconCheck } from "./Icons.jsx";
+
 export default function PrivacyNotice({ style }) {
   return (
     <div
@@ -14,11 +16,16 @@ export default function PrivacyNotice({ style }) {
         ...style,
       }}
     >
-      <span style={{ fontSize: 16 }}>🔒</span>
+      <span style={{ color: "var(--accent)", flexShrink: 0 }}>
+        <IconLock size={18} />
+      </span>
       <span>
-        <strong style={{ color: "var(--text)" }}>Tus archivos no se almacenan.</strong> Todo el
-        procesamiento ocurre en tu propio navegador; los archivos se eliminan de la memoria
-        inmediatamente al cerrar o cambiar de herramienta. Nunca se suben a ningún servidor.
+        <strong style={{ color: "var(--text)", display: "inline-flex", alignItems: "center", gap: 4 }}>
+          <IconCheck size={13} /> 100% privado: tus archivos no se almacenan.
+        </strong>{" "}
+        Todo el procesamiento ocurre en tu propio navegador; los archivos se eliminan de la
+        memoria inmediatamente al cerrar o cambiar de herramienta. Nunca se suben a ningún
+        servidor.
       </span>
     </div>
   );
