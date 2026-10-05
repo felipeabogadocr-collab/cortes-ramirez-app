@@ -7,7 +7,7 @@ import {
   AREAS_PROCESO, COLOR_AREA_PROCESO, DIAS_ALERTA_INACTIVIDAD, numeroWhatsappCliente,
   radicadosDeCliente, tiposProcesoDeArea, useServicios, calcularProximaFechaPorFrecuencia,
   fechaHoyISO, formatoCOP, leerJSONLocal, guardarJSONLocal, useReferenciadores, useAbogadosAsociados,
-  useValorConRetraso, SelectorComision,
+  useValorConRetraso, SelectorComision, permisosPorDefecto,
 } from "../App.jsx";
 
 // Enlace oficial de la Fiscalía para consultar el estado de una denuncia en
@@ -444,6 +444,7 @@ export default function ClientesTab({ usuarioActual, onIrARegistrarPago, onListo
   const [filtro, setFiltro] = useState("");
   const [copiado, setCopiado] = useState("");
   const [orden, setOrden] = useState("recientes");
+  const puedeVerDinero = (usuarioActual.permisos || permisosPorDefecto(usuarioActual.rol)).contabilidad !== false;
   useAvisoAntesDeSalir(showForm && !!form.nombre.trim());
   // Si cierran la pestaña (o la app) a medio llenar el formulario de un
   // cliente nuevo, sin esto ese trabajo se perdía por completo. Se guarda
@@ -766,7 +767,7 @@ export default function ClientesTab({ usuarioActual, onIrARegistrarPago, onListo
                   { titulo: "Juzgado actual", valor: (id) => clientes[id]?.juzgadoActual },
                   { titulo: "Tipo de proceso", valor: (id) => clientes[id]?.tipoProceso },
                   { titulo: "Área", valor: (id) => clientes[id]?.areaProceso },
-                  { titulo: "Valor total acordado", valor: (id) => clientes[id]?.valorTotal },
+                  ...(puedeVerDinero ? [{ titulo: "Valor total acordado", valor: (id) => clientes[id]?.valorTotal }] : []),
                   { titulo: "Notas", valor: (id) => clientes[id]?.notas },
                   { titulo: "Paga (si es distinto al cliente)", valor: (id) => clientes[id]?.pagador?.nombre || "" },
                 ],
@@ -893,7 +894,13 @@ export default function ClientesTab({ usuarioActual, onIrARegistrarPago, onListo
             </p>
           </div>
           <SelectorPagador pagador={form.pagador} onChange={(pagador) => setForm({ ...form, pagador })} />
-          <PlanDePago planPago={form.planPago} onChange={(planPago) => setForm({ ...form, planPago })} />
+          {puedeVerDinero ? (
+            <PlanDePago planPago={form.planPago} onChange={(planPago) => setForm({ ...form, planPago })} />
+          ) : (
+            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.muted, margin: "14px 0" }}>
+              El plan de pago se configura desde Contabilidad — no tienes acceso a esa sección.
+            </p>
+          )}
           <SelectorComision
             titulo="¿Alguien refirió a este cliente? (comisión)"
             contactosHook={useReferenciadores}
@@ -1032,7 +1039,13 @@ export default function ClientesTab({ usuarioActual, onIrARegistrarPago, onListo
                   </Field>
                 </div>
                 <SelectorPagador pagador={formEdicion.pagador} onChange={(pagador) => setFormEdicion({ ...formEdicion, pagador })} />
-                <PlanDePago planPago={formEdicion.planPago} onChange={(planPago) => setFormEdicion({ ...formEdicion, planPago })} />
+                {puedeVerDinero ? (
+                  <PlanDePago planPago={formEdicion.planPago} onChange={(planPago) => setFormEdicion({ ...formEdicion, planPago })} />
+                ) : (
+                  <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.muted, margin: "14px 0" }}>
+                    El plan de pago se configura desde Contabilidad — no tienes acceso a esa sección.
+                  </p>
+                )}
                 <SelectorComision
                   titulo="¿Alguien refirió a este cliente? (comisión)"
                   contactosHook={useReferenciadores}
