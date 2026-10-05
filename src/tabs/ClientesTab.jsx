@@ -444,6 +444,8 @@ export default function ClientesTab({ usuarioActual, onIrARegistrarPago, onListo
   const [filtro, setFiltro] = useState("");
   const [copiado, setCopiado] = useState("");
   const [orden, setOrden] = useState("recientes");
+  const [tipoProcesoLibre, setTipoProcesoLibre] = useState(false);
+  const [tipoProcesoLibreEdicion, setTipoProcesoLibreEdicion] = useState(false);
   const puedeVerDinero = (usuarioActual.permisos || permisosPorDefecto(usuarioActual.rol)).contabilidad !== false;
   useAvisoAntesDeSalir(showForm && !!form.nombre.trim());
   // Si cierran la pestaña (o la app) a medio llenar el formulario de un
@@ -517,6 +519,7 @@ export default function ClientesTab({ usuarioActual, onIrARegistrarPago, onListo
     guardarJSONLocal(LLAVE_BORRADOR_CLIENTE, null);
     setBorradorDisponible(null);
     setForm(FORM_CLIENTE_INICIAL);
+    setTipoProcesoLibre(false);
     setShowForm(false);
   };
 
@@ -533,6 +536,7 @@ export default function ClientesTab({ usuarioActual, onIrARegistrarPago, onListo
 
   const empezarEdicion = (id) => {
     setEditandoId(id);
+    setTipoProcesoLibreEdicion(false);
     // Los clientes creados antes de que existiera "radicados" solo tienen
     // "radicado" (un único valor) — radicadosDeCliente lo convierte en una
     // lista de un elemento para que el editor de radicados tenga algo con
@@ -835,6 +839,7 @@ export default function ClientesTab({ usuarioActual, onIrARegistrarPago, onListo
                 value={form.areaProceso}
                 onChange={(e) => {
                   const areaProceso = e.target.value;
+                  setTipoProcesoLibre(false);
                   setForm({ ...form, areaProceso, tipoProceso: tiposProcesoDeArea(areaProceso)[0] });
                 }}
               >
@@ -846,13 +851,36 @@ export default function ClientesTab({ usuarioActual, onIrARegistrarPago, onListo
               </select>
             </Field>
             <Field label="Tipo de proceso">
-              <select className="drx-input" style={inputStyle} value={form.tipoProceso} onChange={(e) => setForm({ ...form, tipoProceso: e.target.value })}>
-                {tiposProcesoDeArea(form.areaProceso).map((t) => (
-                  <option key={t} value={t}>
-                    {t}
-                  </option>
-                ))}
-              </select>
+              {tipoProcesoLibre ? (
+                <input
+                  className="drx-input"
+                  style={inputStyle}
+                  value={form.tipoProceso}
+                  onChange={(e) => setForm({ ...form, tipoProceso: e.target.value })}
+                  placeholder="Escribe el tipo de proceso"
+                  autoFocus
+                />
+              ) : (
+                <select
+                  className="drx-input"
+                  style={inputStyle}
+                  value={form.tipoProceso}
+                  onChange={(e) => {
+                    if (e.target.value === "Otro") {
+                      setTipoProcesoLibre(true);
+                      setForm({ ...form, tipoProceso: "" });
+                    } else {
+                      setForm({ ...form, tipoProceso: e.target.value });
+                    }
+                  }}
+                >
+                  {tiposProcesoDeArea(form.areaProceso).map((t) => (
+                    <option key={t} value={t}>
+                      {t}
+                    </option>
+                  ))}
+                </select>
+              )}
             </Field>
             <Field label="Valor total acordado (opcional)">
               <CampoDinero
@@ -968,6 +996,7 @@ export default function ClientesTab({ usuarioActual, onIrARegistrarPago, onListo
                       value={formEdicion.areaProceso || AREAS_PROCESO[0]}
                       onChange={(e) => {
                         const areaProceso = e.target.value;
+                        setTipoProcesoLibreEdicion(false);
                         setFormEdicion({ ...formEdicion, areaProceso, tipoProceso: tiposProcesoDeArea(areaProceso)[0] });
                       }}
                     >
@@ -979,24 +1008,47 @@ export default function ClientesTab({ usuarioActual, onIrARegistrarPago, onListo
                     </select>
                   </Field>
                   <Field label="Tipo de proceso">
-                    {(() => {
-                      // Un cliente creado antes de que el tipo dependiera del
-                      // área puede tener guardado un tipo que ya no aparece
-                      // en la lista de su área actual — se incluye igual para
-                      // no cambiarle el dato sin que el usuario lo pida.
-                      const opciones = tiposProcesoDeArea(formEdicion.areaProceso || AREAS_PROCESO[0]);
-                      const valorActual = formEdicion.tipoProceso || opciones[0];
-                      const listaCompleta = opciones.includes(valorActual) ? opciones : [valorActual, ...opciones];
-                      return (
-                        <select className="drx-input" style={inputStyle} value={valorActual} onChange={(e) => setFormEdicion({ ...formEdicion, tipoProceso: e.target.value })}>
-                          {listaCompleta.map((t) => (
-                            <option key={t} value={t}>
-                              {t}
-                            </option>
-                          ))}
-                        </select>
-                      );
-                    })()}
+                    {tipoProcesoLibreEdicion ? (
+                      <input
+                        className="drx-input"
+                        style={inputStyle}
+                        value={formEdicion.tipoProceso || ""}
+                        onChange={(e) => setFormEdicion({ ...formEdicion, tipoProceso: e.target.value })}
+                        placeholder="Escribe el tipo de proceso"
+                        autoFocus
+                      />
+                    ) : (
+                      (() => {
+                        // Un cliente creado antes de que el tipo dependiera del
+                        // área puede tener guardado un tipo que ya no aparece
+                        // en la lista de su área actual — se incluye igual para
+                        // no cambiarle el dato sin que el usuario lo pida.
+                        const opciones = tiposProcesoDeArea(formEdicion.areaProceso || AREAS_PROCESO[0]);
+                        const valorActual = formEdicion.tipoProceso || opciones[0];
+                        const listaCompleta = opciones.includes(valorActual) ? opciones : [valorActual, ...opciones];
+                        return (
+                          <select
+                            className="drx-input"
+                            style={inputStyle}
+                            value={valorActual}
+                            onChange={(e) => {
+                              if (e.target.value === "Otro") {
+                                setTipoProcesoLibreEdicion(true);
+                                setFormEdicion({ ...formEdicion, tipoProceso: "" });
+                              } else {
+                                setFormEdicion({ ...formEdicion, tipoProceso: e.target.value });
+                              }
+                            }}
+                          >
+                            {listaCompleta.map((t) => (
+                              <option key={t} value={t}>
+                                {t}
+                              </option>
+                            ))}
+                          </select>
+                        );
+                      })()
+                    )}
                   </Field>
                   <Field label="Valor total acordado (opcional)">
                     <CampoDinero
