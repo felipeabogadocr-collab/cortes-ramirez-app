@@ -18,6 +18,65 @@ import {
 // mano en un clic, no una consulta automática como la de la Rama Judicial.
 const URL_CONSULTA_SPOA = "https://www.fiscalia.gov.co/servicios-de-informacion-al-ciudadano/consultas/";
 
+// SAMAI (Consejo de Estado) y TyBA/Justicia XXI (juzgados y tribunales que
+// todavía no reportan a la Consulta Unificada) son, igual que la Fiscalía,
+// consultas públicas sin API oficial — por eso siguen el mismo patrón
+// "manual": un acceso directo para que el abogado la revise con un clic, y
+// un comparador que detecta si lo que pegó es distinto a lo último
+// registrado, en vez de intentar automatizar una consulta que el propio
+// portal no ofrece como servicio.
+const URL_SAMAI = "https://samai.consejodeestado.gov.co/Vistas/Casos/procesos.aspx";
+const URL_TYBA = "https://procesojudicial.ramajudicial.gov.co/Justicia21/Inicio.aspx";
+
+const FUENTES_ADICIONALES = [
+  {
+    id: "samai",
+    nombre: "SAMAI (Consejo de Estado)",
+    url: URL_SAMAI,
+    campoEstado: "samaiPorRadicado",
+    color: "#1D4ED8",
+    bg: "#EFF6FF",
+    aplica: (c) => c?.areaProceso === "Administrativo",
+    ayuda: "Busca por número de radicado, clase de proceso o nombre de las partes. Consulta pública del Consejo de Estado, sin registro.",
+  },
+  {
+    id: "tyba",
+    nombre: "TyBA / Justicia XXI",
+    url: URL_TYBA,
+    campoEstado: "tybaPorRadicado",
+    color: "#7C3AED",
+    bg: "#F5F3FF",
+    aplica: () => true,
+    ayuda: "Útil cuando el proceso todavía no aparece en la Rama Judicial Unificada — algunos juzgados y tribunales reportan primero aquí.",
+  },
+];
+
+function estadoFuenteExtraPorRadicado(cliente, radicado, campoEstado) {
+  return (cliente?.[campoEstado] || {})[radicado] || null;
+}
+
+// Un enlace directo por área de proceso a la norma que más se consulta en
+// ese tipo de caso — para no tener que salir a buscarla. No reemplaza el
+// criterio del abogado sobre qué norma aplica exactamente a cada proceso.
+const fp = (i) => `https://www.funcionpublica.gov.co/eva/gestornormativo/norma.php?i=${i}`;
+const NORMAS_POR_AREA = {
+  Civil: [{ nombre: "Código General del Proceso (Ley 1564/2012)", url: fp(48425) }],
+  Penal: [
+    { nombre: "Código Penal (Ley 599/2000)", url: fp(6388) },
+    { nombre: "Código de Procedimiento Penal (Ley 906/2004)", url: fp(14787) },
+  ],
+  Laboral: [{ nombre: "Código Sustantivo del Trabajo", url: fp(199983) }],
+  Familia: [
+    { nombre: "Código de la Infancia y la Adolescencia (Ley 1098/2006)", url: fp(22106) },
+    { nombre: "Código General del Proceso (Ley 1564/2012)", url: fp(48425) },
+  ],
+  Comercial: [{ nombre: "Código de Comercio (Decreto 410/1971)", url: fp(41102) }],
+  Administrativo: [{ nombre: "CPACA (Ley 1437/2011)", url: fp(41249) }],
+  Constitucional: [{ nombre: "Decreto 2591/1991 (Acción de tutela)", url: fp(5304) }],
+  Concursal: [{ nombre: "Régimen de Insolvencia Empresarial (Ley 1116/2006)", url: fp(22657) }],
+  Otro: [],
+};
+
 function estadoRamaPorRadicado(cliente, radicado) {
   const porRadicado = cliente?.ramaJudicialPorRadicado || {};
   if (porRadicado[radicado]) return porRadicado[radicado];
@@ -208,6 +267,10 @@ export default function VigilanciaTab({ onListo }) {
   const [textoFiscalia, setTextoFiscalia] = useState({});
   const [resultadoFiscalia, setResultadoFiscalia] = useState({});
   const [notificandoFiscalia, setNotificandoFiscalia] = useState(null);
+  const [mostrarFuenteExtra, setMostrarFuenteExtra] = useState(null);
+  const [textoFuenteExtra, setTextoFuenteExtra] = useState({});
+  const [resultadoFuenteExtra, setResultadoFuenteExtra] = useState({});
+  const [notificandoFuenteExtra, setNotificandoFuenteExtra] = useState(null);
   const { confirmar, ConfirmarDialogo } = useConfirmarDialogo();
 
   const copiarRadicado = (radicado, id) => {
@@ -485,6 +548,74 @@ export default function VigilanciaTab({ onListo }) {
     window.open(`https://wa.me/${numero}?text=${encodeURIComponent(partes.join("\n"))}`, "_blank");
   };
 
+  // Mismo patrón que compararFiscalia/guardarComoRevisadoFiscalia/
+  // notificarFiscaliaPorWhatsapp, pero parametrizado por fuente (SAMAI,
+  // TyBA) en vez de repetir la misma lógica una vez por cada una.
+  const compararFuenteExtra = (fuente, id, radicado) => {
+    const clave = `${fuente.id}:${id}:${radicado}`;
+    const texto = (textoFuenteExtra[clave] || "").trim();
+    if (!texto) return;
+    const anterior = estadoFuenteExtraPorRadicado(clientes[id], radicado, fuente.campoEstado);
+    const novedad = !anterior || anterior.ultimaActuacionTexto !== texto;
+    setResultadoFuenteExtra((prev) => ({ ...prev, [clave]: { novedad, texto } }));
+  };
+
+  const guardarComoRevisadoFuenteExtra = async (fuente, id, radicado) => {
+    const clave = `${fuente.id}:${id}:${radicado}`;
+    const resultado = resultadoFuenteExtra[clave];
+    if (!resultado) return;
+    const c = clientes[id];
+    const entradaEstado = { ultimaActuacionTexto: resultado.texto, consultadoEn: new Date().toISOString() };
+    const campoPorRadicado = { ...(c[fuente.campoEstado] || {}), [radicado]: entradaEstado };
+    let actualizado = { ...c, [fuente.campoEstado]: campoPorRadicado };
+    if (resultado.novedad) {
+      const nuevaEntrada = { id: uid(), fecha: new Date().toISOString(), nota: `${fuente.nombre} (radicado ${radicado}) — ${resultado.texto}` };
+      actualizado = { ...actualizado, timeline: [...(c.timeline || []), nuevaEntrada], ultimaActuacion: new Date().toISOString(), estadoVigilancia: "Con novedad" };
+    }
+    await storageSet(`cliente:${id}`, JSON.stringify(actualizado), false);
+    setClientes((prev) => ({ ...prev, [id]: actualizado }));
+  };
+
+  const notificarFuenteExtraPorWhatsapp = async (fuente, id, radicado) => {
+    const clave = `${fuente.id}:${id}:${radicado}`;
+    const resultado = resultadoFuenteExtra[clave];
+    if (!resultado) return;
+    const c = clientes[id];
+    const numero = numeroWhatsappCliente(c?.telefono);
+    if (!numero) return;
+    setNotificandoFuenteExtra(clave);
+    let explicacion = "";
+    if (resultado.novedad) {
+      try {
+        explicacion = await explicarParaCliente(resultado.texto, "");
+      } catch (e) {
+        // igual que en Fiscalía: el aviso no puede depender de que el
+        // asistente de IA esté disponible en ese momento.
+      }
+    }
+    setNotificandoFuenteExtra(null);
+    const partes = resultado.novedad
+      ? [
+          `*${getNombreDespacho()}*`,
+          "",
+          `Hola ${c?.nombre || ""}, le informamos una novedad en su proceso ante ${fuente.nombre} (radicado ${radicado}):`,
+          "",
+          resultado.texto,
+          "",
+          explicacion || null,
+          explicacion ? "" : null,
+          "Cualquier duda, quedamos atentos por este mismo medio.",
+        ].filter((linea) => linea !== null)
+      : [
+          `*${getNombreDespacho()}*`,
+          "",
+          `Hola ${c?.nombre || ""}, revisamos su proceso ante ${fuente.nombre} (radicado ${radicado}) y sigue igual que la última vez que le informamos — sin novedades por ahora.`,
+          "",
+          "Cualquier duda, quedamos atentos por este mismo medio.",
+        ];
+    window.open(`https://wa.me/${numero}?text=${encodeURIComponent(partes.join("\n"))}`, "_blank");
+  };
+
   const conRadicado = ids.filter((id) => radicadosDeCliente(clientes[id]).length > 0);
   const sinRadicado = ids.filter((id) => radicadosDeCliente(clientes[id]).length === 0);
   // Cada radicado se vigila por separado — un cliente con 3 radicados cuenta
@@ -713,6 +844,32 @@ export default function VigilanciaTab({ onListo }) {
                   <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, margin: "3px 0 0" }}>
                     {c.tipoProceso} · {c.areaProceso} {dias !== null && `· última novedad hace ${dias} día${dias !== 1 ? "s" : ""}`}
                   </p>
+                  {(NORMAS_POR_AREA[c.areaProceso] || []).length > 0 && (
+                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 5 }}>
+                      {NORMAS_POR_AREA[c.areaProceso].map((norma) => (
+                        <a
+                          key={norma.url}
+                          href={norma.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          title="Abrir texto completo de la norma"
+                          style={{
+                            fontFamily: "Inter, sans-serif",
+                            fontSize: 10.5,
+                            fontWeight: 600,
+                            color: COLORS.navy,
+                            background: COLORS.accentSoft,
+                            border: "1px solid #C7D6EA",
+                            borderRadius: 999,
+                            padding: "2px 9px",
+                            textDecoration: "none",
+                          }}
+                        >
+                          📖 {norma.nombre}
+                        </a>
+                      ))}
+                    </div>
+                  )}
                   </div>
                 </div>
                 <select
@@ -822,6 +979,30 @@ export default function VigilanciaTab({ onListo }) {
                               Fiscalía ↗
                             </a>
                           )}
+                          {FUENTES_ADICIONALES.filter((f) => f.aplica(c)).map((fuente) => (
+                            <a
+                              key={fuente.id}
+                              href={fuente.url}
+                              target="_blank"
+                              rel="noreferrer"
+                              title={`Abre ${fuente.nombre} — ${fuente.ayuda}`}
+                              style={{
+                                fontFamily: "Inter, sans-serif",
+                                fontSize: 11,
+                                fontWeight: 700,
+                                whiteSpace: "nowrap",
+                                padding: "6px 12px",
+                                background: fuente.bg,
+                                color: fuente.color,
+                                textDecoration: "none",
+                                borderLeft: `1px solid ${COLORS.border}`,
+                                display: "flex",
+                                alignItems: "center",
+                              }}
+                            >
+                              {fuente.nombre.split(" ")[0]} ↗
+                            </a>
+                          ))}
                         </span>
                       </div>
                       {estadoRama?.consultadoEn ? (
@@ -1012,6 +1193,106 @@ export default function VigilanciaTab({ onListo }) {
                           )}
                         </div>
                       )}
+
+                      {FUENTES_ADICIONALES.filter((f) => f.aplica(c)).map((fuente) => {
+                        const claveFuente = `${fuente.id}:${id}:${radicado}`;
+                        const abierto = mostrarFuenteExtra === claveFuente;
+                        const estadoGuardado = estadoFuenteExtraPorRadicado(c, radicado, fuente.campoEstado);
+                        const resultadoExtra = resultadoFuenteExtra[claveFuente];
+                        return (
+                          <div key={fuente.id} style={{ marginTop: 10 }}>
+                            {abierto ? (
+                              <div style={{ background: "#fff", border: `1px solid ${COLORS.border}`, borderLeft: `3px solid ${fuente.color}`, borderRadius: 8, padding: 12 }}>
+                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8, marginBottom: 6, flexWrap: "wrap" }}>
+                                  <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, fontWeight: 600, color: COLORS.muted, margin: 0 }}>
+                                    Pega aquí lo que muestra {fuente.nombre} ahora (fecha y descripción de la última actuación)
+                                  </p>
+                                  <a href={fuente.url} target="_blank" rel="noreferrer" style={{ fontSize: 11, fontWeight: 700, color: fuente.color, whiteSpace: "nowrap", textDecoration: "none" }}>
+                                    Abrir ↗
+                                  </a>
+                                </div>
+                                <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11, color: COLORS.muted, margin: "0 0 8px" }}>{fuente.ayuda}</p>
+                                <textarea
+                                  className="drx-input"
+                                  style={{ ...inputStyle, resize: "vertical", minHeight: 60, fontFamily: "Inter, sans-serif", fontSize: 12.5 }}
+                                  value={textoFuenteExtra[claveFuente] || ""}
+                                  onChange={(e) => setTextoFuenteExtra((prev) => ({ ...prev, [claveFuente]: e.target.value }))}
+                                  placeholder="Ej: 15/09/2026 - Se avoca conocimiento por parte del despacho..."
+                                />
+                                <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
+                                  <button
+                                    className="drx-btn-primary"
+                                    style={{ ...buttonPrimary, fontSize: 12, padding: "6px 12px", background: fuente.color }}
+                                    onClick={() => compararFuenteExtra(fuente, id, radicado)}
+                                    disabled={!(textoFuenteExtra[claveFuente] || "").trim()}
+                                  >
+                                    Comparar con la última vez
+                                  </button>
+                                  <button
+                                    className="drx-btn-ghost"
+                                    style={{ ...buttonGhost, fontSize: 12, padding: "6px 12px" }}
+                                    onClick={() => {
+                                      setMostrarFuenteExtra(null);
+                                      setResultadoFuenteExtra((prev) => ({ ...prev, [claveFuente]: null }));
+                                    }}
+                                  >
+                                    Cerrar
+                                  </button>
+                                </div>
+
+                                {resultadoExtra && (
+                                  <div
+                                    className="drx-fade-in"
+                                    style={{
+                                      marginTop: 10,
+                                      background: resultadoExtra.novedad ? fuente.bg : COLORS.surfaceSoft,
+                                      border: `1px solid ${resultadoExtra.novedad ? fuente.color : COLORS.border}`,
+                                      borderRadius: 8,
+                                      padding: 10,
+                                    }}
+                                  >
+                                    <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, fontWeight: 700, color: resultadoExtra.novedad ? fuente.color : COLORS.ink, margin: "0 0 4px" }}>
+                                      {resultadoExtra.novedad ? "Hay una novedad frente a lo último registrado" : "Es igual a lo último registrado — sin novedad"}
+                                    </p>
+                                    <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
+                                      <button className="drx-btn-primary" style={{ ...buttonPrimary, fontSize: 12, padding: "6px 12px" }} onClick={() => guardarComoRevisadoFuenteExtra(fuente, id, radicado)}>
+                                        {resultadoExtra.novedad ? "+ Agregar a la línea de tiempo" : "Marcar como revisado"}
+                                      </button>
+                                      {c.telefono && (
+                                        <button
+                                          className="drx-btn-primary"
+                                          style={{ ...buttonPrimary, fontSize: 12, padding: "6px 12px", background: "#1DA851" }}
+                                          onClick={() => notificarFuenteExtraPorWhatsapp(fuente, id, radicado)}
+                                          disabled={notificandoFuenteExtra === claveFuente}
+                                        >
+                                          {notificandoFuenteExtra === claveFuente
+                                            ? "Preparando notificación…"
+                                            : resultadoExtra.novedad
+                                            ? "Notificar novedad por WhatsApp ↗"
+                                            : "Avisar que sigue igual ↗"}
+                                        </button>
+                                      )}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            ) : (
+                              <button
+                                className="drx-btn-ghost"
+                                style={{ ...buttonGhost, fontSize: 12.5, padding: "6px 12px", background: "#fff" }}
+                                onClick={() => setMostrarFuenteExtra(claveFuente)}
+                              >
+                                <Icono tipo="documento" size={13} style={{ marginRight: 4, verticalAlign: -2 }} /> Comparar última actuación de {fuente.nombre}
+                              </button>
+                            )}
+                            {estadoGuardado?.consultadoEn && (
+                              <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11, color: COLORS.muted, margin: "6px 0 0" }}>
+                                {fuente.nombre} — última revisión: {new Date(estadoGuardado.consultadoEn).toLocaleString("es-CO", { dateStyle: "medium", timeStyle: "short" })}
+                              </p>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                   );
                 })}
