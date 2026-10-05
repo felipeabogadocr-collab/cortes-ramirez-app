@@ -318,7 +318,10 @@ begin
     'radicado', cliente_data->'radicado',
     'valorTotal', cliente_data->'valorTotal',
     'pagos', (
-      select coalesce(jsonb_agg(jsonb_build_object('fecha', p->'fecha', 'valor', p->'valor', 'concepto', p->'concepto')), '[]'::jsonb)
+      select coalesce(
+        jsonb_agg(jsonb_build_object('id', p->'id', 'fecha', p->'fecha', 'valor', p->'valor', 'concepto', p->'concepto', 'tieneRecibo', (p->>'reciboImagen') is not null)),
+        '[]'::jsonb
+      )
       from jsonb_array_elements(coalesce(cliente_data->'pagos', '[]'::jsonb)) p
     ),
     'documentos', docs

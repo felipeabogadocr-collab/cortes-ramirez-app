@@ -47,6 +47,7 @@ export default function VistaPortalCliente() {
   const [procesoInfo, setProcesoInfo] = useState(null);
   const [consultandoProceso, setConsultandoProceso] = useState(false);
   const [errorProceso, setErrorProceso] = useState("");
+  const [descargandoRecibo, setDescargandoRecibo] = useState(null);
 
   const buscar = async () => {
     const code = codigo.trim();
@@ -77,6 +78,30 @@ export default function VistaPortalCliente() {
     setConsultandoProceso(false);
   };
 
+  const descargarRecibo = async (pago) => {
+    if (!pago.id) return;
+    setDescargandoRecibo(pago.id);
+    try {
+      const resp = await fetch(`/api/documentos/firmar?accion=recibo-portal&codigo=${encodeURIComponent(codigo.trim())}&pagoId=${encodeURIComponent(pago.id)}`);
+      const data = await resp.json();
+      const href = data.url || data.dataUrl;
+      if (href) {
+        const a = document.createElement("a");
+        a.href = href;
+        a.target = "_blank";
+        a.rel = "noreferrer";
+        a.download = `recibo_${pago.fecha || ""}.png`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+      }
+    } catch (e) {
+      // Si falla, el cliente simplemente no ve nada descargarse — no hay
+      // mucho más que explicarle aquí sin complicar la pantalla.
+    }
+    setDescargandoRecibo(null);
+  };
+
   const totalPagado = (cliente?.pagos || []).reduce((sum, p) => sum + (Number(p.valor) || 0), 0);
   const valorTotal = Number(cliente?.valorTotal) || 0;
   const saldo = valorTotal > 0 ? valorTotal - totalPagado : null;
@@ -84,7 +109,15 @@ export default function VistaPortalCliente() {
   const colorArea = COLOR_AREA_PROCESO[cliente?.areaProceso] || COLORS.accentBright;
 
   return (
-    <div style={{ maxWidth: 760, margin: "0 auto", padding: "0 20px 40px" }}>
+    <div
+      style={{
+        maxWidth: 760,
+        margin: "0 auto",
+        padding: "0 20px 40px",
+        minHeight: cliente ? undefined : "100%",
+        background: cliente ? undefined : `linear-gradient(180deg, ${COLORS.surfaceSoft} 0%, transparent 220px)`,
+      }}
+    >
       <div
         style={{
           background: `linear-gradient(135deg, #0F5540, ${COLORS.navy} 55%, ${COLORS.navyDeep})`,
@@ -134,47 +167,77 @@ export default function VistaPortalCliente() {
       </div>
 
       {!cliente && (
-        <Card style={{ borderRadius: 16 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
+        <Card style={{ borderRadius: 18, boxShadow: "0 16px 40px rgba(15,85,64,0.1)", position: "relative", overflow: "hidden" }}>
+          <div
+            style={{
+              position: "absolute",
+              right: -50,
+              top: -60,
+              width: 180,
+              height: 180,
+              borderRadius: "50%",
+              background: `radial-gradient(circle, ${COLORS.accentSoft}, transparent 70%)`,
+              pointerEvents: "none",
+            }}
+          />
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16, position: "relative" }}>
             <div
               style={{
-                width: 32,
-                height: 32,
-                borderRadius: 9,
+                width: 34,
+                height: 34,
+                borderRadius: 10,
                 flexShrink: 0,
                 background: `linear-gradient(135deg, ${COLORS.navy}, ${COLORS.navyDeep})`,
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
                 color: "#FFFFFF",
+                boxShadow: `0 6px 14px ${COLORS.navy}40`,
               }}
             >
-              <Icono tipo="llave" size={16} />
+              <Icono tipo="llave" size={17} />
             </div>
-            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 14, color: COLORS.inkSoft, margin: 0, lineHeight: 1.4 }}>
+            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 14, color: COLORS.inkSoft, margin: 0, lineHeight: 1.45 }}>
               Ingresa el código de acceso que te compartió tu abogado para ver el estado de tu proceso.
             </p>
           </div>
-          <Field label="Código de acceso">
-            <input
-              className="drx-input"
-              style={{ ...inputStyle, fontWeight: 700, fontSize: 17, fontFamily: "monospace", textAlign: "center", letterSpacing: 2 }}
-              value={codigo}
-              onChange={(e) => setCodigo(e.target.value)}
-              placeholder="Código de acceso"
-              onKeyDown={(e) => e.key === "Enter" && buscar()}
-              autoFocus
-            />
-          </Field>
-          {notFound && (
-            <p style={{ color: "#B42318", fontSize: 13, marginTop: 10, fontFamily: "Inter, sans-serif", display: "flex", alignItems: "center", gap: 6 }}>
-              <Icono tipo="alerta" size={14} />
-              No encontramos ninguna cuenta con ese código. Verifícalo con tu abogado.
+          <div style={{ position: "relative" }}>
+            <Field label="Código de acceso">
+              <input
+                className="drx-input"
+                style={{ ...inputStyle, fontWeight: 700, fontSize: 18, fontFamily: "monospace", textAlign: "center", letterSpacing: 3, padding: "14px 12px" }}
+                value={codigo}
+                onChange={(e) => setCodigo(e.target.value)}
+                placeholder="Código de acceso"
+                onKeyDown={(e) => e.key === "Enter" && buscar()}
+                autoFocus
+              />
+            </Field>
+            {notFound && (
+              <p style={{ color: "#B42318", fontSize: 13, marginTop: 10, fontFamily: "Inter, sans-serif", display: "flex", alignItems: "center", gap: 6 }}>
+                <Icono tipo="alerta" size={14} />
+                No encontramos ninguna cuenta con ese código. Verifícalo con tu abogado.
+              </p>
+            )}
+            <button className="drx-btn-primary" style={{ ...buttonPrimary, marginTop: 16, width: "100%" }} onClick={buscar} disabled={buscando}>
+              {buscando ? "Buscando..." : "Ver mi información"}
+            </button>
+            <p
+              style={{
+                fontFamily: "Inter, sans-serif",
+                fontSize: 11.5,
+                color: COLORS.muted,
+                margin: "14px 0 0",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 5,
+              }}
+            >
+              <Icono tipo="escudo" size={12} />
+              Solo tú puedes ver esta información con tu código
             </p>
-          )}
-          <button className="drx-btn-primary" style={{ ...buttonPrimary, marginTop: 16, width: "100%" }} onClick={buscar} disabled={buscando}>
-            {buscando ? "Buscando..." : "Ver mi información"}
-          </button>
+          </div>
         </Card>
       )}
 
@@ -380,7 +443,31 @@ export default function VistaPortalCliente() {
                           {new Date(p.fecha).toLocaleDateString("es-CO", { dateStyle: "medium" })}
                         </p>
                       </div>
-                      <span style={{ color: "#166534", fontWeight: 700 }}>{formatoCOP(p.valor)}</span>
+                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                        <span style={{ color: "#166534", fontWeight: 700 }}>{formatoCOP(p.valor)}</span>
+                        {p.tieneRecibo && (
+                          <button
+                            onClick={() => descargarRecibo(p)}
+                            disabled={descargandoRecibo === p.id}
+                            title="Descargar recibo"
+                            style={{
+                              background: COLORS.surfaceSoft,
+                              border: `1px solid ${COLORS.border}`,
+                              borderRadius: 8,
+                              width: 28,
+                              height: 28,
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              cursor: "pointer",
+                              color: COLORS.inkSoft,
+                              flexShrink: 0,
+                            }}
+                          >
+                            <Icono tipo="cursorArriba" size={13} style={{ transform: "rotate(180deg)" }} />
+                          </button>
+                        )}
+                      </div>
                     </div>
                   ))}
               </div>
