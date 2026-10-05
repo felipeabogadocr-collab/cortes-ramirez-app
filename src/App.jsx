@@ -1308,7 +1308,7 @@ export function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-export const APP_VERSION = "1.138.0";
+export const APP_VERSION = "1.138.1";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -8635,11 +8635,28 @@ function App() {
       setUsuarioActual(null);
       return;
     }
-    const { data: perfil, error: errorPerfil } = await supabase
+    let { data: perfil, error: errorPerfil } = await supabase
       .from("perfiles")
       .select("*, despachos(nombre, activo, prueba_hasta, pago_reportado_en, logo_ruta, celular)")
       .eq("id", user.id)
       .maybeSingle();
+    if (errorPerfil) {
+      // Si el despacho todavía no corrió la migración más reciente de
+      // supabase/schema.sql (la que agrega logo_ruta/celular a despachos),
+      // el select de arriba falla ENTERO con "column does not exist" —
+      // aunque el resto del perfil sí exista, nadie de ese despacho podía
+      // iniciar sesión hasta correr el SQL. Mejor reintentar sin esas dos
+      // columnas (el logo propio y el celular del despacho simplemente no
+      // cargan todavía) que dejar a todo el despacho fuera por columnas
+      // opcionales.
+      const reintento = await supabase
+        .from("perfiles")
+        .select("*, despachos(nombre, activo, prueba_hasta, pago_reportado_en)")
+        .eq("id", user.id)
+        .maybeSingle();
+      perfil = reintento.data;
+      errorPerfil = reintento.error;
+    }
     if (errorPerfil) {
       // Si esto falla en silencio (p. ej. porque la base de datos no tiene
       // todavía una columna que el código ya espera, como prueba_hasta /
