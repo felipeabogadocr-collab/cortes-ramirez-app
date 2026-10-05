@@ -425,6 +425,7 @@ export default function CalculadoraTab({ usuarioActual, onListo }) {
   const [generandoPdf, setGenerandoPdf] = useState(false);
   const [creando, setCreando] = useState(false);
   const [resultado, setResultado] = useState(null);
+  const [codigoCopiado, setCodigoCopiado] = useState(false);
 
   const total = Number(valorTotal) || 0;
   const costosNum = Number(costos) || 0;
@@ -577,9 +578,28 @@ export default function CalculadoraTab({ usuarioActual, onListo }) {
             <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: "#166534", margin: "6px 0 0" }}>
               Ya aparece en Clientes y en Contabilidad. El mensaje de WhatsApp se abrió en otra pestaña — el código de firma es <b>{resultado.idDocumento}</b> (también queda guardado en Documentos).
             </p>
-            <button className="drx-btn-ghost" style={{ ...buttonGhost, marginTop: 10 }} onClick={reiniciar}>
-              Calcular otro
-            </button>
+            <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
+              <button
+                className="drx-btn-ghost"
+                style={{ ...buttonGhost, padding: "6px 12px", fontSize: 12.5, fontWeight: 600 }}
+                onClick={() => {
+                  navigator.clipboard?.writeText(resultado.idDocumento);
+                  setCodigoCopiado(true);
+                  setTimeout(() => setCodigoCopiado(false), 1500);
+                }}
+              >
+                {codigoCopiado ? (
+                  "¡Copiado! ✓"
+                ) : (
+                  <>
+                    <Icono tipo="portapapeles" size={13} style={{ marginRight: 4, verticalAlign: -2 }} /> Copiar código
+                  </>
+                )}
+              </button>
+              <button className="drx-btn-ghost" style={buttonGhost} onClick={reiniciar}>
+                Calcular otro
+              </button>
+            </div>
           </div>
         )}
 

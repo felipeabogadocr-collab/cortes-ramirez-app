@@ -1105,6 +1105,7 @@ function AcuerdoPagoForm({ cliente, clienteId, saldo, datosResponsable, usuarioA
   const [generando, setGenerando] = useState(false);
   const [guardando, setGuardando] = useState(false);
   const [hecho, setHecho] = useState(null);
+  const [codigoCopiado, setCodigoCopiado] = useState(false);
 
   const total = Number(valorAcordado) || 0;
   const cuotasEfectivas = Math.min(MAX_CUOTAS_ACUERDO, Math.max(1, Number(numCuotas) || 1));
@@ -1189,6 +1190,23 @@ function AcuerdoPagoForm({ cliente, clienteId, saldo, datosResponsable, usuarioA
         <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: "#166534", margin: "6px 0 0" }}>
           El plan de pago del cliente ya quedó actualizado. Código de firma: <b>{hecho.idDocumento}</b>.
         </p>
+        <button
+          className="drx-btn-ghost"
+          style={{ ...buttonGhost, marginTop: 10, padding: "6px 12px", fontSize: 12.5, fontWeight: 600 }}
+          onClick={() => {
+            navigator.clipboard?.writeText(hecho.idDocumento);
+            setCodigoCopiado(true);
+            setTimeout(() => setCodigoCopiado(false), 1500);
+          }}
+        >
+          {codigoCopiado ? (
+            "¡Copiado! ✓"
+          ) : (
+            <>
+              <Icono tipo="portapapeles" size={13} style={{ marginRight: 4, verticalAlign: -2 }} /> Copiar código
+            </>
+          )}
+        </button>
       </div>
     );
   }
