@@ -406,15 +406,13 @@ export default function AgendaTab({ onListo }) {
     if (!form.titulo.trim()) faltan.push("el título");
     if (!form.fecha) faltan.push("la fecha");
     if (!form.hora) faltan.push("la hora");
-    // El correo del invitado es obligatorio solo al CREAR un evento nuevo,
-    // y solo cuando hay Google Calendar conectado (sin conexión ni siquiera
-    // existe el campo). Al editar uno ya existente se deja opcional: Google
-    // no le devuelve a Nomos la lista de invitados de un evento ya creado,
-    // así que ese campo siempre arranca vacío al editar — exigirlo ahí
-    // bloquearía corregir hasta un simple error de dedo en el título.
-    if (googleConectado && !editandoId) {
-      if (invitados.length === 0) faltan.push("el correo del invitado");
-      else if (!invitados.every((correo) => REGEX_CORREO.test(correo))) faltan.push("un correo válido del invitado");
+    // El correo del invitado es siempre opcional — no todos los eventos se
+    // crean para notificar invitados por correo (ej. un grupo de 10
+    // personas por WhatsApp): el enlace de Meet/Calendar se puede copiar y
+    // compartir aparte con "Copiar invitación", una vez guardado el evento.
+    // Si sí se escriben correos, igual tienen que ser válidos.
+    if (invitados.length > 0 && !invitados.every((correo) => REGEX_CORREO.test(correo))) {
+      faltan.push("un correo válido del invitado");
     }
     if (faltan.length > 0) {
       setErrorForm(`Falta ${faltan.join(", ")}.`);
@@ -934,7 +932,7 @@ export default function AgendaTab({ onListo }) {
                   <Icono tipo="persona" size={17} />
                 </div>
                 <div style={{ flex: 1 }}>
-                  <Field label={editandoId ? "Correo del invitado (opcional)" : <>Correo del invitado <span style={{ color: "#B42318" }}>*</span></>}>
+                  <Field label="Correo del invitado (opcional)">
                     <input
                       className="drx-input"
                       style={inputStyle}
@@ -944,7 +942,7 @@ export default function AgendaTab({ onListo }) {
                     />
                   </Field>
                   <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11, color: COLORS.muted, margin: "4px 0 0" }}>
-                    Sepáralos con comas — a cada uno le llega la invitación de Google Calendar con el link.
+                    Sepáralos con comas si quieres que a cada uno le llegue la invitación de Google Calendar directo a su correo. Si no pones ninguno, el evento se crea igual (con su link de Meet) y lo compartes tú con quien quieras usando "Copiar invitación" — útil para un grupo grande, por ejemplo por WhatsApp.
                   </p>
                 </div>
               </div>
