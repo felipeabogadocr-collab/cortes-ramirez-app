@@ -673,3 +673,11 @@ alter table plataforma_pagos enable row level security;
 -- Sin políticas a propósito: solo el endpoint de servidor (llave
 -- service_role, ya protegido por verificarSuperadmin) lee y escribe aquí —
 -- ni siquiera el Administrador de un despacho debería ver cuánto paga otro.
+
+-- PostgREST (el API que usa Supabase) cachea qué tablas existen y a veces
+-- tarda en darse cuenta de una tabla nueva creada por este script — el
+-- síntoma es "Could not find the table '...' in the schema cache" aunque
+-- la tabla sí quedó creada. Este NOTIFY le avisa que recargue su caché de
+-- una vez, cada vez que se corre este archivo, para no depender de que lo
+-- note solo (o de tener que ir a Settings → API → Reload schema a mano).
+NOTIFY pgrst, 'reload schema';
