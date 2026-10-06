@@ -625,7 +625,16 @@ export default function AgendaTab({ onListo }) {
       invitados: [],
       crearMeet: true,
       recordatorioMinutos: null,
-      editandoAntes: e.googleEventoId ? id : null,
+      // "editandoAntes" decide si Nomos ACTUALIZA este mismo evento o crea
+      // uno nuevo — siempre debe ser este, ya existe en Nomos. Lo que sí es
+      // condicional es "googleEventoIdAntes" (si Google ya tiene una copia
+      // de este evento o hay que crearla ahí desde cero). Antes esto estaba
+      // mal: cuando el evento nunca había llegado a Google (justo el caso
+      // típico de este botón), "editandoAntes" también quedaba en null y
+      // el reintento terminaba creando un evento NUEVO duplicado en Nomos
+      // en vez de arreglar el que ya existía — por eso el original se
+      // quedaba igual, sin link, pase lo que pasara.
+      editandoAntes: id,
       googleEventoIdAntes: e.googleEventoId || null,
     });
     setSincronizandoId(null);
