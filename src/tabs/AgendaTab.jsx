@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "../lib/supabaseClient";
-import { getNombreDespacho } from "../lib/storage";
 import {
   COLORS, EncabezadoSeccion, Card, buttonPrimary, buttonGhost, Field, inputStyle,
   Icono, IconoCampana, EstadoVacio, useConfirmarDialogo, useEventosAgenda, diasHasta, urgenciaTermino,
@@ -83,8 +82,7 @@ const RECORDATORIOS_GOOGLE = [
   { minutos: "1440", etiqueta: "1 día antes" },
 ];
 
-function EventoAgendaCard({ evento, onEliminar, onCompletar, onEditar, onSincronizar, onCrearVideollamada, sincronizando, pasado, googleConectado }) {
-  const fechaTexto = new Date(`${evento.fecha}T${evento.hora || "00:00"}:00`).toLocaleDateString("es-CO", { weekday: "long", day: "numeric", month: "long" });
+function EventoAgendaCard({ evento, onEliminar, onCompletar, onEditar, onSincronizar, sincronizando, pasado, googleConectado }) {
   // Con el encabezado de día nuevo (Hoy / Mañana / día de la semana) arriba
   // de cada grupo, repetir la fecha completa en cada tarjeta ya es
   // redundante — aquí solo se muestra la hora, en formato de 12 horas, más
@@ -100,24 +98,10 @@ function EventoAgendaCard({ evento, onEliminar, onCompletar, onEditar, onSincron
   // atenúa un poco y le sale una etiqueta chiquita, sin moverlo de sección.
   const yaPasoLaHora = !pasado && !evento.completado && evento.hora && new Date(`${evento.fecha}T${evento.hora}:00`) < new Date();
 
-  // El texto de invitación usa el título del evento como "concepto" (Ej:
-  // "Asesoría con Juan Pérez", "Reunión de equipo") — si por algún motivo
-  // no hay título, cae en "la sesión virtual" en vez de dejar el mensaje a
-  // medias. Lleva el nombre del despacho adelante, igual que cualquier otro
-  // mensaje que Nomos arma para mandar a un cliente (recordatorios, recibos,
-  // etc.) — quien lo recibe tiene que saber de inmediato de dónde viene.
-  const compartirInvitacion = () => {
-    const concepto = evento.titulo ? `"${evento.titulo}"` : "la sesión virtual";
-    const texto = `*${getNombreDespacho()}*\n\nTe invito a ${concepto}\n📅 ${fechaTexto}${evento.hora ? ` · ${evento.hora}` : ""}\n🔗 ${evento.googleMeetLink}`;
-    // En celular (donde de verdad se comparte algo), el share nativo del
-    // sistema abre directo WhatsApp/Mensajes/Correo con el texto ya puesto
-    // — nada de copiar y tener que ir a pegarlo a mano. En escritorio, sin
-    // share nativo, se cae al copiapega de siempre.
-    if (navigator.share) {
-      navigator.share({ title: getNombreDespacho(), text: texto }).catch(() => {});
-      return;
-    }
-    navigator.clipboard.writeText(texto).then(() => {
+  // Copia el link de Meet tal cual lo generó Google — nada más, sin armar
+  // ningún mensaje — para pegarlo donde sea (WhatsApp, correo, lo que sea).
+  const copiarLink = () => {
+    navigator.clipboard.writeText(evento.googleMeetLink).then(() => {
       setCopiado(true);
       setTimeout(() => setCopiado(false), 1800);
     });
@@ -168,8 +152,65 @@ function EventoAgendaCard({ evento, onEliminar, onCompletar, onEditar, onSincron
             {evento.clienteNombre ? ` · ${evento.clienteNombre}` : ""}
           </p>
           {evento.notas && <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.inkSoft, margin: "6px 0 0" }}>{evento.notas}</p>}
+          {evento.googleMeetLink && (
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                flexWrap: "wrap",
+                marginTop: 10,
+                background: COLORS.surfaceSoft,
+                border: `1px solid ${COLORS.border}`,
+                borderRadius: 10,
+                padding: "7px 9px",
+              }}
+            >
+              <span
+                style={{
+                  fontFamily: "ui-monospace, 'JetBrains Mono', monospace",
+                  fontSize: 11.5,
+                  color: COLORS.inkSoft,
+                  wordBreak: "break-all",
+                  flex: "1 1 auto",
+                }}
+              >
+                {evento.googleMeetLink}
+              </span>
+              <button
+                onClick={copiarLink}
+                title="Copiar el link de Meet, tal cual, para pegarlo donde quieras"
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                  fontFamily: "Inter, sans-serif",
+                  fontSize: 12,
+                  fontWeight: 700,
+                  color: copiado ? "#166534" : "#FFFFFF",
+                  background: copiado ? "#DCFCE7" : "#0B8043",
+                  border: `1px solid ${copiado ? "#BBF7D0" : "#0B8043"}`,
+                  borderRadius: 20,
+                  padding: "5px 12px",
+                  cursor: "pointer",
+                  whiteSpace: "nowrap",
+                  flexShrink: 0,
+                }}
+              >
+                {copiado ? (
+                  <>
+                    <Icono tipo="check" size={13} /> Copiado
+                  </>
+                ) : (
+                  <>
+                    <Icono tipo="portapapeles" size={13} /> Copiar link
+                  </>
+                )}
+              </button>
+            </div>
+          )}
           {(evento.googleMeetLink || evento.googleHtmlLink) && (
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
               {evento.googleMeetLink && (
                 <a
                   href={evento.googleMeetLink}
@@ -191,44 +232,6 @@ function EventoAgendaCard({ evento, onEliminar, onCompletar, onEditar, onSincron
                 >
                   <Icono tipo="video" size={13} /> Unirse por Meet
                 </a>
-              )}
-              {evento.googleMeetLink && (
-                <button
-                  onClick={compartirInvitacion}
-                  title={
-                    typeof navigator !== "undefined" && navigator.share
-                      ? "Compartir el link de la sesión (con el nombre del despacho) por WhatsApp, correo o donde quieras"
-                      : "Copiar mensaje de invitación con el link, para pegarlo en WhatsApp o correo"
-                  }
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: 6,
-                    fontFamily: "Inter, sans-serif",
-                    fontSize: 12,
-                    fontWeight: 600,
-                    color: copiado ? "#166534" : COLORS.inkSoft,
-                    background: copiado ? "#DCFCE7" : COLORS.surfaceSoft,
-                    border: `1px solid ${copiado ? "#BBF7D0" : COLORS.border}`,
-                    borderRadius: 20,
-                    padding: "5px 12px",
-                    cursor: "pointer",
-                  }}
-                >
-                  {copiado ? (
-                    <>
-                      <Icono tipo="check" size={13} /> Copiado
-                    </>
-                  ) : typeof navigator !== "undefined" && navigator.share ? (
-                    <>
-                      <Icono tipo="compartir" size={13} /> Compartir
-                    </>
-                  ) : (
-                    <>
-                      <Icono tipo="portapapeles" size={13} /> Copiar invitación
-                    </>
-                  )}
-                </button>
               )}
               {evento.googleHtmlLink && (
                 <a
@@ -252,32 +255,6 @@ function EventoAgendaCard({ evento, onEliminar, onCompletar, onEditar, onSincron
                   <Icono tipo="calendario" size={13} /> Ver en Google Calendar
                 </a>
               )}
-            </div>
-          )}
-          {!evento.googleMeetLink && !evento.googleHtmlLink && googleConectado && onCrearVideollamada && !pasado && (
-            <div style={{ marginTop: 10 }}>
-              <button
-                onClick={onCrearVideollamada}
-                disabled={sincronizando}
-                title="Este evento se guardó en Nomos pero no se sincronizó con Google Calendar — reintentar"
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 6,
-                  fontFamily: "Inter, sans-serif",
-                  fontSize: 12,
-                  fontWeight: 600,
-                  color: "#B45309",
-                  background: "#FEF3E2",
-                  border: "1px solid #FCE3B8",
-                  borderRadius: 20,
-                  padding: "5px 12px",
-                  cursor: sincronizando ? "default" : "pointer",
-                }}
-              >
-                <Icono tipo={sincronizando ? "refrescar" : "video"} size={13} className={sincronizando ? "drx-spin" : undefined} />
-                {sincronizando ? "Creando…" : "Crear videollamada"}
-              </button>
             </div>
           )}
         </div>
@@ -446,8 +423,9 @@ export default function AgendaTab({ onListo }) {
         // El evento en Nomos ya quedó guardado — que Google falle no debe
         // bloquear ni deshacer eso, pero antes esto fallaba en silencio: el
         // evento se veía "normal" en Nomos sin ningún link de Meet, sin
-        // ninguna pista de por qué. Ahora se avisa y se puede reintentar
-        // desde la tarjeta del evento con "Crear videollamada".
+        // ninguna pista de por qué. Ahora al menos se avisa (ver guardar()
+        // más abajo) — para recuperarlo, basta con editar el evento y
+        // guardarlo de nuevo sin cambiar nada.
         return { ok: false, error: datos?.error || "No se pudo sincronizar con Google Calendar." };
       } catch {
         return { ok: false, error: "No se pudo conectar con Google Calendar." };
@@ -527,7 +505,7 @@ export default function AgendaTab({ onListo }) {
 
     if (erroresGoogle > 0) {
       const cuantos = erroresGoogle > 1 ? `${erroresGoogle} de los eventos` : "El evento";
-      setAvisoGoogle(`⚠ Se guardó en Nomos, pero ${cuantos} no se pudo sincronizar con Google Calendar (${ultimoErrorGoogle}) — por eso no tiene link de Meet. Reintenta desde "Crear videollamada" en su tarjeta.`);
+      setAvisoGoogle(`⚠ Se guardó en Nomos, pero ${cuantos} no se pudo sincronizar con Google Calendar (${ultimoErrorGoogle}) — por eso no tiene link de Meet. Ábrelo con el lápiz y guarda de nuevo para reintentarlo.`);
     }
   };
 
@@ -611,39 +589,11 @@ export default function AgendaTab({ onListo }) {
     setSincronizandoId(null);
   };
 
-  // Reintento manual para un evento que ya existe en Nomos pero se quedó
-  // sin link de Meet (la sincronización con Google falló al crearlo, por
-  // ejemplo por un token vencido en ese momento). Si el evento nunca llegó
-  // a existir en Google (sin googleEventoId), lo crea de cero; si sí existe
-  // pero le falta el Meet, lo actualiza agregándoselo.
-  const crearVideollamadaClick = async (id) => {
-    const e = eventos[id];
-    if (!e) return;
-    setSincronizandoId(id);
-    const resultado = await guardarUnaOcurrencia({
-      datosEvento: { titulo: e.titulo, fecha: e.fecha, hora: e.hora || "", notas: e.notas || "", clienteId: e.clienteId || "", clienteNombre: e.clienteNombre || "" },
-      invitados: [],
-      crearMeet: true,
-      recordatorioMinutos: null,
-      // "editandoAntes" decide si Nomos ACTUALIZA este mismo evento o crea
-      // uno nuevo — siempre debe ser este, ya existe en Nomos. Lo que sí es
-      // condicional es "googleEventoIdAntes" (si Google ya tiene una copia
-      // de este evento o hay que crearla ahí desde cero). Antes esto estaba
-      // mal: cuando el evento nunca había llegado a Google (justo el caso
-      // típico de este botón), "editandoAntes" también quedaba en null y
-      // el reintento terminaba creando un evento NUEVO duplicado en Nomos
-      // en vez de arreglar el que ya existía — por eso el original se
-      // quedaba igual, sin link, pase lo que pasara.
-      editandoAntes: id,
-      googleEventoIdAntes: e.googleEventoId || null,
-    });
-    setSincronizandoId(null);
-    if (!resultado.ok) {
-      setAvisoGoogle(`⚠ No se pudo crear la videollamada para "${e.titulo}" (${resultado.error}).`);
-    } else {
-      setAvisoGoogle(`✓ Videollamada creada para "${e.titulo}".`);
-    }
-  };
+  // Si la sincronización con Google falló al guardar un evento (ver el
+  // aviso que arma guardar() más abajo), la forma de recuperarlo es volver
+  // a abrirlo con el lápiz y guardarlo de nuevo sin cambiar nada — ese
+  // camino (editarClick → guardar) ya actualiza el mismo evento en vez de
+  // crear uno nuevo, así que no hace falta un botón de reintento aparte.
 
   const lista = ids
     .map((id) => ({ id, ...eventos[id] }))
@@ -1223,7 +1173,6 @@ export default function AgendaTab({ onListo }) {
                       onCompletar={() => actualizar(e.id, { completado: !e.completado })}
                       onEditar={() => editarClick(e.id)}
                       onSincronizar={() => sincronizarClick(e.id)}
-                      onCrearVideollamada={() => crearVideollamadaClick(e.id)}
                       sincronizando={sincronizandoId === e.id}
                       googleConectado={googleConectado}
                       pasado={diaSeleccionadoMes < hoyISO}
@@ -1261,7 +1210,6 @@ export default function AgendaTab({ onListo }) {
                     onCompletar={() => actualizar(e.id, { completado: !e.completado })}
                     onEditar={() => editarClick(e.id)}
                     onSincronizar={() => sincronizarClick(e.id)}
-                    onCrearVideollamada={() => crearVideollamadaClick(e.id)}
                     sincronizando={sincronizandoId === e.id}
                     googleConectado={googleConectado}
                   />
