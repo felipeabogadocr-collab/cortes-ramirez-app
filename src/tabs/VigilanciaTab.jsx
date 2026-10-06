@@ -970,7 +970,6 @@ export default function VigilanciaTab({ onListo }) {
                                 {notificando === clave ? "Preparando notificación…" : "Notificar al grupo ↗"}
                               </button>
                             ) : null}
-                            )}
                           </div>
                           {explicaciones[clave] && (
                             <div style={{ marginTop: 10, background: COLORS.accentSoft, border: "1px solid #C7D6EA", borderRadius: 8, padding: 10 }}>
