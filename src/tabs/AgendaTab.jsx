@@ -83,7 +83,7 @@ const RECORDATORIOS_GOOGLE = [
   { minutos: "1440", etiqueta: "1 día antes" },
 ];
 
-function EventoAgendaCard({ evento, onEliminar, onCompletar, onEditar, onSincronizar, sincronizando, pasado, googleConectado }) {
+function EventoAgendaCard({ evento, onEliminar, onCompletar, onEditar, onSincronizar, onCrearVideollamada, sincronizando, pasado, googleConectado }) {
   const fechaTexto = new Date(`${evento.fecha}T${evento.hora || "00:00"}:00`).toLocaleDateString("es-CO", { weekday: "long", day: "numeric", month: "long" });
   // Con el encabezado de día nuevo (Hoy / Mañana / día de la semana) arriba
   // de cada grupo, repetir la fecha completa en cada tarjeta ya es
@@ -254,6 +254,32 @@ function EventoAgendaCard({ evento, onEliminar, onCompletar, onEditar, onSincron
               )}
             </div>
           )}
+          {!evento.googleMeetLink && !evento.googleHtmlLink && googleConectado && onCrearVideollamada && !pasado && (
+            <div style={{ marginTop: 10 }}>
+              <button
+                onClick={onCrearVideollamada}
+                disabled={sincronizando}
+                title="Este evento se guardó en Nomos pero no se sincronizó con Google Calendar — reintentar"
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                  fontFamily: "Inter, sans-serif",
+                  fontSize: 12,
+                  fontWeight: 600,
+                  color: "#B45309",
+                  background: "#FEF3E2",
+                  border: "1px solid #FCE3B8",
+                  borderRadius: 20,
+                  padding: "5px 12px",
+                  cursor: sincronizando ? "default" : "pointer",
+                }}
+              >
+                <Icono tipo={sincronizando ? "refrescar" : "video"} size={13} className={sincronizando ? "drx-spin" : undefined} />
+                {sincronizando ? "Creando…" : "Crear videollamada"}
+              </button>
+            </div>
+          )}
         </div>
         <div style={{ display: "flex", gap: 10, alignItems: "center", flexShrink: 0 }}>
           {onEditar && (
@@ -415,12 +441,19 @@ export default function AgendaTab({ onListo }) {
         const datos = await resp.json();
         if (resp.ok) {
           await actualizar(id, { googleEventoId: datos.googleEventoId, googleHtmlLink: datos.googleHtmlLink, googleMeetLink: datos.googleMeetLink });
+          return { ok: true };
         }
-      } catch {
         // El evento en Nomos ya quedó guardado — que Google falle no debe
-        // bloquear ni deshacer eso, solo se pierde el link de Meet.
+        // bloquear ni deshacer eso, pero antes esto fallaba en silencio: el
+        // evento se veía "normal" en Nomos sin ningún link de Meet, sin
+        // ninguna pista de por qué. Ahora se avisa y se puede reintentar
+        // desde la tarjeta del evento con "Crear videollamada".
+        return { ok: false, error: datos?.error || "No se pudo sincronizar con Google Calendar." };
+      } catch {
+        return { ok: false, error: "No se pudo conectar con Google Calendar." };
       }
     }
+    return { ok: true };
   };
 
   const guardar = async () => {
@@ -460,6 +493,8 @@ export default function AgendaTab({ onListo }) {
       }
     }
 
+    let erroresGoogle = 0;
+    let ultimoErrorGoogle = "";
     for (let i = 0; i < fechasOcurrencias.length; i++) {
       const datosEvento = {
         titulo: form.titulo.trim(),
@@ -472,7 +507,7 @@ export default function AgendaTab({ onListo }) {
       // Cada ocurrencia es independiente, así que solo la primera (o la
       // que se está editando) puede reutilizar un googleEventoId existente
       // — las siguientes de una serie nueva siempre son eventos nuevos.
-      await guardarUnaOcurrencia({
+      const resultado = await guardarUnaOcurrencia({
         datosEvento,
         invitados,
         crearMeet,
@@ -480,11 +515,20 @@ export default function AgendaTab({ onListo }) {
         editandoAntes: i === 0 ? editandoAntes : null,
         googleEventoIdAntes: i === 0 ? googleEventoIdAntes : null,
       });
+      if (!resultado.ok) {
+        erroresGoogle++;
+        ultimoErrorGoogle = resultado.error;
+      }
     }
 
     setForm(FORM_VACIO);
     setMostrarForm(false);
     setEditandoId(null);
+
+    if (erroresGoogle > 0) {
+      const cuantos = erroresGoogle > 1 ? `${erroresGoogle} de los eventos` : "El evento";
+      setAvisoGoogle(`⚠ Se guardó en Nomos, pero ${cuantos} no se pudo sincronizar con Google Calendar (${ultimoErrorGoogle}) — por eso no tiene link de Meet. Reintenta desde "Crear videollamada" en su tarjeta.`);
+    }
   };
 
   const editarClick = (id) => {
@@ -565,6 +609,31 @@ export default function AgendaTab({ onListo }) {
       // Nomos se queda con la última versión que sí tenía.
     }
     setSincronizandoId(null);
+  };
+
+  // Reintento manual para un evento que ya existe en Nomos pero se quedó
+  // sin link de Meet (la sincronización con Google falló al crearlo, por
+  // ejemplo por un token vencido en ese momento). Si el evento nunca llegó
+  // a existir en Google (sin googleEventoId), lo crea de cero; si sí existe
+  // pero le falta el Meet, lo actualiza agregándoselo.
+  const crearVideollamadaClick = async (id) => {
+    const e = eventos[id];
+    if (!e) return;
+    setSincronizandoId(id);
+    const resultado = await guardarUnaOcurrencia({
+      datosEvento: { titulo: e.titulo, fecha: e.fecha, hora: e.hora || "", notas: e.notas || "", clienteId: e.clienteId || "", clienteNombre: e.clienteNombre || "" },
+      invitados: [],
+      crearMeet: true,
+      recordatorioMinutos: null,
+      editandoAntes: e.googleEventoId ? id : null,
+      googleEventoIdAntes: e.googleEventoId || null,
+    });
+    setSincronizandoId(null);
+    if (!resultado.ok) {
+      setAvisoGoogle(`⚠ No se pudo crear la videollamada para "${e.titulo}" (${resultado.error}).`);
+    } else {
+      setAvisoGoogle(`✓ Videollamada creada para "${e.titulo}".`);
+    }
   };
 
   const lista = ids
@@ -1145,6 +1214,7 @@ export default function AgendaTab({ onListo }) {
                       onCompletar={() => actualizar(e.id, { completado: !e.completado })}
                       onEditar={() => editarClick(e.id)}
                       onSincronizar={() => sincronizarClick(e.id)}
+                      onCrearVideollamada={() => crearVideollamadaClick(e.id)}
                       sincronizando={sincronizandoId === e.id}
                       googleConectado={googleConectado}
                       pasado={diaSeleccionadoMes < hoyISO}
@@ -1182,6 +1252,7 @@ export default function AgendaTab({ onListo }) {
                     onCompletar={() => actualizar(e.id, { completado: !e.completado })}
                     onEditar={() => editarClick(e.id)}
                     onSincronizar={() => sincronizarClick(e.id)}
+                    onCrearVideollamada={() => crearVideollamadaClick(e.id)}
                     sincronizando={sincronizandoId === e.id}
                     googleConectado={googleConectado}
                   />
