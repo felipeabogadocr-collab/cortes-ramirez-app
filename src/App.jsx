@@ -33,6 +33,7 @@ const TerminosUso = lazy(() => import("./views/TerminosUso.jsx"));
 const VistaDiagnostico = lazy(() => import("./views/VistaDiagnostico.jsx"));
 import { supabase } from "./lib/supabaseClient";
 import { contrasenaFiltrada } from "./lib/pwnedPassword.js";
+import { generarCuotasAcuerdoPago } from "./lib/contabilidadCalculos.js";
 import {
   diasDesde, diasHasta, calcularProximaFechaPorFrecuencia, formatoCOP, calcularEstado,
   numeroWhatsappCliente, textoEstadoPago, TAMANO_MAX_ARCHIVO_MB, archivoDemasiadoGrande,
@@ -1312,7 +1313,7 @@ export function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-export const APP_VERSION = "1.141.1";
+export const APP_VERSION = "1.142.0";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -5618,6 +5619,73 @@ export function useEgresos() {
   };
 
   return { egresos, cargado, crear, editar, eliminar, recategorizarMasivo };
+}
+
+// Compras del despacho a crédito/cuotas (un computador en 12 cuotas, un
+// préstamo, etc.) — el espejo de "plan de pago" de un cliente, pero al
+// revés: aquí el despacho es quien debe. Se registra una sola vez (valor
+// total, cuántas cuotas, cada cuánto) y Nomos arma el calendario con
+// generarCuotasAcuerdoPago (mismo cálculo que ya usa el acuerdo de pago de
+// un cliente). Cada cuota paga crea un egreso real (cuenta igual en los
+// totales de Contabilidad) y queda marcada aparte, para saber cuánto falta
+// y cuándo es la próxima — sin mezclar "lo que me deben" con "lo que debo".
+export function useCreditos() {
+  const [creditos, setCreditosState] = useState([]);
+  const [cargado, setCargado] = useState(false);
+
+  const cargar = useCallback(async () => {
+    const raw = await storageGet("creditos-contabilidad", false);
+    setCreditosState(raw ? JSON.parse(raw) : []);
+    setCargado(true);
+  }, []);
+
+  useEffect(() => {
+    cargar();
+  }, [cargar]);
+
+  const crear = async ({ concepto, categoria, valorTotal, numCuotas, diaPago }) => {
+    const cuotas = generarCuotasAcuerdoPago({ valorTotal: Number(valorTotal) || 0, numCuotas: Number(numCuotas) || 1, diaPago: diaPago ? Number(diaPago) : null }).map(
+      (c) => ({ ...c, pagada: false, egresoId: null })
+    );
+    const nuevo = {
+      id: uid(),
+      concepto: concepto.trim(),
+      categoria,
+      valorTotal: Number(valorTotal) || 0,
+      cuotas,
+      creadoEn: new Date().toISOString(),
+    };
+    const actualizados = [nuevo, ...creditos];
+    await storageSet("creditos-contabilidad", JSON.stringify(actualizados), false);
+    setCreditosState(actualizados);
+    return nuevo;
+  };
+
+  const editar = async (id, cambios) => {
+    const actualizados = creditos.map((c) => (c.id === id ? { ...c, ...cambios } : c));
+    await storageSet("creditos-contabilidad", JSON.stringify(actualizados), false);
+    setCreditosState(actualizados);
+  };
+
+  const eliminar = async (id) => {
+    const actualizados = creditos.filter((c) => c.id !== id);
+    await storageSet("creditos-contabilidad", JSON.stringify(actualizados), false);
+    setCreditosState(actualizados);
+  };
+
+  // Marca UNA cuota puntual (por índice) como pagada, enlazada al egreso real
+  // que ya se creó para ella — sin tocar las demás cuotas del mismo crédito.
+  const marcarCuotaPagada = async (id, idxCuota, egresoId) => {
+    const actualizados = creditos.map((c) => {
+      if (c.id !== id) return c;
+      const cuotas = c.cuotas.map((cu, i) => (i === idxCuota ? { ...cu, pagada: true, egresoId } : cu));
+      return { ...c, cuotas };
+    });
+    await storageSet("creditos-contabilidad", JSON.stringify(actualizados), false);
+    setCreditosState(actualizados);
+  };
+
+  return { creditos, cargado, crear, editar, eliminar, marcarCuotaPagada };
 }
 
 export const FRECUENCIAS_SERVICIO = ["Mensual", "Quincenal", "Semanal", "Pago único"];

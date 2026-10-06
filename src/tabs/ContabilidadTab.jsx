@@ -32,6 +32,7 @@ import {
   GraficaBarrasAgrupadas,
   CATEGORIAS_EGRESO,
   useEgresos,
+  useCreditos,
   CATEGORIAS_OTRO_INGRESO,
   useOtrosIngresos,
   numeroWhatsappCliente,
@@ -1875,6 +1876,162 @@ function EgresoCard({ egreso, onEditar, onEliminar, clientesDisponibles, mediosP
   );
 }
 
+function FormularioCredito({ onRegistrar }) {
+  const [concepto, setConcepto] = useState("");
+  const [categoria, setCategoria] = useState(CATEGORIAS_EGRESO[0]);
+  const [valorTotal, setValorTotal] = useState("");
+  const [numCuotas, setNumCuotas] = useState("12");
+  const [diaPago, setDiaPago] = useState("");
+  const [guardando, setGuardando] = useState(false);
+
+  const registrar = async () => {
+    if (!concepto.trim() || !valorTotal || Number(valorTotal) <= 0 || !numCuotas || Number(numCuotas) <= 0) return;
+    setGuardando(true);
+    await onRegistrar({ concepto, categoria, valorTotal, numCuotas, diaPago: diaPago || null });
+    setConcepto("");
+    setValorTotal("");
+    setNumCuotas("12");
+    setDiaPago("");
+    setGuardando(false);
+  };
+
+  return (
+    <div style={{ marginTop: 12, borderTop: `1px solid ${COLORS.border}`, paddingTop: 14 }}>
+      <div className="drx-grid-form" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+        <Field label="Concepto">
+          <input className="drx-input" style={inputStyle} value={concepto} onChange={(e) => setConcepto(e.target.value)} placeholder="Ej: Computador para la oficina" />
+        </Field>
+        <Field label="Categoría">
+          <select className="drx-input" style={inputStyle} value={categoria} onChange={(e) => setCategoria(e.target.value)}>
+            {CATEGORIAS_EGRESO.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+          </select>
+        </Field>
+      </div>
+      <div className="drx-grid-form" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
+        <Field label="Valor total (COP)">
+          <CampoDinero style={inputStyle} value={valorTotal} onChange={(e) => setValorTotal(e.target.value)} placeholder="Ej: 2.400.000" />
+        </Field>
+        <Field label="Número de cuotas">
+          <input
+            type="number"
+            min="1"
+            className="drx-input"
+            style={inputStyle}
+            value={numCuotas}
+            onChange={(e) => setNumCuotas(e.target.value)}
+          />
+        </Field>
+        <Field label="Día de pago del mes (opcional)">
+          <input
+            type="number"
+            min="1"
+            max="31"
+            className="drx-input"
+            style={inputStyle}
+            value={diaPago}
+            onChange={(e) => setDiaPago(e.target.value)}
+            placeholder="Ej: 15"
+          />
+        </Field>
+      </div>
+      {valorTotal > 0 && numCuotas > 0 && (
+        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, marginTop: 10 }}>
+          {numCuotas} cuota{Number(numCuotas) !== 1 ? "s" : ""} de {formatoCOP(Number(valorTotal) / Number(numCuotas))} cada una.
+        </p>
+      )}
+      <button
+        className="drx-btn-primary"
+        style={{ ...buttonPrimary, marginTop: 14, background: "#7C3AED" }}
+        onClick={registrar}
+        disabled={guardando || !concepto.trim() || !valorTotal || !numCuotas}
+      >
+        {guardando ? "Guardando..." : "Registrar crédito"}
+      </button>
+    </div>
+  );
+}
+
+function CreditoCard({ credito, mediosPago = MEDIOS_PAGO_DEFECTO, onPagarCuota, onEliminar }) {
+  const [pagandoIdx, setPagandoIdx] = useState(null);
+  const [medioPago, setMedioPago] = useState("");
+
+  const idxProxima = credito.cuotas.findIndex((c) => !c.pagada);
+  const cuotasPagadas = credito.cuotas.filter((c) => c.pagada).length;
+  const totalCuotas = credito.cuotas.length;
+  const saldoPendiente = credito.cuotas.filter((c) => !c.pagada).reduce((sum, c) => sum + c.valor, 0);
+  const completo = idxProxima === -1;
+  const proxima = !completo ? credito.cuotas[idxProxima] : null;
+  const vencida = proxima && new Date(`${proxima.fecha}T12:00:00`).getTime() < Date.now();
+
+  const confirmarPago = async () => {
+    setPagandoIdx(idxProxima);
+    await onPagarCuota(credito, idxProxima, medioPago);
+    setPagandoIdx(null);
+  };
+
+  return (
+    <div style={{ background: COLORS.surfaceSoft, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: 12, marginTop: 10 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 8 }}>
+        <div>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11, fontWeight: 700, color: "#6D28D9", background: "#EEE9FC", display: "inline-block", padding: "2px 8px", borderRadius: 20, margin: "0 0 4px" }}>
+            CRÉDITO · {credito.categoria}
+          </p>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13.5, fontWeight: 700, color: COLORS.ink, margin: 0 }}>{credito.concepto}</p>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, margin: "3px 0 0" }}>
+            {cuotasPagadas}/{totalCuotas} cuotas pagadas · Total {formatoCOP(credito.valorTotal)}
+            {!completo && ` · Falta ${formatoCOP(saldoPendiente)}`}
+          </p>
+        </div>
+        <button className="drx-btn-ghost" style={{ ...buttonGhost, padding: "5px 12px", fontSize: 12, color: "#B42318", borderColor: "#F2B8B5" }} onClick={() => onEliminar(credito)}>
+          Eliminar
+        </button>
+      </div>
+
+      {completo ? (
+        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: "#166534", fontWeight: 600, marginTop: 10 }}>✓ Crédito pagado por completo.</p>
+      ) : (
+        <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <span
+            style={{
+              fontFamily: "Inter, sans-serif",
+              fontSize: 12,
+              fontWeight: 700,
+              padding: "3px 10px",
+              borderRadius: 20,
+              background: vencida ? "#FEF2F2" : "#EEF2FF",
+              color: vencida ? "#B42318" : "#4338CA",
+              border: `1px solid ${vencida ? "#FECACA" : "#DDE3FB"}`,
+            }}
+          >
+            {vencida ? "Vencida" : "Próxima cuota"}: {formatoCOP(proxima.valor)} ·{" "}
+            {new Date(`${proxima.fecha}T12:00:00`).toLocaleDateString("es-CO", { dateStyle: "medium" })}
+          </span>
+          <select className="drx-input" style={{ ...inputStyle, maxWidth: 170, padding: "6px 10px", fontSize: 12 }} value={medioPago} onChange={(e) => setMedioPago(e.target.value)}>
+            <option value="">¿De qué cuenta sale?</option>
+            {mediosPago.map((m) => (
+              <option key={m} value={m}>
+                {m}
+              </option>
+            ))}
+          </select>
+          <button
+            className="drx-btn-primary"
+            style={{ ...buttonPrimary, padding: "6px 14px", fontSize: 12.5, background: "#7C3AED" }}
+            onClick={confirmarPago}
+            disabled={pagandoIdx !== null}
+          >
+            {pagandoIdx !== null ? "Registrando..." : "Pagar esta cuota"}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // Tarjeta de solo lectura para "Todos los ingresos" — junta pagos de
 // clientes y otros ingresos en el mismo formato visual que EgresoCard. No
 // tiene editar/eliminar: un pago de cliente se corrige desde la tarjeta de
@@ -2124,6 +2281,7 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
   const [mesFiltroIngresoTotal, setMesFiltroIngresoTotal] = useState("Todos");
   const { egresos, crear: crearEgreso, editar: editarEgreso, eliminar: eliminarEgresoBase, recategorizarMasivo } = useEgresos();
   const { ingresos: otrosIngresos, crear: crearOtroIngreso, editar: editarOtroIngreso, eliminar: eliminarOtroIngresoBase } = useOtrosIngresos();
+  const { creditos, crear: crearCreditoBase, eliminar: eliminarCreditoBase, marcarCuotaPagada } = useCreditos();
   const { mediosPago, cuentasSaldo, guardarMediosPago, guardarCuentasSaldo } = useMediosPago();
   const { contactos: referenciadores } = useReferenciadores();
   const { contactos: abogadosAsociados } = useAbogadosAsociados();
@@ -2270,6 +2428,36 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
     if (!ok) return;
     await eliminarEgresoBase(egreso.id);
     registrarAuditoria(usuarioActual, "eliminar_egreso", "egreso", egreso.id, { concepto: egreso.concepto, valor: egreso.valor });
+  };
+
+  const registrarCredito = async (datos) => {
+    const nuevo = await crearCreditoBase(datos);
+    registrarAuditoria(usuarioActual, "registrar_credito", "credito", nuevo.id, { concepto: nuevo.concepto, valorTotal: nuevo.valorTotal });
+    setModoRegistro(null);
+  };
+
+  // Pagar una cuota crea el egreso real de ese día (cuenta igual en los
+  // totales de Contabilidad, como cualquier otro egreso) y solo DESPUÉS
+  // marca esa cuota puntual como pagada, enlazada al egreso que se acaba de
+  // crear — si el egreso fallara, la cuota se queda sin marcar.
+  const pagarCuotaCredito = async (credito, idxCuota, medioPago) => {
+    const cuota = credito.cuotas[idxCuota];
+    const nuevoEgreso = await crearEgreso({
+      concepto: `${credito.concepto} (cuota ${idxCuota + 1}/${credito.cuotas.length})`,
+      categoria: credito.categoria,
+      valor: cuota.valor,
+      fecha: new Date().toISOString().slice(0, 10),
+      medioPago: medioPago || "",
+    });
+    await marcarCuotaPagada(credito.id, idxCuota, nuevoEgreso.id);
+    registrarAuditoria(usuarioActual, "pagar_cuota_credito", "credito", credito.id, { concepto: credito.concepto, cuota: idxCuota + 1, valor: cuota.valor });
+  };
+
+  const eliminarCredito = async (credito) => {
+    const ok = await confirmar(`¿Eliminar el crédito "${credito.concepto}"? Las cuotas que ya pagaste quedan igual en Egresos — esto solo borra el seguimiento de las que faltan. No se puede deshacer.`);
+    if (!ok) return;
+    await eliminarCreditoBase(credito.id);
+    registrarAuditoria(usuarioActual, "eliminar_credito", "credito", credito.id, { concepto: credito.concepto });
   };
 
   // "Otro" era la categoría más parecida a "no sé qué es todavía" antes de
@@ -2856,6 +3044,13 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
         >
           {modoRegistro === "ingreso" ? "Cancelar" : "+ Registrar otro ingreso"}
         </button>
+        <button
+          className="drx-btn-primary"
+          style={{ ...buttonPrimary, background: "#7C3AED" }}
+          onClick={() => setModoRegistro(modoRegistro === "credito" ? null : "credito")}
+        >
+          {modoRegistro === "credito" ? "Cancelar" : "+ Registrar crédito"}
+        </button>
       </div>
 
       {modoRegistro === "pago" && (
@@ -2901,6 +3096,15 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
             Para plata que entra sin ser el pago de un cliente puntual — rendimientos, reembolsos, algo administrativo o que no sabes bien cómo clasificar.
           </p>
           <FormularioOtroIngreso onRegistrar={registrarOtroIngreso} mediosPago={mediosPago} />
+        </Card>
+      )}
+      {modoRegistro === "credito" && (
+        <Card style={{ marginBottom: 20, borderLeft: "4px solid #7C3AED" }}>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, fontWeight: 700, color: COLORS.ink, marginBottom: 4 }}>Registrar crédito o compra a cuotas</p>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, marginBottom: 14 }}>
+            Algo que compró el despacho y está pagando poco a poco (un equipo, un préstamo...) — Nomos arma el calendario de cuotas y te avisa cuándo toca la próxima.
+          </p>
+          <FormularioCredito onRegistrar={registrarCredito} />
         </Card>
       )}
 
@@ -3364,6 +3568,17 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
 
       {vistaContabilidad === "egresos" && (
         <>
+      {creditos.length > 0 && (
+        <Card style={{ marginBottom: 20 }}>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, fontWeight: 700, color: COLORS.ink, marginBottom: 4 }}>Créditos y compras a cuotas</p>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, marginBottom: 4 }}>
+            Lo que el despacho debe pagar, no lo que le deben — cada cuota pagada se registra como un egreso normal.
+          </p>
+          {creditos.map((c) => (
+            <CreditoCard key={c.id} credito={c} mediosPago={mediosPago} onPagarCuota={pagarCuotaCredito} onEliminar={eliminarCredito} />
+          ))}
+        </Card>
+      )}
       {categoriasEgresoOrdenadas.length > 0 && (
         <Card style={{ marginBottom: 20 }}>
           <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, fontWeight: 700, color: COLORS.ink, marginBottom: 4 }}>Egresos por categoría</p>
