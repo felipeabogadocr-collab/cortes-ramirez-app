@@ -1312,7 +1312,7 @@ export function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-export const APP_VERSION = "1.141.0";
+export const APP_VERSION = "1.141.1";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -7249,12 +7249,11 @@ function PantallaPendienteActivacion({ usuarioActual, onCerrarSesion }) {
   );
 }
 
-// Freno del lado del cliente contra intentos repetidos de inicio de sesión y
-// contra el "bombardeo" de correos de recuperación de contraseña. No
-// reemplaza los límites del servidor (Supabase Auth ya los tiene) — es una
-// capa adicional, y por eso se guarda en localStorage: así sobrevive a
-// recargar la página, que es lo primero que probaría alguien para saltársela.
-const LLAVE_INTENTOS_LOGIN = "nomos_intentos_login";
+// Freno del lado del cliente contra el "bombardeo" de correos de
+// recuperación de contraseña (ver enviarRecuperacion). No reemplaza los
+// límites del servidor (Supabase Auth ya los tiene) — es una capa
+// adicional, y por eso se guarda en localStorage: así sobrevive a recargar
+// la página.
 const LLAVE_COOLDOWN_RECUPERACION = "nomos_cooldown_recuperacion";
 
 export function leerJSONLocal(llave, porDefecto) {
@@ -7386,8 +7385,6 @@ function LoginGate({ onIngresar, onCancelar, pantallaInicial, errorExterno }) {
   const [fotoArchivo, setFotoArchivo] = useState(null);
   const [fotoPreview, setFotoPreview] = useState("");
   const [iniciadoEn] = useState(() => Date.now());
-  const [bloqueadoHasta, setBloqueadoHasta] = useState(() => leerJSONLocal(LLAVE_INTENTOS_LOGIN, {}).bloqueadoHasta || 0);
-  const segundosBloqueoLogin = useCuentaRegresiva(bloqueadoHasta);
   const [proximoEnvioRecuperacion, setProximoEnvioRecuperacion] = useState(() => leerJSONLocal(LLAVE_COOLDOWN_RECUPERACION, {}).proximoEnvio || 0);
   const [codigo2FA, setCodigo2FA] = useState("");
   const [factorId2FA, setFactorId2FA] = useState(null);
@@ -7508,7 +7505,7 @@ function LoginGate({ onIngresar, onCancelar, pantallaInicial, errorExterno }) {
   };
 
   const iniciarSesion = async () => {
-    if (!email.trim() || !contrasena.trim() || segundosBloqueoLogin > 0) return;
+    if (!email.trim() || !contrasena.trim()) return;
     setEnviando(true);
     setError("");
     // Todo el proceso de login vive dentro de un try/catch/finally a
@@ -7532,23 +7529,14 @@ function LoginGate({ onIngresar, onCancelar, pantallaInicial, errorExterno }) {
         }
       }
       if (loginError) {
-        const anterior = leerJSONLocal(LLAVE_INTENTOS_LOGIN, { intentos: 0 });
-        const intentos = (anterior.intentos || 0) + 1;
-        // A partir del 5º intento fallido seguido, cada uno duplica la espera
-        // (30s, 60s, 120s…) hasta un tope de 5 minutos — suficiente para
-        // frenar un ataque automatizado sin castigar a alguien que
-        // simplemente se equivocó de contraseña una o dos veces.
-        let nuevoBloqueo = 0;
-        if (intentos >= 5) {
-          nuevoBloqueo = Date.now() + Math.min(30 * 2 ** (intentos - 5), 300) * 1000;
-          setBloqueadoHasta(nuevoBloqueo);
-        }
-        guardarJSONLocal(LLAVE_INTENTOS_LOGIN, { intentos, bloqueadoHasta: nuevoBloqueo });
+        // El freno de intentos repetidos (que duplicaba la espera tras el 5º
+        // intento fallido) se quitó: Supabase Auth ya tiene su propio límite
+        // del lado del servidor contra fuerza bruta, y el de aquí (guardado
+        // en localStorage, por dispositivo) terminaba bloqueando a alguien
+        // que solo se equivocó de contraseña un par de veces seguidas.
         setError("Correo o contraseña incorrectos.");
         return;
       }
-      guardarJSONLocal(LLAVE_INTENTOS_LOGIN, { intentos: 0, bloqueadoHasta: 0 });
-      setBloqueadoHasta(0);
 
       // Si el usuario activó verificación en dos pasos (ver
       // PanelSeguridad2FA), la contraseña sola no basta — Supabase marca
@@ -7811,18 +7799,13 @@ function LoginGate({ onIngresar, onCancelar, pantallaInicial, errorExterno }) {
               </Field>
             </div>
             {error && <p style={{ color: "#B42318", fontSize: 12.5, marginTop: 10, fontFamily: "Inter, sans-serif" }}>{error}</p>}
-            {segundosBloqueoLogin > 0 && (
-              <p style={{ color: "#B45309", fontSize: 12, marginTop: 10, fontFamily: "Inter, sans-serif" }}>
-                Demasiados intentos fallidos. Espera {segundosBloqueoLogin}s antes de volver a intentar.
-              </p>
-            )}
             <button
               className="drx-btn-primary drx-cta-shine"
               style={{ ...buttonPrimary, width: "100%", marginTop: 16 }}
               onClick={iniciarSesion}
-              disabled={enviando || !email.trim() || !contrasena.trim() || segundosBloqueoLogin > 0}
+              disabled={enviando || !email.trim() || !contrasena.trim()}
             >
-              {segundosBloqueoLogin > 0 ? `Espera ${segundosBloqueoLogin}s` : enviando ? "Ingresando…" : "Ingresar"}
+              {enviando ? "Ingresando…" : "Ingresar"}
             </button>
             <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11, color: COLORS.muted, marginTop: 14, textAlign: "center" }}>
               <button
