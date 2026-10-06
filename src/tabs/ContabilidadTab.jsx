@@ -1649,10 +1649,27 @@ function ReciboCard({ cliente, pago, onEditar, onEliminar, datosResponsable, por
               )}
             </a>
           )}
-          {numero && (
+          {numero ? (
             <button className="drx-btn-primary" style={{ ...buttonPrimary, padding: "5px 12px", fontSize: 12, background: "#1DA851" }} onClick={enviarPorWhatsapp}>
               Enviar por WhatsApp ↗
             </button>
+          ) : (
+            <span
+              title={`${pagadorTiene ? "El pagador" : "El cliente"} no tiene teléfono registrado — agrégalo en Clientes → Editar para poder enviarle el recibo por WhatsApp.`}
+              style={{
+                ...buttonGhost,
+                padding: "5px 12px",
+                fontSize: 12,
+                color: "#B45309",
+                background: "#FEF3E2",
+                borderColor: "#FCE3B8",
+                cursor: "help",
+                display: "inline-flex",
+                alignItems: "center",
+              }}
+            >
+              <Icono tipo="alerta" size={12} style={{ marginRight: 4 }} /> Sin teléfono — no se puede enviar
+            </span>
           )}
           <button className="drx-btn-ghost" style={{ ...buttonGhost, padding: "5px 12px", fontSize: 12 }} onClick={descargarCuentaDeCobro} disabled={generandoCuenta}>
             {generandoCuenta ? (
