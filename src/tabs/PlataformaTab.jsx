@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { supabase } from "../lib/supabaseClient";
 import {
   COLORS, diasDesde, useConfirmarDialogo, inputStyle, buttonPrimary, buttonGhost, Card,
-  EncabezadoSeccion, Spinner, Icono,
+  EncabezadoSeccion, Spinner, Icono, CampoDinero, formatoCOP, Field, fechaHoyISO,
 } from "../App.jsx";
 
 // Errores no controlados que el ErrorBoundary del frontend atrapa se
@@ -156,6 +156,143 @@ function PanelActividadDespacho({ despachoId }) {
   );
 }
 
+// Registro manual de pagos de suscripción — hasta que haya una pasarela de
+// pago real (Wompi/ePayco), el superadmin cobra por transferencia/Nequi y
+// confirma a mano aquí cuánto y cuándo pagó cada despacho. "pagó este mes"
+// se calcula sobre el pago más reciente, comparando mes y año calendario
+// contra hoy — no son 30 días exactos desde el último pago.
+function mismoMes(fechaIso) {
+  if (!fechaIso) return false;
+  const f = new Date(`${fechaIso}T12:00:00`);
+  const hoy = new Date();
+  return f.getFullYear() === hoy.getFullYear() && f.getMonth() === hoy.getMonth();
+}
+
+function PanelPagosDespacho({ despacho, pagos, onRegistrado, onEliminado }) {
+  const [abierto, setAbierto] = useState(false);
+  const [valor, setValor] = useState("");
+  const [fecha, setFecha] = useState(fechaHoyISO());
+  const [guardando, setGuardando] = useState(false);
+  const [eliminandoId, setEliminandoId] = useState(null);
+  const [error, setError] = useState("");
+
+  const ultimoPago = pagos[0] || null;
+  const pagoEsteMes = ultimoPago && mismoMes(ultimoPago.fecha);
+
+  const registrar = async () => {
+    const valorNum = Number(valor);
+    if (!valorNum || valorNum <= 0 || !fecha) return;
+    setGuardando(true);
+    setError("");
+    try {
+      const { data: sesionData } = await supabase.auth.getSession();
+      const token = sesionData?.session?.access_token;
+      const response = await fetch("/api/plataforma/despachos", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ accion: "registrar_pago", despachoId: despacho.id, valor: valorNum, fecha }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "No se pudo registrar el pago.");
+      onRegistrado(despacho.id, data.pago);
+      setValor("");
+      setFecha(fechaHoyISO());
+    } catch (e) {
+      setError(e.message);
+    }
+    setGuardando(false);
+  };
+
+  const eliminar = async (pagoId) => {
+    setEliminandoId(pagoId);
+    try {
+      const { data: sesionData } = await supabase.auth.getSession();
+      const token = sesionData?.session?.access_token;
+      const response = await fetch("/api/plataforma/despachos", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ accion: "eliminar_pago", pagoId }),
+      });
+      if (!response.ok) throw new Error("No se pudo eliminar el pago.");
+      onEliminado(despacho.id, pagoId);
+    } catch (e) {
+      setError(e.message);
+    }
+    setEliminandoId(null);
+  };
+
+  return (
+    <div style={{ marginTop: 10 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+        {ultimoPago ? (
+          <span
+            style={{
+              fontFamily: "Inter, sans-serif",
+              fontSize: 11,
+              fontWeight: 700,
+              padding: "2px 9px",
+              borderRadius: 20,
+              background: pagoEsteMes ? "#F0FDF4" : "#FEF3E2",
+              color: pagoEsteMes ? "#166534" : "#B45309",
+              border: `1px solid ${pagoEsteMes ? "#BBF7D0" : "#FCE3B8"}`,
+            }}
+          >
+            {pagoEsteMes ? "✓ Pagó este mes" : "⚠ Sin pago este mes"} — {formatoCOP(ultimoPago.valor)} el{" "}
+            {new Date(`${ultimoPago.fecha}T12:00:00`).toLocaleDateString("es-CO", { dateStyle: "medium" })}
+          </span>
+        ) : (
+          <span style={{ fontFamily: "Inter, sans-serif", fontSize: 11, fontWeight: 700, color: "#B45309", background: "#FEF3E2", border: "1px solid #FCE3B8", borderRadius: 20, padding: "2px 9px" }}>
+            ⚠ Ningún pago registrado todavía
+          </span>
+        )}
+        <button
+          onClick={() => setAbierto((a) => !a)}
+          style={{ background: "none", border: "none", cursor: "pointer", padding: 0, fontFamily: "Inter, sans-serif", fontSize: 11.5, fontWeight: 700, color: COLORS.accentBright }}
+        >
+          {abierto ? "Ocultar pagos ▲" : "Registrar / ver pagos ▼"}
+        </button>
+      </div>
+
+      {abierto && (
+        <div style={{ marginTop: 10, background: COLORS.surfaceSoft, borderRadius: 10, padding: 12 }}>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-end" }}>
+            <Field label="Valor pagado (COP)">
+              <CampoDinero style={{ ...inputStyle, width: 150 }} value={valor} onChange={(e) => setValor(e.target.value)} placeholder="Ej: 120.000" />
+            </Field>
+            <Field label="Fecha">
+              <input type="date" className="drx-input" style={{ ...inputStyle, width: 150 }} value={fecha} onChange={(e) => setFecha(e.target.value)} />
+            </Field>
+            <button className="drx-btn-primary" style={{ ...buttonPrimary, padding: "9px 16px" }} onClick={registrar} disabled={guardando || !valor || !fecha}>
+              {guardando ? "Guardando…" : "Registrar pago"}
+            </button>
+          </div>
+          {error && <p style={{ color: "#B42318", fontSize: 12, marginTop: 8, fontFamily: "Inter, sans-serif" }}>{error}</p>}
+
+          {pagos.length > 0 && (
+            <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 6 }}>
+              {pagos.map((p) => (
+                <div key={p.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: COLORS.panel, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "6px 10px" }}>
+                  <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.ink, margin: 0 }}>
+                    {formatoCOP(p.valor)} · {new Date(`${p.fecha}T12:00:00`).toLocaleDateString("es-CO", { dateStyle: "medium" })}
+                  </p>
+                  <button
+                    onClick={() => eliminar(p.id)}
+                    disabled={eliminandoId === p.id}
+                    title="Eliminar este pago"
+                    style={{ background: "none", border: "none", cursor: "pointer", color: "#B42318", fontSize: 11, fontFamily: "Inter, sans-serif", fontWeight: 600 }}
+                  >
+                    {eliminandoId === p.id ? "…" : "Eliminar"}
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function PlataformaTab({ onListo }) {
   const [despachos, setDespachos] = useState([]);
   const [cargando, setCargando] = useState(true);
@@ -248,6 +385,16 @@ export default function PlataformaTab({ onListo }) {
     setCambiando(null);
   };
 
+  const onPagoRegistrado = (despachoId, pago) => {
+    setDespachos((prev) =>
+      prev.map((d) => (d.id === despachoId ? { ...d, pagos: [pago, ...(d.pagos || [])].sort((a, b) => (a.fecha < b.fecha ? 1 : -1)) } : d))
+    );
+  };
+
+  const onPagoEliminado = (despachoId, pagoId) => {
+    setDespachos((prev) => prev.map((d) => (d.id === despachoId ? { ...d, pagos: (d.pagos || []).filter((p) => p.id !== pagoId) } : d)));
+  };
+
   const textoFiltro = filtro.trim().toLowerCase();
   const despachosFiltrados = textoFiltro
     ? despachos.filter((d) => d.nombre?.toLowerCase().includes(textoFiltro) || d.adminEmail?.toLowerCase().includes(textoFiltro))
@@ -257,6 +404,7 @@ export default function PlataformaTab({ onListo }) {
   const activos = despachosFiltrados.filter((d) => d.activo && !pruebaVencida(d));
   const HACE_7_DIAS = Date.now() - 7 * 24 * 60 * 60 * 1000;
   const activosUsandoEstaSemana = activos.filter((d) => d.ultimaActividad && new Date(d.ultimaActividad).getTime() >= HACE_7_DIAS).length;
+  const activosPagaronEsteMes = activos.filter((d) => d.pagos?.[0] && mismoMes(d.pagos[0].fecha)).length;
 
   const textoUltimaActividad = (fecha) => {
     if (!fecha) return "sin inicios de sesión registrados todavía";
@@ -277,6 +425,9 @@ export default function PlataformaTab({ onListo }) {
           </p>
           <p style={{ fontFamily: "Inter, sans-serif", fontSize: 22, fontWeight: 800, color: COLORS.ink, margin: "4px 0 0" }}>
             {activosUsandoEstaSemana} de {activos.length} despachos activos entraron esta semana
+          </p>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, fontWeight: 700, color: activosPagaronEsteMes === activos.length ? "#166534" : "#B45309", margin: "8px 0 0" }}>
+            {activosPagaronEsteMes} de {activos.length} despachos activos con pago registrado este mes
           </p>
         </Card>
       )}
@@ -338,6 +489,7 @@ export default function PlataformaTab({ onListo }) {
                       )}
                     </p>
                     <PanelActividadDespacho despachoId={d.id} />
+                    <PanelPagosDespacho despacho={d} pagos={d.pagos || []} onRegistrado={onPagoRegistrado} onEliminado={onPagoEliminado} />
                   </div>
                   <div style={{ display: "flex", gap: 8 }}>
                     <button
@@ -379,6 +531,7 @@ export default function PlataformaTab({ onListo }) {
                       {textoUltimaActividad(d.ultimaActividad)}
                     </p>
                     <PanelActividadDespacho despachoId={d.id} />
+                    <PanelPagosDespacho despacho={d} pagos={d.pagos || []} onRegistrado={onPagoRegistrado} onEliminado={onPagoEliminado} />
                   </div>
                   <button className="drx-btn-ghost" style={buttonGhost} onClick={() => alternarActivo(d)} disabled={cambiando === d.id}>
                     {cambiando === d.id ? "…" : "Desactivar"}

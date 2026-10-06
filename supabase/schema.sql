@@ -651,3 +651,25 @@ create table if not exists google_calendar_conexiones (
 );
 
 alter table google_calendar_conexiones enable row level security;
+
+-- Pagos de suscripción a Nomos, registrados a mano por el superadmin --------
+-- Antes solo existía "pago_reportado_en" (el propio despacho dice "ya
+-- pagué", sin confirmar nada) y "activo" (sí/no) — no quedaba un historial
+-- de cuánto pagó cada despacho ni cuándo, así que no había forma de ver de
+-- un vistazo quién ya pagó este mes y quién no. Esta tabla es ese registro
+-- manual: cada fila es un pago que el superadmin confirmó y anotó él mismo
+-- desde "Plataforma" (api/plataforma/despachos.js).
+create table if not exists plataforma_pagos (
+  id bigserial primary key,
+  despacho_id uuid not null references despachos (id) on delete cascade,
+  valor bigint not null,
+  fecha date not null,
+  creado_en timestamptz not null default now()
+);
+
+create index if not exists plataforma_pagos_despacho_idx on plataforma_pagos (despacho_id, fecha desc);
+
+alter table plataforma_pagos enable row level security;
+-- Sin políticas a propósito: solo el endpoint de servidor (llave
+-- service_role, ya protegido por verificarSuperadmin) lee y escribe aquí —
+-- ni siquiera el Administrador de un despacho debería ver cuánto paga otro.

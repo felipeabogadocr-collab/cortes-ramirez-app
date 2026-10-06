@@ -103,12 +103,41 @@ export default async function handler(req, res) {
       }
     });
 
+    // Historial de pagos registrados a mano (ver tabla plataforma_pagos) —
+    // se manda completo (no solo el último) para que el panel pueda mostrar
+    // "pagó este mes" calculando sobre la fecha más reciente de cada uno.
+    const { data: pagos } = await admin
+      .from("plataforma_pagos")
+      .select("id, despacho_id, valor, fecha")
+      .order("fecha", { ascending: false });
+    const pagosPorDespacho = {};
+    (pagos || []).forEach((p) => {
+      if (!pagosPorDespacho[p.despacho_id]) pagosPorDespacho[p.despacho_id] = [];
+      pagosPorDespacho[p.despacho_id].push(p);
+    });
+
     const resultado = (despachos || []).map((d) => ({
       ...d,
       adminEmail: adminsPorDespacho[d.id] || null,
       ultimaActividad: ultimaActividadPorDespacho[d.id] || null,
+      pagos: pagosPorDespacho[d.id] || [],
     }));
     return res.status(200).json({ despachos: resultado });
+  }
+
+  if (req.method === "POST" && req.body?.accion === "registrar_pago") {
+    const { despachoId, valor, fecha } = req.body || {};
+    const valorNum = Number(valor);
+    if (!despachoId || !fecha || !Number.isFinite(valorNum) || valorNum <= 0) {
+      return res.status(400).json({ error: "Faltan datos" });
+    }
+    const { data: pago, error } = await admin
+      .from("plataforma_pagos")
+      .insert({ despacho_id: despachoId, valor: Math.round(valorNum), fecha })
+      .select("id, despacho_id, valor, fecha")
+      .single();
+    if (error) return res.status(500).json({ error: error.message });
+    return res.status(200).json({ ok: true, pago });
   }
 
   if (req.method === "POST") {
@@ -122,6 +151,14 @@ export default async function handler(req, res) {
     // viéndose como vencida aunque ya esté activo de forma permanente.
     const cambios = activo ? { activo, prueba_hasta: null, pago_reportado_en: null } : { activo };
     const { error } = await admin.from("despachos").update(cambios).eq("id", despachoId);
+    if (error) return res.status(500).json({ error: error.message });
+    return res.status(200).json({ ok: true });
+  }
+
+  if (req.method === "DELETE" && (req.body?.accion === "eliminar_pago" || req.query?.accion === "eliminar_pago")) {
+    const pagoId = req.body?.pagoId || req.query?.pagoId;
+    if (!pagoId) return res.status(400).json({ error: "Falta el id del pago" });
+    const { error } = await admin.from("plataforma_pagos").delete().eq("id", pagoId);
     if (error) return res.status(500).json({ error: error.message });
     return res.status(200).json({ ok: true });
   }
