@@ -1314,7 +1314,7 @@ export function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-export const APP_VERSION = "1.153.0";
+export const APP_VERSION = "1.154.0";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -7069,10 +7069,11 @@ export const PLANES_PRECIO = [
 
 export const FUNCIONES_LANDING = [
   { titulo: "Resumen", color: "#2F80ED", iconoTab: "resumen", texto: "Lo que necesita tu atención hoy, en un solo panel." },
+  { titulo: "Agenda + Google Calendar", color: "#8B5CF6", iconoTab: "agenda", texto: "Cada evento se crea también en tu Google Calendar, con link de Meet listo para compartir." },
   { titulo: "Clientes", color: "#14B8A6", iconoTab: "clientes", texto: "Ficha completa por cliente, con búsqueda instantánea." },
   { titulo: "Vigilancia judicial", color: "#F5A524", iconoTab: "vigilancia", texto: "La Rama Judicial, consultada y explicada por IA." },
+  { titulo: "Antecedentes", color: "#6366F1", iconoTab: "antecedentes", texto: "RUES, antecedentes judiciales, fiscales y más, en un solo lugar." },
   { titulo: "Contabilidad", color: "#F43F5E", iconoTab: "contabilidad", texto: "Pagos, recibos y cobros listos para WhatsApp." },
-  { titulo: "Calendario de contenido", color: "#8B5CF6", iconoTab: "contenido", texto: "Ideas de redes sociales generadas con IA." },
   { titulo: "Firmar documentos", color: "#10B981", iconoTab: "documentos", texto: "Firma electrónica desde el celular, sin instalar nada." },
   { titulo: "Portal del cliente", color: "#2F80ED", iconoTab: "usuarios", texto: "Tus clientes consultan su caso sin llamarte." },
   { titulo: "Reportes", color: "#0EA5E9", iconoTab: "reportes", texto: "Ingresos y carga de trabajo, con datos reales." },

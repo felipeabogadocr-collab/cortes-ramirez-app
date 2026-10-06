@@ -21,7 +21,6 @@ import {
   NUMERO_WHATSAPP_DESPACHO,
   PLANES_PRECIO,
   FUNCIONES_LANDING,
-  FAQ_LANDING,
   SEGURIDAD_LANDING,
 } from "../App.jsx";
 
@@ -125,7 +124,6 @@ export default function LandingPage({ onRegistrar, onIniciarSesion }) {
             <a href="#funciones" className="drx-navlink" style={navLinkStyle}>Funciones</a>
             <a href="#seguridad" className="drx-navlink" style={navLinkStyle}>Seguridad</a>
             <a href="#planes" className="drx-navlink" style={navLinkStyle}>Planes</a>
-            <a href="#faq" className="drx-navlink" style={navLinkStyle}>Preguntas frecuentes</a>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
             <button
@@ -167,7 +165,6 @@ export default function LandingPage({ onRegistrar, onIniciarSesion }) {
               { href: "#funciones", texto: "Funciones" },
               { href: "#seguridad", texto: "Seguridad" },
               { href: "#planes", texto: "Planes" },
-              { href: "#faq", texto: "Preguntas frecuentes" },
             ].map((link) => (
               <a
                 key={link.href}
@@ -312,53 +309,6 @@ export default function LandingPage({ onRegistrar, onIniciarSesion }) {
       </div>
 
       <div style={{ maxWidth: 1040, margin: "0 auto", padding: "0 20px 60px" }}>
-        <Kicker texto="Cómo funciona" />
-        <h2 style={{ fontFamily: "Inter, sans-serif", fontSize: 22, fontWeight: 800, color: COLORS.headingText, textAlign: "center", marginBottom: 8, marginTop: 0 }}>
-          De cero a operando, en tres pasos
-        </h2>
-        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted, textAlign: "center", marginBottom: 34 }}>
-          No hay nada que instalar ni configurar a mano — empiezas a usarlo el mismo día.
-        </p>
-        <div style={{ position: "relative", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 24, marginBottom: 64 }}>
-          <div
-            aria-hidden="true"
-            style={{ position: "absolute", top: 22, left: "16%", right: "16%", height: 2, background: `linear-gradient(90deg, ${COLORS.border}, ${COLORS.accentBright}, ${COLORS.border})`, display: window?.innerWidth < 720 ? "none" : "block" }}
-          />
-          {[
-            { n: "1", titulo: "Registra tu despacho", texto: "Con tu correo y el nombre del despacho — sin tarjeta de crédito ni formularios largos." },
-            { n: "2", titulo: "Invita a tu equipo", texto: "Agrega abogados y asistentes, cada uno con el rol y los permisos que le correspondan." },
-            { n: "3", titulo: "Empieza a gestionar", texto: "Carga tus clientes y procesos, y desde ahí Nomos vigila, cobra y firma contigo." },
-          ].map((paso, i) => (
-            <AlEntrar key={paso.n} retraso={i * 90}>
-              <div style={{ textAlign: "center", position: "relative" }}>
-                <div
-                  style={{
-                    width: 44,
-                    height: 44,
-                    borderRadius: "50%",
-                    background: COLORS.navy,
-                    color: "#FFFFFF",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontFamily: "Inter, sans-serif",
-                    fontWeight: 800,
-                    fontSize: 17,
-                    margin: "0 auto 14px",
-                    boxShadow: "0 8px 20px rgba(11,61,46,0.25)",
-                  }}
-                >
-                  {paso.n}
-                </div>
-                <p style={{ fontFamily: "Inter, sans-serif", fontSize: 14.5, fontWeight: 700, color: COLORS.headingText, marginBottom: 6 }}>{paso.titulo}</p>
-                <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.muted, lineHeight: 1.6, margin: 0, maxWidth: 240, marginLeft: "auto", marginRight: "auto" }}>
-                  {paso.texto}
-                </p>
-              </div>
-            </AlEntrar>
-          ))}
-        </div>
-
         <Kicker texto="Todo en un solo lugar" />
         <h2 id="funciones" style={{ fontFamily: "Inter, sans-serif", fontSize: 22, fontWeight: 800, color: COLORS.headingText, textAlign: "center", marginBottom: 8, marginTop: 0, scrollMarginTop: 90 }}>
           Qué encuentras adentro
@@ -399,6 +349,27 @@ export default function LandingPage({ onRegistrar, onIniciarSesion }) {
         <div style={{ display: "flex", flexDirection: "column", gap: 56, marginBottom: 64 }}>
           {[
             {
+              kicker: "Agenda · Nuevo",
+              titulo: "Conecta tu Google Calendar y olvídate de copiar links a mano",
+              texto: "Cada evento que creas en Nomos se crea también en tu Google Calendar real, con su enlace de Google Meet generado automáticamente — listo para copiar y compartir con el cliente por WhatsApp en un clic.",
+              color: "#8B5CF6",
+              contenido: (
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  <div style={{ background: "#0d3524", borderRadius: 10, padding: "12px 14px" }}>
+                    <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, fontWeight: 700, color: "#FFFFFF", margin: "0 0 2px" }}>Asesoría Jurídica // Juan Pérez</p>
+                    <p style={{ fontFamily: "Inter, sans-serif", fontSize: 9.5, color: "#9FB6D6", margin: 0 }}>Hoy · 6:00 p.m.</p>
+                  </div>
+                  <div style={{ background: "#0d3524", borderRadius: 8, padding: "8px 10px", display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{ width: 20, height: 20, borderRadius: "50%", background: "#0B8043", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                      <Icono tipo="video" size={10} style={{ color: "#FFFFFF" }} />
+                    </span>
+                    <span style={{ fontFamily: "monospace", fontSize: 9.5, color: "#9FB6D6", flex: 1 }}>meet.google.com/pbq-qwfa-esp</span>
+                    <span style={{ fontFamily: "Inter, sans-serif", fontSize: 9, fontWeight: 700, color: "#FFFFFF", background: "#0B8043", borderRadius: 20, padding: "3px 9px" }}>Copiar</span>
+                  </div>
+                </div>
+              ),
+            },
+            {
               kicker: "Vigilancia judicial",
               titulo: "La Rama Judicial, vigilada sola todos los días",
               texto: "Registras el radicado una vez y Nomos consulta el proceso automáticamente cada día. Cuando hay una actuación nueva, una IA te la explica en palabras simples y te sugiere el siguiente paso — no vuelves a revisar procesos uno por uno.",
@@ -418,47 +389,6 @@ export default function LandingPage({ onRegistrar, onIniciarSesion }) {
                       </span>
                     </div>
                   ))}
-                </div>
-              ),
-            },
-            {
-              kicker: "Firma electrónica",
-              titulo: "Firmas con validez legal, desde el celular",
-              texto: "Compartes un código con tu cliente y firma sin instalar nada. Cada firma queda con hash de integridad, consentimiento expreso e IP capturada del lado del servidor — con base en la Ley 527 de 1999, y verificable después si el documento se modificó.",
-              color: "#10B981",
-              contenido: (
-                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                  <div style={{ background: "#0d3524", borderRadius: 10, padding: "12px 14px", display: "flex", alignItems: "center", gap: 12 }}>
-                    <div style={{ width: 30, height: 30, borderRadius: "50%", background: "#10B981", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                      <span style={{ color: "#FFFFFF", fontWeight: 800, fontSize: 14 }}>✓</span>
-                    </div>
-                    <div>
-                      <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, fontWeight: 700, color: "#FFFFFF", margin: 0 }}>Contrato de prestación de servicios</p>
-                      <p style={{ fontFamily: "Inter, sans-serif", fontSize: 9.5, color: "#9FB6D6", margin: "2px 0 0" }}>Firmado por cliente y abogado</p>
-                    </div>
-                  </div>
-                  <div style={{ background: "#0d3524", borderRadius: 8, padding: "8px 12px", fontFamily: "monospace", fontSize: 9.5, color: "#7C93B8", wordBreak: "break-all" }}>
-                    hash: 8f3a2c…e91d — íntegro ✓
-                  </div>
-                </div>
-              ),
-            },
-            {
-              kicker: "Reportes",
-              titulo: "Decide con datos reales, no con intuición",
-              texto: "Ingresos por mes, procesos por estado y carga de trabajo por abogado, siempre actualizados y sin armar nada en Excel. Sabes cuánto entró este mes y cuánto falta por cobrar con solo entrar a la pestaña.",
-              color: "#0EA5E9",
-              contenido: (
-                <div>
-                  <div style={{ background: "#0d3524", borderRadius: 10, padding: "12px 14px", display: "flex", alignItems: "flex-end", gap: 8, height: 84, marginBottom: 10 }}>
-                    {[30, 48, 40, 62, 58, 75, 66].map((h, i) => (
-                      <div key={i} style={{ flex: 1, height: `${h}%`, borderRadius: 3, background: i === 5 ? "#0EA5E9" : "#1e5fb4" }} />
-                    ))}
-                  </div>
-                  <div style={{ background: "#0d3524", borderRadius: 8, padding: "9px 12px", display: "flex", justifyContent: "space-between" }}>
-                    <span style={{ fontFamily: "Inter, sans-serif", fontSize: 10, color: "#9FB6D6" }}>Ingreso este mes</span>
-                    <span style={{ fontFamily: "Inter, sans-serif", fontSize: 12, fontWeight: 800, color: "#10B981" }}>▲ 18%</span>
-                  </div>
                 </div>
               ),
             },
@@ -725,44 +655,6 @@ export default function LandingPage({ onRegistrar, onIniciarSesion }) {
 
       </div>
 
-      <div style={{ background: COLORS.surfaceSoft, borderTop: `1px solid ${COLORS.border}`, padding: "56px 20px 60px" }}>
-        <div style={{ maxWidth: 900, margin: "0 auto" }}>
-          <Kicker texto="Antes de escribirnos" />
-          <h2 id="faq" style={{ fontFamily: "Inter, sans-serif", fontSize: 22, fontWeight: 800, color: COLORS.headingText, textAlign: "center", marginBottom: 30, marginTop: 0, scrollMarginTop: 90 }}>
-            Preguntas frecuentes
-          </h2>
-          <div className="drx-faq" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))", gap: 12 }}>
-            {FAQ_LANDING.map((f, i) => (
-              <AlEntrar key={i} retraso={(i % 4) * 60}>
-                <details style={{ background: COLORS.panel, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: "14px 20px", height: "100%" }}>
-                  <summary
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 10,
-                      fontFamily: "Inter, sans-serif",
-                      fontSize: 13,
-                      fontWeight: 800,
-                      letterSpacing: 0.3,
-                      color: COLORS.ink,
-                      cursor: "pointer",
-                    }}
-                  >
-                    <span style={{ width: 22, height: 22, borderRadius: 6, background: COLORS.accentSoft, color: COLORS.navy, display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 800, flexShrink: 0 }}>
-                      ?
-                    </span>
-                    {f.p}
-                  </summary>
-                  <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.inkSoft, lineHeight: 1.7, margin: "12px 0 0" }}>
-                    {f.r}
-                  </p>
-                </details>
-              </AlEntrar>
-            ))}
-          </div>
-        </div>
-      </div>
-
       <AlEntrar>
         <div
           style={{
@@ -826,7 +718,6 @@ export default function LandingPage({ onRegistrar, onIniciarSesion }) {
               <a href="#funciones" style={footerLinkStyle}>Funciones</a>
               <a href="#seguridad" style={footerLinkStyle}>Seguridad</a>
               <a href="#planes" style={footerLinkStyle}>Planes</a>
-              <a href="#faq" style={footerLinkStyle}>Preguntas frecuentes</a>
             </div>
           </div>
 
