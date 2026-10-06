@@ -51,10 +51,10 @@ function descargarICS(evento) {
 // sin marcarse completada, no un estado aparte que alguien tenga que
 // mantener a mano.
 const FILTROS_TAREA = [
-  { id: "todas", nombre: "Todas" },
-  { id: "proximas", nombre: "Próximas" },
-  { id: "vencidas", nombre: "Vencidas" },
-  { id: "cumplidas", nombre: "Cumplidas" },
+  { id: "todas", nombre: "Todas", gradiente: "linear-gradient(135deg, #475569 0%, #334155 100%)", sombra: "rgba(51,65,85,0.35)" },
+  { id: "proximas", nombre: "Próximas", gradiente: "linear-gradient(135deg, #14B8A6 0%, #0D9488 100%)", sombra: "rgba(13,148,136,0.35)" },
+  { id: "vencidas", nombre: "Vencidas", gradiente: "linear-gradient(135deg, #F59E0B 0%, #D97706 100%)", sombra: "rgba(217,119,6,0.35)" },
+  { id: "cumplidas", nombre: "Cumplidas", gradiente: "linear-gradient(135deg, #22C55E 0%, #16A34A 100%)", sombra: "rgba(22,163,74,0.35)" },
 ];
 
 const DIAS_SEMANA = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
@@ -118,8 +118,9 @@ function EventoAgendaCard({ evento, onEliminar, onCompletar, onEditar, onSincron
               width: 22,
               height: 22,
               borderRadius: "50%",
-              border: `2px solid ${evento.completado ? "#16A34A" : COLORS.border}`,
-              background: evento.completado ? "#16A34A" : "transparent",
+              border: `2px solid ${evento.completado ? "transparent" : COLORS.border}`,
+              background: evento.completado ? "linear-gradient(135deg, #22C55E 0%, #16A34A 100%)" : "transparent",
+              boxShadow: evento.completado ? "0 2px 6px rgba(22,163,74,0.4)" : "none",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
@@ -127,6 +128,7 @@ function EventoAgendaCard({ evento, onEliminar, onCompletar, onEditar, onSincron
               cursor: "pointer",
               flexShrink: 0,
               marginTop: 2,
+              transition: "all .15s ease",
             }}
           >
             {evento.completado && <Icono tipo="check" size={12} />}
@@ -157,15 +159,30 @@ function EventoAgendaCard({ evento, onEliminar, onCompletar, onEditar, onSincron
               style={{
                 display: "flex",
                 alignItems: "center",
-                gap: 8,
+                gap: 9,
                 flexWrap: "wrap",
                 marginTop: 10,
-                background: COLORS.surfaceSoft,
-                border: `1px solid ${COLORS.border}`,
+                background: "linear-gradient(135deg, #F0FDF4 0%, " + COLORS.surfaceSoft + " 100%)",
+                border: "1px solid #D4F2DD",
                 borderRadius: 10,
                 padding: "7px 9px",
               }}
             >
+              <span
+                style={{
+                  width: 22,
+                  height: 22,
+                  borderRadius: "50%",
+                  background: "#0B8043",
+                  color: "#FFFFFF",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flexShrink: 0,
+                }}
+              >
+                <Icono tipo="video" size={11} />
+              </span>
               <span
                 style={{
                   fontFamily: "ui-monospace, 'JetBrains Mono', monospace",
@@ -710,25 +727,40 @@ export default function AgendaTab({ onListo }) {
       <Card
         style={{
           marginBottom: 20,
+          position: "relative",
+          overflow: "hidden",
           borderLeft: `4px solid ${googleConectado ? "#10B981" : "#4285F4"}`,
           background: googleConectado ? "linear-gradient(135deg, " + COLORS.panel + " 0%, #F0FDF4 100%)" : COLORS.panel,
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, flexWrap: "wrap" }}>
+        {googleConectado && (
+          <div
+            style={{
+              position: "absolute",
+              right: -30,
+              top: -30,
+              width: 140,
+              height: 140,
+              borderRadius: "50%",
+              background: "radial-gradient(circle, rgba(16,185,129,0.14), transparent 70%)",
+              pointerEvents: "none",
+            }}
+          />
+        )}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, flexWrap: "wrap", position: "relative" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <div
               style={{
                 width: 40,
                 height: 40,
                 borderRadius: 10,
-                background: "#FFFFFF",
-                border: `1px solid ${COLORS.border}`,
+                background: googleConectado ? "linear-gradient(135deg, #10B981 0%, #0D9488 100%)" : "linear-gradient(135deg, #4285F4 0%, #2F6BDB 100%)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                color: "#4285F4",
+                color: "#FFFFFF",
                 flexShrink: 0,
-                boxShadow: "0 1px 3px rgba(16,24,40,0.08)",
+                boxShadow: `0 4px 12px ${googleConectado ? "rgba(16,185,129,0.35)" : "rgba(66,133,244,0.35)"}`,
               }}
             >
               <Icono tipo="calendario" size={20} />
@@ -796,8 +828,23 @@ export default function AgendaTab({ onListo }) {
               ))}
             </div>
           </div>
-          <span style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, fontWeight: 700, color: COLORS.muted, background: COLORS.surfaceSoft, border: `1px solid ${COLORS.border}`, borderRadius: 20, padding: "5px 11px", marginBottom: 3 }}>
-            {listaFiltrada.length} evento{listaFiltrada.length !== 1 ? "s" : ""}
+          <span
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 5,
+              fontFamily: "Inter, sans-serif",
+              fontSize: 11.5,
+              fontWeight: 700,
+              color: "#6D4FD1",
+              background: "#F3EEFE",
+              border: "1px solid #DDD0F8",
+              borderRadius: 20,
+              padding: "5px 12px",
+              marginBottom: 3,
+            }}
+          >
+            <Icono tipo="calendario" size={11} /> {listaFiltrada.length} evento{listaFiltrada.length !== 1 ? "s" : ""}
           </span>
         </div>
         <button
@@ -818,7 +865,23 @@ export default function AgendaTab({ onListo }) {
             "Cancelar"
           ) : (
             <>
-              <span style={{ fontSize: 19, lineHeight: 1, fontWeight: 400 }}>+</span> Nuevo evento
+              <span
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  width: 20,
+                  height: 20,
+                  borderRadius: "50%",
+                  background: "rgba(255,255,255,0.22)",
+                  fontSize: 15,
+                  lineHeight: 1,
+                  fontWeight: 700,
+                }}
+              >
+                +
+              </span>
+              Nuevo evento
             </>
           )}
         </button>
@@ -834,9 +897,11 @@ export default function AgendaTab({ onListo }) {
               ...buttonGhost,
               padding: "6px 14px",
               fontSize: 12.5,
-              background: filtroTarea === f.id ? COLORS.navy : COLORS.panel,
+              fontWeight: 700,
+              background: filtroTarea === f.id ? f.gradiente : COLORS.panel,
               color: filtroTarea === f.id ? "#FFFFFF" : COLORS.inkSoft,
-              borderColor: filtroTarea === f.id ? COLORS.navy : COLORS.border,
+              borderColor: filtroTarea === f.id ? "transparent" : COLORS.border,
+              boxShadow: filtroTarea === f.id ? `0 3px 10px ${f.sombra}` : "none",
             }}
           >
             {f.nombre}
@@ -1086,6 +1151,7 @@ export default function AgendaTab({ onListo }) {
                   style={{
                     background: seleccionado ? "#F3EEFE" : "#FFFFFF",
                     border: "none",
+                    borderTop: seleccionado ? "2px solid #8B5CF6" : "2px solid transparent",
                     cursor: "pointer",
                     minHeight: 74,
                     padding: "6px 5px",
@@ -1095,6 +1161,7 @@ export default function AgendaTab({ onListo }) {
                     alignItems: "flex-start",
                     opacity: fueraDeMes ? 0.4 : 1,
                     textAlign: "left",
+                    transition: "background .12s ease",
                   }}
                 >
                   <span
@@ -1103,7 +1170,8 @@ export default function AgendaTab({ onListo }) {
                       fontSize: 11.5,
                       fontWeight: esHoy ? 800 : 600,
                       color: esHoy ? "#FFFFFF" : COLORS.ink,
-                      background: esHoy ? "#8B5CF6" : "transparent",
+                      background: esHoy ? "linear-gradient(135deg, #8B5CF6 0%, #6D4FD1 100%)" : "transparent",
+                      boxShadow: esHoy ? "0 2px 6px rgba(109,79,209,0.4)" : "none",
                       borderRadius: "50%",
                       width: 20,
                       height: 20,
@@ -1195,11 +1263,23 @@ export default function AgendaTab({ onListo }) {
                   {etiquetaFecha(grupo.fecha)}
                 </span>
                 {grupo.fecha === hoyISO && (
-                  <span style={{ fontFamily: "Inter, sans-serif", fontSize: 10, fontWeight: 700, color: "#FFFFFF", background: "#8B5CF6", borderRadius: 20, padding: "1px 8px", flexShrink: 0 }}>
+                  <span
+                    style={{
+                      fontFamily: "Inter, sans-serif",
+                      fontSize: 10,
+                      fontWeight: 700,
+                      color: "#FFFFFF",
+                      background: "linear-gradient(135deg, #8B5CF6 0%, #6D4FD1 100%)",
+                      boxShadow: "0 2px 6px rgba(109,79,209,0.4)",
+                      borderRadius: 20,
+                      padding: "2px 9px",
+                      flexShrink: 0,
+                    }}
+                  >
                     HOY
                   </span>
                 )}
-                <span style={{ flex: 1, height: 1, background: COLORS.border }} />
+                <span style={{ flex: 1, height: 1, background: `linear-gradient(90deg, ${COLORS.border}, transparent)` }} />
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                 {grupo.eventos.map((e) => (
