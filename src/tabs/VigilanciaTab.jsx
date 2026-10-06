@@ -18,6 +18,13 @@ import {
 // mano en un clic, no una consulta automática como la de la Rama Judicial.
 const URL_CONSULTA_SPOA = "https://www.fiscalia.gov.co/servicios-de-informacion-al-ciudadano/consultas/";
 
+// SAMAI es el sistema de expediente judicial del Consejo de Estado y los
+// tribunales administrativos — el que aplica a procesos de la jurisdicción
+// Contencioso Administrativa. Es un portal .aspx antiguo (formularios con
+// postback, no una API como la de Rama Judicial), así que por ahora esto es
+// un acceso directo para consultarlo a mano, igual que con la Fiscalía.
+const URL_CONSULTA_SAMAI = "https://samai.consejodeestado.gov.co/Vistas/Casos/procesos.aspx";
+
 function estadoRamaPorRadicado(cliente, radicado) {
   const porRadicado = cliente?.ramaJudicialPorRadicado || {};
   if (porRadicado[radicado]) return porRadicado[radicado];
@@ -588,7 +595,10 @@ export default function VigilanciaTab({ onListo }) {
         <strong><Icono tipo="balanza" size={13} style={{ marginRight: 4, verticalAlign: -2 }} /> Sobre esta sección:</strong> aquí centralizas los procesos que tienen número de radicado. La consulta{" "}
         <strong>"Consultar Rama Judicial"</strong> trae el estado real desde la Consulta de Procesos Nacional Unificada
         (el mismo buscador público de la Rama Judicial, por número de radicado — no existe una API oficial del Estado
-        para esto, así que si algún día cambian su página puede dejar de funcionar y hay que ajustarlo).
+        para esto, así que si algún día cambian su página puede dejar de funcionar y hay que ajustarlo). Para procesos{" "}
+        <strong>Penales</strong> hay un acceso directo a la Fiscalía, y para procesos{" "}
+        <strong>Administrativos</strong> uno a SAMAI (Consejo de Estado / tribunales administrativos) — ninguno de los
+        dos se puede consultar solo desde aquí, hay que abrirlos y revisarlos a mano.
       </div>
 
       {sinRadicado.length > 0 && (
@@ -820,6 +830,29 @@ export default function VigilanciaTab({ onListo }) {
                               }}
                             >
                               Fiscalía ↗
+                            </a>
+                          )}
+                          {c.areaProceso === "Administrativo" && (
+                            <a
+                              href={URL_CONSULTA_SAMAI}
+                              target="_blank"
+                              rel="noreferrer"
+                              title="Abre SAMAI (Consejo de Estado / tribunales administrativos) — búscalo ahí con el radicado"
+                              style={{
+                                fontFamily: "Inter, sans-serif",
+                                fontSize: 11,
+                                fontWeight: 700,
+                                whiteSpace: "nowrap",
+                                padding: "6px 12px",
+                                background: "#EEF0FD",
+                                color: "#3730A3",
+                                textDecoration: "none",
+                                borderLeft: `1px solid ${COLORS.border}`,
+                                display: "flex",
+                                alignItems: "center",
+                              }}
+                            >
+                              SAMAI ↗
                             </a>
                           )}
                         </span>
