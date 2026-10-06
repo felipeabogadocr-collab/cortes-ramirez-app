@@ -192,7 +192,22 @@ export default async function handler(req, res) {
     const usuario = await obtenerUsuarioDesdeToken(admin, req);
     if (!usuario) return res.status(401).json({ error: "Inicia sesión primero." });
     const { data: conexion } = await admin.from("google_calendar_conexiones").select("email_google").eq("usuario_id", usuario.id).maybeSingle();
-    return res.status(200).json({ conectado: !!conexion, email: conexion?.email_google || null });
+    if (!conexion) return res.status(200).json({ conectado: false, email: null });
+    // No basta con que exista la fila: el refresh_token puede haber quedado
+    // inválido (revocado desde Google, o — muy común mientras la app de
+    // Google Cloud sigue en modo "Testing" sin verificar — Google vence los
+    // refresh tokens a los 7 días solo). Antes esto reportaba "conectado"
+    // igual, así que la insignia verde se quedaba mintiendo mientras crear
+    // cualquier evento fallaba en silencio con "no_conectado". Ahora se
+    // valida de verdad: si ya no se puede renovar el token, se borra la
+    // conexión muerta y se reporta desconectado, para que quede claro que
+    // hay que volver a conectar.
+    const accessToken = await obtenerAccessTokenVigente(admin, usuario.id);
+    if (!accessToken) {
+      await admin.from("google_calendar_conexiones").delete().eq("usuario_id", usuario.id);
+      return res.status(200).json({ conectado: false, email: null, reconectar: true });
+    }
+    return res.status(200).json({ conectado: true, email: conexion.email_google || null });
   }
 
   if (req.method === "POST") {
