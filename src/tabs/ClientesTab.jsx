@@ -23,11 +23,50 @@ const URL_CONSULTA_SPOA = "https://www.fiscalia.gov.co/servicios-de-informacion-
 // usuario del despacho lo vea.
 const LLAVE_BORRADOR_CLIENTE = "borrador-cliente-nuevo";
 
-// De dónde es el cliente — la mayoría son de estas ciudades, pero el
-// despacho también lleva casos de clientes colombianos radicados en
-// España u otro país, o en otra ciudad de Colombia distinta a las 3
-// principales.
-const UBICACIONES_CLIENTE = ["Bogotá", "Medellín", "Cali", "Otra ciudad de Colombia", "España", "Otro país"];
+// De dónde es el cliente — la mayoría son de estas ciudades principales.
+// Para cualquier otro caso (otra ciudad de Colombia, u otro país) se elige
+// "Otro país" y se escribe a mano — no es una lista que Nomos arme sola a
+// partir de lo ya registrado, es fija.
+const UBICACIONES_CLIENTE = ["Bogotá", "Medellín", "Cali", "Barranquilla", "Cartagena", "Bucaramanga"];
+
+// Selector de ubicación reutilizado en el formulario de creación y en el
+// de edición: ciudades principales en el desplegable, o "Otro país" para
+// escribir cualquier otro lugar a mano. Si el cliente ya tenía guardada una
+// ubicación que no está en la lista actual (ej. datos viejos como
+// "España"), se trata igual como manual — se ve y se puede editar, no se
+// pierde.
+function SelectorUbicacion({ value, onChange }) {
+  const esConocida = UBICACIONES_CLIENTE.includes(value);
+  const modoManual = value !== "" && !esConocida;
+  return (
+    <div>
+      <select
+        className="drx-input"
+        style={inputStyle}
+        value={modoManual ? "Otro país" : value}
+        onChange={(e) => onChange(e.target.value)}
+      >
+        <option value="">Sin especificar</option>
+        {UBICACIONES_CLIENTE.map((u) => (
+          <option key={u} value={u}>
+            {u}
+          </option>
+        ))}
+        <option value="Otro país">Otro país</option>
+      </select>
+      {modoManual && (
+        <input
+          className="drx-input"
+          style={{ ...inputStyle, marginTop: 6 }}
+          placeholder="Escribe la ciudad o el país"
+          value={value === "Otro país" ? "" : value}
+          onChange={(e) => onChange(e.target.value)}
+          autoFocus
+        />
+      )}
+    </div>
+  );
+}
 
 const FORM_CLIENTE_INICIAL = {
   nombre: "",
@@ -811,14 +850,7 @@ export default function ClientesTab({ usuarioActual, onIrARegistrarPago, onListo
               <input className="drx-input" style={inputStyle} value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
             </Field>
             <Field label="Ubicación">
-              <select className="drx-input" style={inputStyle} value={form.ubicacion} onChange={(e) => setForm({ ...form, ubicacion: e.target.value })}>
-                <option value="">Sin especificar</option>
-                {UBICACIONES_CLIENTE.map((u) => (
-                  <option key={u} value={u}>
-                    {u}
-                  </option>
-                ))}
-              </select>
+              <SelectorUbicacion value={form.ubicacion} onChange={(ubicacion) => setForm({ ...form, ubicacion })} />
             </Field>
             <Field label="Número(s) de radicado (opcional)">
               <EditorRadicados radicados={form.radicados} onChange={(radicados) => setForm({ ...form, radicados })} />
@@ -968,14 +1000,7 @@ export default function ClientesTab({ usuarioActual, onIrARegistrarPago, onListo
                     <input className="drx-input" style={inputStyle} value={formEdicion.email || ""} onChange={(e) => setFormEdicion({ ...formEdicion, email: e.target.value })} />
                   </Field>
                   <Field label="Ubicación">
-                    <select className="drx-input" style={inputStyle} value={formEdicion.ubicacion || ""} onChange={(e) => setFormEdicion({ ...formEdicion, ubicacion: e.target.value })}>
-                      <option value="">Sin especificar</option>
-                      {UBICACIONES_CLIENTE.map((u) => (
-                        <option key={u} value={u}>
-                          {u}
-                        </option>
-                      ))}
-                    </select>
+                    <SelectorUbicacion value={formEdicion.ubicacion || ""} onChange={(ubicacion) => setFormEdicion({ ...formEdicion, ubicacion })} />
                   </Field>
                   <Field label="Número(s) de radicado (opcional)">
                     <EditorRadicados radicados={formEdicion.radicados} onChange={(radicados) => setFormEdicion({ ...formEdicion, radicados })} />
