@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "../lib/supabaseClient";
+import { getNombreDespacho } from "../lib/storage";
 import {
   COLORS, EncabezadoSeccion, Card, buttonPrimary, buttonGhost, Field, inputStyle,
   Icono, IconoCampana, EstadoVacio, useConfirmarDialogo, useEventosAgenda, diasHasta, urgenciaTermino,
@@ -102,10 +103,20 @@ function EventoAgendaCard({ evento, onEliminar, onCompletar, onEditar, onSincron
   // El texto de invitación usa el título del evento como "concepto" (Ej:
   // "Asesoría con Juan Pérez", "Reunión de equipo") — si por algún motivo
   // no hay título, cae en "la sesión virtual" en vez de dejar el mensaje a
-  // medias.
-  const copiarInvitacion = () => {
+  // medias. Lleva el nombre del despacho adelante, igual que cualquier otro
+  // mensaje que Nomos arma para mandar a un cliente (recordatorios, recibos,
+  // etc.) — quien lo recibe tiene que saber de inmediato de dónde viene.
+  const compartirInvitacion = () => {
     const concepto = evento.titulo ? `"${evento.titulo}"` : "la sesión virtual";
-    const texto = `Te invito a ${concepto}\n📅 ${fechaTexto}${evento.hora ? ` · ${evento.hora}` : ""}\n🔗 ${evento.googleMeetLink}`;
+    const texto = `*${getNombreDespacho()}*\n\nTe invito a ${concepto}\n📅 ${fechaTexto}${evento.hora ? ` · ${evento.hora}` : ""}\n🔗 ${evento.googleMeetLink}`;
+    // En celular (donde de verdad se comparte algo), el share nativo del
+    // sistema abre directo WhatsApp/Mensajes/Correo con el texto ya puesto
+    // — nada de copiar y tener que ir a pegarlo a mano. En escritorio, sin
+    // share nativo, se cae al copiapega de siempre.
+    if (navigator.share) {
+      navigator.share({ title: getNombreDespacho(), text: texto }).catch(() => {});
+      return;
+    }
     navigator.clipboard.writeText(texto).then(() => {
       setCopiado(true);
       setTimeout(() => setCopiado(false), 1800);
@@ -183,8 +194,12 @@ function EventoAgendaCard({ evento, onEliminar, onCompletar, onEditar, onSincron
               )}
               {evento.googleMeetLink && (
                 <button
-                  onClick={copiarInvitacion}
-                  title="Copiar mensaje de invitación con el link, para pegarlo en WhatsApp o correo"
+                  onClick={compartirInvitacion}
+                  title={
+                    typeof navigator !== "undefined" && navigator.share
+                      ? "Compartir el link de la sesión (con el nombre del despacho) por WhatsApp, correo o donde quieras"
+                      : "Copiar mensaje de invitación con el link, para pegarlo en WhatsApp o correo"
+                  }
                   style={{
                     display: "inline-flex",
                     alignItems: "center",
@@ -203,6 +218,10 @@ function EventoAgendaCard({ evento, onEliminar, onCompletar, onEditar, onSincron
                   {copiado ? (
                     <>
                       <Icono tipo="check" size={13} /> Copiado
+                    </>
+                  ) : typeof navigator !== "undefined" && navigator.share ? (
+                    <>
+                      <Icono tipo="compartir" size={13} /> Compartir
                     </>
                   ) : (
                     <>
