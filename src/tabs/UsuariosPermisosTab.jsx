@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { supabase } from "../lib/supabaseClient";
 import {
   setDespachoActual, getNombreDespacho, obtenerPapelera, restaurarDePapelera, eliminarDefinitivo,
+  subirFotoPerfil, obtenerUrlFotoPerfil,
 } from "../lib/storage";
 import {
   COLORS, formatoCOP, registrarAuditoria, useConfirmarDialogo, useUsuariosDespacho, Field,
@@ -9,7 +10,77 @@ import {
   CampoContrasena, useCuentaRegresiva, leerJSONLocal, guardarJSONLocal, permisosPorDefecto,
   notificacionesPorDefecto, SECCIONES_PERMISOS, NOTIF_CATEGORIAS, CampoDinero,
   useServicios, FRECUENCIAS_SERVICIO, useReferenciadores, useAbogadosAsociados,
+  AvatarIniciales, archivoEsImagenValida, TAMANO_MAX_ARCHIVO_MB, archivoDemasiadoGrande,
 } from "../App.jsx";
+
+// Mismo patrón que la foto propia (ver cambiarFotoPerfil en App.jsx): el
+// Administrador sube la foto al bucket "avatares" (RLS por despacho_id, no
+// por dueño del archivo, así que puede subir la de cualquier compañero de
+// su propio despacho) y guarda la ruta en "perfiles". Cada tarjeta pide su
+// propia URL de descarga porque el bucket es privado — no hay una URL
+// pública fija que se pueda reutilizar entre usuarios.
+function AvatarUsuario({ usuario, puedeEditar, actualizar }) {
+  const [url, setUrl] = useState("");
+  const [subiendo, setSubiendo] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let cancelado = false;
+    let urlCreada = null;
+    if (!usuario.foto_url) return;
+    obtenerUrlFotoPerfil(usuario.foto_url)
+      .then((u) => {
+        if (cancelado) return;
+        urlCreada = u;
+        setUrl(u);
+      })
+      .catch(() => {});
+    return () => {
+      cancelado = true;
+      if (urlCreada) URL.revokeObjectURL(urlCreada);
+    };
+  }, [usuario.foto_url]);
+
+  const cambiarFoto = async (e) => {
+    const archivo = e.target.files?.[0];
+    e.target.value = "";
+    if (!archivo) return;
+    if (archivoDemasiadoGrande(archivo)) {
+      setError(`No puede pesar más de ${TAMANO_MAX_ARCHIVO_MB} MB.`);
+      return;
+    }
+    if (!(await archivoEsImagenValida(archivo))) {
+      setError("No es una imagen válida (o es un formato no admitido, como SVG).");
+      return;
+    }
+    setError("");
+    setSubiendo(true);
+    try {
+      const ruta = await subirFotoPerfil(usuario.id, archivo);
+      await actualizar(usuario.id, { foto_url: ruta });
+    } catch (err) {
+      setError("No se pudo actualizar la foto. Intenta de nuevo.");
+    }
+    setSubiendo(false);
+  };
+
+  return (
+    <div style={{ position: "relative", flexShrink: 0 }}>
+      <label
+        title={puedeEditar ? "Cambiar foto" : undefined}
+        style={{ display: "flex", cursor: puedeEditar ? (subiendo ? "wait" : "pointer") : "default", opacity: subiendo ? 0.6 : 1 }}
+      >
+        <AvatarIniciales nombre={usuario.nombre} fotoUrl={url} size={40} />
+        {puedeEditar && <input type="file" accept="image/*" onChange={cambiarFoto} disabled={subiendo} style={{ display: "none" }} />}
+      </label>
+      {error && (
+        <p style={{ position: "absolute", top: "100%", left: 0, width: 160, color: "#B42318", fontSize: 10.5, marginTop: 4, fontFamily: "Inter, sans-serif", lineHeight: 1.3 }}>
+          {error}
+        </p>
+      )}
+    </div>
+  );
+}
 
 // Los administradores ya pueden leer toda la auditoría de su despacho (ver
 // política RLS "administradores leen auditoria del mismo despacho"), así que
@@ -713,7 +784,9 @@ export default function UsuariosPermisosTab({ usuarioActual, onDespachoRenombrad
           return (
             <Card key={u.id}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12, flexWrap: "wrap", gap: 8 }}>
-                <div>
+                <div style={{ display: "flex", gap: 12 }}>
+                  <AvatarUsuario usuario={u} puedeEditar={usuarioActual.rol === "Administrador"} actualizar={actualizar} />
+                  <div>
                   <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, fontWeight: 700, color: COLORS.ink, margin: 0, display: "flex", alignItems: "center", gap: 8 }}>
                     {u.nombre} {u.id === usuarioActualId && <span style={{ color: COLORS.muted, fontWeight: 400, fontSize: 12 }}>(tú)</span>}
                     <span
@@ -736,6 +809,7 @@ export default function UsuariosPermisosTab({ usuarioActual, onDespachoRenombrad
                   <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11, color: COLORS.muted, margin: "2px 0 0" }}>
                     <UltimaSesionUsuario usuarioId={u.id} />
                   </p>
+                  </div>
                 </div>
                 <div style={{ display: "flex", gap: 8 }}>
                   <button

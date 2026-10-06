@@ -652,7 +652,7 @@ function ensureFonts() {
 // verdad) y se rechaza SVG explícitamente, porque a diferencia de un
 // JPG/PNG puede llevar <script> adentro — algo que una foto de perfil
 // nunca necesita.
-async function archivoEsImagenValida(file) {
+export async function archivoEsImagenValida(file) {
   if (!file || !file.type.startsWith("image/") || file.type === "image/svg+xml") return false;
   try {
     const bitmap = await createImageBitmap(file);
@@ -1308,7 +1308,7 @@ export function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-export const APP_VERSION = "1.138.1";
+export const APP_VERSION = "1.139.0";
 
 function SelloVersion({ oscuro }) {
   return (
