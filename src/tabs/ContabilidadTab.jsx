@@ -1421,6 +1421,16 @@ function ReciboCard({ cliente, pago, onEditar, onEliminar, datosResponsable, por
     window.open(`https://wa.me/${numero}?text=${encodeURIComponent(mensaje)}`, "_blank");
   };
 
+  // Mismo caso que el recordatorio de pago al grupo (ver enviarRecordatorioPagoGrupo
+  // en App.jsx): sin teléfono individual pero con grupo de WhatsApp del proceso.
+  // WhatsApp no deja prellenar texto al abrir un grupo ya existente, así que se
+  // copia el mensaje al portapapeles y se abre el grupo para solo pegarlo.
+  const enviarPorWhatsappGrupo = () => {
+    const mensaje = `*${getNombreDespacho()}*\n\nHola, confirmamos la recepción del pago de ${cliente.nombre}:\n\nMedio: ${pago.medioPago}\nValor: ${formatoCOP(pago.valor)}\nFecha: ${new Date(pago.fecha).toLocaleDateString("es-CO", { dateStyle: "long" })}${pago.concepto ? `\nConcepto: ${pago.concepto}` : ""}\n\nEn un momento compartimos el recibo por este mismo medio. ¡Gracias por su confianza!`;
+    navigator.clipboard?.writeText(mensaje).catch(() => {});
+    window.open(cliente.grupoWhatsapp, "_blank");
+  };
+
   const descargarCuentaDeCobro = async () => {
     setGenerandoCuenta(true);
     try {
@@ -1653,9 +1663,18 @@ function ReciboCard({ cliente, pago, onEditar, onEliminar, datosResponsable, por
             <button className="drx-btn-primary" style={{ ...buttonPrimary, padding: "5px 12px", fontSize: 12, background: "#1DA851" }} onClick={enviarPorWhatsapp}>
               Enviar por WhatsApp ↗
             </button>
+          ) : cliente.grupoWhatsapp ? (
+            <button
+              className="drx-btn-primary"
+              title="El cliente no tiene teléfono individual, pero el proceso tiene grupo de WhatsApp — copia el mensaje y abre el grupo para pegarlo."
+              style={{ ...buttonPrimary, padding: "5px 12px", fontSize: 12, background: "#1DA851" }}
+              onClick={enviarPorWhatsappGrupo}
+            >
+              Enviar al grupo ↗
+            </button>
           ) : (
             <span
-              title={`${pagadorTiene ? "El pagador" : "El cliente"} no tiene teléfono registrado — agrégalo en Clientes → Editar para poder enviarle el recibo por WhatsApp.`}
+              title={`${pagadorTiene ? "El pagador" : "El cliente"} no tiene teléfono registrado ni grupo de WhatsApp — agrégalo en Clientes → Editar para poder enviarle el recibo por WhatsApp.`}
               style={{
                 ...buttonGhost,
                 padding: "5px 12px",
