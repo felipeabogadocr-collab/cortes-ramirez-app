@@ -18,6 +18,7 @@ const CalculadoraTab = lazy(() => import("./tabs/CalculadoraTab.jsx"));
 const AgendaTab = lazy(() => import("./tabs/AgendaTab.jsx"));
 const ClientesTab = lazy(() => import("./tabs/ClientesTab.jsx"));
 const VigilanciaTab = lazy(() => import("./tabs/VigilanciaTab.jsx"));
+const AntecedentesTab = lazy(() => import("./tabs/AntecedentesTab.jsx"));
 const ReportesTab = lazy(() => import("./tabs/ReportesTab.jsx"));
 const ContenidoTab = lazy(() => import("./tabs/ContenidoTab.jsx"));
 const DocumentosTab = lazy(() => import("./tabs/DocumentosTab.jsx"));
@@ -1313,7 +1314,7 @@ export function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-export const APP_VERSION = "1.146.0";
+export const APP_VERSION = "1.147.0";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -4411,6 +4412,7 @@ export const ICONOS_TAB = {
   agenda: "M3.5 5h13v11h-13v-11ZM3.5 8.5h13M7 3v3M13 3v3M6.5 11.5h2M11.5 11.5h2",
   usuarios: "M10 12.7a2.7 2.7 0 1 0 0-5.4 2.7 2.7 0 0 0 0 5.4Zm7-2.7a7 7 0 0 1-.1 1.2l1.6 1.2-1.5 2.6-1.9-.7c-.4.3-.9.6-1.4.8l-.3 2H8.6l-.3-2c-.5-.2-1-.5-1.4-.8l-1.9.7-1.5-2.6 1.6-1.2A7 7 0 0 1 5 10c0-.4 0-.8.1-1.2L3.5 7.6l1.5-2.6 1.9.7c.4-.3.9-.6 1.4-.8l.3-2h2.8l.3 2c.5.2 1 .5 1.4.8l1.9-.7 1.5 2.6-1.6 1.2c.1.4.1.8.1 1.2Z",
   calculadora: "M5 2.5h10v15H5v-15Zm0 4.2h10M7 10h1M7 12.5h1M7 15h1M9.7 10h1M9.7 12.5h1M9.7 15h1M12.4 10h1M12.4 12.5v2.5",
+  antecedentes: "M3 5.5h14v9H3v-9Zm4 2.3a1.6 1.6 0 1 0 0 3.2 1.6 1.6 0 0 0 0-3.2ZM4.7 13.8c.3-1.5 1.3-2.3 2.3-2.3s2 .8 2.3 2.3M11.5 8.3h4M11.5 10.7h4M11.5 13.1h2.3",
 };
 
 export function IconoTab({ tipo }) {
@@ -8624,6 +8626,7 @@ function App() {
     agenda: () => import("./tabs/AgendaTab.jsx"),
     clientes: () => import("./tabs/ClientesTab.jsx"),
     vigilancia: () => import("./tabs/VigilanciaTab.jsx"),
+    antecedentes: () => import("./tabs/AntecedentesTab.jsx"),
     reportes: () => import("./tabs/ReportesTab.jsx"),
     contenido: () => import("./tabs/ContenidoTab.jsx"),
     documentos: () => import("./tabs/DocumentosTab.jsx"),
@@ -9110,6 +9113,11 @@ function App() {
               Vigilancia judicial
             </SidebarButton>
           )}
+          {puedeVer("antecedentes") && (
+            <SidebarButton active={tab === "antecedentes"} onClick={() => setTab("antecedentes")} onMouseEnter={() => precargarTab("antecedentes")} color="#6366F1" icono="antecedentes">
+              Antecedentes
+            </SidebarButton>
+          )}
           {puedeVer("contabilidad") && (
             <SidebarButton active={tab === "contabilidad"} onClick={() => setTab("contabilidad")} onMouseEnter={() => precargarTab("contabilidad")} color="#F43F5E" icono="contabilidad">
               Contabilidad
@@ -9382,6 +9390,13 @@ function App() {
                 <TabErrorBoundary nombre="vigilancia">
                   <Suspense fallback={<CargandoSeccion />}>
                     <VigilanciaTab onListo={marcarDatosListos} />
+                  </Suspense>
+                </TabErrorBoundary>
+              )}
+              {tab === "antecedentes" && puedeVer("antecedentes") && (
+                <TabErrorBoundary nombre="antecedentes">
+                  <Suspense fallback={<CargandoSeccion />}>
+                    <AntecedentesTab onListo={marcarDatosListos} />
                   </Suspense>
                 </TabErrorBoundary>
               )}
