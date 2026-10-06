@@ -1313,7 +1313,7 @@ export function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-export const APP_VERSION = "1.145.0";
+export const APP_VERSION = "1.146.0";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -5142,6 +5142,15 @@ export function enviarRecordatorioPagoGrupo(cliente) {
   const fechaTexto = new Date(cliente.proximoPago.fecha).toLocaleDateString("es-CO", { dateStyle: "long" });
   const valorTexto = cliente.proximoPago.valorEsperado ? ` por un valor de ${formatoCOP(cliente.proximoPago.valorEsperado)}` : "";
   const mensaje = `*${getNombreDespacho()}*\n\nHola, les recordamos que el próximo pago de ${cliente.nombre} está programado para el ${fechaTexto}${valorTexto}.\n\nSi ya se realizó el pago, ignoren este mensaje — quedamos atentos a la confirmación. Cualquier duda, con gusto ayudamos.`;
+  enviarMensajeGrupoWhatsapp(cliente, mensaje);
+}
+
+// Mismo mecanismo que enviarRecordatorioPagoGrupo, reutilizable para
+// cualquier otro mensaje (novedad judicial, recibo, portal...) cuando el
+// cliente no tiene teléfono individual pero sí un grupo de WhatsApp del
+// proceso: WhatsApp no deja prellenar texto al abrir un grupo ya existente,
+// así que se copia el mensaje al portapapeles y se abre el grupo.
+export function enviarMensajeGrupoWhatsapp(cliente, mensaje) {
   navigator.clipboard?.writeText(mensaje).catch(() => {});
   window.open(cliente.grupoWhatsapp, "_blank");
 }
@@ -6635,32 +6644,40 @@ function ModalNotificaciones({
           </p>
           {pagosPendientes.length > 0 ? (
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {pagosPendientes.map(({ cliente, dias }, i) => (
-                <div key={i} style={{ background: COLORS.accentSoft, borderRadius: 8, padding: "10px 12px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                  <div>
-                    <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, fontWeight: 600, color: COLORS.navy, margin: 0 }}>{cliente.nombre}</p>
-                    <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11, color: COLORS.navy, margin: "2px 0 0" }}>
-                      {textoEstadoPago(dias)}
-                      {cliente.proximoPago?.valorEsperado ? ` · ${formatoCOP(cliente.proximoPago.valorEsperado)}` : ""}
-                    </p>
+              {pagosPendientes.map(({ cliente, dias }, i) => {
+                const tieneNumero = !!numeroWhatsappCliente(cliente.pagador?.telefono || cliente.telefono);
+                return (
+                  <div key={i} style={{ background: COLORS.accentSoft, borderRadius: 8, padding: "10px 12px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                    <div>
+                      <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, fontWeight: 600, color: COLORS.navy, margin: 0 }}>{cliente.nombre}</p>
+                      <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11, color: COLORS.navy, margin: "2px 0 0" }}>
+                        {textoEstadoPago(dias)}
+                        {cliente.proximoPago?.valorEsperado ? ` · ${formatoCOP(cliente.proximoPago.valorEsperado)}` : ""}
+                      </p>
+                    </div>
+                    <div style={{ display: "flex", gap: 6 }}>
+                      {tieneNumero && (
+                        <button className="drx-btn-primary" style={{ ...buttonPrimary, padding: "5px 10px", fontSize: 11.5, background: "#1DA851" }} onClick={() => enviarRecordatorioPago(cliente)}>
+                          Recordar ↗
+                        </button>
+                      )}
+                      {cliente.grupoWhatsapp && (
+                        <button
+                          className={tieneNumero ? "drx-btn-ghost" : "drx-btn-primary"}
+                          style={tieneNumero ? { ...buttonGhost, padding: "5px 10px", fontSize: 11.5 } : { ...buttonPrimary, padding: "5px 10px", fontSize: 11.5, background: "#1DA851" }}
+                          title="Copia el mensaje y abre el grupo de WhatsApp del proceso"
+                          onClick={() => enviarRecordatorioPagoGrupo(cliente)}
+                        >
+                          Al grupo ↗
+                        </button>
+                      )}
+                      {!tieneNumero && !cliente.grupoWhatsapp && (
+                        <span style={{ fontFamily: "Inter, sans-serif", fontSize: 11, color: "#B45309" }}>Sin teléfono ni grupo</span>
+                      )}
+                    </div>
                   </div>
-                  <div style={{ display: "flex", gap: 6 }}>
-                    <button className="drx-btn-primary" style={{ ...buttonPrimary, padding: "5px 10px", fontSize: 11.5, background: "#1DA851" }} onClick={() => enviarRecordatorioPago(cliente)}>
-                      Recordar ↗
-                    </button>
-                    {cliente.grupoWhatsapp && (
-                      <button
-                        className="drx-btn-ghost"
-                        style={{ ...buttonGhost, padding: "5px 10px", fontSize: 11.5 }}
-                        title="Copia el mensaje y abre el grupo de WhatsApp del proceso"
-                        onClick={() => enviarRecordatorioPagoGrupo(cliente)}
-                      >
-                        Al grupo ↗
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           ) : (
             <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.muted, marginBottom: 18 }}>No hay pagos por vencer en los próximos días.</p>

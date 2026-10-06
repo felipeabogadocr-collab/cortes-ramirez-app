@@ -5,6 +5,7 @@ import {
   COLORS, uid, diasDesde, useIndex, useConfirmarDialogo, inputStyle, buttonPrimary, buttonGhost, Card,
   EncabezadoSeccion, Icono, AvatarIniciales, EstadoVacio, LineaDeTiempo, COLOR_AREA_PROCESO,
   ESTADOS_VIGILANCIA, consultarRamaJudicial, radicadosDeCliente, numeroWhatsappCliente,
+  enviarMensajeGrupoWhatsapp,
 } from "../App.jsx";
 
 // El estado de "última consulta" de un radicado vive en dos lugares por
@@ -383,10 +384,11 @@ export default function VigilanciaTab({ onListo }) {
   // alcanza a generar a tiempo), pero nunca se queda esperando para
   // siempre: si el asistente de IA falla, el aviso sale igual solo con el
   // dato crudo de la actuación.
-  const notificarNovedadPorWhatsapp = async (id, radicado, actuacion) => {
+  const notificarNovedadPorWhatsapp = async (id, radicado, actuacion, { grupal = false } = {}) => {
     const c = clientes[id];
-    const numero = numeroWhatsappCliente(c?.telefono);
-    if (!numero) return;
+    const numero = grupal ? null : numeroWhatsappCliente(c?.telefono);
+    if (!grupal && !numero) return;
+    if (grupal && !c?.grupoWhatsapp) return;
     const clave = `${id}:${radicado}`;
     setNotificando(clave);
     let explicacion = "";
@@ -401,7 +403,9 @@ export default function VigilanciaTab({ onListo }) {
     const partes = [
       `*${getNombreDespacho()}*`,
       "",
-      `Hola ${c?.nombre || ""}, le informamos una novedad en su proceso${c?.tipoProceso ? ` de ${c.tipoProceso}` : ""} (radicado ${radicado}):`,
+      grupal
+        ? `Hola, les informamos una novedad en el proceso de ${c?.nombre || ""}${c?.tipoProceso ? ` de ${c.tipoProceso}` : ""} (radicado ${radicado}):`
+        : `Hola ${c?.nombre || ""}, le informamos una novedad en su proceso${c?.tipoProceso ? ` de ${c.tipoProceso}` : ""} (radicado ${radicado}):`,
       "",
       `Actuación: ${actuacion.actuacion}`,
       actuacion.anotacion ? actuacion.anotacion : null,
@@ -412,7 +416,12 @@ export default function VigilanciaTab({ onListo }) {
       explicacion ? "" : null,
       "Cualquier duda, quedamos atentos por este mismo medio.",
     ].filter((linea) => linea !== null);
-    window.open(`https://wa.me/${numero}?text=${encodeURIComponent(partes.join("\n"))}`, "_blank");
+    const mensaje = partes.join("\n");
+    if (grupal) {
+      enviarMensajeGrupoWhatsapp(c, mensaje);
+    } else {
+      window.open(`https://wa.me/${numero}?text=${encodeURIComponent(mensaje)}`, "_blank");
+    }
   };
 
   // El portal de la Fiscalía no se puede consultar solo (ver la nota junto a
@@ -452,13 +461,14 @@ export default function VigilanciaTab({ onListo }) {
   // si falla); si no hay novedad, el mensaje es distinto — le confirma al
   // cliente que se revisó y sigue igual que la última vez, en vez de
   // quedarse callado.
-  const notificarFiscaliaPorWhatsapp = async (id, radicado) => {
+  const notificarFiscaliaPorWhatsapp = async (id, radicado, { grupal = false } = {}) => {
     const clave = `${id}:${radicado}`;
     const resultado = resultadoFiscalia[clave];
     if (!resultado) return;
     const c = clientes[id];
-    const numero = numeroWhatsappCliente(c?.telefono);
-    if (!numero) return;
+    const numero = grupal ? null : numeroWhatsappCliente(c?.telefono);
+    if (!grupal && !numero) return;
+    if (grupal && !c?.grupoWhatsapp) return;
     setNotificandoFiscalia(clave);
     let explicacion = "";
     if (resultado.novedad) {
@@ -470,11 +480,15 @@ export default function VigilanciaTab({ onListo }) {
       }
     }
     setNotificandoFiscalia(null);
+    const saludo = grupal ? "Hola, les informamos" : `Hola ${c?.nombre || ""}, le informamos`;
+    const saludoSinNovedad = grupal
+      ? "Hola, revisamos el proceso"
+      : `Hola ${c?.nombre || ""}, revisamos su proceso`;
     const partes = resultado.novedad
       ? [
           `*${getNombreDespacho()}*`,
           "",
-          `Hola ${c?.nombre || ""}, le informamos una novedad en su proceso ante la Fiscalía (radicado ${radicado}):`,
+          `${saludo} una novedad en ${grupal ? `el proceso de ${c?.nombre || ""} ` : "su proceso "}ante la Fiscalía (radicado ${radicado}):`,
           "",
           resultado.texto,
           "",
@@ -485,11 +499,16 @@ export default function VigilanciaTab({ onListo }) {
       : [
           `*${getNombreDespacho()}*`,
           "",
-          `Hola ${c?.nombre || ""}, revisamos su proceso ante la Fiscalía (radicado ${radicado}) y sigue igual que la última vez que le informamos — sin novedades por ahora.`,
+          `${saludoSinNovedad} ante la Fiscalía (radicado ${radicado}) y sigue igual que la última vez que informamos — sin novedades por ahora.`,
           "",
           "Cualquier duda, quedamos atentos por este mismo medio.",
         ];
-    window.open(`https://wa.me/${numero}?text=${encodeURIComponent(partes.join("\n"))}`, "_blank");
+    const mensaje = partes.join("\n");
+    if (grupal) {
+      enviarMensajeGrupoWhatsapp(c, mensaje);
+    } else {
+      window.open(`https://wa.me/${numero}?text=${encodeURIComponent(mensaje)}`, "_blank");
+    }
   };
 
   const conRadicado = ids.filter((id) => radicadosDeCliente(clientes[id]).length > 0);
@@ -667,8 +686,17 @@ export default function VigilanciaTab({ onListo }) {
                     >
                       {notificando === clave ? "Preparando…" : "Notificar por WhatsApp ↗"}
                     </button>
+                  ) : c?.grupoWhatsapp ? (
+                    <button
+                      className="drx-btn-primary"
+                      style={{ ...buttonPrimary, fontSize: 12, padding: "6px 12px", background: "#1DA851" }}
+                      onClick={() => notificarNovedadPorWhatsapp(n.id, n.radicado, n.actuacion, { grupal: true })}
+                      disabled={notificando === clave}
+                    >
+                      {notificando === clave ? "Preparando…" : "Notificar al grupo ↗"}
+                    </button>
                   ) : (
-                    <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, color: "#B45309", margin: 0 }}>Sin teléfono registrado</p>
+                    <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, color: "#B45309", margin: 0 }}>Sin teléfono ni grupo registrado</p>
                   )}
                 </div>
               );
@@ -923,7 +951,7 @@ export default function VigilanciaTab({ onListo }) {
                                 </>
                               )}
                             </button>
-                            {c.telefono && (
+                            {c.telefono ? (
                               <button
                                 className="drx-btn-primary"
                                 style={{ ...buttonPrimary, fontSize: 12, padding: "6px 12px", background: "#1DA851" }}
@@ -932,6 +960,16 @@ export default function VigilanciaTab({ onListo }) {
                               >
                                 {notificando === clave ? "Preparando notificación…" : "Notificar novedad por WhatsApp ↗"}
                               </button>
+                            ) : c.grupoWhatsapp ? (
+                              <button
+                                className="drx-btn-primary"
+                                style={{ ...buttonPrimary, fontSize: 12, padding: "6px 12px", background: "#1DA851" }}
+                                onClick={() => notificarNovedadPorWhatsapp(id, radicado, { ...resultado.ultimaActuacion, despacho: resultado.proceso?.despacho }, { grupal: true })}
+                                disabled={notificando === clave}
+                              >
+                                {notificando === clave ? "Preparando notificación…" : "Notificar al grupo ↗"}
+                              </button>
+                            ) : null}
                             )}
                           </div>
                           {explicaciones[clave] && (
@@ -1010,7 +1048,7 @@ export default function VigilanciaTab({ onListo }) {
                                     <button className="drx-btn-primary" style={{ ...buttonPrimary, fontSize: 12, padding: "6px 12px" }} onClick={() => guardarComoRevisadoFiscalia(id, radicado)}>
                                       {resultadoFiscalia[clave].novedad ? "+ Agregar a la línea de tiempo" : "Marcar como revisado"}
                                     </button>
-                                    {c.telefono && (
+                                    {c.telefono ? (
                                       <button
                                         className="drx-btn-primary"
                                         style={{ ...buttonPrimary, fontSize: 12, padding: "6px 12px", background: "#1DA851" }}
@@ -1023,7 +1061,20 @@ export default function VigilanciaTab({ onListo }) {
                                           ? "Notificar novedad por WhatsApp ↗"
                                           : "Avisar que sigue igual ↗"}
                                       </button>
-                                    )}
+                                    ) : c.grupoWhatsapp ? (
+                                      <button
+                                        className="drx-btn-primary"
+                                        style={{ ...buttonPrimary, fontSize: 12, padding: "6px 12px", background: "#1DA851" }}
+                                        onClick={() => notificarFiscaliaPorWhatsapp(id, radicado, { grupal: true })}
+                                        disabled={notificandoFiscalia === clave}
+                                      >
+                                        {notificandoFiscalia === clave
+                                          ? "Preparando notificación…"
+                                          : resultadoFiscalia[clave].novedad
+                                          ? "Notificar al grupo ↗"
+                                          : "Avisar al grupo que sigue igual ↗"}
+                                      </button>
+                                    ) : null}
                                   </div>
                                 </div>
                               )}

@@ -7,7 +7,7 @@ import {
   AREAS_PROCESO, COLOR_AREA_PROCESO, DIAS_ALERTA_INACTIVIDAD, numeroWhatsappCliente,
   radicadosDeCliente, tiposProcesoDeArea, useServicios, calcularProximaFechaPorFrecuencia,
   fechaHoyISO, formatoCOP, leerJSONLocal, guardarJSONLocal, useReferenciadores, useAbogadosAsociados,
-  useValorConRetraso, SelectorComision, permisosPorDefecto,
+  useValorConRetraso, SelectorComision, permisosPorDefecto, enviarMensajeGrupoWhatsapp,
 } from "../App.jsx";
 
 // Enlace oficial de la Fiscalía para consultar el estado de una denuncia en
@@ -1400,23 +1400,42 @@ export default function ClientesTab({ usuarioActual, onIrARegistrarPago, onListo
                   </div>
                 </div>
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap", maxWidth: "100%" }}>
-                  <button
-                    className="drx-btn-ghost"
-                    style={{ ...buttonGhost, background: "#1DA851", color: "#FFFFFF", border: "none" }}
-                    onClick={() => {
-                      const numero = numeroWhatsappCliente(c.telefono);
-                      // Sin emojis a propósito: los de secuencia compuesta
-                      // (como los números con recuadro 1️⃣2️⃣) no se ven bien
-                      // en todos los WhatsApp/dispositivos y salían como
-                      // "�" — con texto plano se ve más serio para un
-                      // mensaje de despacho de abogados, y no depende de que
-                      // el teléfono de cada cliente tenga esas fuentes.
-                      const mensaje = `*${getNombreDespacho()}*\n\nHola ${c.nombre || ""}, te compartimos acceso a tu portal personal. Ahí puedes consultar el estado de tu proceso y tu estado de cuenta cuando quieras.\n\nIngresa aquí: ${window.location.origin}/#portal\nCódigo de acceso: *${id}*`;
-                      window.open(`https://wa.me/${numero}?text=${encodeURIComponent(mensaje)}`, "_blank");
-                    }}
-                  >
-                    Compartir portal ↗
-                  </button>
+                  {(() => {
+                    const numeroPortal = numeroWhatsappCliente(c.telefono);
+                    const puedeCompartir = !!numeroPortal || !!c.grupoWhatsapp;
+                    return (
+                      <button
+                        className="drx-btn-ghost"
+                        disabled={!puedeCompartir}
+                        title={puedeCompartir ? undefined : "Agrega un teléfono o un grupo de WhatsApp del proceso (en Editar) para poder compartir el portal"}
+                        style={{
+                          ...buttonGhost,
+                          background: puedeCompartir ? "#1DA851" : undefined,
+                          color: puedeCompartir ? "#FFFFFF" : undefined,
+                          border: puedeCompartir ? "none" : undefined,
+                          opacity: puedeCompartir ? 1 : 0.55,
+                          cursor: puedeCompartir ? "pointer" : "not-allowed",
+                        }}
+                        onClick={() => {
+                          if (!puedeCompartir) return;
+                          // Sin emojis a propósito: los de secuencia compuesta
+                          // (como los números con recuadro 1️⃣2️⃣) no se ven bien
+                          // en todos los WhatsApp/dispositivos y salían como
+                          // "�" — con texto plano se ve más serio para un
+                          // mensaje de despacho de abogados, y no depende de que
+                          // el teléfono de cada cliente tenga esas fuentes.
+                          const mensaje = `*${getNombreDespacho()}*\n\nHola ${c.nombre || ""}, te compartimos acceso a tu portal personal. Ahí puedes consultar el estado de tu proceso y tu estado de cuenta cuando quieras.\n\nIngresa aquí: ${window.location.origin}/#portal\nCódigo de acceso: *${id}*`;
+                          if (numeroPortal) {
+                            window.open(`https://wa.me/${numeroPortal}?text=${encodeURIComponent(mensaje)}`, "_blank");
+                          } else {
+                            enviarMensajeGrupoWhatsapp(c, mensaje);
+                          }
+                        }}
+                      >
+                        {numeroPortal ? "Compartir portal ↗" : puedeCompartir ? "Compartir portal al grupo ↗" : "Compartir portal ↗"}
+                      </button>
+                    );
+                  })()}
                   <button
                     className="drx-btn-ghost"
                     style={buttonGhost}
