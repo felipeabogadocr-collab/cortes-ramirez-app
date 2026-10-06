@@ -1308,7 +1308,7 @@ export function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-export const APP_VERSION = "1.139.0";
+export const APP_VERSION = "1.139.1";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -9321,7 +9321,11 @@ function App() {
         </div>
       </div>
 
-      <LexFlotante usuarioActual={usuarioActual} />
+      {/* LexFlotante (chat flotante de IA) desactivado a pedido de Felipe — no
+          estaba respondiendo bien. Queda para volver a activarlo más
+          adelante con Claude, como función de pago. La tarjeta "Lex ·
+          análisis financiero" de Resumen (ResumenTab) NO se tocó — sigue
+          activa. <LexFlotante usuarioActual={usuarioActual} /> */}
 
       {avisoInactividad && (
         <div
