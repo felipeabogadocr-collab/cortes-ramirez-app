@@ -88,6 +88,21 @@ test("Organizar páginas: rotar, extraer una página y guardar", async ({ page }
   await expect(page.getByText("Tu archivo está listo")).toBeVisible({ timeout: 10000 });
 });
 
+test("Firmar PDF: elige la segunda página con las miniaturas y firma solo esa", async ({ page }) => {
+  await openTool(page, "FIRMAR PDF");
+  await page.setInputFiles('input[type="file"]', SAMPLE_PDF);
+  await expect(page.getByText("Firmando la página 1 de 2")).toBeVisible({ timeout: 10000 });
+
+  // Las miniaturas dejan elegir la página con un clic, sin tocar las demás.
+  await page.locator('button[title="Página 2"]').click();
+  await expect(page.getByText("Firmando la página 2 de 2")).toBeVisible();
+
+  await page.getByRole("button", { name: "Escribir nombre" }).click();
+  await page.getByPlaceholder("Ej: María Pérez").fill("Ana Prueba");
+  await page.locator("main").getByRole("button", { name: "Firmar PDF" }).click();
+  await expect(page.getByText("Tu archivo está listo")).toBeVisible({ timeout: 10000 });
+});
+
 test("Dividir PDF: divide y descarga", async ({ page }) => {
   await openTool(page, "DIVIDIR PDF");
   await page.setInputFiles('input[type="file"]', SAMPLE_PDF);

@@ -383,26 +383,61 @@ export default function SignTool({ chainedFile, onConsumedChain }) {
   return (
     <div className="sign-layout">
       <div>
-        <label style={{ fontSize: 12, fontWeight: 600, display: "block", marginBottom: 4 }}>Página a firmar</label>
-        <select
-          value={pageIndex}
-          onChange={(e) => setPageIndex(Number(e.target.value))}
+        <label style={{ fontSize: 12, fontWeight: 600, display: "block", marginBottom: 4 }}>
+          ¿En cuál página va la firma? ({thumbs.length} página{thumbs.length !== 1 ? "s" : ""})
+        </label>
+        <p style={{ fontSize: 11, color: "var(--muted)", margin: "0 0 8px" }}>
+          Toca la página donde quieres dejar la firma — solo esa página queda firmada, las demás no cambian.
+        </p>
+        <div
           style={{
-            width: "100%",
-            padding: 8,
-            borderRadius: 8,
-            border: "1px solid var(--border)",
-            background: "var(--bg)",
-            color: "var(--text)",
+            display: "flex",
+            gap: 8,
+            overflowX: "auto",
+            paddingBottom: 8,
+            marginBottom: 6,
+            WebkitOverflowScrolling: "touch",
           }}
         >
-          {thumbs.map((_, i) => (
-            <option key={i} value={i}>
-              Página {i + 1}
-            </option>
+          {thumbs.map((thumb, i) => (
+            <button
+              key={i}
+              onClick={() => setPageIndex(i)}
+              title={`Página ${i + 1}`}
+              style={{
+                flexShrink: 0,
+                padding: 0,
+                borderRadius: 8,
+                border: `2px solid ${i === pageIndex ? "var(--brand-2)" : "var(--border)"}`,
+                background: "none",
+                cursor: "pointer",
+                position: "relative",
+                boxShadow: i === pageIndex ? "0 0 0 2px var(--brand-2-soft, rgba(0,0,0,0.08))" : "none",
+              }}
+            >
+              <img src={thumb} alt={`Página ${i + 1}`} draggable={false} style={{ height: 90, display: "block", borderRadius: 6 }} />
+              <span
+                style={{
+                  position: "absolute",
+                  bottom: 3,
+                  right: 3,
+                  background: i === pageIndex ? "var(--brand-2)" : "rgba(0,0,0,0.6)",
+                  color: "#fff",
+                  fontSize: 10.5,
+                  fontWeight: 700,
+                  borderRadius: 5,
+                  padding: "1px 5px",
+                }}
+              >
+                {i + 1}
+              </span>
+            </button>
           ))}
-        </select>
-        <div ref={containerRef} style={{ position: "relative", marginTop: 10, userSelect: "none", WebkitUserSelect: "none" }}>
+        </div>
+        <p style={{ fontSize: 12.5, fontWeight: 600, margin: "10px 0 4px", color: "var(--brand-2)" }}>
+          Firmando la página {pageIndex + 1} de {thumbs.length}
+        </p>
+        <div ref={containerRef} style={{ position: "relative", marginTop: 4, userSelect: "none", WebkitUserSelect: "none" }}>
           <img
             src={thumbs[pageIndex]}
             alt=""
