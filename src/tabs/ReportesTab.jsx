@@ -1,9 +1,146 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { getNombreDespacho } from "../lib/storage";
 import {
   COLORS, formatoCOP, exportarCSV, buttonGhost, Card, EncabezadoSeccion, Icono, EstadoVacio,
   Spinner, GraficaBarras, GraficaBarrasAgrupadas, COLOR_AREA_PROCESO, COLOR_ESTADO_VIGILANCIA,
-  ESTADOS_VIGILANCIA, useDatosReportes,
+  ESTADOS_VIGILANCIA, useDatosReportes, ensureJsPDF, obtenerLogoBase64,
 } from "../App.jsx";
+
+// Las gráficas en pantalla son SVG propio (GraficaBarras/GraficaBarrasAgrupadas,
+// hechas a mano) — no hay forma directa de "imprimirlas" en un PDF, así que el
+// reporte descargable muestra la misma información en listas/tablas de texto,
+// sección por sección, en vez de intentar redibujar las barras.
+async function generarReportePdf(datos) {
+  await ensureJsPDF();
+  const { jsPDF } = window.jspdf;
+  const pdf = new jsPDF({ unit: "pt", format: "letter" });
+  const pageWidth = pdf.internal.pageSize.getWidth();
+  const pageHeight = pdf.internal.pageSize.getHeight();
+  const marginX = 56;
+  const anchoUtil = pageWidth - marginX * 2;
+  let y = 56;
+
+  const salto = (alto) => {
+    if (y + alto > pageHeight - 50) {
+      pdf.addPage();
+      y = 56;
+    }
+  };
+
+  try {
+    const logoSize = 44;
+    pdf.addImage(await obtenerLogoBase64(), "PNG", pageWidth / 2 - logoSize / 2, y, logoSize, logoSize);
+    y += logoSize + 14;
+  } catch (e) {
+    // el PDF se genera igual sin logo
+  }
+
+  pdf.setFont("helvetica", "bold");
+  pdf.setFontSize(13);
+  pdf.setTextColor(11, 18, 32);
+  pdf.text(getNombreDespacho(), pageWidth / 2, y, { align: "center" });
+  y += 20;
+  pdf.setFont("helvetica", "bold");
+  pdf.setFontSize(17);
+  pdf.text("Reporte de gestión", pageWidth / 2, y, { align: "center" });
+  y += 18;
+  pdf.setFont("helvetica", "normal");
+  pdf.setFontSize(10);
+  pdf.setTextColor(100, 116, 139);
+  pdf.text(new Date().toLocaleDateString("es-CO", { dateStyle: "long" }), pageWidth / 2, y, { align: "center" });
+  y += 32;
+
+  const titulo = (texto) => {
+    salto(28);
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(12.5);
+    pdf.setTextColor(11, 18, 32);
+    pdf.text(texto, marginX, y);
+    y += 8;
+    pdf.setDrawColor(203, 213, 225);
+    pdf.line(marginX, y, pageWidth - marginX, y);
+    y += 16;
+  };
+
+  const fila = (etiqueta, valor, opciones = {}) => {
+    salto(16);
+    pdf.setFont("helvetica", "normal");
+    pdf.setFontSize(10.5);
+    pdf.setTextColor(51, 65, 85);
+    pdf.text(etiqueta, marginX, y);
+    pdf.setFont("helvetica", "bold");
+    pdf.setTextColor(...(opciones.color || [15, 23, 42]));
+    pdf.text(String(valor), pageWidth - marginX, y, { align: "right" });
+    y += 15;
+  };
+
+  const nota = (texto) => {
+    salto(20);
+    pdf.setFont("helvetica", "italic");
+    pdf.setFontSize(9.5);
+    pdf.setTextColor(100, 116, 139);
+    pdf.splitTextToSize(texto, anchoUtil).forEach((linea) => {
+      salto(13);
+      pdf.text(linea, marginX, y);
+      y += 13;
+    });
+    y += 6;
+  };
+
+  titulo("Resumen");
+  fila("Clientes activos", datos.listaClientes.length);
+  fila("Ingreso este mes", formatoCOP(datos.ingresoMesActual), { color: [22, 101, 52] });
+  fila("Egresos este mes", formatoCOP(datos.egresoMesActual), { color: datos.egresoMesActual > 0 ? [180, 35, 24] : undefined });
+  fila("Neto este mes", formatoCOP(datos.netoMesActual), { color: datos.netoMesActual >= 0 ? [22, 101, 52] : [180, 35, 24] });
+  fila("Cartera pendiente", formatoCOP(datos.carteraPendienteTotal), { color: datos.carteraPendienteTotal > 0 ? [180, 35, 24] : undefined });
+  y += 8;
+
+  titulo("Ingresos vs. egresos por mes");
+  fila("Total recaudado (histórico)", formatoCOP(datos.ingresoTotalHistorico));
+  fila("Total egresos (histórico)", formatoCOP(datos.egresoTotalHistorico));
+  fila("Neto histórico", formatoCOP(datos.netoTotalHistorico));
+  y += 4;
+  datos.mesesEtiquetas.forEach((m) => {
+    fila(m.etiqueta, `${formatoCOP(datos.ingresosPorMes[m.clave])} · ${formatoCOP(datos.egresosPorMes[m.clave])} egresos`);
+  });
+  y += 8;
+
+  titulo("Procesos por estado");
+  if (datos.listaClientes.length === 0) {
+    nota("Aún no hay clientes registrados.");
+  } else {
+    ESTADOS_VIGILANCIA.forEach((estado) => fila(estado, datos.conteoEstados[estado] || 0));
+    if (datos.sinRevisar > 0) fila("Sin revisar", datos.sinRevisar);
+  }
+  y += 8;
+
+  titulo("Carga de trabajo por abogado");
+  if (datos.filasCarga.length === 0) {
+    nota("Aún no hay clientes registrados.");
+  } else {
+    datos.filasCarga.forEach(([nombreAbogado, n]) => fila(nombreAbogado, n));
+  }
+  y += 8;
+
+  titulo("Distribución por área del derecho");
+  if (datos.filasArea.length === 0) {
+    nota("Aún no hay clientes registrados.");
+  } else {
+    datos.filasArea.forEach(([area, n]) => fila(area, n));
+    if (datos.clientesConPago > 0) fila("Ticket promedio por cliente que ha pagado", formatoCOP(datos.ticketPromedio));
+  }
+
+  const totalPaginas = pdf.internal.getNumberOfPages();
+  for (let p = 1; p <= totalPaginas; p++) {
+    pdf.setPage(p);
+    pdf.setFont("helvetica", "normal");
+    pdf.setFontSize(9);
+    pdf.setTextColor(148, 163, 184);
+    pdf.text(`Página ${p} de ${totalPaginas}`, pageWidth / 2, pageHeight - 24, { align: "center" });
+  }
+
+  pdf.save(`reporte_${getNombreDespacho().replace(/[^a-z0-9]+/gi, "_").toLowerCase()}_${new Date().toISOString().slice(0, 10)}.pdf`);
+}
 
 export default function ReportesTab({ onListo }) {
   const {
@@ -33,6 +170,35 @@ export default function ReportesTab({ onListo }) {
     listaClientes,
   } = useDatosReportes();
 
+  const [generandoPdf, setGenerandoPdf] = useState(false);
+  const descargarPdf = async () => {
+    setGenerandoPdf(true);
+    try {
+      await generarReportePdf({
+        listaClientes,
+        ingresoMesActual,
+        egresoMesActual,
+        netoMesActual,
+        carteraPendienteTotal,
+        ingresoTotalHistorico,
+        egresoTotalHistorico,
+        netoTotalHistorico,
+        mesesEtiquetas,
+        ingresosPorMes,
+        egresosPorMes,
+        conteoEstados,
+        sinRevisar,
+        filasCarga,
+        filasArea,
+        clientesConPago,
+        ticketPromedio,
+      });
+    } catch (e) {
+      console.error("No se pudo generar el reporte en PDF:", e);
+    }
+    setGenerandoPdf(false);
+  };
+
   useEffect(() => {
     if (!cargando) onListo?.();
   }, [cargando]);
@@ -50,22 +216,27 @@ export default function ReportesTab({ onListo }) {
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
         <EncabezadoSeccion titulo="Reportes" color="#0EA5E9" />
-        <button
-          className="drx-btn-ghost"
-          style={buttonGhost}
-          onClick={() =>
-            exportarCSV(
-              "reporte-ingresos.csv",
-              [
-                { titulo: "Mes", valor: (m) => m.etiqueta },
-                { titulo: "Ingreso", valor: (m) => ingresosPorMes[m.clave] },
-              ],
-              mesesEtiquetas
-            )
-          }
-        >
-          Exportar Excel
-        </button>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button className="drx-btn-ghost" style={buttonGhost} onClick={descargarPdf} disabled={generandoPdf}>
+            {generandoPdf ? "Generando…" : "Exportar PDF"}
+          </button>
+          <button
+            className="drx-btn-ghost"
+            style={buttonGhost}
+            onClick={() =>
+              exportarCSV(
+                "reporte-ingresos.csv",
+                [
+                  { titulo: "Mes", valor: (m) => m.etiqueta },
+                  { titulo: "Ingreso", valor: (m) => ingresosPorMes[m.clave] },
+                ],
+                mesesEtiquetas
+              )
+            }
+          >
+            Exportar Excel
+          </button>
+        </div>
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, marginBottom: 20 }}>

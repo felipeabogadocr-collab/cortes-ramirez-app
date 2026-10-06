@@ -193,6 +193,10 @@ export const TIPOS_ID = ["Cédula de ciudadanía", "Cédula de extranjería", "P
 // Número de WhatsApp del despacho (con indicativo, sin espacios ni +), usado en el botón "¿Tienes dudas?"
 export const NUMERO_WHATSAPP_DESPACHO = "573192875428";
 
+// Guía de uso de Nomos (botón "Ayuda" de la barra superior) — un artifact de
+// Claude, se actualiza aparte de un despliegue de código normal.
+export const URL_GUIA_NOMOS = "https://claude.ai/artifact/Pdmx44JrBwfkJ3u1MyDYke";
+
 // "Ordinario / Verbal / Ejecutivo..." es la clasificación de trámites del
 // Código General del Proceso (civil) — no tiene nada que ver con el trámite
 // penal (Ley 906 de 2004, sistema acusatorio: indagación, imputación,
@@ -1308,7 +1312,7 @@ export function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-export const APP_VERSION = "1.139.1";
+export const APP_VERSION = "1.140.0";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -1623,6 +1627,8 @@ export function Icono({ tipo, size = 15, style, className }) {
       return <svg {...p}><path d="M12 21s7-6.5 7-11.5A7 7 0 0 0 5 9.5C5 14.5 12 21 12 21Z" /><circle cx="12" cy="9.5" r="2.3" /></svg>;
     case "video":
       return <svg {...p}><rect x="2.5" y="6.5" width="13" height="11" rx="2" /><path d="m15.5 10.5 5-3v9l-5-3Z" /></svg>;
+    case "ayuda":
+      return <svg {...p}><circle cx="12" cy="12" r="9.5" /><path d="M9.2 9.2a2.8 2.8 0 1 1 3.9 2.6c-.8.4-1.1.9-1.1 1.7v.4" /><circle cx="12" cy="17" r="0.3" fill="currentColor" /></svg>;
     default:
       return null;
   }
@@ -3881,37 +3887,59 @@ function ResumenTab({ nombre, usuarioId, usuarioActual, onIr, onListo }) {
 
       {(() => {
         const a = analisis;
+        const iconoSenal = (categoria) =>
+          ({
+            Tendencia: "grafico",
+            "Año contra año": "grafico",
+            "Rango del semestre": "grafico",
+            Margen: "objetivo",
+            "Punto de equilibrio": "balanza",
+            "Cartera atrasada": "reloj",
+            "Cobro sin programar": "reloj",
+            Cobro: "alerta",
+            "Gasto atípico": "alerta",
+            Capacidad: "persona",
+            Concentración: "objetivo",
+            "Flujo de caja": "calendario",
+            "Calidad del dato": "escudo",
+            "Retención acumulada": "documento",
+          }[categoria] || "chispa");
         return (
-          <Card
-            style={{
-              marginBottom: 24,
-              borderLeft: `4px solid ${a.listo ? a.color : "#94A3B8"}`,
-              background: `linear-gradient(135deg, ${COLORS.panel} 0%, ${a.listo ? a.color + "0D" : COLORS.surfaceSoft} 100%)`,
-            }}
-          >
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14, flexWrap: "wrap", gap: 10 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <div
-                  style={{
-                    width: 38,
-                    height: 38,
-                    borderRadius: "50%",
-                    background: `linear-gradient(135deg, ${COLORS.navy}, ${COLORS.accentBright})`,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    flexShrink: 0,
-                    color: "#FFFFFF",
-                  }}
-                >
-                  <IconoLex size={19} />
-                </div>
-                <div>
-                  <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, fontWeight: 800, color: COLORS.headingText, margin: 0 }}>
-                    {NOMBRE_ASISTENTE} · análisis financiero
-                  </p>
-                  <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, margin: "2px 0 0" }}>Con base en tus ingresos, egresos, cartera y carga de trabajo</p>
-                </div>
+          <Card style={{ marginBottom: 24, borderRadius: 16, position: "relative", overflow: "hidden" }}>
+            <div
+              style={{
+                position: "absolute",
+                right: -40,
+                top: -50,
+                width: 180,
+                height: 180,
+                borderRadius: "50%",
+                background: `radial-gradient(circle, ${a.listo ? a.color : COLORS.navy}14, transparent 70%)`,
+                pointerEvents: "none",
+              }}
+            />
+            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 18, position: "relative" }}>
+              <div
+                style={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: 12,
+                  flexShrink: 0,
+                  background: `linear-gradient(135deg, ${COLORS.navy}, ${COLORS.navyDeep})`,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  color: "#FFFFFF",
+                  boxShadow: `0 6px 14px ${COLORS.navy}40`,
+                }}
+              >
+                <IconoLex size={21} />
+              </div>
+              <div>
+                <p style={{ fontFamily: "Inter, sans-serif", fontSize: 14.5, fontWeight: 800, color: COLORS.headingText, margin: 0 }}>
+                  {NOMBRE_ASISTENTE} · análisis financiero
+                </p>
+                <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, margin: "2px 0 0" }}>Con base en tus ingresos, egresos, cartera y carga de trabajo</p>
               </div>
             </div>
 
@@ -3923,14 +3951,17 @@ function ResumenTab({ nombre, usuarioId, usuarioActual, onIr, onListo }) {
               <>
                 <div
                   style={{
-                    display: "inline-block",
-                    background: a.color + "1A",
-                    border: `1px solid ${a.color}40`,
-                    borderRadius: 10,
-                    padding: "8px 14px",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 10,
+                    background: `linear-gradient(135deg, ${a.color}1A, ${a.color}0D)`,
+                    border: `1px solid ${a.color}35`,
+                    borderRadius: 12,
+                    padding: "12px 16px",
                     marginBottom: 16,
                   }}
                 >
+                  <div style={{ width: 8, height: 8, borderRadius: "50%", background: a.color, flexShrink: 0, boxShadow: `0 0 0 4px ${a.color}25` }} />
                   <p style={{ fontFamily: "Inter, sans-serif", fontSize: 17, fontWeight: 800, color: a.color, margin: 0 }}>{a.veredicto}</p>
                 </div>
                 <p style={{ fontFamily: "'Source Serif 4', serif", fontSize: 13.5, color: COLORS.ink, lineHeight: 1.6, margin: "0 0 16px" }}>{a.consejo}</p>
@@ -3941,10 +3972,10 @@ function ResumenTab({ nombre, usuarioId, usuarioActual, onIr, onListo }) {
                   </p>
                 )}
 
-                <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11, fontWeight: 700, color: COLORS.muted, textTransform: "uppercase", letterSpacing: 0.5, margin: "0 0 8px" }}>
+                <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11, fontWeight: 700, color: COLORS.muted, textTransform: "uppercase", letterSpacing: 0.5, margin: "0 0 10px" }}>
                   Lo que hay detrás del veredicto
                 </p>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 8, marginBottom: 6 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 10, marginBottom: 6 }}>
                   {a.senales.map((s, i) => {
                     const colorSenal = s.positiva === true ? "#166534" : s.positiva === false ? "#B42318" : COLORS.navy;
                     const fondoSenal = s.positiva === true ? "#F0FDF4" : s.positiva === false ? "#FEF2F2" : COLORS.surfaceSoft;
@@ -3955,21 +3986,40 @@ function ResumenTab({ nombre, usuarioId, usuarioActual, onIr, onListo }) {
                         onClick={() => onIr("contabilidad")}
                         title="Ver el detalle en Contabilidad"
                         style={{
-                          display: "block",
+                          display: "flex",
+                          alignItems: "flex-start",
+                          gap: 10,
                           background: fondoSenal,
                           border: `1px solid ${bordeSenal}`,
                           cursor: "pointer",
                           textAlign: "left",
-                          padding: "9px 12px",
-                          borderRadius: 10,
+                          padding: "11px 12px",
+                          borderRadius: 11,
                           fontFamily: "inherit",
                         }}
                         className="drx-senal-clicable"
                       >
-                        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 10.5, fontWeight: 800, color: colorSenal, textTransform: "uppercase", letterSpacing: 0.4, margin: "0 0 3px" }}>
-                          {s.categoria}
-                        </p>
-                        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.ink, margin: 0, lineHeight: 1.45 }}>{s.texto}</p>
+                        <div
+                          style={{
+                            width: 26,
+                            height: 26,
+                            borderRadius: 8,
+                            flexShrink: 0,
+                            background: `${colorSenal}1A`,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            color: colorSenal,
+                          }}
+                        >
+                          <Icono tipo={iconoSenal(s.categoria)} size={13} />
+                        </div>
+                        <div style={{ minWidth: 0 }}>
+                          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 10.5, fontWeight: 800, color: colorSenal, textTransform: "uppercase", letterSpacing: 0.4, margin: "0 0 3px" }}>
+                            {s.categoria}
+                          </p>
+                          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.ink, margin: 0, lineHeight: 1.45 }}>{s.texto}</p>
+                        </div>
                       </button>
                     );
                   })}
@@ -9177,6 +9227,25 @@ function App() {
               />
             )}
             </div>
+            <a
+              href={URL_GUIA_NOMOS}
+              target="_blank"
+              rel="noreferrer"
+              className="drx-btn-ghost"
+              title="Guía de uso de Nomos"
+              style={{
+                ...buttonGhost,
+                textDecoration: "none",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                width: 38,
+                height: 38,
+                padding: 0,
+              }}
+            >
+              <Icono tipo="ayuda" size={16} />
+            </a>
             <button className="drx-btn-ghost" style={buttonGhost} onClick={() => setModoPublico(true)} title="Ver vista del cliente">
               <Icono tipo="ojo" size={13} style={{ marginRight: 4, verticalAlign: -2 }} />
               <span className="drx-oculta-movil">Ver vista del cliente ↗</span>
