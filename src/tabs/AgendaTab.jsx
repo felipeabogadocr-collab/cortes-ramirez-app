@@ -279,7 +279,11 @@ export default function AgendaTab({ onListo }) {
   const [sincronizandoId, setSincronizandoId] = useState(null);
   const { clientes: clientesLigero, cargado: clientesCargados } = useClientesLigero();
   const [permisoNotif, setPermisoNotif] = useState(typeof Notification !== "undefined" ? Notification.permission : "unsupported");
-  const [filtroTarea, setFiltroTarea] = useState("todas");
+  // "Próximas" (hoy en adelante) por defecto, no "Todas": una Agenda que
+  // abre mostrando un evento de hace semanas antes que los de hoy no sirve
+  // de un vistazo — lo viejo sigue a un clic en el filtro "Todas" o
+  // "Vencidas" para quien sí lo necesite.
+  const [filtroTarea, setFiltroTarea] = useState("proximas");
   const [vista, setVista] = useState("agenda");
   const [mesVisto, setMesVisto] = useState(() => {
     const d = new Date();
