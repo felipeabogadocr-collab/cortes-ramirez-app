@@ -88,6 +88,35 @@ const FORM_CLIENTE_INICIAL = {
   abogadoAsociado: null,
 };
 
+// Reacomodar roles cuando uno se confunde al crear el cliente: el principal
+// y quien paga (o alguien de "otras personas") intercambian lugar. Solo se
+// mueven nombre y teléfono — el correo, el plan de pago, los radicados y
+// todo lo demás sigue siendo del mismo cliente.
+function intercambiarConPagador(f) {
+  if (!f.pagador) return f;
+  return {
+    ...f,
+    nombre: (f.pagador.nombre || "").toUpperCase(),
+    telefono: f.pagador.telefono || "",
+    pagador: { nombre: (f.nombre || "").toUpperCase(), telefono: f.telefono || "" },
+  };
+}
+function hacerPrincipal(f, id) {
+  const persona = (f.otrasPersonas || []).find((x) => x.id === id);
+  if (!persona) return f;
+  return {
+    ...f,
+    nombre: (persona.nombre || "").toUpperCase(),
+    telefono: persona.telefono || "",
+    otrasPersonas: f.otrasPersonas.map((x) => (x.id === id ? { ...x, nombre: (f.nombre || "").toUpperCase(), telefono: f.telefono || "", rol: "" } : x)),
+  };
+}
+function quePague(f, id) {
+  const persona = (f.otrasPersonas || []).find((x) => x.id === id);
+  if (!persona) return f;
+  return { ...f, pagador: { nombre: (persona.nombre || "").toUpperCase(), telefono: persona.telefono || "" } };
+}
+
 // A veces quien paga no es el cliente: el proceso es de Pepito, pero Juan
 // (un familiar, un socio) es quien hace el pago. Cuando eso pasa, los
 // recordatorios de pago y la confirmación/recibo deben llegarle a quien
@@ -95,7 +124,7 @@ const FORM_CLIENTE_INICIAL = {
 // registrar a esa persona sin mezclarla con el cliente ni con "otras
 // personas del proceso" (que es solo informativo, no cambia a dónde se
 // manda nada).
-function SelectorPagador({ pagador, onChange }) {
+function SelectorPagador({ pagador, onChange, onIntercambiar }) {
   const esOtraPersona = !!pagador;
 
   return (
@@ -127,7 +156,7 @@ function SelectorPagador({ pagador, onChange }) {
             className="drx-input"
             style={{ ...inputStyle, padding: "8px 10px", fontSize: 13 }}
             value={pagador.nombre}
-            onChange={(e) => onChange({ ...pagador, nombre: e.target.value })}
+            onChange={(e) => onChange({ ...pagador, nombre: e.target.value.toUpperCase() })}
             placeholder="Nombre de quien paga"
           />
           <input
@@ -138,6 +167,17 @@ function SelectorPagador({ pagador, onChange }) {
             placeholder="Teléfono de quien paga"
           />
         </div>
+      )}
+      {esOtraPersona && onIntercambiar && (
+        <button
+          type="button"
+          className="drx-btn-ghost"
+          style={{ ...buttonGhost, padding: "6px 12px", fontSize: 12, marginTop: 8 }}
+          onClick={onIntercambiar}
+          title="El que paga pasa a ser el cliente principal, y el principal pasa a ser quien paga"
+        >
+          ⇅ Intercambiar: que quien paga sea el cliente principal
+        </button>
       )}
     </div>
   );
@@ -159,7 +199,7 @@ function SelectorPagador({ pagador, onChange }) {
 // no calza ninguno, "Otro" deja escribirlo libre.
 const ROLES_OTRAS_PERSONAS = ["Obligado solidario", "Cliente solidario", "Cónyuge", "Socio", "Heredero", "Codemandante", "Codemandado"];
 
-function EditorOtrasPersonas({ personas, onChange }) {
+function EditorOtrasPersonas({ personas, onChange, onHacerPrincipal, onQuePague }) {
   const lista = personas || [];
   // Ids de filas donde se eligió "Otro" y se está escribiendo el rol libre
   // — aparte del valor guardado, porque mientras se escribe puede estar
@@ -184,7 +224,7 @@ function EditorOtrasPersonas({ personas, onChange }) {
         const esRolLibre = rolLibre[p.id] || (p.rol && !ROLES_OTRAS_PERSONAS.includes(p.rol));
         return (
           <div key={p.id} className="drx-grid-form" style={{ display: "grid", gridTemplateColumns: "1.3fr 1fr 1fr auto", gap: 8, marginTop: 8, alignItems: "center" }}>
-            <input className="drx-input" style={{ ...inputStyle, padding: "8px 10px", fontSize: 13 }} value={p.nombre} onChange={(e) => actualizar(p.id, "nombre", e.target.value)} placeholder="Nombre completo" />
+            <input className="drx-input" style={{ ...inputStyle, padding: "8px 10px", fontSize: 13 }} value={p.nombre} onChange={(e) => actualizar(p.id, "nombre", e.target.value.toUpperCase())} placeholder="Nombre completo" />
             <input className="drx-input" style={{ ...inputStyle, padding: "8px 10px", fontSize: 13 }} value={p.telefono} onChange={(e) => actualizar(p.id, "telefono", e.target.value)} placeholder="Teléfono (opcional)" />
             {esRolLibre ? (
               <input
@@ -221,6 +261,20 @@ function EditorOtrasPersonas({ personas, onChange }) {
             <button onClick={() => quitar(p.id)} style={{ background: "none", border: "none", cursor: "pointer", color: COLORS.muted, display: "flex" }} title="Quitar">
               <Icono tipo="check" size={14} style={{ transform: "rotate(45deg)" }} />
             </button>
+            {p.nombre?.trim() && (onHacerPrincipal || onQuePague) && (
+              <div style={{ gridColumn: "1 / -1", display: "flex", gap: 8, flexWrap: "wrap", marginTop: -2 }}>
+                {onHacerPrincipal && (
+                  <button type="button" className="drx-btn-ghost" style={{ ...buttonGhost, padding: "4px 10px", fontSize: 11.5 }} onClick={() => onHacerPrincipal(p.id)} title="Esta persona pasa a ser el cliente principal y el principal queda en esta lista">
+                    ⇅ Hacer cliente principal
+                  </button>
+                )}
+                {onQuePague && (
+                  <button type="button" className="drx-btn-ghost" style={{ ...buttonGhost, padding: "4px 10px", fontSize: 11.5 }} onClick={() => onQuePague(p.id)} title="Los recordatorios y recibos de pago le llegarán a esta persona">
+                    💳 Que pague esta persona
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         );
       })}
@@ -940,7 +994,7 @@ export default function ClientesTab({ usuarioActual, onIrARegistrarPago, onListo
               <input className="drx-input" style={inputStyle} value={form.notas} onChange={(e) => setForm({ ...form, notas: e.target.value })} />
             </Field>
           </div>
-          <EditorOtrasPersonas personas={form.otrasPersonas} onChange={(otrasPersonas) => setForm({ ...form, otrasPersonas })} />
+          <EditorOtrasPersonas personas={form.otrasPersonas} onChange={(otrasPersonas) => setForm({ ...form, otrasPersonas })} onHacerPrincipal={(id) => setForm((f) => hacerPrincipal(f, id))} onQuePague={(id) => setForm((f) => quePague(f, id))} />
           <div style={{ marginTop: 12, marginBottom: 12 }}>
             <Field label="Grupo de WhatsApp del proceso (opcional)">
               <input
@@ -955,7 +1009,7 @@ export default function ClientesTab({ usuarioActual, onIrARegistrarPago, onListo
               Si son varias personas en el proceso, pega aquí el enlace del grupo (WhatsApp → grupo → Info del grupo → Invitar por enlace). El botón "Al grupo" copiará el recordatorio y abrirá el grupo para pegarlo.
             </p>
           </div>
-          <SelectorPagador pagador={form.pagador} onChange={(pagador) => setForm({ ...form, pagador })} />
+          <SelectorPagador pagador={form.pagador} onChange={(pagador) => setForm({ ...form, pagador })} onIntercambiar={() => setForm((f) => intercambiarConPagador(f))} />
           {puedeVerDinero ? (
             <PlanDePago planPago={form.planPago} onChange={(planPago) => setForm({ ...form, planPago })} />
           ) : (
@@ -1107,7 +1161,7 @@ export default function ClientesTab({ usuarioActual, onIrARegistrarPago, onListo
                     <input className="drx-input" style={inputStyle} value={formEdicion.notas || ""} onChange={(e) => setFormEdicion({ ...formEdicion, notas: e.target.value })} />
                   </Field>
                 </div>
-                <EditorOtrasPersonas personas={formEdicion.otrasPersonas} onChange={(otrasPersonas) => setFormEdicion({ ...formEdicion, otrasPersonas })} />
+                <EditorOtrasPersonas personas={formEdicion.otrasPersonas} onChange={(otrasPersonas) => setFormEdicion({ ...formEdicion, otrasPersonas })} onHacerPrincipal={(id) => setFormEdicion((f) => hacerPrincipal(f, id))} onQuePague={(id) => setFormEdicion((f) => quePague(f, id))} />
                 <div style={{ marginTop: 12, marginBottom: 12 }}>
                   <Field label="Grupo de WhatsApp del proceso (opcional)">
                     <input
@@ -1119,7 +1173,7 @@ export default function ClientesTab({ usuarioActual, onIrARegistrarPago, onListo
                     />
                   </Field>
                 </div>
-                <SelectorPagador pagador={formEdicion.pagador} onChange={(pagador) => setFormEdicion({ ...formEdicion, pagador })} />
+                <SelectorPagador pagador={formEdicion.pagador} onChange={(pagador) => setFormEdicion({ ...formEdicion, pagador })} onIntercambiar={() => setFormEdicion((f) => intercambiarConPagador(f))} />
                 {puedeVerDinero ? (
                   <PlanDePago planPago={formEdicion.planPago} onChange={(planPago) => setFormEdicion({ ...formEdicion, planPago })} />
                 ) : (
@@ -1190,7 +1244,7 @@ export default function ClientesTab({ usuarioActual, onIrARegistrarPago, onListo
                 <div style={{ flex: 1, minWidth: 260, display: "flex", gap: 12 }}>
                   <AvatarIniciales nombre={c.nombre} />
                   <div style={{ flex: 1 }}>
-                  <p style={{ fontFamily: "Inter, sans-serif", fontSize: 17, fontWeight: 700, margin: 0, color: COLORS.ink }}>{c.nombre}</p>
+                  <p style={{ fontFamily: "Inter, sans-serif", fontSize: 17, fontWeight: 700, margin: 0, color: COLORS.ink }}>{(c.nombre || "").toUpperCase()}</p>
                   <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted, margin: "4px 0 0", display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
                     {c.telefono && (
                       <span
@@ -1219,7 +1273,7 @@ export default function ClientesTab({ usuarioActual, onIrARegistrarPago, onListo
                   </p>
                   {c.otrasPersonas?.length > 0 && (
                     <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, margin: "4px 0 0", display: "flex", alignItems: "center", gap: 5 }}>
-                      <Icono tipo="persona" size={12} /> También: {c.otrasPersonas.map((p) => p.nombre + (p.rol ? ` (${p.rol})` : "")).filter(Boolean).join(", ")}
+                      <Icono tipo="persona" size={12} /> También: {c.otrasPersonas.map((p) => (p.nombre || "").toUpperCase() + (p.rol ? ` (${p.rol})` : "")).filter(Boolean).join(", ")}
                     </p>
                   )}
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
@@ -1382,7 +1436,7 @@ export default function ClientesTab({ usuarioActual, onIrARegistrarPago, onListo
                   {c.pagador?.nombre && (
                     <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.inkSoft, margin: "8px 0 0" }}>
                       <Icono tipo="tarjeta" size={12} style={{ marginRight: 4, verticalAlign: -2 }} />
-                      Paga: <strong>{c.pagador.nombre}</strong>
+                      Paga: <strong>{c.pagador.nombre.toUpperCase()}</strong>
                       {c.pagador.telefono ? ` · ${c.pagador.telefono}` : ""}
                     </p>
                   )}
