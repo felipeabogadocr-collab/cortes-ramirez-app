@@ -149,7 +149,7 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: "GEMINI_API_KEY no configurada en el servidor" });
   }
 
-  const { max_tokens, system, tools, messages } = req.body || {};
+  const { max_tokens, system, tools, messages, temperature } = req.body || {};
   if (!messages) {
     return res.status(400).json({ error: "Falta 'messages' en el cuerpo de la solicitud" });
   }
@@ -175,6 +175,10 @@ export default async function handler(req, res) {
     contents: contenidos,
     generationConfig: { maxOutputTokens: Math.min(Number(max_tokens) || 700, MAX_TOKENS_CAP) },
   };
+  // Opcional: más variedad cuando se piden ideas creativas (acotado a 0–1.5).
+  if (Number.isFinite(Number(temperature)) && temperature !== null && temperature !== undefined) {
+    body.generationConfig.temperature = Math.max(0, Math.min(1.5, Number(temperature)));
+  }
   if (system) body.systemInstruction = { parts: [{ text: system }] };
 
   // Gemini rechaza con "invalid argument" la combinación de herramientas +

@@ -45,7 +45,20 @@ function contextoEstrategia(estrategia) {
   return partes.join(" ");
 }
 
-async function generarIdeasCalendario(tema, estrategia) {
+// Ángulos distintos para cada tanda: así pedir ideas varias veces en el
+// mismo día da contenido nuevo en vez de variaciones de lo mismo.
+const ANGULOS_IDEAS = [
+  "mitos legales que la gente cree", "errores comunes que cuestan plata", "preguntas frecuentes de clientes",
+  "derechos que casi nadie conoce", "casos cotidianos explicados fácil", "noticias y cambios de ley recientes",
+  "detrás de cámaras del despacho", "historias de éxito sin datos personales", "tendencias y audios virales adaptados",
+  "consejos rápidos de 30 segundos", "comparaciones antes y después", "checklists y guías paso a paso",
+  "situaciones de familia, trabajo, deudas, arriendos y tránsito", "respuestas a comentarios de seguidores",
+  "términos legales traducidos a lenguaje simple", "fechas y plazos que no se deben dejar pasar",
+];
+
+async function generarIdeasCalendario(tema, estrategia, ideasPrevias = []) {
+  const angulos = [...ANGULOS_IDEAS].sort(() => Math.random() - 0.5).slice(0, 3).join(", ");
+  const previas = ideasPrevias.slice(0, 60).map((t) => `- ${t}`).join("\n");
   const contexto = contextoEstrategia(estrategia);
   const { data: sesionData } = await supabase.auth.getSession();
   const token = sesionData?.session?.access_token;
@@ -58,11 +71,14 @@ async function generarIdeasCalendario(tema, estrategia) {
     body: JSON.stringify({
       model: "claude-sonnet-4-6",
       max_tokens: 600,
+      temperature: 1.1,
       system:
         `Eres un community manager experto y estratega de contenido para ${getNombreDespacho()}, un despacho de abogados en Colombia que publica en Instagram, Facebook y TikTok. ` +
         `Genera 5 ideas de contenido concretas, poderosas y variadas (educativas, cercanas, casos de éxito sin romper confidencialidad, detrás de cámaras, tendencias, formatos de video corto, etc.), pensadas para atraer seguidores del nicho correcto y convertirlos en clientes potenciales.` +
         (tema ? ` Enfocadas en: ${tema}.` : ".") +
         (contexto ? ` ${contexto}` : "") +
+        ` Para esta tanda inspírate sobre todo en estos ángulos: ${angulos}.` +
+        (previas ? ` Estas ideas YA se generaron antes; NO las repitas ni propongas variaciones parecidas, todas deben ser nuevas y distintas:\n${previas}\n` : "") +
         ` Responde SOLO con una lista numerada del 1 al 5, cada idea en una sola línea corta (máximo 25 palabras) incluyendo el formato (reel, carrusel, historia, etc.), sin texto adicional antes o después, sin usar markdown.`,
       messages: [{ role: "user", content: "Dame ideas de contenido." }],
     }),
@@ -481,7 +497,9 @@ export default function ContenidoTab({ onListo }) {
     setGenerandoIdeas(true);
     setErrorIdeas("");
     try {
-      const nuevas = await generarIdeasCalendario(temaIdeas.trim(), estrategia);
+      const yaExisten = new Set(ideas.map((i) => i.texto.trim().toLowerCase()));
+      const nuevas = (await generarIdeasCalendario(temaIdeas.trim(), estrategia, ideas.map((i) => i.texto)))
+        .filter((t) => !yaExisten.has(t.trim().toLowerCase()));
       if (nuevas.length > 0) await agregarVarias(nuevas);
       else setErrorIdeas("La IA no devolvió ideas esta vez. Intenta de nuevo.");
     } catch (e) {
