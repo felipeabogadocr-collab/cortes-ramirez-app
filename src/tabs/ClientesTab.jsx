@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { storageSet, getNombreDespacho, obtenerClientesPorId } from "../lib/storage";
 import {
   COLORS, uid, registrarAuditoria, diasDesde, exportarCSV, useIndex, useConfirmarDialogo,
@@ -336,7 +336,7 @@ const MAX_CUOTAS = 30;
 // plan de pago quedaba a medio llenar y tocaba reintentar sin entender por
 // qué. Un formulario directo de "cuántas cuotas, de cuánto, cada cuánto" no
 // tiene nada que interpretar ni que le pueda salir mal.
-function PlanDePago({ planPago, onChange }) {
+function PlanDePago({ planPago, onChange, valorTotal }) {
   const { servicios } = useServicios();
   const [servicioElegidoId, setServicioElegidoId] = useState("");
   const plan = planPago || {};
@@ -352,6 +352,7 @@ function PlanDePago({ planPago, onChange }) {
       resumen: servicio.nombre,
       proximaFecha,
       numCuotas: 1,
+      valorManual: true,
       cuotas: [{ fecha: proximaFecha, valor: servicio.valor }],
     });
     setServicioElegidoId("");
@@ -361,12 +362,12 @@ function PlanDePago({ planPago, onChange }) {
   // encadenando la frecuencia — la misma cuenta que ya usa el resto de la
   // app para "próximo pago", solo que aquí se muestra completa de una vez
   // en vez de una fecha a la vez.
-  const generarCuotas = (base) => {
+  const generarCuotas = (base, valores) => {
     const numCuotas = base.frecuencia === "Pago único" ? 1 : Number(base.numCuotas) || 1;
     const cuotas = [];
     let fecha = base.proximaFecha || "";
     for (let i = 0; i < numCuotas; i++) {
-      cuotas.push({ fecha, valor: base.valor || 0 });
+      cuotas.push({ fecha, valor: valores ? valores[i] : base.valor || 0 });
       if (fecha && base.frecuencia && base.frecuencia !== "Pago único" && base.frecuencia !== "Otro") {
         fecha = calcularProximaFechaPorFrecuencia(fecha, base.frecuencia);
       }
@@ -398,13 +399,45 @@ function PlanDePago({ planPago, onChange }) {
     // campo. Si se sobrescribiera con el valor ya corregido, el campo
     // "saltaba" de vuelta a 1 apenas se intentaba borrar para cambiarlo.
     const numCuotasEfectivo = combinado.frecuencia === "Pago único" ? 1 : Math.min(MAX_CUOTAS, Math.max(1, Number(combinado.numCuotas) || 1));
+    // Si arriba ya se puso el "Valor total acordado", el valor de cada cuota
+    // se calcula solo: (total − anticipo) ÷ número de cuotas, redondeado a
+    // pesos enteros y con la diferencia del redondeo en la última cuota para
+    // que la suma dé exacto el total. Si la persona escribe a mano el valor
+    // de la cuota, se respeta (valorManual) hasta que pida calcularlo de nuevo.
+    const total = Number(valorTotal) || 0;
+    const anticipo = Math.max(0, Number(combinado.anticipo) || 0);
+    let valores = null;
+    if (total > 0 && !combinado.valorManual) {
+      const restante = Math.max(0, total - anticipo);
+      const base = Math.round(restante / numCuotasEfectivo);
+      valores = Array.from({ length: numCuotasEfectivo }, (_, i) => (i === numCuotasEfectivo - 1 ? restante - base * (numCuotasEfectivo - 1) : base));
+      combinado.valor = base;
+    }
     const cuotasTexto = numCuotasEfectivo > 1 ? ` en ${numCuotasEfectivo} cuotas` : "";
+    const textoAnticipo = anticipo > 0 ? `Anticipo de ${formatoCOP(anticipo)} + ` : "";
     const resumen = combinado.valor
-      ? `${formatoCOP(combinado.valor)} ${(combinado.frecuencia || "").toLowerCase()}${cuotasTexto}`.trim()
-      : "";
-    const cuotas = generarCuotas({ ...combinado, numCuotas: numCuotasEfectivo });
+      ? `${textoAnticipo}${formatoCOP(combinado.valor)} ${(combinado.frecuencia || "").toLowerCase()}${cuotasTexto}`.trim()
+      : anticipo > 0
+        ? `Anticipo de ${formatoCOP(anticipo)}`
+        : "";
+    let cuotas = generarCuotas({ ...combinado, numCuotas: numCuotasEfectivo }, valores);
+    if (anticipo > 0) cuotas = [{ fecha: combinado.fechaAnticipo || fechaHoyISO(), valor: anticipo, esAnticipo: true }, ...cuotas];
     onChange({ ...combinado, cuotas, descripcion: resumen, resumen });
   };
+
+  // Si cambian el "Valor total acordado" de arriba después de armar el
+  // plan, las cuotas se recalculan solas (salvo que el valor se haya puesto
+  // a mano).
+  const totalPrevio = useRef(valorTotal);
+  useEffect(() => {
+    if (totalPrevio.current === valorTotal) return;
+    totalPrevio.current = valorTotal;
+    if (planPago && (planPago.numCuotas || planPago.valor || planPago.anticipo) && !planPago.valorManual) actualizar({});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [valorTotal]);
+
+  const totalNum = Number(valorTotal) || 0;
+  const sumaPlan = (plan.cuotas || []).reduce((acc, c) => acc + (Number(c.valor) || 0), 0);
 
   const actualizarCuota = (idx, campo, valor) => {
     const cuotas = (plan.cuotas || []).map((c, i) => (i === idx ? { ...c, [campo]: valor } : c));
@@ -434,13 +467,44 @@ function PlanDePago({ planPago, onChange }) {
         </div>
       )}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, textAlign: "left" }}>
-        <Field label="Valor por cuota (COP)">
+        <Field label="Abono inicial / anticipo (opcional)">
+          <CampoDinero
+            style={{ ...inputStyle, fontSize: 12.5, padding: "7px 8px" }}
+            value={plan.anticipo || ""}
+            onChange={(e) => actualizar({ anticipo: Number(e.target.value) })}
+            placeholder="Ej: 1.000.000"
+          />
+        </Field>
+        {Number(plan.anticipo) > 0 ? (
+          <Field label="Fecha del anticipo">
+            <input
+              type="date"
+              className="drx-input"
+              style={{ ...inputStyle, fontSize: 12.5, padding: "7px 8px" }}
+              value={plan.fechaAnticipo || fechaHoyISO()}
+              onChange={(e) => actualizar({ fechaAnticipo: e.target.value })}
+            />
+          </Field>
+        ) : (
+          <div />
+        )}
+        <Field label={totalNum > 0 && !plan.valorManual ? "Valor por cuota (se calcula solo)" : "Valor por cuota (COP)"}>
           <CampoDinero
             style={{ ...inputStyle, fontSize: 12.5, padding: "7px 8px" }}
             value={plan.valor || ""}
-            onChange={(e) => actualizar({ valor: Number(e.target.value) })}
-            placeholder="Ej: 500.000"
+            onChange={(e) => actualizar({ valor: Number(e.target.value), valorManual: true })}
+            placeholder={totalNum > 0 ? "Se calcula con el valor total" : "Ej: 500.000"}
           />
+          {totalNum > 0 && !plan.valorManual && (
+            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11, color: COLORS.muted, margin: "4px 0 0" }}>
+              {formatoCOP(totalNum)}{Number(plan.anticipo) > 0 ? ` − anticipo ${formatoCOP(Number(plan.anticipo))}` : ""} ÷ {plan.frecuencia === "Pago único" ? 1 : Math.min(MAX_CUOTAS, Math.max(1, Number(plan.numCuotas) || 1))} cuota(s). Puedes cambiarlo a mano.
+            </p>
+          )}
+          {totalNum > 0 && plan.valorManual && (
+            <button type="button" className="drx-btn-ghost" style={{ ...buttonGhost, padding: "3px 9px", fontSize: 11, marginTop: 4 }} onClick={() => actualizar({ valorManual: false })}>
+              ↺ Calcular solo con el valor total
+            </button>
+          )}
         </Field>
         <Field label="Frecuencia">
           <select
@@ -501,7 +565,7 @@ function PlanDePago({ planPago, onChange }) {
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             {plan.cuotas.map((c, idx) => (
               <div key={idx} className="drx-grid-form" style={{ display: "grid", gridTemplateColumns: "70px 1fr 1fr", gap: 8, alignItems: "center" }}>
-                <span style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted }}>Cuota {idx + 1}</span>
+                <span style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted }}>{c.esAnticipo ? "Anticipo" : `Cuota ${plan.cuotas[0]?.esAnticipo ? idx : idx + 1}`}</span>
                 <input
                   type="date"
                   className="drx-input"
@@ -521,6 +585,11 @@ function PlanDePago({ planPago, onChange }) {
       )}
       {plan.resumen && (
         <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.inkSoft, marginTop: 10, fontStyle: "italic", textAlign: "left" }}>"{plan.resumen}"</p>
+      )}
+      {totalNum > 0 && sumaPlan > 0 && sumaPlan !== totalNum && (
+        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, color: "#B45309", margin: "6px 0 0", textAlign: "left" }}>
+          ⚠ El plan suma {formatoCOP(sumaPlan)} y el valor total acordado es {formatoCOP(totalNum)} (diferencia de {formatoCOP(Math.abs(totalNum - sumaPlan))}).
+        </p>
       )}
     </div>
   );
@@ -590,7 +659,12 @@ export default function ClientesTab({ usuarioActual, onIrARegistrarPago, onListo
       if (!seguir) return;
     }
     const id = uid();
-    const proximoPago = form.planPago?.proximaFecha ? { fecha: form.planPago.proximaFecha, valorEsperado: form.planPago.valor } : null;
+    const primeraCuota = form.planPago?.cuotas?.[0];
+    const proximoPago = primeraCuota?.fecha
+      ? { fecha: primeraCuota.fecha, valorEsperado: primeraCuota.valor }
+      : form.planPago?.proximaFecha
+        ? { fecha: form.planPago.proximaFecha, valorEsperado: form.planPago.valor }
+        : null;
     // "radicado" (el primero) se mantiene además de "radicados" (la lista
     // completa) para que todo el código viejo que solo conoce "radicado"
     // (el portal del cliente, el asistente de IA, etc.) siga funcionando
@@ -639,9 +713,12 @@ export default function ClientesTab({ usuarioActual, onIrARegistrarPago, onListo
 
   const guardarEdicion = async (id) => {
     if (!formEdicion.nombre?.trim()) return;
-    const proximoPago = formEdicion.planPago?.proximaFecha
-      ? { fecha: formEdicion.planPago.proximaFecha, valorEsperado: formEdicion.planPago.valor }
-      : formEdicion.proximoPago || null;
+    const cuotaPendiente = formEdicion.planPago?.cuotas?.[(formEdicion.pagos || []).length];
+    const proximoPago = cuotaPendiente?.fecha
+      ? { fecha: cuotaPendiente.fecha, valorEsperado: cuotaPendiente.valor }
+      : formEdicion.planPago?.proximaFecha
+        ? { fecha: formEdicion.planPago.proximaFecha, valorEsperado: formEdicion.planPago.valor }
+        : formEdicion.proximoPago || null;
     if (formEdicion.planPago?.valor && !formEdicion.planPago?.proximaFecha && !proximoPago) {
       const seguir = await confirmar(
         `Le pusiste un valor al plan de pago de ${formEdicion.nombre || "el cliente"} pero falta la fecha. Si guardas así, va a quedar sin próximo cobro programado. ¿Guardar de todas formas?`
@@ -1011,7 +1088,7 @@ export default function ClientesTab({ usuarioActual, onIrARegistrarPago, onListo
           </div>
           <SelectorPagador pagador={form.pagador} onChange={(pagador) => setForm({ ...form, pagador })} onIntercambiar={() => setForm((f) => intercambiarConPagador(f))} />
           {puedeVerDinero ? (
-            <PlanDePago planPago={form.planPago} onChange={(planPago) => setForm({ ...form, planPago })} />
+            <PlanDePago planPago={form.planPago} valorTotal={form.valorTotal} onChange={(planPago) => setForm((f) => ({ ...f, planPago }))} />
           ) : (
             <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.muted, margin: "14px 0" }}>
               El plan de pago se configura desde Contabilidad — no tienes acceso a esa sección.
@@ -1175,7 +1252,7 @@ export default function ClientesTab({ usuarioActual, onIrARegistrarPago, onListo
                 </div>
                 <SelectorPagador pagador={formEdicion.pagador} onChange={(pagador) => setFormEdicion({ ...formEdicion, pagador })} onIntercambiar={() => setFormEdicion((f) => intercambiarConPagador(f))} />
                 {puedeVerDinero ? (
-                  <PlanDePago planPago={formEdicion.planPago} onChange={(planPago) => setFormEdicion({ ...formEdicion, planPago })} />
+                  <PlanDePago planPago={formEdicion.planPago} valorTotal={formEdicion.valorTotal} onChange={(planPago) => setFormEdicion((f) => ({ ...f, planPago }))} />
                 ) : (
                   <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.muted, margin: "14px 0" }}>
                     El plan de pago se configura desde Contabilidad — no tienes acceso a esa sección.
