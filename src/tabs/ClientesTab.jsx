@@ -1653,8 +1653,8 @@ export default function ClientesTab({ usuarioActual, onIrARegistrarPago, onListo
           className="drx-fade-in"
           style={{
             position: "fixed",
-            bottom: 24,
-            right: 24,
+            bottom: "calc(24px + var(--sab))",
+            right: "calc(24px + var(--sar))",
             zIndex: 200,
             background: "#3E7C7C",
             color: "#FFFFFF",

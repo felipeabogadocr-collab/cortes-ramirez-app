@@ -31,6 +31,20 @@ export default function LandingPage({ onRegistrar, onIniciarSesion }) {
   const [mostrarSubir, setMostrarSubir] = useState(false);
   const [mostrarCtaFlotante, setMostrarCtaFlotante] = useState(false);
   const [menuMovilAbierto, setMenuMovilAbierto] = useState(false);
+  // El encabezado se arma según el ancho REAL de la pantalla (no solo con
+  // CSS): así en celular siempre sale en una sola fila — logo, Registrar y
+  // menú — aunque el navegador tarde en aplicar los estilos o tenga una
+  // versión vieja guardada.
+  const consultaMovil = "(max-width: 760px)";
+  const [esMovil, setEsMovil] = useState(() => typeof window !== "undefined" && window.matchMedia?.(consultaMovil).matches);
+  useEffect(() => {
+    const mq = window.matchMedia?.(consultaMovil);
+    if (!mq) return;
+    const alCambiar = () => setEsMovil(mq.matches);
+    alCambiar();
+    mq.addEventListener ? mq.addEventListener("change", alCambiar) : mq.addListener(alCambiar);
+    return () => (mq.removeEventListener ? mq.removeEventListener("change", alCambiar) : mq.removeListener(alCambiar));
+  }, []);
   const ctaFlotanteRef = useRef(null);
   const [ctaFlotanteAltura, setCtaFlotanteAltura] = useState(0);
   // La barra flotante de abajo puede pasar a dos líneas en pantallas
@@ -118,37 +132,70 @@ export default function LandingPage({ onRegistrar, onIniciarSesion }) {
         <div style={{ position: "absolute", left: 0, right: 0, bottom: -2, height: 2, background: COLORS.border }}>
           <div style={{ width: `${progresoScroll}%`, height: "100%", background: COLORS.accentBright, transition: "width 0.1s linear" }} />
         </div>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: scrolleado ? "10px 24px" : "14px 24px", maxWidth: 1040, margin: "0 auto", flexWrap: "wrap", gap: 12, transition: "padding 0.2s ease" }}>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            padding: esMovil ? (scrolleado ? "8px 14px" : "10px 14px") : scrolleado ? "10px 24px" : "14px 24px",
+            maxWidth: 1040,
+            margin: "0 auto",
+            flexWrap: "nowrap",
+            gap: esMovil ? 8 : 12,
+            transition: "padding 0.2s ease",
+          }}
+        >
           <InsigniaPlataforma />
-          <div className="drx-landing-links" style={{ display: "flex", alignItems: "center", gap: 22, flexWrap: "wrap" }}>
-            <a href="#funciones" className="drx-navlink" style={navLinkStyle}>Funciones</a>
-            <a href="#seguridad" className="drx-navlink" style={navLinkStyle}>Seguridad</a>
-            <a href="#planes" className="drx-navlink" style={navLinkStyle}>Planes</a>
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-            <button
-              onClick={onIniciarSesion}
-              className="drx-landing-inicio-desktop"
-              style={{ background: "none", border: "none", color: COLORS.muted, fontFamily: "Inter, sans-serif", fontSize: 13, fontWeight: 600, cursor: "pointer", textDecoration: "underline" }}
-            >
-              Iniciar sesión
+          {!esMovil && (
+            <div className="drx-landing-links" style={{ display: "flex", alignItems: "center", gap: 22, flexWrap: "wrap" }}>
+              <a href="#funciones" className="drx-navlink" style={navLinkStyle}>Funciones</a>
+              <a href="#seguridad" className="drx-navlink" style={navLinkStyle}>Seguridad</a>
+              <a href="#planes" className="drx-navlink" style={navLinkStyle}>Planes</a>
+            </div>
+          )}
+          <div style={{ display: "flex", alignItems: "center", gap: esMovil ? 8 : 16, flexShrink: 0 }}>
+            {!esMovil && (
+              <button
+                onClick={onIniciarSesion}
+                className="drx-landing-inicio-desktop"
+                style={{ background: "none", border: "none", color: COLORS.muted, fontFamily: "Inter, sans-serif", fontSize: 13, fontWeight: 600, cursor: "pointer", textDecoration: "underline", whiteSpace: "nowrap" }}
+              >
+                Iniciar sesión
+              </button>
+            )}
+            <button className="drx-btn-primary" style={{ ...buttonPrimary, padding: esMovil ? "9px 14px" : "9px 18px", fontSize: 13, whiteSpace: "nowrap" }} onClick={onRegistrar}>
+              {esMovil ? "Registrarme" : "Registrar despacho"}
             </button>
-            <button className="drx-btn-primary" style={{ ...buttonPrimary, padding: "9px 18px", fontSize: 13 }} onClick={onRegistrar}>
-              Registrar despacho
-            </button>
-            <BotonTema oscuro={oscuro} onClick={alternar} />
-            <button
-              className="drx-landing-hamburguesa"
-              onClick={() => setMenuMovilAbierto((v) => !v)}
-              title="Menú"
-              aria-label="Abrir menú"
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                <line x1="3" y1="6" x2="21" y2="6" />
-                <line x1="3" y1="12" x2="21" y2="12" />
-                <line x1="3" y1="18" x2="21" y2="18" />
-              </svg>
-            </button>
+            {!esMovil && <BotonTema oscuro={oscuro} onClick={alternar} />}
+            {esMovil && (
+              <button
+                onClick={() => setMenuMovilAbierto((v) => !v)}
+                title="Menú"
+                aria-label="Abrir menú"
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  width: 40,
+                  height: 40,
+                  flexShrink: 0,
+                  background: "transparent",
+                  border: `1px solid ${COLORS.border}`,
+                  borderRadius: 10,
+                  cursor: "pointer",
+                  color: COLORS.headingText,
+                  WebkitAppearance: "none",
+                  appearance: "none",
+                  padding: 0,
+                }}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                  <line x1="3" y1="6" x2="21" y2="6" />
+                  <line x1="3" y1="12" x2="21" y2="12" />
+                  <line x1="3" y1="18" x2="21" y2="18" />
+                </svg>
+              </button>
+            )}
           </div>
         </div>
         {menuMovilAbierto && (
@@ -184,6 +231,10 @@ export default function LandingPage({ onRegistrar, onIniciarSesion }) {
             >
               Iniciar sesión
             </button>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 0 0" }}>
+              <span style={{ ...navLinkStyle }}>{oscuro ? "Modo oscuro" : "Modo claro"}</span>
+              <BotonTema oscuro={oscuro} onClick={alternar} />
+            </div>
           </div>
         )}
       </div>
@@ -762,8 +813,8 @@ export default function LandingPage({ onRegistrar, onIniciarSesion }) {
         title="Escríbenos por WhatsApp"
         style={{
           position: "fixed",
-          bottom: mostrarCtaFlotante ? ctaFlotanteAltura + 16 : 22,
-          right: 22,
+          bottom: `calc(${mostrarCtaFlotante ? ctaFlotanteAltura + 16 : 22}px + var(--sab))`,
+          right: "calc(22px + var(--sar))",
           width: 56,
           height: 56,
           borderRadius: "50%",
@@ -788,8 +839,8 @@ export default function LandingPage({ onRegistrar, onIniciarSesion }) {
         aria-label="Volver arriba"
         style={{
           position: "fixed",
-          bottom: mostrarCtaFlotante ? ctaFlotanteAltura + 18 : 24,
-          left: 24,
+          bottom: `calc(${mostrarCtaFlotante ? ctaFlotanteAltura + 18 : 24}px + var(--sab))`,
+          left: "calc(24px + var(--sal))",
           width: 44,
           height: 44,
           borderRadius: "50%",
@@ -823,7 +874,7 @@ export default function LandingPage({ onRegistrar, onIniciarSesion }) {
           background: COLORS.panel,
           borderTop: `1px solid ${COLORS.border}`,
           boxShadow: "0 -6px 20px rgba(11,61,46,0.12)",
-          padding: "12px 20px",
+          padding: "12px 20px calc(12px + var(--sab))",
           transform: mostrarCtaFlotante ? "translateY(0)" : "translateY(100%)",
           transition: "transform 0.3s ease",
         }}

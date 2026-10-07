@@ -813,6 +813,45 @@ function base64ToUint8Array(base64) {
 
 export const GlobalStyle = () => (
   <style>{`
+    /* --- Bordes seguros del celular (iPhone con isla/notch, barra de gestos,
+       Android con barra de navegación) ---
+       La app pide ocupar toda la pantalla (viewport-fit=cover + barra de
+       estado translúcida en iPhone instalado), así que el sistema dibuja la
+       hora y la batería ENCIMA del contenido. Estas variables son el alto
+       de cada borde (0 en computador o donde no aplica) y el body se corre
+       hacia adentro esa misma medida; la franja de arriba se pinta del verde
+       de la marca para que la hora (blanca) siempre se lea. */
+    :root {
+      --sat: env(safe-area-inset-top, 0px);
+      --sab: env(safe-area-inset-bottom, 0px);
+      --sal: env(safe-area-inset-left, 0px);
+      --sar: env(safe-area-inset-right, 0px);
+    }
+    html { background: #F4F6F9; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+    /* El body se corre hacia adentro el alto de cada borde. Las barras
+       "sticky" (encabezados) usan top: 0: el navegador ya las pega debajo de
+       este relleno, porque el body es el que hace scroll. Las "fixed" van
+       contra la pantalla completa y por eso suman var(--sat)/var(--sab). */
+    body {
+      padding: var(--sat) var(--sar) var(--sab) var(--sal) !important;
+      -webkit-tap-highlight-color: transparent;
+      overscroll-behavior-y: none;
+    }
+    body::before {
+      content: "";
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      height: var(--sat);
+      background: #3E7C7C;
+      z-index: 100000;
+      pointer-events: none;
+    }
+    /* iPhone hace zoom solo al tocar un campo con letra de menos de 16px y
+       la pantalla queda descuadrada (corrida a un lado) — en celular todos
+       los campos usan 16px. */
+    @media (max-width: 860px) {
+      input:not([type="checkbox"]):not([type="radio"]), select, textarea { font-size: 16px !important; }
+    }
     :root, .drx-tema-claro {
       --drx-bg: #F4F6F9;
       --drx-panel: #FFFFFF;
@@ -987,6 +1026,7 @@ export const GlobalStyle = () => (
         box-shadow: 10px 0 32px rgba(0,0,0,0.35);
       }
       .drx-sidebar.drx-sidebar-abierta { transform: translateX(0); overscroll-behavior: contain; }
+      .drx-sidebar { padding-top: calc(24px + var(--sat)) !important; padding-bottom: calc(24px + var(--sab)) !important; padding-left: calc(16px + var(--sal)) !important; }
       .drx-sidebar-overlay.drx-sidebar-abierta {
         display: block;
         position: fixed;
@@ -1314,7 +1354,7 @@ export function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-export const APP_VERSION = "1.158.0";
+export const APP_VERSION = "1.159.0";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -1454,6 +1494,11 @@ export function useTema() {
       setOscuro(raw === "oscuro");
     })();
   }, []);
+  // El fondo de la página (lo que se ve detrás de la barra de gestos del
+  // iPhone o al estirar la pantalla) sigue el tema — antes quedaba blanco.
+  useEffect(() => {
+    document.documentElement.style.backgroundColor = oscuro ? "#10151D" : "#F4F6F9";
+  }, [oscuro]);
   const alternar = async () => {
     const nuevo = !oscuro;
     setOscuro(nuevo);
@@ -2833,11 +2878,11 @@ function LexFlotante({ usuarioActual }) {
         className="drx-fade-in"
         style={{
           position: "fixed",
-          bottom: 22,
-          right: 22,
+          bottom: "calc(22px + var(--sab))",
+          right: "calc(22px + var(--sar))",
           zIndex: 1600,
           width: "min(400px, calc(100vw - 32px))",
-          maxHeight: "min(600px, calc(100vh - 100px))",
+          maxHeight: "min(600px, calc(100dvh - 100px - var(--sat) - var(--sab)))",
           display: "flex",
           flexDirection: "column",
         }}
@@ -2861,7 +2906,7 @@ function LexFlotante({ usuarioActual }) {
   }
 
   return (
-    <div style={{ position: "fixed", bottom: 22, right: 22, zIndex: 1500, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8 }}>
+    <div style={{ position: "fixed", bottom: "calc(22px + var(--sab))", right: "calc(22px + var(--sar))", zIndex: 1500, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8 }}>
       {visible && (
         <div
           className="drx-fade-in"
@@ -6176,7 +6221,7 @@ function PanelSeguridad2FA({ onCerrar }) {
   };
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(6,14,28,0.55)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+    <div style={{ position: "fixed", inset: 0, background: "rgba(6,14,28,0.55)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: "calc(20px + var(--sat)) calc(20px + var(--sar)) calc(20px + var(--sab)) calc(20px + var(--sal))" }}>
       <div
         ref={panelRef}
         className="drx-dropdown-in"
@@ -6368,7 +6413,7 @@ function PanelMiDespacho({ usuarioActual, fotoPerfilUrl, subiendoFotoPerfil, cam
   };
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(6,14,28,0.55)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+    <div style={{ position: "fixed", inset: 0, background: "rgba(6,14,28,0.55)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: "calc(20px + var(--sat)) calc(20px + var(--sar)) calc(20px + var(--sab)) calc(20px + var(--sal))" }}>
       <div
         ref={panelRef}
         className="drx-dropdown-in"
@@ -6879,7 +6924,7 @@ function PantallaCargaInicial() {
   return (
     <div
       style={{
-        minHeight: "100vh",
+        minHeight: "100%",
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
@@ -7415,7 +7460,7 @@ export function useConfirmarDialogo() {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        padding: 20,
+        padding: "calc(20px + var(--sat)) calc(20px + var(--sar)) calc(20px + var(--sab)) calc(20px + var(--sal))",
         zIndex: 2000,
       }}
     >
@@ -8331,7 +8376,7 @@ function IndicadorSincronizacion() {
       role="status"
       style={{
         position: "fixed",
-        top: 0,
+        top: "var(--sat)",
         left: 0,
         right: 0,
         zIndex: 3900,
@@ -8491,7 +8536,7 @@ class ErrorBoundary extends Component {
       return (
         <div
           style={{
-            minHeight: "100vh",
+            minHeight: "100%",
             display: "flex",
             flexDirection: "column",
             alignItems: "center",
@@ -9085,7 +9130,7 @@ function App() {
           padding: "24px 16px",
           position: "sticky",
           top: 0,
-          height: "100vh",
+          height: "calc(100vh - var(--sat) - var(--sab))",
           overflowY: "auto",
           zIndex: 1,
         }}
@@ -9501,7 +9546,7 @@ function App() {
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            padding: 20,
+            padding: "calc(20px + var(--sat)) calc(20px + var(--sar)) calc(20px + var(--sab)) calc(20px + var(--sal))",
             zIndex: 2000,
           }}
         >
