@@ -33,7 +33,7 @@ const HERRAMIENTAS_ANTECEDENTES = [
     para: "Todas las áreas",
     descripcion: "Si una persona (abogado, funcionario, contraparte) tiene sanciones disciplinarias — Procuraduría General.",
     dato: "Cédula o NIT",
-    url: "https://www.procuraduria.gov.co/Pages/antecedente.aspx",
+    url: "https://www.procuraduria.gov.co/Pages/Consulta-de-Antecedentes.aspx",
     color: "#7C3AED",
   },
   {
