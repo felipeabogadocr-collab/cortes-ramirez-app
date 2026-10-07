@@ -8,13 +8,21 @@ import { COLORS, EncabezadoSeccion, Card, Icono, inputStyle, buttonGhost, button
 // acceso directo: escribes el dato que pide, lo copias y lo abres para
 // buscar a mano, igual que ya pasa con Fiscalía y SAMAI en Vigilancia
 // judicial.
+// Tipos de documento que piden los portales del Estado (cada uno usa una
+// lista un poco distinta, pero estos son los que comparten).
+const TIPOS_DOC = ["Cédula de ciudadanía", "Cédula de extranjería", "NIT", "Pasaporte", "Tarjeta de identidad"];
+
+// Cada portal pide sus propios datos — Nomos los pide igual, en el mismo
+// orden, para que solo haya que copiarlos y pegarlos allá. El código de
+// verificación (captcha) de cada portal no se puede llenar desde Nomos.
 const HERRAMIENTAS_ANTECEDENTES = [
   {
     id: "rues",
     nombre: "RUES — Registro único empresarial",
     para: "Comercial · Concursal",
     descripcion: "Si una empresa existe, quién es su representante legal, y si está en liquidación o un proceso de insolvencia.",
-    dato: "NIT o nombre de la empresa",
+    campos: [{ id: "busqueda", label: "NIT (sin dígito de verificación) o razón social", principal: true }],
+    nota: "En el RUES elige buscar por NIT o por razón social.",
     url: "https://www.rues.org.co/",
     color: "#2563EB",
   },
@@ -23,7 +31,11 @@ const HERRAMIENTAS_ANTECEDENTES = [
     nombre: "Antecedentes judiciales",
     para: "Penal",
     descripcion: "Si una persona tiene antecedentes penales vigentes — consulta de la Policía Nacional.",
-    dato: "Número de cédula",
+    campos: [
+      { id: "tipo", label: "Tipo de documento", tipo: "doc" },
+      { id: "numero", label: "Número de documento", principal: true },
+    ],
+    nota: "El portal primero pide aceptar los términos de uso.",
     url: "https://antecedentes.policia.gov.co:7005/WebJudicial/",
     color: "#B91C1C",
   },
@@ -32,7 +44,11 @@ const HERRAMIENTAS_ANTECEDENTES = [
     nombre: "Antecedentes disciplinarios",
     para: "Todas las áreas",
     descripcion: "Si una persona (abogado, funcionario, contraparte) tiene sanciones disciplinarias — Procuraduría General.",
-    dato: "Cédula o NIT",
+    campos: [
+      { id: "tipo", label: "Tipo de documento", tipo: "doc" },
+      { id: "numero", label: "Número de documento", principal: true },
+    ],
+    nota: "Entra a «Generar certificado de antecedentes». El portal hace una pregunta de seguridad (por ejemplo, un nombre) que se responde allá.",
     url: "https://www.procuraduria.gov.co/Pages/Consulta-de-Antecedentes.aspx",
     color: "#7C3AED",
   },
@@ -40,8 +56,12 @@ const HERRAMIENTAS_ANTECEDENTES = [
     id: "antecedentesFiscales",
     nombre: "Antecedentes fiscales",
     para: "Todas las áreas",
-    descripcion: "Boletín de responsables fiscales — si alguien está inhabilitado para manejar recursos públicos. En la página: Certificado de antecedentes fiscales → Persona natural (o jurídica).",
-    dato: "Cédula o NIT",
+    descripcion: "Boletín de responsables fiscales — si alguien está inhabilitado para manejar recursos públicos.",
+    campos: [
+      { id: "tipo", label: "Tipo de documento", tipo: "doc" },
+      { id: "numero", label: "Número de documento o NIT", principal: true },
+    ],
+    nota: "En la página: Certificado de antecedentes fiscales → Persona natural (o jurídica).",
     url: "https://www.contraloria.gov.co/",
     color: "#0F766E",
   },
@@ -49,9 +69,14 @@ const HERRAMIENTAS_ANTECEDENTES = [
     id: "runt",
     nombre: "RUNT — vehículos",
     para: "Civil · Comercial",
-    descripcion: "Datos básicos de un vehículo (marca, modelo, estado) por placa — útil en procesos con bienes de por medio. El RUNT pide también la cédula del propietario; prendas y embargos salen en el histórico vehicular, que es pago.",
-    dato: "Número de placa",
-    url: "https://www.runt.gov.co/actores/ciudadano/consulta-de-vehiculos-por-placa",
+    descripcion: "Datos básicos de un vehículo (marca, modelo, estado). Prendas y embargos salen en el histórico vehicular, que es pago.",
+    campos: [
+      { id: "placa", label: "Placa", principal: true, mayus: true },
+      { id: "tipo", label: "Tipo de documento del propietario", tipo: "doc" },
+      { id: "numero", label: "Número de documento del propietario" },
+    ],
+    nota: "El RUNT exige la placa y el documento del propietario actual. Si la página queda en blanco, es el portal del RUNT cargando: espera unos segundos o recárgala.",
+    url: "https://portalpublico.runt.gov.co/#/consulta-vehiculo/consulta/consulta-ciudadana",
     color: "#D97706",
   },
   {
@@ -59,7 +84,11 @@ const HERRAMIENTAS_ANTECEDENTES = [
     nombre: "Comparendos / Código de Policía",
     para: "Administrativo",
     descripcion: "Medidas correctivas o comparendos de Policía (RNMC) asociados a una persona.",
-    dato: "Número de cédula",
+    campos: [
+      { id: "tipo", label: "Tipo de documento", tipo: "doc" },
+      { id: "numero", label: "Número de documento", principal: true },
+      { id: "expedicion", label: "Fecha de expedición del documento (si la pide)", tipo: "fecha" },
+    ],
     url: "https://srvcnpc.policia.gov.co/PSC/frm_cnp_consulta.aspx",
     color: "#DB2777",
   },
@@ -68,31 +97,85 @@ const HERRAMIENTAS_ANTECEDENTES = [
     nombre: "SIMIT — multas de tránsito",
     para: "Civil · Administrativo",
     descripcion: "Multas de tránsito pendientes de una persona o un vehículo.",
-    dato: "Cédula o placa",
+    campos: [{ id: "busqueda", label: "Placa o número de documento", principal: true, mayus: true }],
+    nota: "Escríbelo en el recuadro «Estado de cuenta» del SIMIT.",
     url: "https://www.fcm.org.co/simit/#/home-public",
     color: "#059669",
   },
 ];
 
-function TarjetaHerramienta({ h }) {
-  const [valor, setValor] = useState("");
-  const [copiado, setCopiado] = useState(false);
+function copiarTexto(texto, inputEl) {
+  if (navigator.clipboard?.writeText) return navigator.clipboard.writeText(texto).then(() => true).catch(() => (inputEl?.select(), false));
+  inputEl?.select();
+  return Promise.resolve(false);
+}
 
-  const inputRef = useRef(null);
-  // Si el portapapeles no está disponible (algunos navegadores lo bloquean),
-  // se deja el texto seleccionado para copiarlo con Ctrl+C en vez de no
-  // hacer nada.
+function CampoConCopiar({ campo, valor, onChange, color }) {
+  const ref = useRef(null);
+  const [copiado, setCopiado] = useState(false);
+  const textoParaCopiar = campo.tipo === "fecha" && valor ? valor.split("-").reverse().join("/") : valor;
   const copiar = () => {
-    if (!valor.trim()) return;
-    const marcarCopiado = () => {
+    if (!valor) return;
+    copiarTexto(textoParaCopiar, ref.current).then((ok) => {
+      if (!ok) return;
       setCopiado(true);
       setTimeout(() => setCopiado(false), 1200);
-    };
-    if (navigator.clipboard?.writeText) {
-      navigator.clipboard.writeText(valor.trim()).then(marcarCopiado).catch(() => inputRef.current?.select());
-    } else {
-      inputRef.current?.select();
-    }
+    });
+  };
+  return (
+    <div>
+      <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, fontWeight: 600, color: COLORS.inkSoft, margin: "0 0 4px" }}>{campo.label}</p>
+      <div style={{ display: "flex", gap: 6 }}>
+        {campo.tipo === "doc" ? (
+          <select ref={ref} className="drx-input" style={{ ...inputStyle, flex: 1 }} value={valor} onChange={(e) => onChange(e.target.value)}>
+            {TIPOS_DOC.map((t) => (
+              <option key={t} value={t}>
+                {t}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <input
+            ref={ref}
+            type={campo.tipo === "fecha" ? "date" : "text"}
+            className="drx-input"
+            style={{ ...inputStyle, flex: 1, minWidth: 0 }}
+            value={valor}
+            onChange={(e) => onChange(campo.mayus ? e.target.value.toUpperCase() : e.target.value)}
+          />
+        )}
+        {campo.tipo !== "doc" && (
+          <button
+            type="button"
+            className="drx-btn-ghost"
+            style={{ ...buttonGhost, padding: "6px 10px", fontSize: 12, flexShrink: 0, color: copiado ? color : undefined }}
+            disabled={!valor}
+            onClick={copiar}
+            title="Copiar para pegarlo en el portal"
+          >
+            {copiado ? "✓" : "Copiar"}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function TarjetaHerramienta({ h }) {
+  const [valores, setValores] = useState(() => Object.fromEntries(h.campos.map((c) => [c.id, c.tipo === "doc" ? TIPOS_DOC[0] : ""])));
+  const principal = h.campos.find((c) => c.principal);
+  const valorPrincipal = (principal && valores[principal.id]?.trim()) || "";
+  const [avisoCopiado, setAvisoCopiado] = useState(false);
+
+  // Al abrir el portal, el dato principal (cédula, placa, NIT) queda copiado
+  // para pegarlo de una vez.
+  const abrir = () => {
+    if (!valorPrincipal) return;
+    copiarTexto(valorPrincipal).then((ok) => {
+      if (!ok) return;
+      setAvisoCopiado(true);
+      setTimeout(() => setAvisoCopiado(false), 2500);
+    });
   };
 
   return (
@@ -115,28 +198,28 @@ function TarjetaHerramienta({ h }) {
         </span>
       </div>
       <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.inkSoft, lineHeight: 1.5, margin: "0 0 12px" }}>{h.descripcion}</p>
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-        <input
-          className="drx-input"
-          style={{ ...inputStyle, flex: "1 1 160px" }}
-          ref={inputRef}
-          placeholder={h.dato}
-          value={valor}
-          onChange={(e) => setValor(e.target.value)}
-        />
-        <button className="drx-btn-ghost" style={buttonGhost} disabled={!valor.trim()} onClick={copiar}>
-          {copiado ? "✓ Copiado" : "Copiar"}
-        </button>
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        {h.campos.map((c) => (
+          <CampoConCopiar key={c.id} campo={c} valor={valores[c.id]} color={h.color} onChange={(v) => setValores((prev) => ({ ...prev, [c.id]: v }))} />
+        ))}
+      </div>
+      {h.nota && <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, color: COLORS.muted, lineHeight: 1.5, margin: "10px 0 0" }}>ℹ {h.nota}</p>}
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 12, flexWrap: "wrap" }}>
         <a
           href={h.url}
           target="_blank"
           rel="noreferrer"
-          onClick={copiar}
+          onClick={abrir}
           className="drx-btn-primary"
           style={{ ...buttonPrimary, background: h.color, textDecoration: "none", display: "inline-flex", alignItems: "center" }}
         >
-          Abrir ↗
+          Abrir portal ↗
         </a>
+        {avisoCopiado && (
+          <span style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: h.color, fontWeight: 600 }}>
+            ✓ {principal.label.split(" (")[0]} copiado — pégalo en el portal
+          </span>
+        )}
       </div>
     </Card>
   );
@@ -168,7 +251,7 @@ export default function AntecedentesTab({ onListo }) {
         </strong>{" "}
         son enlaces a portales públicos y gratuitos del Estado para revisar antecedentes de clientes, contrapartes o
         bienes. Ninguno es una integración automática de Nomos (como sí lo es Rama Judicial) — escribe el dato que
-        pide cada uno y toca "Abrir": el dato se copia solo para que lo pegues en el portal.
+        pide cada portal (son los mismos datos que te pedirá allá) y toca "Abrir portal": el dato principal se copia solo. El código de verificación (captcha) de cada portal sí hay que llenarlo allá.
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 14 }}>
         {HERRAMIENTAS_ANTECEDENTES.map((h) => (
