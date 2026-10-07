@@ -371,7 +371,16 @@ export default function DocumentosTab({ usuarioActual, onListo }) {
   };
 
   const guardarEdicionDoc = async (id) => {
-    if (!formEdicionDoc.titulo?.trim() || !formEdicionDoc.contenido?.trim()) return;
+    // Un documento PDF no tiene "contenido" de texto — exigirlo dejaba el
+    // botón sin hacer nada y sin decir por qué.
+    if (!formEdicionDoc.titulo?.trim()) {
+      alert("Ponle un título al documento antes de guardar.");
+      return;
+    }
+    if (formEdicionDoc.tipoDocumento !== "pdf" && !formEdicionDoc.contenido?.trim()) {
+      alert("El contenido del documento está vacío. Escribe el texto antes de guardar.");
+      return;
+    }
     await storageSet(`documento:${id}`, JSON.stringify(formEdicionDoc), true);
     setDocs((prev) => ({ ...prev, [id]: formEdicionDoc }));
     registrarAuditoria(usuarioActual, "editar_documento", "documento", id, { nombre: formEdicionDoc.titulo });
@@ -393,7 +402,9 @@ export default function DocumentosTab({ usuarioActual, onListo }) {
       ? `1. Haz clic aquí: ${ENLACE_FIRMA}\n2. Cuando te lo pida, escribe este código: *${id}*\n3. Sigue los pasos en pantalla para firmar`
       : `1. Ingresa al aplicativo de firmas\n2. Escribe este código: *${id}*\n3. Sigue los pasos en pantalla para firmar`;
     const mensaje = `*${getNombreDespacho()}*\n\nHola ${d.cliente || ""}, te compartimos el documento *"${d.titulo}"* para tu firma electrónica.\n\n${pasos}\n\nCualquier duda, escríbenos por este mismo medio.`;
-    const url = `https://wa.me/${numero}?text=${encodeURIComponent(mensaje)}`;
+    // Sin número guardado, wa.me sin número deja elegir el contacto o grupo
+    // dentro de WhatsApp en vez de esconder el botón.
+    const url = `https://wa.me/${numero.length > 4 ? numero : ""}?text=${encodeURIComponent(mensaje)}`;
     window.open(url, "_blank");
   };
 
@@ -403,7 +414,9 @@ export default function DocumentosTab({ usuarioActual, onListo }) {
     const numero = `${d.whatsappIndicativo || ""}${(d.whatsappNumero || "").replace(/[^0-9]/g, "")}`;
     const fechaCliente = firmaCliente ? new Date(firmaCliente.firmadoEn).toLocaleDateString("es-CO", { dateStyle: "long" }) : "";
     const mensaje = `*${getNombreDespacho()}*\n\nHola ${d.cliente || ""}, tu documento "${d.titulo}" quedó firmado el ${fechaCliente}, también por ${firmaAbogado ? firmaAbogado.nombre : "tu abogado"}. Ya está listo.\n\nEn un momento te comparto el PDF firmado por este mismo medio.`;
-    const url = `https://wa.me/${numero}?text=${encodeURIComponent(mensaje)}`;
+    // Sin número guardado, wa.me sin número deja elegir el contacto o grupo
+    // dentro de WhatsApp en vez de esconder el botón.
+    const url = `https://wa.me/${numero.length > 4 ? numero : ""}?text=${encodeURIComponent(mensaje)}`;
     window.open(url, "_blank");
   };
 
@@ -868,13 +881,13 @@ export default function DocumentosTab({ usuarioActual, onListo }) {
                   </button>
                 </div>
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                  {estado === "pendiente" && d.whatsappNumero && (
+                  {estado === "pendiente" && (
                     <button
                       className="drx-btn-primary"
                       style={{ ...buttonPrimary, padding: "6px 14px", fontSize: 12.5, background: "#1DA851" }}
                       onClick={() => enviarPorWhatsapp(d, id)}
                     >
-                      Enviar por WhatsApp ↗
+                      {d.whatsappNumero ? "Enviar por WhatsApp ↗" : "Enviar por WhatsApp (elegir contacto) ↗"}
                     </button>
                   )}
                   {puedeFirmarAbogado && firmandoDocId !== id && (
@@ -896,15 +909,13 @@ export default function DocumentosTab({ usuarioActual, onListo }) {
                       <button className="drx-btn-ghost" style={{ ...buttonGhost, padding: "6px 14px", fontSize: 12.5 }} onClick={() => descargarPdfFirmado(d)}>
                         <Icono tipo="documento" size={13} style={{ marginRight: 4, verticalAlign: -2 }} /> Ver / descargar PDF firmado ↗
                       </button>
-                      {d.whatsappNumero && (
-                        <button
-                          className="drx-btn-primary"
-                          style={{ ...buttonPrimary, padding: "6px 14px", fontSize: 12.5, background: "#1DA851" }}
-                          onClick={() => enviarDocumentoListoPorWhatsapp(d)}
-                        >
-                          Avisar al cliente ↗
-                        </button>
-                      )}
+                      <button
+                        className="drx-btn-primary"
+                        style={{ ...buttonPrimary, padding: "6px 14px", fontSize: 12.5, background: "#1DA851" }}
+                        onClick={() => enviarDocumentoListoPorWhatsapp(d)}
+                      >
+                        {d.whatsappNumero ? "Avisar al cliente ↗" : "Avisar al cliente (elegir contacto) ↗"}
+                      </button>
                     </>
                   )}
                   <button className="drx-btn-ghost" style={{ ...buttonGhost, padding: "4px 10px", fontSize: 12 }} onClick={() => empezarEdicionDoc(id)}>

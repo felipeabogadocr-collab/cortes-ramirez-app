@@ -2641,11 +2641,14 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
     const valorTotal = Number(c?.valorTotal) || 0;
     return valorTotal > 0 ? valorTotal - totalPagado : null;
   };
-  const carteraTotal = ids.reduce((sum, id) => {
+  // Una bolsa administrativa no es un cliente real que deba plata — no
+  // suma a la cartera pendiente (igual que ya no genera "Atrasado").
+  const idsCobrables = ids.filter((id) => !clientes[id]?.esClienteAdministrativo);
+  const carteraTotal = idsCobrables.reduce((sum, id) => {
     const saldo = saldoDe(clientes[id]);
     return saldo && saldo > 0 ? sum + saldo : sum;
   }, 0);
-  const clientesConSaldoPendiente = ids.filter((id) => (saldoDe(clientes[id]) || 0) > 0).length;
+  const clientesConSaldoPendiente = idsCobrables.filter((id) => (saldoDe(clientes[id]) || 0) > 0).length;
 
   const ultimoPagoDe = (c) => {
     const pagos = c?.pagos || [];
@@ -3022,7 +3025,7 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
   const idsFiltrados = useMemo(() => {
     const textoFiltro = filtroConRetraso.trim().toLowerCase();
     let resultado = textoFiltro ? ids.filter((id) => clientes[id]?.nombre?.toLowerCase().includes(textoFiltro)) : ids;
-    if (soloPendientes) resultado = resultado.filter((id) => (saldoDe(clientes[id]) || 0) > 0);
+    if (soloPendientes) resultado = resultado.filter((id) => !clientes[id]?.esClienteAdministrativo && (saldoDe(clientes[id]) || 0) > 0);
     return [...resultado].sort((a, b) => {
       if (orden === "saldo") return (saldoDe(clientes[b]) || 0) - (saldoDe(clientes[a]) || 0);
       if (orden === "ultimoPago") {

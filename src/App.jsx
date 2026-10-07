@@ -1314,7 +1314,7 @@ export function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-export const APP_VERSION = "1.154.1";
+export const APP_VERSION = "1.155.0";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -3768,7 +3768,7 @@ function ChecklistPrimerosPasos({ r, onIr }) {
   );
 }
 
-function ResumenTab({ nombre, usuarioId, usuarioActual, onIr, onListo }) {
+function ResumenTab({ nombre, usuarioId, usuarioActual, onIr, onListo, puedeVer = () => true }) {
   const r = useResumenGeneral();
   const rep = useDatosReportes();
   // Resumen ya muestra sus propias tarjetas con su carga progresiva (cada
@@ -3829,7 +3829,7 @@ function ResumenTab({ nombre, usuarioId, usuarioActual, onIr, onListo }) {
             { texto: "+ Nuevo documento", tab: "documentos" },
             { texto: "+ Registrar pago", tab: "contabilidad" },
             { texto: "+ Evento en agenda", tab: "agenda" },
-          ].map((a) => (
+          ].filter((a) => puedeVer(a.tab)).map((a) => (
             <button
               key={a.tab}
               className="drx-btn-ghost"
@@ -9379,7 +9379,10 @@ function App() {
             <div style={{ display: cambiandoTab ? "none" : "block" }}>
               {tab === "resumen" && puedeVer("resumen") && (
                 <TabErrorBoundary nombre="resumen">
-                  <ResumenTab nombre={usuarioActual.nombre} usuarioId={usuarioActual.id} usuarioActual={usuarioActual} onIr={setTab} onListo={marcarDatosListos} />
+                  <ResumenTab nombre={usuarioActual.nombre} usuarioId={usuarioActual.id} usuarioActual={usuarioActual} onIr={(t) => {
+                    if (puedeVer(t)) setTab(t);
+                    else alert("No tienes acceso a esa sección. Pídele al administrador del despacho que te la habilite.");
+                  }} puedeVer={puedeVer} onListo={marcarDatosListos} />
                 </TabErrorBoundary>
               )}
               {tab === "agenda" && puedeVer("agenda") && (

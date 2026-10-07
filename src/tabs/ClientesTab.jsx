@@ -914,14 +914,16 @@ export default function ClientesTab({ usuarioActual, onIrARegistrarPago, onListo
                 </select>
               )}
             </Field>
-            <Field label="Valor total acordado (opcional)">
-              <CampoDinero
-                style={inputStyle}
-                value={form.valorTotal}
-                onChange={(e) => setForm({ ...form, valorTotal: e.target.value })}
-                placeholder="Ej: 3.000.000"
-              />
-            </Field>
+            {puedeVerDinero && (
+              <Field label="Valor total acordado (opcional)">
+                <CampoDinero
+                  style={inputStyle}
+                  value={form.valorTotal}
+                  onChange={(e) => setForm({ ...form, valorTotal: e.target.value })}
+                  placeholder="Ej: 3.000.000"
+                />
+              </Field>
+            )}
             <Field label="Abogado asignado (opcional)">
               <select className="drx-input" style={inputStyle} value={form.abogadoAsignado} onChange={(e) => setForm({ ...form, abogadoAsignado: e.target.value })}>
                 <option value="">Sin asignar</option>
@@ -1075,13 +1077,15 @@ export default function ClientesTab({ usuarioActual, onIrARegistrarPago, onListo
                       })()
                     )}
                   </Field>
-                  <Field label="Valor total acordado (opcional)">
-                    <CampoDinero
-                      style={inputStyle}
-                      value={formEdicion.valorTotal || ""}
-                      onChange={(e) => setFormEdicion({ ...formEdicion, valorTotal: e.target.value })}
-                    />
-                  </Field>
+                  {puedeVerDinero && (
+                    <Field label="Valor total acordado (opcional)">
+                      <CampoDinero
+                        style={inputStyle}
+                        value={formEdicion.valorTotal || ""}
+                        onChange={(e) => setFormEdicion({ ...formEdicion, valorTotal: e.target.value })}
+                      />
+                    </Field>
+                  )}
                   <Field label="Abogado asignado (opcional)">
                     <select
                       className="drx-input"

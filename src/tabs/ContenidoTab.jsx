@@ -428,6 +428,7 @@ export default function ContenidoTab({ onListo }) {
   const [editandoId, setEditandoId] = useState(null);
   const [temaIdeas, setTemaIdeas] = useState("");
   const [generandoIdeas, setGenerandoIdeas] = useState(false);
+  const [errorIdeas, setErrorIdeas] = useState("");
   const [ideaCopiada, setIdeaCopiada] = useState("");
 
   const lista = Object.values(items);
@@ -478,11 +479,13 @@ export default function ContenidoTab({ onListo }) {
 
   const pedirIdeas = async () => {
     setGenerandoIdeas(true);
+    setErrorIdeas("");
     try {
       const nuevas = await generarIdeasCalendario(temaIdeas.trim(), estrategia);
       if (nuevas.length > 0) await agregarVarias(nuevas);
+      else setErrorIdeas("La IA no devolvió ideas esta vez. Intenta de nuevo.");
     } catch (e) {
-      // se puede reintentar con el mismo botón
+      setErrorIdeas(`No se pudieron generar ideas: ${e?.message || "error de conexión"}. Intenta de nuevo.`);
     }
     setGenerandoIdeas(false);
   };
@@ -555,6 +558,7 @@ export default function ContenidoTab({ onListo }) {
             )}
           </button>
         </div>
+        {errorIdeas && <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: "#B42318", margin: "0 0 10px" }}>{errorIdeas}</p>}
         {ideas.length > 0 ? (
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {ideas.map((idea) => (

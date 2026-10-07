@@ -443,6 +443,12 @@ export default function AgendaTab({ onListo }) {
         // ninguna pista de por qué. Ahora al menos se avisa (ver guardar()
         // más abajo) — para recuperarlo, basta con editar el evento y
         // guardarlo de nuevo sin cambiar nada.
+        if (datos?.error === "no_conectado") {
+          // La conexión con Google murió (token vencido o revocado): se
+          // refleja en el badge para que no siga diciendo "Conectado".
+          setGoogleConectado(false);
+          return { ok: false, error: "la conexión con Google se perdió — vuelve a conectarla arriba" };
+        }
         return { ok: false, error: datos?.error || "No se pudo sincronizar con Google Calendar." };
       } catch {
         return { ok: false, error: "No se pudo conectar con Google Calendar." };
@@ -598,10 +604,17 @@ export default function AgendaTab({ onListo }) {
           googleHtmlLink: datos.googleHtmlLink,
           googleMeetLink: datos.googleMeetLink,
         });
+        setAvisoGoogle("✓ Sincronizado con Google Calendar.");
+      } else if (resp.ok) {
+        setAvisoGoogle("✓ El evento ya estaba al día con Google Calendar.");
+      } else if (datos?.error === "no_conectado") {
+        setGoogleConectado(false);
+        setAvisoGoogle("⚠ La conexión con Google Calendar se perdió. Vuelve a conectarla arriba y sincroniza de nuevo.");
+      } else {
+        setAvisoGoogle(`⚠ No se pudo sincronizar: ${datos?.error || "error de Google Calendar"}. Nomos conserva la última versión guardada.`);
       }
     } catch {
-      // Silencioso: sincronizar es un "por si acaso", no algo crítico —
-      // Nomos se queda con la última versión que sí tenía.
+      setAvisoGoogle("⚠ No se pudo conectar con Google Calendar. Revisa tu conexión e intenta de nuevo.");
     }
     setSincronizandoId(null);
   };

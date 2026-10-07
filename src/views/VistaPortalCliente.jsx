@@ -48,6 +48,7 @@ export default function VistaPortalCliente() {
   const [consultandoProceso, setConsultandoProceso] = useState(false);
   const [errorProceso, setErrorProceso] = useState("");
   const [descargandoRecibo, setDescargandoRecibo] = useState(null);
+  const [errorRecibo, setErrorRecibo] = useState("");
 
   const buscar = async () => {
     const code = codigo.trim();
@@ -81,6 +82,7 @@ export default function VistaPortalCliente() {
   const descargarRecibo = async (pago) => {
     if (!pago.id) return;
     setDescargandoRecibo(pago.id);
+    setErrorRecibo("");
     try {
       const resp = await fetch(`/api/documentos/firmar?accion=recibo-portal&codigo=${encodeURIComponent(codigo.trim())}&pagoId=${encodeURIComponent(pago.id)}`);
       const data = await resp.json();
@@ -94,10 +96,11 @@ export default function VistaPortalCliente() {
         document.body.appendChild(a);
         a.click();
         a.remove();
+      } else {
+        setErrorRecibo("No pudimos descargar el recibo. Intenta de nuevo o pídeselo a tu abogado.");
       }
     } catch (e) {
-      // Si falla, el cliente simplemente no ve nada descargarse — no hay
-      // mucho más que explicarle aquí sin complicar la pantalla.
+      setErrorRecibo("No pudimos descargar el recibo. Revisa tu conexión e intenta de nuevo.");
     }
     setDescargandoRecibo(null);
   };
@@ -471,6 +474,9 @@ export default function VistaPortalCliente() {
                     </div>
                   ))}
               </div>
+              {errorRecibo && (
+                <p style={{ margin: "10px 0 0", color: "#B91C1C", fontFamily: "Inter, sans-serif", fontSize: 12 }}>{errorRecibo}</p>
+              )}
             </Card>
           )}
 
