@@ -93,7 +93,7 @@ const FORM_CLIENTE_INICIAL = {
 // mueven nombre y teléfono — el correo, el plan de pago, los radicados y
 // todo lo demás sigue siendo del mismo cliente.
 function intercambiarConPagador(f) {
-  if (!f.pagador) return f;
+  if (!f.pagador?.nombre?.trim()) return f;
   return {
     ...f,
     nombre: (f.pagador.nombre || "").toUpperCase(),
@@ -174,6 +174,7 @@ function SelectorPagador({ pagador, onChange, onIntercambiar }) {
           className="drx-btn-ghost"
           style={{ ...buttonGhost, padding: "6px 12px", fontSize: 12, marginTop: 8 }}
           onClick={onIntercambiar}
+          disabled={!pagador.nombre?.trim()}
           title="El que paga pasa a ser el cliente principal, y el principal pasa a ser quien paga"
         >
           ⇅ Intercambiar: que quien paga sea el cliente principal
@@ -404,12 +405,12 @@ function PlanDePago({ planPago, onChange, valorTotal }) {
     // pesos enteros y con la diferencia del redondeo en la última cuota para
     // que la suma dé exacto el total. Si la persona escribe a mano el valor
     // de la cuota, se respeta (valorManual) hasta que pida calcularlo de nuevo.
-    const total = Number(valorTotal) || 0;
+    const total = Number(String(valorTotal ?? "").replace(/\D/g, "")) || 0;
     const anticipo = Math.max(0, Number(combinado.anticipo) || 0);
     let valores = null;
     if (total > 0 && !combinado.valorManual) {
       const restante = Math.max(0, total - anticipo);
-      const base = Math.round(restante / numCuotasEfectivo);
+      const base = Math.floor(restante / numCuotasEfectivo);
       valores = Array.from({ length: numCuotasEfectivo }, (_, i) => (i === numCuotasEfectivo - 1 ? restante - base * (numCuotasEfectivo - 1) : base));
       combinado.valor = base;
     }
@@ -436,7 +437,7 @@ function PlanDePago({ planPago, onChange, valorTotal }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [valorTotal]);
 
-  const totalNum = Number(valorTotal) || 0;
+  const totalNum = Number(String(valorTotal ?? "").replace(/\D/g, "")) || 0;
   const sumaPlan = (plan.cuotas || []).reduce((acc, c) => acc + (Number(c.valor) || 0), 0);
 
   const actualizarCuota = (idx, campo, valor) => {

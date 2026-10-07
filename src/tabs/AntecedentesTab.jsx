@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { COLORS, EncabezadoSeccion, Card, Icono, inputStyle, buttonGhost, buttonPrimary } from "../App.jsx";
 
 // Todos estos portales son públicos y gratuitos (del Estado colombiano),
@@ -15,7 +15,7 @@ const HERRAMIENTAS_ANTECEDENTES = [
     para: "Comercial · Concursal",
     descripcion: "Si una empresa existe, quién es su representante legal, y si está en liquidación o un proceso de insolvencia.",
     dato: "NIT o nombre de la empresa",
-    url: "https://www.rues.org.co/RM",
+    url: "https://www.rues.org.co/",
     color: "#2563EB",
   },
   {
@@ -40,18 +40,18 @@ const HERRAMIENTAS_ANTECEDENTES = [
     id: "antecedentesFiscales",
     nombre: "Antecedentes fiscales",
     para: "Todas las áreas",
-    descripcion: "Boletín de responsables fiscales — si alguien está inhabilitado para manejar recursos públicos.",
+    descripcion: "Boletín de responsables fiscales — si alguien está inhabilitado para manejar recursos públicos. En la página: Certificado de antecedentes fiscales → Persona natural (o jurídica).",
     dato: "Cédula o NIT",
-    url: "https://www.contraloria.gov.co/web/guest/certificado-de-antecedentes",
+    url: "https://www.contraloria.gov.co/",
     color: "#0F766E",
   },
   {
     id: "runt",
     nombre: "RUNT — vehículos",
     para: "Civil · Comercial",
-    descripcion: "Información de un vehículo: propietario, prendas, estado — útil en procesos con bienes de por medio.",
+    descripcion: "Datos básicos de un vehículo (marca, modelo, estado) por placa — útil en procesos con bienes de por medio. El RUNT pide también la cédula del propietario; prendas y embargos salen en el histórico vehicular, que es pago.",
     dato: "Número de placa",
-    url: "https://www.runt.com.co/consultaCiudadana/#/consultaVehiculo",
+    url: "https://www.runt.gov.co/actores/ciudadano/consulta-de-vehiculos-por-placa",
     color: "#D97706",
   },
   {
@@ -60,7 +60,7 @@ const HERRAMIENTAS_ANTECEDENTES = [
     para: "Administrativo",
     descripcion: "Medidas correctivas o comparendos de Policía (RNMC) asociados a una persona.",
     dato: "Número de cédula",
-    url: "https://srvpsi.policia.gov.co:8443/PNC-RNMC-WEB/",
+    url: "https://srvcnpc.policia.gov.co/PSC/frm_cnp_consulta.aspx",
     color: "#DB2777",
   },
   {
@@ -78,15 +78,21 @@ function TarjetaHerramienta({ h }) {
   const [valor, setValor] = useState("");
   const [copiado, setCopiado] = useState(false);
 
+  const inputRef = useRef(null);
+  // Si el portapapeles no está disponible (algunos navegadores lo bloquean),
+  // se deja el texto seleccionado para copiarlo con Ctrl+C en vez de no
+  // hacer nada.
   const copiar = () => {
     if (!valor.trim()) return;
-    navigator.clipboard
-      ?.writeText(valor.trim())
-      .then(() => {
-        setCopiado(true);
-        setTimeout(() => setCopiado(false), 1200);
-      })
-      .catch(() => {});
+    const marcarCopiado = () => {
+      setCopiado(true);
+      setTimeout(() => setCopiado(false), 1200);
+    };
+    if (navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(valor.trim()).then(marcarCopiado).catch(() => inputRef.current?.select());
+    } else {
+      inputRef.current?.select();
+    }
   };
 
   return (
@@ -113,6 +119,7 @@ function TarjetaHerramienta({ h }) {
         <input
           className="drx-input"
           style={{ ...inputStyle, flex: "1 1 160px" }}
+          ref={inputRef}
           placeholder={h.dato}
           value={valor}
           onChange={(e) => setValor(e.target.value)}
@@ -124,6 +131,7 @@ function TarjetaHerramienta({ h }) {
           href={h.url}
           target="_blank"
           rel="noreferrer"
+          onClick={copiar}
           className="drx-btn-primary"
           style={{ ...buttonPrimary, background: h.color, textDecoration: "none", display: "inline-flex", alignItems: "center" }}
         >
@@ -160,7 +168,7 @@ export default function AntecedentesTab({ onListo }) {
         </strong>{" "}
         son enlaces a portales públicos y gratuitos del Estado para revisar antecedentes de clientes, contrapartes o
         bienes. Ninguno es una integración automática de Nomos (como sí lo es Rama Judicial) — escribe el dato que
-        pide cada uno, cópialo con el botón y ábrelo para consultar a mano.
+        pide cada uno y toca "Abrir": el dato se copia solo para que lo pegues en el portal.
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 14 }}>
         {HERRAMIENTAS_ANTECEDENTES.map((h) => (
