@@ -12,6 +12,45 @@
 
 import { supabaseAdmin } from "../_lib/supabaseAdmin.js";
 import { consultarProceso } from "../_lib/ramaJudicial.js";
+import { configWompi, cobrarFuenteDePago, DIAS_GRACIA } from "../despachos/reportar-pago.js";
+
+// Cobro automático mensual de la suscripción a Nomos (Wompi). Vive en este
+// mismo cron diario porque el plan Hobby de Vercel permite pocos crons y
+// máximo 12 funciones. Cobra a los despachos con cobro automático cuyo plan
+// vence hoy o ya venció (dentro de los días de gracia), máximo un intento
+// por día; el resultado llega por el aviso de Wompi
+// (api/despachos/reportar-pago.js?wompi=evento), que es el que extiende el
+// mes o anota el error.
+async function cobrarSuscripcionesVencidas(admin) {
+  const cfg = configWompi();
+  if (!cfg.recurrente) return { cobros: 0, omitido: "Wompi sin llave privada" };
+  const ahora = Date.now();
+  const limiteGracia = new Date(ahora - (DIAS_GRACIA + 1) * 24 * 60 * 60 * 1000).toISOString();
+  const { data: despachos, error } = await admin
+    .from("despachos")
+    .select("id, plan, pagado_hasta, wompi_fuente_pago_id, wompi_email, cobro_auto_intento_en")
+    .eq("cobro_automatico", true)
+    .not("wompi_fuente_pago_id", "is", null)
+    .lte("pagado_hasta", new Date(ahora).toISOString())
+    .gte("pagado_hasta", limiteGracia);
+  if (error) return { cobros: 0, error: error.message };
+  let cobros = 0;
+  const errores = [];
+  for (const d of despachos || []) {
+    // Un intento por día como máximo (el cron corre una vez al día, pero
+    // también se protege si alguien lo dispara a mano).
+    if (d.cobro_auto_intento_en && ahora - new Date(d.cobro_auto_intento_en).getTime() < 20 * 60 * 60 * 1000) continue;
+    try {
+      await admin.from("despachos").update({ cobro_auto_intento_en: new Date().toISOString() }).eq("id", d.id);
+      await cobrarFuenteDePago(cfg, d);
+      cobros++;
+    } catch (e) {
+      errores.push(d.id);
+      await admin.from("despachos").update({ cobro_auto_error: String(e.message || e).slice(0, 300) }).eq("id", d.id);
+    }
+  }
+  return { cobros, errores: errores.length };
+}
 
 export const maxDuration = 60;
 
@@ -43,6 +82,14 @@ export default async function handler(req, res) {
   }
 
   const admin = supabaseAdmin();
+
+  let suscripciones = null;
+  try {
+    suscripciones = await cobrarSuscripcionesVencidas(admin);
+  } catch (e) {
+    console.error("Error en el cobro automático de suscripciones:", e);
+    suscripciones = { error: String(e.message || e) };
+  }
 
   const { data: clientes, error } = await admin
     .from("clientes")
@@ -118,5 +165,5 @@ export default async function handler(req, res) {
     }
   }
 
-  return res.status(200).json({ revisados, conNovedad, conError });
+  return res.status(200).json({ revisados, conNovedad, conError, suscripciones });
 }

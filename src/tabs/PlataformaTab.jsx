@@ -194,7 +194,7 @@ function PanelPagosDespacho({ despacho, pagos, onRegistrado, onEliminado }) {
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "No se pudo registrar el pago.");
-      onRegistrado(despacho.id, data.pago);
+      onRegistrado(despacho.id, data.pago, data.pagadoHasta);
       setValor("");
       setFecha(fechaHoyISO());
     } catch (e) {
@@ -245,6 +245,19 @@ function PanelPagosDespacho({ despacho, pagos, onRegistrado, onEliminado }) {
             ⚠ Ningún pago registrado todavía
           </span>
         )}
+        {despacho.pagado_hasta && (() => {
+          const vence = new Date(despacho.pagado_hasta);
+          const dias = Math.ceil((vence.getTime() - Date.now()) / 86400000);
+          const vencido = dias < 0;
+          const color = vencido ? ["#FEF2F2", "#B42318", "#F3C6C0"] : dias <= 5 ? ["#FEF3E2", "#B45309", "#FCE3B8"] : ["#EEF2FF", "#3730A3", "#C7D2FE"];
+          return (
+            <span style={{ fontFamily: "Inter, sans-serif", fontSize: 11, fontWeight: 700, padding: "2px 9px", borderRadius: 20, background: color[0], color: color[1], border: `1px solid ${color[2]}` }}>
+              {vencido ? "Venció" : "Vence"} el {vence.toLocaleDateString("es-CO", { dateStyle: "medium" })}
+              {despacho.cobro_automatico ? ` · 🔁 Cobro automático${despacho.wompi_tarjeta ? ` (${despacho.wompi_tarjeta})` : ""}` : ""}
+              {despacho.cobro_auto_error ? " · ⚠ último cobro falló" : ""}
+            </span>
+          );
+        })()}
         <button
           onClick={() => setAbierto((a) => !a)}
           style={{ background: "none", border: "none", cursor: "pointer", padding: 0, fontFamily: "Inter, sans-serif", fontSize: 11.5, fontWeight: 700, color: COLORS.accentBright }}
@@ -386,9 +399,9 @@ export default function PlataformaTab({ onListo }) {
     setCambiando(null);
   };
 
-  const onPagoRegistrado = (despachoId, pago) => {
+  const onPagoRegistrado = (despachoId, pago, pagadoHasta) => {
     setDespachos((prev) =>
-      prev.map((d) => (d.id === despachoId ? { ...d, pagos: [pago, ...(d.pagos || [])].sort((a, b) => (a.fecha < b.fecha ? 1 : -1)) } : d))
+      prev.map((d) => (d.id === despachoId ? { ...d, ...(pagadoHasta ? { pagado_hasta: pagadoHasta, activo: true, prueba_hasta: null } : {}), pagos: [pago, ...(d.pagos || [])].sort((a, b) => (a.fecha < b.fecha ? 1 : -1)) } : d))
     );
   };
 

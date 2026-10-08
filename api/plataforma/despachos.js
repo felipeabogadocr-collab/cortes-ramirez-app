@@ -9,6 +9,7 @@
 
 import { supabaseAdmin } from "../_lib/supabaseAdmin.js";
 import { dentroDelLimite } from "../_lib/rateLimit.js";
+import { extenderUnMes } from "../despachos/reportar-pago.js";
 
 async function verificarSuperadmin(admin, req) {
   const authHeader = req.headers.authorization || "";
@@ -76,7 +77,7 @@ export default async function handler(req, res) {
   if (req.method === "GET") {
     const { data: despachos, error } = await admin
       .from("despachos")
-      .select("id, nombre, activo, creado_en, prueba_hasta, pago_reportado_en")
+      .select("*")
       .order("creado_en", { ascending: false });
     if (error) return res.status(500).json({ error: error.message });
 
@@ -137,7 +138,17 @@ export default async function handler(req, res) {
       .select("id, despacho_id, valor, fecha")
       .single();
     if (error) return res.status(500).json({ error: error.message });
-    return res.status(200).json({ ok: true, pago });
+    // Un pago registrado a mano también extiende el plan un mes (igual que
+    // uno por Wompi) y deja el despacho activo. Si la base de datos todavía
+    // no tiene la columna pagado_hasta (falta correr schema.sql), el pago
+    // igual queda anotado — solo no se extiende el vencimiento.
+    let pagadoHasta = null;
+    const { data: desp, error: errDesp } = await admin.from("despachos").select("pagado_hasta").eq("id", despachoId).maybeSingle();
+    if (!errDesp) {
+      pagadoHasta = extenderUnMes(desp?.pagado_hasta);
+      await admin.from("despachos").update({ pagado_hasta: pagadoHasta, activo: true, prueba_hasta: null, pago_reportado_en: null }).eq("id", despachoId);
+    }
+    return res.status(200).json({ ok: true, pago, pagadoHasta });
   }
 
   if (req.method === "POST") {

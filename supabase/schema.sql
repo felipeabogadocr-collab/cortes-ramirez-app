@@ -677,6 +677,33 @@ alter table plataforma_pagos add column if not exists wompi_transaccion_id text;
 alter table plataforma_pagos add column if not exists metodo text;
 create unique index if not exists plataforma_pagos_wompi_idx on plataforma_pagos (wompi_transaccion_id) where wompi_transaccion_id is not null;
 
+-- Vencimiento mensual y cobro automático de la suscripción -----------------
+-- pagado_hasta: hasta cuándo está pagado el plan. Cada pago (Wompi o
+-- registrado a mano en Plataforma) lo extiende un mes. Pasados 2 días de
+-- gracia sin pago, el despacho se ve como pendiente de activar. Si es null
+-- (despachos activados antes de esto), no vence.
+-- cobro_automatico / wompi_*: tarjeta guardada en Wompi como "fuente de
+-- pago" (Nomos nunca guarda el número de la tarjeta, solo el id que da
+-- Wompi y una etiqueta tipo "VISA •••• 4242") para cobrar cada mes solo.
+alter table despachos add column if not exists pagado_hasta timestamptz;
+alter table despachos add column if not exists plan text;
+alter table despachos add column if not exists cobro_automatico boolean not null default false;
+alter table despachos add column if not exists wompi_fuente_pago_id text;
+alter table despachos add column if not exists wompi_tarjeta text;
+alter table despachos add column if not exists wompi_email text;
+alter table despachos add column if not exists cobro_auto_intento_en timestamptz;
+alter table despachos add column if not exists cobro_auto_error text;
+
+-- SEGURIDAD: la política "administradores renombran su despacho" deja
+-- actualizar la fila completa del despacho — sin esto, un Administrador
+-- podría marcarse activo o ponerse una fecha de pago falsa desde el
+-- navegador sin pagar. Desde el navegador solo se pueden cambiar nombre,
+-- celular y logo; todo lo demás (activo, prueba, pagos, vencimiento, cobro
+-- automático) lo cambia únicamente el servidor con la llave service_role.
+revoke update on despachos from anon;
+revoke update on despachos from authenticated;
+grant update (nombre, celular, logo_ruta) on despachos to authenticated;
+
 alter table plataforma_pagos enable row level security;
 -- Sin políticas a propósito: solo el endpoint de servidor (llave
 -- service_role, ya protegido por verificarSuperadmin) lee y escribe aquí —

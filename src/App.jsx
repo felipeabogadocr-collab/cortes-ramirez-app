@@ -1354,7 +1354,7 @@ export function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-export const APP_VERSION = "1.160.0";
+export const APP_VERSION = "1.161.0";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -6537,7 +6537,7 @@ function PanelMiDespacho({ usuarioActual, fotoPerfilUrl, subiendoFotoPerfil, cam
 
         {esAdmin && !usuarioActual.es_superadmin && (
           <div style={{ marginBottom: 18, background: COLORS.surfaceSoft, border: `1px solid ${COLORS.border}`, borderRadius: 12, padding: 14 }}>
-            <PagarPlanWompi compacto />
+            <SuscripcionNomos usuarioActual={usuarioActual} />
           </div>
         )}
 
@@ -7368,6 +7368,238 @@ export function PagarPlanWompi({ compacto = false }) {
   );
 }
 
+// Días que se puede seguir usando Nomos después de la fecha de vencimiento
+// del plan (igual que DIAS_GRACIA en api/despachos/reportar-pago.js).
+const DIAS_GRACIA_PLAN = 2;
+const fechaLargaPlan = (iso) => (iso ? new Date(iso).toLocaleDateString("es-CO", { day: "numeric", month: "long", year: "numeric" }) : "");
+const NOMBRE_PLAN_NOMOS = { abogado: "Abogado", despacho: "Despacho" };
+
+// Cobro automático mensual con tarjeta. El número de la tarjeta va del
+// navegador DIRECTO a Wompi (que devuelve un token); a Nomos solo llega ese
+// token y una etiqueta tipo "VISA •••• 4242" — Nomos nunca ve ni guarda el
+// número completo ni el código de seguridad.
+function CobroAutomaticoWompi({ usuarioActual, config, plan }) {
+  const [abierto, setAbierto] = useState(false);
+  const [aut, setAut] = useState(null);
+  const [tarjeta, setTarjeta] = useState({ numero: "", mes: "", anio: "", cvc: "", titular: "" });
+  const [acepta, setAcepta] = useState(false);
+  const [procesando, setProcesando] = useState("");
+  const [error, setError] = useState("");
+  const [exito, setExito] = useState("");
+  const { confirmar, ConfirmarDialogo } = useConfirmarDialogo();
+  if (!config?.recurrente) return null;
+  const valorPlan = config.planes?.[plan]?.valor || 0;
+
+  const abrir = async () => {
+    setAbierto(true);
+    setError("");
+    try {
+      setAut(await llamarPagosNomos({ accion: "wompi_autorizacion" }));
+    } catch (e) {
+      setError(e.message);
+    }
+  };
+
+  const esperarCobro = async (id) => {
+    for (let i = 0; i < 15; i++) {
+      await new Promise((r) => setTimeout(r, 4000));
+      const { estado } = await llamarPagosNomos({ accion: "wompi_estado", id });
+      if (estado === "APPROVED") return "APPROVED";
+      if (estado !== "PENDING") return estado;
+    }
+    return "PENDING";
+  };
+
+  const activar = async () => {
+    setError("");
+    const numero = tarjeta.numero.replace(/\D/g, "");
+    if (numero.length < 13 || !tarjeta.mes || !tarjeta.anio || tarjeta.cvc.length < 3 || !tarjeta.titular.trim()) {
+      setError("Revisa los datos de la tarjeta: número, vencimiento (MM/AA), código de seguridad y nombre del titular.");
+      return;
+    }
+    if (!acepta) {
+      setError("Para continuar debes aceptar la autorización de cobro y los términos de Wompi.");
+      return;
+    }
+    try {
+      setProcesando("Verificando la tarjeta con Wompi…");
+      const resp = await fetch(`${aut.api}/tokens/cards`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${aut.llavePublica}` },
+        body: JSON.stringify({
+          number: numero,
+          cvc: tarjeta.cvc,
+          exp_month: tarjeta.mes.padStart(2, "0"),
+          exp_year: tarjeta.anio.slice(-2),
+          card_holder: tarjeta.titular.trim(),
+        }),
+      });
+      const json = await resp.json().catch(() => ({}));
+      if (!resp.ok || !json?.data?.id) throw new Error("Wompi no aceptó los datos de la tarjeta. Revísalos o prueba con otra tarjeta.");
+      const etiqueta = `${json.data.brand || "Tarjeta"} •••• ${json.data.last_four || numero.slice(-4)}`;
+      setProcesando("Guardando la tarjeta para el cobro automático…");
+      const r = await llamarPagosNomos({ accion: "wompi_activar_cobro", token: json.data.id, acceptanceToken: aut.acceptanceToken, plan, tarjeta: etiqueta });
+      setTarjeta({ numero: "", mes: "", anio: "", cvc: "", titular: "" });
+      if (r.cobrado && r.transaccionId) {
+        setProcesando("Cobrando el primer mes…");
+        const estado = r.estado === "APPROVED" ? "APPROVED" : await esperarCobro(r.transaccionId);
+        if (estado !== "APPROVED") throw new Error(estado === "PENDING" ? "La tarjeta quedó guardada y el cobro está en proceso; tu plan se activa solo apenas Wompi lo apruebe." : "La tarjeta quedó guardada, pero el cobro fue rechazado. Revisa con tu banco o registra otra tarjeta.");
+        setExito(`✓ Listo: se cobró el primer mes a ${etiqueta} y el cobro automático quedó activo.`);
+      } else {
+        setExito(`✓ Cobro automático activo con ${etiqueta}. El próximo cobro será el ${fechaLargaPlan(r.pagadoHasta)}.`);
+      }
+      setProcesando("");
+      setTimeout(() => window.location.reload(), 2500);
+    } catch (e) {
+      setProcesando("");
+      setError(e.message);
+    }
+  };
+
+  const desactivar = async () => {
+    if (!(await confirmar("¿Desactivar el cobro automático? Tendrás que pagar tu plan a mano cada mes para no perder el acceso."))) return;
+    try {
+      await llamarPagosNomos({ accion: "wompi_desactivar_cobro" });
+      window.location.reload();
+    } catch (e) {
+      setError(e.message);
+    }
+  };
+
+  const campo = { ...inputStyle, padding: "9px 11px", fontSize: 14, width: "100%", boxSizing: "border-box" };
+  if (usuarioActual.cobroAutomatico) {
+    return (
+      <div style={{ marginTop: 12, borderTop: `1px solid ${COLORS.border}`, paddingTop: 12, fontFamily: "Inter, sans-serif" }}>
+        <p style={{ fontSize: 13, fontWeight: 700, color: COLORS.ink, margin: 0 }}>🔁 Cobro automático activo</p>
+        <p style={{ fontSize: 12.5, color: COLORS.inkSoft, margin: "4px 0 0" }}>
+          {usuarioActual.wompiTarjeta || "Tarjeta guardada en Wompi"}
+          {usuarioActual.pagadoHasta ? ` · próximo cobro el ${fechaLargaPlan(usuarioActual.pagadoHasta)}` : ""}
+        </p>
+        {usuarioActual.cobroAutoError && <p style={{ fontSize: 12.5, color: "#B42318", margin: "6px 0 0" }}>⚠ El último cobro no se pudo hacer: {usuarioActual.cobroAutoError}. Registra otra tarjeta o paga a mano.</p>}
+        <button type="button" onClick={desactivar} style={{ ...buttonGhost, padding: "6px 12px", fontSize: 12, marginTop: 8 }}>
+          Desactivar cobro automático
+        </button>
+        {error && <p style={{ color: "#B42318", fontSize: 12.5, margin: "8px 0 0" }}>{error}</p>}
+        {ConfirmarDialogo}
+      </div>
+    );
+  }
+  return (
+    <div style={{ marginTop: 12, borderTop: `1px solid ${COLORS.border}`, paddingTop: 12, fontFamily: "Inter, sans-serif", textAlign: "left" }}>
+      {!abierto ? (
+        <button type="button" onClick={abrir} style={{ ...buttonGhost, width: "100%", padding: "9px 12px", fontSize: 13 }}>
+          🔁 Activar cobro automático mensual con tarjeta
+        </button>
+      ) : exito ? (
+        <p style={{ fontSize: 13, color: "#166534", background: "#F0FDF4", border: "1px solid #BBF7D0", borderRadius: 10, padding: "10px 12px", margin: 0 }}>{exito}</p>
+      ) : (
+        <div>
+          <p style={{ fontSize: 13, fontWeight: 700, color: COLORS.ink, margin: "0 0 8px" }}>Cobro automático con tarjeta</p>
+          <div style={{ display: "grid", gap: 8 }}>
+            <input style={campo} inputMode="numeric" autoComplete="cc-number" placeholder="Número de la tarjeta" value={tarjeta.numero} onChange={(e) => setTarjeta({ ...tarjeta, numero: e.target.value.replace(/[^\d ]/g, "").slice(0, 23) })} />
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
+              <input style={campo} inputMode="numeric" autoComplete="cc-exp-month" placeholder="Mes (MM)" value={tarjeta.mes} onChange={(e) => setTarjeta({ ...tarjeta, mes: e.target.value.replace(/\D/g, "").slice(0, 2) })} />
+              <input style={campo} inputMode="numeric" autoComplete="cc-exp-year" placeholder="Año (AA)" value={tarjeta.anio} onChange={(e) => setTarjeta({ ...tarjeta, anio: e.target.value.replace(/\D/g, "").slice(0, 4) })} />
+              <input style={campo} inputMode="numeric" autoComplete="cc-csc" placeholder="CVC" value={tarjeta.cvc} onChange={(e) => setTarjeta({ ...tarjeta, cvc: e.target.value.replace(/\D/g, "").slice(0, 4) })} />
+            </div>
+            <input style={campo} autoComplete="cc-name" placeholder="Nombre del titular (como aparece en la tarjeta)" value={tarjeta.titular} onChange={(e) => setTarjeta({ ...tarjeta, titular: e.target.value.toUpperCase() })} />
+          </div>
+          <label style={{ display: "flex", gap: 8, alignItems: "flex-start", fontSize: 12, color: COLORS.inkSoft, margin: "10px 0", lineHeight: 1.5 }}>
+            <input type="checkbox" checked={acepta} onChange={(e) => setAcepta(e.target.checked)} style={{ marginTop: 3 }} />
+            <span>
+              Autorizo a Nomos a cobrar {formatoCOP(valorPlan)} cada mes (plan {NOMBRE_PLAN_NOMOS[plan]}) a esta tarjeta hasta que desactive el cobro automático, y acepto los{" "}
+              {aut?.terminosUrl ? (
+                <a href={aut.terminosUrl} target="_blank" rel="noreferrer" style={{ color: COLORS.accentBright }}>
+                  términos y condiciones de Wompi
+                </a>
+              ) : (
+                "términos y condiciones de Wompi"
+              )}
+              .
+            </span>
+          </label>
+          <button className="drx-btn-primary" style={{ ...buttonPrimary, width: "100%" }} onClick={activar} disabled={!!procesando || !aut}>
+            {procesando || "Guardar tarjeta y activar"}
+          </button>
+          <p style={{ fontSize: 11, color: COLORS.muted, margin: "6px 0 0", textAlign: "center" }}>🔒 Los datos de la tarjeta van directo a Wompi; Nomos no los guarda.</p>
+        </div>
+      )}
+      {error && <p style={{ color: "#B42318", fontSize: 12.5, margin: "8px 0 0" }}>{error}</p>}
+    </div>
+  );
+}
+
+// Bloque "Tu plan de Nomos" de Mi despacho: estado y vencimiento, pago en
+// línea y cobro automático.
+function SuscripcionNomos({ usuarioActual }) {
+  const [config, setConfig] = useState(null);
+  useEffect(() => {
+    fetch("/api/despachos/reportar-pago?wompi=config")
+      .then((r) => (r.ok ? r.json() : null))
+      .then(setConfig)
+      .catch(() => setConfig(null));
+  }, []);
+  const plan = usuarioActual.planNomos || "despacho";
+  const vence = usuarioActual.pagadoHasta;
+  const dias = vence ? Math.ceil((new Date(vence).getTime() - Date.now()) / 86400000) : null;
+  return (
+    <div style={{ fontFamily: "Inter, sans-serif" }}>
+      <p style={{ fontSize: 12, fontWeight: 700, color: COLORS.muted, textTransform: "uppercase", letterSpacing: 0.4, margin: "0 0 6px" }}>Tu plan de Nomos</p>
+      {vence && (
+        <p style={{ fontSize: 13, color: dias < 0 ? "#B42318" : dias <= 5 ? "#B45309" : COLORS.inkSoft, margin: "0 0 10px" }}>
+          Plan {NOMBRE_PLAN_NOMOS[plan] || "Despacho"} · {dias < 0 ? `venció el ${fechaLargaPlan(vence)}` : `pagado hasta el ${fechaLargaPlan(vence)}`}
+        </p>
+      )}
+      <PagarPlanWompi compacto />
+      <CobroAutomaticoWompi usuarioActual={usuarioActual} config={config} plan={plan} />
+    </div>
+  );
+}
+
+// Aviso arriba del panel cuando el plan está por vencer o ya venció (dentro
+// de los días de gracia). Si el cobro automático está activo y sin errores,
+// no molesta: el cobro llega solo.
+function AvisoPlanPorVencer({ usuarioActual }) {
+  const [cerrado, setCerrado] = useState(false);
+  const [abriendo, setAbriendo] = useState(false);
+  const vence = usuarioActual.pagadoHasta;
+  if (!vence || cerrado) return null;
+  if (usuarioActual.cobroAutomatico && !usuarioActual.cobroAutoError) return null;
+  const msVence = new Date(vence).getTime();
+  const dias = Math.ceil((msVence - Date.now()) / 86400000);
+  if (dias > 3) return null;
+  const limite = fechaLargaPlan(new Date(msVence + DIAS_GRACIA_PLAN * 86400000).toISOString());
+  const esAdmin = usuarioActual.rol === "Administrador";
+  const texto =
+    dias < 0
+      ? `Tu plan de Nomos venció el ${fechaLargaPlan(vence)}. Paga antes del ${limite} para no perder el acceso.`
+      : `Tu plan de Nomos vence el ${fechaLargaPlan(vence)}.${usuarioActual.cobroAutoError ? " El cobro automático falló." : ""} Págalo para no perder el acceso (tienes hasta el ${limite}).`;
+  const pagar = async () => {
+    setAbriendo(true);
+    try {
+      const { url } = await llamarPagosNomos({ accion: "wompi_checkout", plan: usuarioActual.planNomos || "despacho" });
+      window.location.href = url;
+    } catch {
+      setAbriendo(false);
+    }
+  };
+  return (
+    <div style={{ position: "fixed", bottom: "calc(16px + var(--sab))", left: "50%", transform: "translateX(-50%)", zIndex: 1400, width: "min(560px, calc(100vw - 28px))", background: dias < 0 ? "#FEF2F2" : "#FFFBEB", border: `1px solid ${dias < 0 ? "#F3C6C0" : "#FDE68A"}`, color: dias < 0 ? "#B42318" : "#92400E", borderRadius: 12, padding: "12px 38px 12px 14px", fontFamily: "Inter, sans-serif", fontSize: 13, fontWeight: 600, lineHeight: 1.5, boxShadow: "0 12px 30px rgba(0,0,0,0.12)" }}>
+      {texto}
+      {esAdmin ? (
+        <button onClick={pagar} disabled={abriendo} className="drx-btn-primary" style={{ ...buttonPrimary, padding: "6px 14px", fontSize: 12.5, marginLeft: 8, marginTop: 6 }}>
+          {abriendo ? "Abriendo…" : "Pagar ahora"}
+        </button>
+      ) : (
+        <span> Pídele al administrador del despacho que lo pague.</span>
+      )}
+      <button onClick={() => setCerrado(true)} aria-label="Cerrar" style={{ position: "absolute", top: 6, right: 10, background: "none", border: "none", color: "inherit", fontSize: 18, cursor: "pointer" }}>
+        ×
+      </button>
+    </div>
+  );
+}
+
 // Al volver de Wompi (?pago=wompi&id=<transacción>) se confirma el pago
 // contra el servidor. PSE puede quedar "PENDING" unos minutos, así que se
 // vuelve a preguntar cada 5 s durante 2 minutos antes de rendirse.
@@ -7485,12 +7717,14 @@ function PantallaPendienteActivacion({ usuarioActual, onCerrarSesion, avisoPago,
       <Card style={{ maxWidth: 460, width: "100%", textAlign: "center" }}>
         <InsigniaPlataforma grande />
         <h1 style={{ fontFamily: "Inter, sans-serif", fontSize: 20, fontWeight: 800, color: COLORS.headingText, margin: "0 0 10px" }}>
-          {pruebaVencida ? "Tu demo de 3 horas terminó" : "Tu cuenta está casi lista"}
+          {usuarioActual.planVencido ? "Tu plan de Nomos venció" : pruebaVencida ? "Tu demo de 3 horas terminó" : "Tu cuenta está casi lista"}
         </h1>
         <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted, lineHeight: 1.6, marginBottom: 20 }}>
-          {pruebaVencida
-            ? `Esperamos que hayas podido probar de todo en `
-            : `Ya confirmamos tu correo y creamos `}
+          {usuarioActual.planVencido
+            ? `Tu plan venció el ${fechaLargaPlan(usuarioActual.pagadoHasta)} y pasaron los ${DIAS_GRACIA_PLAN} días de gracia. Tus datos siguen guardados en `
+            : pruebaVencida
+              ? `Esperamos que hayas podido probar de todo en `
+              : `Ya confirmamos tu correo y creamos `}
           <strong>{usuarioActual.despachoNombre}</strong>
           {pruebaVencida ? ". Para seguir usándolo, activa tu plan pagando abajo." : ". Solo falta activar tu plan para entrar."}
         </p>
@@ -8987,11 +9221,23 @@ function App() {
       setUsuarioActual(null);
       return;
     }
+    // Primero con las columnas del vencimiento mensual y el cobro automático
+    // (supabase/schema.sql más reciente); si la base todavía no las tiene,
+    // se cae a las versiones anteriores en vez de dejar a todos afuera.
     let { data: perfil, error: errorPerfil } = await supabase
       .from("perfiles")
-      .select("*, despachos(nombre, activo, prueba_hasta, pago_reportado_en, logo_ruta, celular)")
+      .select("*, despachos(nombre, activo, prueba_hasta, pago_reportado_en, logo_ruta, celular, pagado_hasta, plan, cobro_automatico, wompi_tarjeta, cobro_auto_error)")
       .eq("id", user.id)
       .maybeSingle();
+    if (errorPerfil) {
+      const reintentoLogo = await supabase
+        .from("perfiles")
+        .select("*, despachos(nombre, activo, prueba_hasta, pago_reportado_en, logo_ruta, celular)")
+        .eq("id", user.id)
+        .maybeSingle();
+      perfil = reintentoLogo.data;
+      errorPerfil = reintentoLogo.error;
+    }
     if (errorPerfil) {
       // Si el despacho todavía no corrió la migración más reciente de
       // supabase/schema.sql (la que agrega logo_ruta/celular a despachos),
@@ -9038,14 +9284,26 @@ function App() {
     // prueba_hasta, ver api/plataforma/despachos.js), vuelve a tratarse como
     // pendiente de activar aunque el flag "activo" siga en true.
     const pruebaVencida = perfil?.despachos?.prueba_hasta && new Date(perfil.despachos.prueba_hasta).getTime() <= Date.now();
+    // Vencimiento mensual: cada pago extiende pagado_hasta un mes; pasados
+    // DIAS_GRACIA_PLAN días sin pago, el despacho vuelve a verse como
+    // pendiente de activar. Sin fecha (despachos activados antes de esto) no
+    // vence.
+    const pagadoHasta = perfil?.despachos?.pagado_hasta || null;
+    const planVencido = !!pagadoHasta && new Date(pagadoHasta).getTime() + DIAS_GRACIA_PLAN * 86400000 <= Date.now();
     const usuario = perfil
       ? {
           ...perfil,
           email: user.email,
           despachoNombre: perfil.despachos?.nombre || "",
-          despachoActivo: perfil.despachos?.activo !== false && !pruebaVencida,
+          despachoActivo: perfil.despachos?.activo !== false && !pruebaVencida && !planVencido,
           pruebaHasta: perfil.despachos?.prueba_hasta || null,
           pagoReportadoEn: perfil.despachos?.pago_reportado_en || null,
+          pagadoHasta,
+          planVencido,
+          planNomos: perfil.despachos?.plan || null,
+          cobroAutomatico: !!perfil.despachos?.cobro_automatico,
+          wompiTarjeta: perfil.despachos?.wompi_tarjeta || null,
+          cobroAutoError: perfil.despachos?.cobro_auto_error || null,
         }
       : null;
     setUsuarioActual(usuario);
@@ -9258,6 +9516,7 @@ function App() {
       <IndicadorSincronizacion />
       <AvisoPruebaGratis pruebaHasta={usuarioActual.pruebaHasta} />
       <AvisoPagoWompi aviso={avisoPagoWompi} onCerrar={() => setAvisoPagoWompi(null)} />
+      {!usuarioActual.es_superadmin && <AvisoPlanPorVencer usuarioActual={usuarioActual} />}
       <div
         className={`drx-sidebar-overlay${sidebarMovilAbierta ? " drx-sidebar-abierta" : ""}`}
         onClick={() => setSidebarMovilAbierta(false)}

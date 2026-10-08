@@ -9,6 +9,8 @@ const DESPACHO = "11111111-2222-3333-4444-555555555555";
 // --- Supabase simulado: guarda en memoria los pagos y los cambios al despacho.
 let pagos;
 let despachoActualizado;
+let despacho; // estado simulado de la fila del despacho
+let rol;
 const admin = {
   auth: { getUser: async () => ({ data: { user: { id: "u1", email: "a@b.co" } }, error: null }) },
   from(tabla) {
@@ -18,7 +20,8 @@ const admin = {
       eq: (col, val) => ((q.filtros[col] = val), api),
       order: () => api,
       maybeSingle: async () => {
-        if (tabla === "perfiles") return { data: { despacho_id: DESPACHO } };
+        if (tabla === "perfiles") return { data: { despacho_id: DESPACHO, rol } };
+        if (tabla === "despachos") return { data: { ...despacho } };
         if (tabla === "plataforma_pagos") return { data: pagos.find((p) => p.wompi_transaccion_id === q.filtros.wompi_transaccion_id) || null };
         return { data: null };
       },
@@ -30,6 +33,7 @@ const admin = {
       update: (cambios) => ({
         eq: async (col, val) => {
           despachoActualizado = { ...cambios, [col]: val };
+          despacho = { ...despacho, ...cambios };
           return { error: null };
         },
       }),
@@ -40,7 +44,7 @@ const admin = {
 vi.mock("../../api/_lib/supabaseAdmin.js", () => ({ supabaseAdmin: () => admin }));
 vi.mock("../../api/_lib/rateLimit.js", () => ({ dentroDelLimite: async () => true }));
 
-const { default: handler } = await import("../../api/despachos/reportar-pago.js");
+const { default: handler, extenderUnMes } = await import("../../api/despachos/reportar-pago.js");
 
 function llamar({ method = "POST", query = {}, body = {}, headers = {} } = {}) {
   return new Promise((resolve) => {
@@ -69,6 +73,9 @@ function evento(tx, secreto = "test_events_abc") {
 beforeEach(() => {
   pagos = [];
   despachoActualizado = null;
+  despacho = { id: DESPACHO, pagado_hasta: null };
+  rol = "Administrador";
+  process.env.WOMPI_PRIVATE_KEY = "prv_test_priv";
   process.env.WOMPI_PUBLIC_KEY = "pub_test_xyz";
   process.env.WOMPI_INTEGRITY_SECRET = "test_integrity_123";
   process.env.WOMPI_EVENTS_SECRET = "test_events_abc";
@@ -130,5 +137,69 @@ describe("pagos de suscripción con Wompi", () => {
     expect(cfg.data.habilitado).toBe(false);
     const r = await llamar({ body: { accion: "wompi_checkout", plan: "abogado" } });
     expect(r.status).toBe(503);
+  });
+
+  it("un pago aprobado deja el plan pagado un mes; el aviso repetido no regala otro mes", async () => {
+    const tx = { id: "tx-9", status: "APPROVED", amount_in_cents: 12000000, currency: "COP", reference: `NOMOS_${DESPACHO}_despacho_1` };
+    await llamar({ query: { wompi: "evento" }, body: evento(tx), headers: { authorization: "" } });
+    const primera = new Date(despacho.pagado_hasta);
+    const dias = (primera.getTime() - Date.now()) / 86400000;
+    expect(dias).toBeGreaterThan(27);
+    expect(dias).toBeLessThan(32);
+    expect(despacho.plan).toBe("despacho");
+    await llamar({ query: { wompi: "evento" }, body: evento(tx), headers: { authorization: "" } });
+    expect(new Date(despacho.pagado_hasta).getTime()).toBe(primera.getTime());
+  });
+
+  it("pagar antes de tiempo suma el mes sobre la fecha que ya tenía", () => {
+    const enDiezDias = new Date(Date.now() + 10 * 86400000);
+    const nueva = new Date(extenderUnMes(enDiezDias.toISOString()));
+    const esperada = new Date(enDiezDias);
+    esperada.setMonth(esperada.getMonth() + 1);
+    expect(nueva.getTime()).toBe(esperada.getTime());
+  });
+
+  it("solo el Administrador puede activar el cobro automático", async () => {
+    rol = "Abogado";
+    const r = await llamar({ body: { accion: "wompi_activar_cobro", token: "tok", acceptanceToken: "acc", plan: "abogado" } });
+    expect(r.status).toBe(403);
+  });
+
+  it("activar el cobro automático guarda la tarjeta; si el plan sigue vigente no cobra todavía", async () => {
+    despacho.pagado_hasta = new Date(Date.now() + 5 * 86400000).toISOString();
+    const llamadas = [];
+    globalThis.fetch = vi.fn(async (url, opciones) => {
+      llamadas.push({ url, opciones });
+      return { ok: true, json: async () => ({ data: { id: 777 } }) };
+    });
+    const r = await llamar({ body: { accion: "wompi_activar_cobro", token: "tok_test", acceptanceToken: "acc", plan: "abogado", tarjeta: "VISA •••• 4242" } });
+    expect(r.status).toBe(200);
+    expect(r.data.cobrado).toBe(false);
+    expect(llamadas).toHaveLength(1);
+    expect(llamadas[0].url).toContain("/payment_sources");
+    expect(llamadas[0].opciones.headers.Authorization).toBe("Bearer prv_test_priv");
+    expect(despacho).toMatchObject({ cobro_automatico: true, wompi_fuente_pago_id: "777", wompi_tarjeta: "VISA •••• 4242", plan: "abogado" });
+  });
+
+  it("si el plan está vencido, al activar el cobro automático cobra el primer mes con la tarjeta guardada", async () => {
+    despacho.pagado_hasta = new Date(Date.now() - 86400000).toISOString();
+    const llamadas = [];
+    globalThis.fetch = vi.fn(async (url, opciones) => {
+      llamadas.push({ url, body: opciones?.body ? JSON.parse(opciones.body) : null });
+      if (url.endsWith("/payment_sources")) return { ok: true, json: async () => ({ data: { id: 778 } }) };
+      return { ok: true, json: async () => ({ data: { id: "tx-auto", status: "PENDING" } }) };
+    });
+    const r = await llamar({ body: { accion: "wompi_activar_cobro", token: "tok_test", acceptanceToken: "acc", plan: "despacho" } });
+    expect(r.data).toMatchObject({ cobrado: true, transaccionId: "tx-auto" });
+    const cobro = llamadas.find((l) => l.url.endsWith("/transactions"));
+    expect(cobro.body).toMatchObject({ amount_in_cents: 12000000, currency: "COP", payment_source_id: 778, recurrent: true });
+    expect(cobro.body.signature).toBe(sha256(`${cobro.body.reference}12000000COPtest_integrity_123`));
+  });
+
+  it("un cobro rechazado queda anotado como error y no activa nada", async () => {
+    const tx = { id: "tx-r", status: "DECLINED", status_message: "Fondos insuficientes", amount_in_cents: 12000000, currency: "COP", reference: `NOMOS_${DESPACHO}_despacho_1` };
+    await llamar({ query: { wompi: "evento" }, body: evento(tx), headers: { authorization: "" } });
+    expect(despacho.cobro_auto_error).toContain("rechazado");
+    expect(despacho.activo).toBeUndefined();
   });
 });
