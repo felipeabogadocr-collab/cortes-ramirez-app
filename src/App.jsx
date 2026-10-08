@@ -13,6 +13,7 @@ import logoNomosDocUrl from "./assets/logo-nomos.png";
 // pago/egresos/otros ingresos, recibos, gráficas...) — cargarla solo cuando
 // alguien realmente abre esa pestaña, en vez de siempre al entrar a Nomos,
 // hace que el resto de la app arranque más rápido.
+import RecorridoGuiado, { construirPasosRecorrido } from "./views/RecorridoGuiado.jsx";
 const ContabilidadTab = lazy(() => import("./tabs/ContabilidadTab.jsx"));
 const CalculadoraTab = lazy(() => import("./tabs/CalculadoraTab.jsx"));
 const AgendaTab = lazy(() => import("./tabs/AgendaTab.jsx"));
@@ -1354,7 +1355,7 @@ export function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-export const APP_VERSION = "1.166.0";
+export const APP_VERSION = "1.167.0";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -1507,6 +1508,73 @@ export function useTema() {
   return { oscuro, alternar };
 }
 
+// Secciones del menú lateral que cada usuario puede reordenar u ocultar
+// desde Mi despacho → Personalizar menú. Resumen va siempre primero y
+// Usuarios y permisos siempre al final, fuera de esta lista. Ocultar solo
+// limpia el menú: lo que controla el acceso siguen siendo los permisos.
+export const MENU_SECCIONES = [
+  { id: "agenda", nombre: "Agenda", color: "#8B5CF6" },
+  { id: "clientes", nombre: "Clientes", color: "#14B8A6" },
+  { id: "vigilancia", nombre: "Vigilancia judicial", color: "#F5A524" },
+  { id: "antecedentes", nombre: "Antecedentes", color: "#6366F1" },
+  { id: "contabilidad", nombre: "Contabilidad", color: "#F43F5E" },
+  { id: "calculadora", nombre: "Calculadora de precios", color: "#F59E0B" },
+  { id: "contenido", nombre: "Calendario de contenido", color: "#8B5CF6" },
+  { id: "documentos", nombre: "Firmar documentos", color: "#10B981" },
+  { id: "reportes", nombre: "Reportes", color: "#0EA5E9" },
+];
+
+// Orden guardado por el usuario; las secciones que no estaban (nuevas)
+// quedan al final en su orden original.
+export function ordenarMenu(pref) {
+  const orden = (pref?.orden || []).filter((id) => MENU_SECCIONES.some((m) => m.id === id));
+  return [...orden.map((id) => MENU_SECCIONES.find((m) => m.id === id)), ...MENU_SECCIONES.filter((m) => !orden.includes(m.id))];
+}
+
+// Preferencia del menú por usuario: en la base (sigue al usuario entre
+// computador y celular) y una copia local para pintarlo sin esperar.
+function useMenuPersonalizado(usuarioId) {
+  const llave = usuarioId ? `menu-personalizado:${usuarioId}` : null;
+  const [pref, setPref] = useState(() => {
+    try {
+      return (llave && JSON.parse(localStorage.getItem(llave) || "null")) || {};
+    } catch {
+      return {};
+    }
+  });
+  useEffect(() => {
+    if (!llave) return;
+    let cancelado = false;
+    storageGet(llave).then((v) => {
+      if (cancelado || !v) return;
+      try {
+        const p = JSON.parse(v);
+        setPref(p);
+        localStorage.setItem(llave, v);
+      } catch {
+        // valor dañado: se queda el orden por defecto
+      }
+    });
+    return () => {
+      cancelado = true;
+    };
+  }, [llave]);
+  const guardar = (nueva) => {
+    setPref(nueva);
+    if (!llave) return;
+    const texto = JSON.stringify(nueva);
+    try {
+      localStorage.setItem(llave, texto);
+    } catch {
+      // se guarda igual en la base
+    }
+    storageSet(llave, texto);
+  };
+  return [pref, guardar];
+}
+
+// Usuarios creados desde esta fecha hacen el recorrido guiado obligatorio.
+const FECHA_INICIO_RECORRIDO = "2026-10-08";
 const MINUTOS_INACTIVIDAD = 30;
 const SEGUNDOS_AVISO_PREVIO = 60;
 
@@ -3734,84 +3802,6 @@ function ProximoEventoResumen({ onIr }) {
   );
 }
 
-// Un despacho recién creado entra a un panel con las 10 pestañas vacías, sin
-// ninguna guía de por dónde empezar. Esta tarjeta muestra 3 pasos objetivos
-// (verificables con los mismos datos que ya trae ResumenTab, sin pedir nada
-// nuevo al servidor) y se oculta sola en cuanto los 3 quedan completos — no
-// hace falta que nadie la cierre a mano. Quien sí quiera ocultarla antes
-// puede hacerlo con el botón "Ocultar", que se recuerda por despacho.
-const LLAVE_CHECKLIST_INICIO = "nomos_checklist_inicio_oculto";
-
-function ChecklistPrimerosPasos({ r, onIr }) {
-  const despachoId = getDespachoActualId();
-  const [oculto, setOculto] = useState(() => {
-    if (!despachoId) return false;
-    return leerJSONLocal(LLAVE_CHECKLIST_INICIO, []).includes(despachoId);
-  });
-
-  const pasos = [
-    { texto: "Agrega tu primer cliente", hecho: r.totalClientes > 0, tab: "clientes" },
-    { texto: "Crea tu primer documento", hecho: r.docsPendientes + r.docsFaltaAbogado + r.docsListos > 0, tab: "documentos" },
-    { texto: "Invita a alguien más de tu equipo", hecho: r.totalUsuarios > 1, tab: "usuarios" },
-  ];
-  const completados = pasos.filter((p) => p.hecho).length;
-
-  if (oculto || completados === pasos.length) return null;
-
-  const ocultar = () => {
-    if (despachoId) {
-      const ocultos = leerJSONLocal(LLAVE_CHECKLIST_INICIO, []);
-      if (!ocultos.includes(despachoId)) guardarJSONLocal(LLAVE_CHECKLIST_INICIO, [...ocultos, despachoId]);
-    }
-    setOculto(true);
-  };
-
-  return (
-    <Card style={{ marginBottom: 24, borderLeft: `4px solid ${COLORS.accentBright}` }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10 }}>
-        <div>
-          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 14, fontWeight: 700, color: COLORS.ink, margin: 0 }}>Primeros pasos en Nomos</p>
-          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, margin: "4px 0 0" }}>{completados} de {pasos.length} completados</p>
-        </div>
-        <button
-          onClick={ocultar}
-          style={{ background: "none", border: "none", cursor: "pointer", fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, padding: 4, flexShrink: 0 }}
-        >
-          Ocultar ✕
-        </button>
-      </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 14 }}>
-        {pasos.map((p) => (
-          <button
-            key={p.tab}
-            className="drx-btn-ghost"
-            onClick={() => onIr(p.tab)}
-            style={{ ...buttonGhost, display: "flex", alignItems: "center", gap: 10, justifyContent: "flex-start", textAlign: "left", background: COLORS.panel, opacity: p.hecho ? 0.55 : 1 }}
-          >
-            <span
-              style={{
-                width: 18,
-                height: 18,
-                borderRadius: "50%",
-                border: `2px solid ${p.hecho ? "#10B981" : COLORS.border}`,
-                background: p.hecho ? "#10B981" : "transparent",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                flexShrink: 0,
-                fontSize: 11,
-                color: "#fff",
-              }}
-            >
-              {p.hecho ? "✓" : ""}
-            </span>
-            <span style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.ink, textDecoration: p.hecho ? "line-through" : "none" }}>{p.texto}</span>
-          </button>
-        ))}
-      </div>
-    </Card>
-  );
-}
 
 function ResumenTab({ nombre, usuarioId, usuarioActual, onIr, onListo, puedeVer = () => true }) {
   const r = useResumenGeneral();
@@ -3887,7 +3877,6 @@ function ResumenTab({ nombre, usuarioId, usuarioActual, onIr, onListo, puedeVer 
         </div>
       </div>
 
-      <ChecklistPrimerosPasos r={r} onIr={onIr} />
       <ProximoEventoResumen onIr={onIr} />
       <TerminosPorVencerResumen onIr={onIr} />
 
@@ -4726,11 +4715,12 @@ export function AvatarIniciales({ nombre, size = 34, fotoUrl }) {
   );
 }
 
-function SidebarButton({ active, onClick, onMouseEnter, children, color, icono }) {
+function SidebarButton({ active, onClick, onMouseEnter, children, color, icono, tour }) {
   const c = color || "#2F80ED";
   return (
     <button
       className="drx-tab"
+      data-tour={tour}
       onClick={onClick}
       onMouseEnter={onMouseEnter}
       style={{
@@ -4812,6 +4802,7 @@ function BuscadorGlobal({ onIr }) {
         className="drx-input"
         style={{ ...inputStyle, width: "100%", minWidth: 0, boxSizing: "border-box" }}
         placeholder="Buscar cliente o documento..."
+        data-tour="buscar"
         title="Buscar cliente o documento (Ctrl+K)"
         value={q}
         onChange={(e) => {
@@ -6333,7 +6324,57 @@ function PanelSeguridad2FA({ onCerrar }) {
 // resuelve que cada despacho (tenant) vea SU propia marca en las cuentas de
 // cobro, los recibos y los contratos que genera — antes todos veían el
 // mismo logo fijo de Cortés Ramírez Abogados.
-function PanelMiDespacho({ usuarioActual, fotoPerfilUrl, subiendoFotoPerfil, cambiarFotoPerfil, onCerrar, onDespachoRenombrado }) {
+// Mi despacho → Personalizar menú: cada usuario ordena (flechas) y oculta
+// las secciones del menú lateral. Solo afecta su propio menú.
+function PersonalizarMenu({ pref, onGuardar, puedeVer }) {
+  const [abierto, setAbierto] = useState(false);
+  const lista = ordenarMenu(pref).filter((m) => !puedeVer || puedeVer(m.id));
+  const ocultas = pref.ocultas || [];
+  const mover = (i, d) => {
+    const ids = lista.map((m) => m.id);
+    const j = i + d;
+    if (j < 0 || j >= ids.length) return;
+    [ids[i], ids[j]] = [ids[j], ids[i]];
+    onGuardar({ ...pref, orden: ids });
+  };
+  const alternar = (id) => onGuardar({ ...pref, ocultas: ocultas.includes(id) ? ocultas.filter((x) => x !== id) : [...ocultas, id] });
+  const flecha = { background: COLORS.panel, border: `1px solid ${COLORS.border}`, borderRadius: 8, width: 30, height: 30, cursor: "pointer", color: COLORS.inkSoft, fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 };
+  return (
+    <div style={{ marginBottom: 18, background: COLORS.surfaceSoft, border: `1px solid ${COLORS.border}`, borderRadius: 12, padding: 14 }}>
+      <button type="button" onClick={() => setAbierto(!abierto)} style={{ background: "none", border: "none", padding: 0, width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer", fontFamily: "Inter, sans-serif" }}>
+        <span style={{ textAlign: "left" }}>
+          <span style={{ display: "block", fontSize: 13, fontWeight: 700, color: COLORS.headingText }}>Personalizar menú</span>
+          <span style={{ display: "block", fontSize: 11.5, color: COLORS.muted, marginTop: 3 }}>Ordena u oculta las secciones de tu menú. Solo cambia el tuyo.</span>
+        </span>
+        <span style={{ color: COLORS.muted, fontSize: 18 }}>{abierto ? "−" : "+"}</span>
+      </button>
+      {abierto && (
+        <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 6 }}>
+          <div style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, padding: "4px 2px" }}>Resumen · siempre primero</div>
+          {lista.map((m, i) => {
+            const oculta = ocultas.includes(m.id);
+            return (
+              <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 8, background: COLORS.panel, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: "6px 8px", opacity: oculta ? 0.5 : 1 }}>
+                <span style={{ width: 8, height: 8, borderRadius: "50%", background: m.color, flexShrink: 0 }} />
+                <span style={{ flex: 1, fontFamily: "Inter, sans-serif", fontSize: 13, fontWeight: 600, color: COLORS.ink, textDecoration: oculta ? "line-through" : "none" }}>{m.nombre}</span>
+                <button type="button" style={flecha} onClick={() => mover(i, -1)} disabled={i === 0} title="Subir">↑</button>
+                <button type="button" style={flecha} onClick={() => mover(i, 1)} disabled={i === lista.length - 1} title="Bajar">↓</button>
+                <button type="button" style={{ ...flecha, width: "auto", padding: "0 10px", fontSize: 12, fontWeight: 700 }} onClick={() => alternar(m.id)}>
+                  {oculta ? "Mostrar" : "Ocultar"}
+                </button>
+              </div>
+            );
+          })}
+          <button type="button" onClick={() => onGuardar({})} style={{ background: "none", border: "none", color: COLORS.muted, fontFamily: "Inter, sans-serif", fontSize: 12, textDecoration: "underline", cursor: "pointer", alignSelf: "flex-start", marginTop: 4, padding: 0 }}>
+            Restablecer orden original
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PanelMiDespacho({ usuarioActual, fotoPerfilUrl, subiendoFotoPerfil, cambiarFotoPerfil, onCerrar, onDespachoRenombrado, menuPref, onGuardarMenu, puedeVer }) {
   const panelRef = useRef(null);
   const esAdmin = usuarioActual.rol === "Administrador";
   const { usuarios: usuariosDespacho } = useUsuariosDespacho();
@@ -6556,6 +6597,8 @@ function PanelMiDespacho({ usuarioActual, fotoPerfilUrl, subiendoFotoPerfil, cam
             </div>
           )}
         </div>
+
+        {onGuardarMenu && <PersonalizarMenu pref={menuPref || {}} onGuardar={onGuardarMenu} puedeVer={puedeVer} />}
 
         {esAdmin && !usuarioActual.es_superadmin && (
           <div style={{ marginBottom: 18, background: COLORS.surfaceSoft, border: `1px solid ${COLORS.border}`, borderRadius: 12, padding: 14 }}>
@@ -9476,6 +9519,45 @@ function App() {
     );
   }
 
+  // Recorrido guiado obligatorio para usuarios creados desde que existe
+  // (no se les impone a quienes ya venían usando Nomos). Se marca como hecho
+  // en la base (por usuario) y en el navegador; ?recorrido=1 lo fuerza para
+  // revisarlo.
+  const [mostrarRecorrido, setMostrarRecorrido] = useState(false);
+  const [menuPref, guardarMenuPref] = useMenuPersonalizado(usuarioActual?.id);
+  useEffect(() => {
+    const id = usuarioActual?.id;
+    if (!id) return;
+    const forzado = new URLSearchParams(window.location.search).get("recorrido") === "1";
+    if (!forzado && (usuarioActual?.es_superadmin || !usuarioActual?.creado_en || usuarioActual?.creado_en < FECHA_INICIO_RECORRIDO)) return;
+    const llave = `recorrido-completado:${id}`;
+    if (!forzado) {
+      try {
+        if (localStorage.getItem(llave)) return;
+      } catch {
+        // sin localStorage se consulta solo la base
+      }
+    }
+    let cancelado = false;
+    (forzado ? Promise.resolve(null) : storageGet(llave)).then((hecho) => {
+      if (!cancelado && !hecho) setMostrarRecorrido(true);
+    });
+    return () => {
+      cancelado = true;
+    };
+  }, [usuarioActual?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  const terminarRecorrido = () => {
+    const llave = `recorrido-completado:${usuarioActual.id}`;
+    try {
+      localStorage.setItem(llave, "1");
+    } catch {
+      // se guarda igual en la base
+    }
+    storageSet(llave, new Date().toISOString());
+    setMostrarRecorrido(false);
+    setTab("resumen");
+  };
+
   if (!sesionCargada) {
     return (
       <>
@@ -9559,10 +9641,18 @@ function App() {
     return permisos[seccionId] !== false;
   };
 
+
   return (
     <div className={`drx-app-shell ${oscuro ? "drx-tema-oscuro" : "drx-tema-claro"}`} style={{ background: COLORS.bg, minHeight: "100%", display: "flex" }}>
       <GlobalStyle />
       <TexturaGrano />
+      {mostrarRecorrido && (
+        <RecorridoGuiado
+          pasos={construirPasosRecorrido({ puedeVer, esAdmin: usuarioActual.rol === "Administrador", nombre: usuarioActual.nombre })}
+          onIrSeccion={setTab}
+          onTerminar={terminarRecorrido}
+        />
+      )}
       <AvisoErroresAlmacenamiento />
       <IndicadorSincronizacion />
       <AvisoPruebaGratis pruebaHasta={usuarioActual.pruebaHasta} />
@@ -9637,62 +9727,32 @@ function App() {
 
         <div style={{ display: "flex", flexDirection: "column", gap: 8, flex: 1 }}>
           {puedeVer("resumen") && (
-            <SidebarButton active={tab === "resumen"} onClick={() => setTab("resumen")} color="#2F80ED" icono="resumen">
+            <SidebarButton tour="resumen" active={tab === "resumen"} onClick={() => setTab("resumen")} color="#2F80ED" icono="resumen">
               Resumen
             </SidebarButton>
           )}
-          {puedeVer("agenda") && (
-            <SidebarButton active={tab === "agenda"} onClick={() => setTab("agenda")} onMouseEnter={() => precargarTab("agenda")} color="#8B5CF6" icono="agenda">
-              Agenda
-            </SidebarButton>
-          )}
-          {puedeVer("clientes") && (
-            <SidebarButton active={tab === "clientes"} onClick={() => setTab("clientes")} onMouseEnter={() => precargarTab("clientes")} color="#14B8A6" icono="clientes">
-              Clientes
-            </SidebarButton>
-          )}
-          {puedeVer("vigilancia") && (
-            <SidebarButton active={tab === "vigilancia"} onClick={() => setTab("vigilancia")} onMouseEnter={() => precargarTab("vigilancia")} color="#F5A524" icono="vigilancia">
-              Vigilancia judicial
-            </SidebarButton>
-          )}
-          {puedeVer("antecedentes") && (
-            <SidebarButton active={tab === "antecedentes"} onClick={() => setTab("antecedentes")} onMouseEnter={() => precargarTab("antecedentes")} color="#6366F1" icono="antecedentes">
-              Antecedentes
-            </SidebarButton>
-          )}
-          {puedeVer("contabilidad") && (
-            <SidebarButton active={tab === "contabilidad"} onClick={() => setTab("contabilidad")} onMouseEnter={() => precargarTab("contabilidad")} color="#F43F5E" icono="contabilidad">
-              Contabilidad
-            </SidebarButton>
-          )}
-          {puedeVer("calculadora") && (
-            <SidebarButton active={tab === "calculadora"} onClick={() => setTab("calculadora")} onMouseEnter={() => precargarTab("calculadora")} color="#F59E0B" icono="calculadora">
-              Calculadora de precios
-            </SidebarButton>
-          )}
-          {puedeVer("contenido") && (
-            <SidebarButton active={tab === "contenido"} onClick={() => setTab("contenido")} onMouseEnter={() => precargarTab("contenido")} color="#8B5CF6" icono="contenido">
-              Calendario de contenido
-            </SidebarButton>
-          )}
-          {puedeVer("documentos") && (
-            <SidebarButton active={tab === "documentos"} onClick={irADocumentos} onMouseEnter={() => precargarTab("documentos")} color="#10B981" icono="documentos">
-              Firmar documentos
-            </SidebarButton>
-          )}
-          {puedeVer("reportes") && (
-            <SidebarButton active={tab === "reportes"} onClick={() => setTab("reportes")} onMouseEnter={() => precargarTab("reportes")} color="#0EA5E9" icono="reportes">
-              Reportes
-            </SidebarButton>
-          )}
+          {ordenarMenu(menuPref)
+            .filter((m) => puedeVer(m.id) && !(menuPref.ocultas || []).includes(m.id))
+            .map((m) => (
+              <SidebarButton
+                key={m.id}
+                tour={m.id}
+                active={tab === m.id}
+                onClick={m.id === "documentos" ? irADocumentos : () => setTab(m.id)}
+                onMouseEnter={() => precargarTab(m.id)}
+                color={m.color}
+                icono={m.id}
+              >
+                {m.nombre}
+              </SidebarButton>
+            ))}
           {usuarioActual.rol === "Administrador" && (
-            <SidebarButton active={tab === "usuarios"} onClick={() => setTab("usuarios")} onMouseEnter={() => precargarTab("usuarios")} color="#6B7480" icono="usuarios">
+            <SidebarButton tour="usuarios" active={tab === "usuarios"} onClick={() => setTab("usuarios")} onMouseEnter={() => precargarTab("usuarios")} color="#6B7480" icono="usuarios">
               Usuarios y permisos
             </SidebarButton>
           )}
           {usuarioActual.es_superadmin && (
-            <SidebarButton active={tab === "plataforma"} onClick={() => setTab("plataforma")} onMouseEnter={() => precargarTab("plataforma")} color="#DC2626" icono="usuarios">
+            <SidebarButton tour="plataforma" active={tab === "plataforma"} onClick={() => setTab("plataforma")} onMouseEnter={() => precargarTab("plataforma")} color="#DC2626" icono="usuarios">
               Plataforma
             </SidebarButton>
           )}
@@ -9744,6 +9804,9 @@ function App() {
           subiendoFotoPerfil={subiendoFotoPerfil}
           cambiarFotoPerfil={cambiarFotoPerfil}
           onCerrar={() => setMostrarMiDespacho(false)}
+          menuPref={menuPref}
+          onGuardarMenu={guardarMenuPref}
+          puedeVer={puedeVer}
           onDespachoRenombrado={(nuevoNombre) => setUsuarioActual((prev) => (prev ? { ...prev, despachoNombre: nuevoNombre } : prev))}
         />
       )}
@@ -9847,6 +9910,7 @@ function App() {
             )}
             </div>
             <a
+              data-tour="ayuda"
               href={URL_GUIA_NOMOS}
               target="_blank"
               rel="noreferrer"
