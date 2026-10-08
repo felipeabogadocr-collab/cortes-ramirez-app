@@ -11,7 +11,7 @@ const PASOS_SECCIONES = [
   { id: "agenda", titulo: "Agenda", texto: "Crea citas, audiencias y recordatorios. Se pueden sincronizar con Google Calendar y llevar enlace de Google Meet automático." },
   { id: "clientes", titulo: "Clientes", texto: "La ficha de cada cliente: datos, radicados, plan de pagos, línea de tiempo del caso y el botón para compartirle su portal privado." },
   { id: "vigilancia", titulo: "Vigilancia judicial", texto: "Nomos revisa tus radicados en la Rama Judicial y te avisa cuando hay una actuación nueva, sin que tengas que entrar a buscar." },
-  { id: "antecedentes", titulo: "Antecedentes", texto: "Las 7 consultas oficiales (Policía, Procuraduría, Contraloría, RUES, RUNT, RNMC y SIMIT): escribe el dato, cópialo y abre el portal oficial." },
+  { id: "antecedentes", titulo: "Antecedentes", texto: "Más de 15 consultas oficiales (Policía, Procuraduría, Contraloría, REDAM, DIAN, RUNT, SIMIT y más): escribe el dato, cópialo y abre el portal oficial." },
   { id: "contabilidad", titulo: "Contabilidad", texto: "Registra pagos con su recibo, controla saldos, cuotas y gastos del despacho, y envía recibos por WhatsApp." },
   { id: "calculadora", titulo: "Calculadora de precios", texto: "Calcula honorarios y arma la propuesta de pago con anticipo y cuotas antes de cerrar con un cliente." },
   { id: "contenido", titulo: "Calendario de contenido", texto: "Planea las publicaciones de redes sociales del despacho y genera ideas con IA." },
