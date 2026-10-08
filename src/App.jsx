@@ -1354,7 +1354,7 @@ export function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-export const APP_VERSION = "1.165.0";
+export const APP_VERSION = "1.166.0";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -9030,6 +9030,10 @@ function App() {
   const [modoPublico, setModoPublico] = useState(isFirmaView);
   const [modoPortal, setModoPortal] = useState(isPortalView);
   const [usuarioActual, setUsuarioActual] = useState(null);
+  // Copia del usuario actual que se puede leer dentro de callbacks sin
+  // volver a crearlos (ver cargarPerfilActual y onAuthStateChange).
+  const usuarioActualRef = useRef(null);
+  usuarioActualRef.current = usuarioActual;
   const [ultimaSesionAnterior, setUltimaSesionAnterior] = useState(null);
   const [sesionCargada, setSesionCargada] = useState(false);
   const [errorCargaPerfil, setErrorCargaPerfil] = useState(null);
@@ -9237,7 +9241,18 @@ function App() {
   const cargarPerfilActual = useCallback(async (registrarLogin) => {
     const {
       data: { user },
+      error: errorUsuario,
     } = await supabase.auth.getUser();
+    // Al volver a la pestaña tras un rato (computador o celular que se
+    // despierta), la conexión suele tardar un segundo en volver: getUser
+    // falla por red aunque la sesión siga vigente. Antes eso se trataba
+    // como "sin sesión" y sacaba al usuario a la pantalla de ingreso,
+    // perdiendo lo que estaba haciendo. Si ya había alguien adentro y el
+    // error no es de sesión, se deja todo como estaba.
+    const yaHabiaUsuario = !!usuarioActualRef.current;
+    if (!user && yaHabiaUsuario && errorUsuario && errorUsuario.name !== "AuthSessionMissingError" && errorUsuario.status !== 401 && errorUsuario.status !== 403) {
+      return;
+    }
     if (!user) {
       setDespachoActual(null);
       setUsuarioActual(null);
@@ -9276,6 +9291,12 @@ function App() {
         .maybeSingle();
       perfil = reintento.data;
       errorPerfil = reintento.error;
+    }
+    if (errorPerfil && usuarioActualRef.current?.id === user.id) {
+      // Recarga en segundo plano que falló (red caída un momento): se
+      // conserva el perfil que ya estaba cargado en vez de sacar al usuario.
+      console.error("No se pudo refrescar el perfil (se conserva el actual):", errorPerfil);
+      return;
     }
     if (errorPerfil) {
       // Si esto falla en silencio (p. ej. porque la base de datos no tiene
@@ -9351,11 +9372,19 @@ function App() {
       await cargarPerfilActual(false);
       setSesionCargada(true);
     })();
-    const { data: suscripcion } = supabase.auth.onAuthStateChange((event) => {
+    const { data: suscripcion } = supabase.auth.onAuthStateChange((event, sesion) => {
       if (event === "PASSWORD_RECOVERY") {
         setModoRecuperacion(true);
         return;
       }
+      // Supabase renueva el token solo y, en varias versiones, vuelve a
+      // emitir "SIGNED_IN" cada vez que la pestaña recupera el foco. Recargar
+      // el perfil en cada uno de esos eventos rehacía el panel y, si la red
+      // fallaba justo ahí, sacaba al usuario. Solo se recarga cuando de
+      // verdad cambia la sesión: salida, cambio de datos del usuario, o un
+      // ingreso de alguien distinto al que ya está adentro.
+      if (event === "TOKEN_REFRESHED" || event === "INITIAL_SESSION") return;
+      if (event === "SIGNED_IN" && sesion?.user?.id && sesion.user.id === usuarioActualRef.current?.id) return;
       cargarPerfilActual(event === "SIGNED_IN");
     });
     return () => suscripcion.subscription.unsubscribe();
