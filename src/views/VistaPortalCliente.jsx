@@ -436,7 +436,7 @@ export default function VistaPortalCliente() {
 
   // ---------- Portal ----------
   return (
-    <div style={{ minHeight: "100%", background: COLORS.bg, paddingBottom: 48 }}>
+    <div style={{ minHeight: "100%", background: COLORS.bg, paddingBottom: 96 }}>
       {/* Encabezado */}
       <header style={{ background: `radial-gradient(900px 400px at 85% -20%, #1F7A66 0%, transparent 60%), linear-gradient(160deg, #0F4C41 0%, ${VERDE_PROFUNDO} 55%, #06231E 100%)`, padding: "22px 20px 86px", position: "relative", overflow: "hidden" }}>
         <div style={{ position: "absolute", inset: 0, backgroundImage: "radial-gradient(rgba(255,255,255,0.06) 1px, transparent 1px)", backgroundSize: "18px 18px", pointerEvents: "none" }} />
@@ -962,10 +962,36 @@ export default function VistaPortalCliente() {
           )}
         </div>
 
-        <p style={{ ...fuente, fontSize: 11.5, color: COLORS.muted, textAlign: "center", margin: "28px 0 0", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
-          <Icono tipo="escudo" size={12} /> Información confidencial · Protegida por la Ley 1581 de 2012 · Con tecnología Nomos
-        </p>
+        <footer style={{ margin: "32px 0 0", paddingTop: 20, borderTop: `1px solid ${COLORS.border}`, display: "flex", flexDirection: "column", alignItems: "center", gap: 10, textAlign: "center" }}>
+          {logoUrl && <img src={logoUrl} alt={despacho.nombre || ""} style={{ height: 44, maxWidth: 180, objectFit: "contain" }} />}
+          {despacho.nombre && <p style={{ ...fuente, fontSize: 13, fontWeight: 700, color: COLORS.ink, margin: 0 }}>{despacho.nombre}</p>}
+          <p style={{ ...fuente, fontSize: 11.5, color: COLORS.muted, margin: 0, display: "flex", alignItems: "center", gap: 6 }}>
+            <Icono tipo="escudo" size={12} /> Información confidencial · Ley 1581 de 2012
+          </p>
+          <div style={{ display: "flex", alignItems: "center", gap: 7, marginTop: 4, color: COLORS.muted }}>
+            <span style={{ ...fuente, fontSize: 11 }}>Con tecnología de</span>
+            <span style={{ color: "#3E7C7C", display: "flex" }}>
+              <IconoNomos size={16} />
+            </span>
+            <span style={{ ...fuente, fontSize: 13, fontWeight: 800, color: COLORS.headingText }}>Nomos</span>
+          </div>
+        </footer>
       </div>
+
+      {whatsapp && (
+        <a
+          href={wa(`${saludo} Te escribo desde mi portal.`)}
+          target="_blank"
+          rel="noreferrer"
+          aria-label={`Escribir por WhatsApp a ${despacho.nombre || "mi abogado"}`}
+          style={{ position: "fixed", right: "calc(18px + var(--sar, 0px))", bottom: "calc(18px + var(--sab, 0px))", zIndex: 20, display: "flex", alignItems: "center", gap: 8, background: "#1DA851", color: "#FFFFFF", textDecoration: "none", borderRadius: 999, padding: "12px 18px 12px 14px", boxShadow: "0 12px 28px -8px rgba(29,168,81,0.7)", ...fuente, fontSize: 14, fontWeight: 800 }}
+        >
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="#FFFFFF" aria-hidden="true">
+            <path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm0 18.2a8.2 8.2 0 0 1-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.2-.4.2-.4.7-1.3.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3 3 3 0 0 0-.9 2.2 5.2 5.2 0 0 0 1.1 2.7 11.8 11.8 0 0 0 4.5 4c1.7.7 2.3.8 3.1.6.5-.1 1.5-.6 1.7-1.2.2-.6.2-1.1.2-1.2-.1-.1-.3-.2-.5-.3z" />
+          </svg>
+          WhatsApp
+        </a>
+      )}
     </div>
   );
 }
