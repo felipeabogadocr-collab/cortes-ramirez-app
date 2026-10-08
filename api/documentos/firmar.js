@@ -34,28 +34,39 @@ function obtenerIp(req) {
 // cliente dueño de "codigo" (el mismo código de acceso del portal) antes
 // de generar una URL firmada de corta duración — nunca se expone el
 // bucket completo ni la ruta de otro cliente.
+// Busca al cliente por el código corto del portal (8 caracteres) o por el
+// id completo de los enlaces viejos.
+async function buscarClientePortal(admin, codigo, columnas) {
+  const consulta = () => admin.from("clientes").select(columnas).is("eliminado_en", null);
+  let r = await consulta().eq("id", codigo).maybeSingle();
+  const corto = String(codigo).trim().replace(/-/g, "").toUpperCase();
+  if (!r.data && !r.error && /^[A-Z0-9]{8}$/.test(corto)) {
+    r = await consulta().eq("data->>codigoPortal", corto).maybeSingle();
+  }
+  return r;
+}
+
+// Logo del despacho para el encabezado del Portal del cliente (el bucket
+// "logos" es privado: se entrega una URL firmada de corta duración).
+async function manejarLogo(req, res, admin) {
+  const { codigo } = req.query || {};
+  if (!codigo) return res.status(400).json({ error: "Faltan datos" });
+  const { data: cliente } = await buscarClientePortal(admin, codigo, "despacho_id");
+  if (!cliente?.despacho_id) return res.status(404).json({ error: "No encontrado" });
+  const { data: despacho } = await admin.from("despachos").select("logo_ruta").eq("id", cliente.despacho_id).maybeSingle();
+  if (!despacho?.logo_ruta) return res.status(404).json({ error: "Sin logo" });
+  const { data: firmada, error } = await admin.storage.from("logos").createSignedUrl(despacho.logo_ruta, 3600);
+  if (error || !firmada?.signedUrl) return res.status(404).json({ error: "Sin logo" });
+  return res.status(200).json({ url: firmada.signedUrl });
+}
+
 async function manejarRecibo(req, res, admin) {
   const { codigo, pagoId } = req.query || {};
   if (!codigo || !pagoId) {
     return res.status(400).json({ error: "Faltan datos" });
   }
 
-  // Código corto del portal (8 caracteres) o el id completo de enlaces viejos.
-  const corto = String(codigo).trim().replace(/-/g, "").toUpperCase();
-  let { data: cliente, error: errorCliente } = await admin
-    .from("clientes")
-    .select("data")
-    .eq("id", codigo)
-    .is("eliminado_en", null)
-    .maybeSingle();
-  if (!cliente && !errorCliente && /^[A-Z0-9]{8}$/.test(corto)) {
-    ({ data: cliente, error: errorCliente } = await admin
-      .from("clientes")
-      .select("data")
-      .eq("data->>codigoPortal", corto)
-      .is("eliminado_en", null)
-      .maybeSingle());
-  }
+  const { data: cliente, error: errorCliente } = await buscarClientePortal(admin, codigo, "data");
   if (errorCliente || !cliente) {
     return res.status(404).json({ error: "No encontrado" });
   }
@@ -119,6 +130,12 @@ export default async function handler(req, res) {
       return res.status(429).json({ error: "Demasiados intentos. Espera un momento e inténtalo de nuevo." });
     }
     return manejarRecibo(req, res, admin);
+  }
+  if (req.method === "GET" && req.query?.accion === "logo-portal") {
+    const admin = supabaseAdmin();
+    const puedeContinuar = await dentroDelLimite(admin, req, "documentos/firmar", 20, 60);
+    if (!puedeContinuar) return res.status(429).json({ error: "Demasiados intentos." });
+    return manejarLogo(req, res, admin);
   }
 
   if (req.method !== "POST") {
