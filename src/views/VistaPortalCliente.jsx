@@ -8,13 +8,12 @@ import {
   COLOR_AREA_PROCESO,
   buttonPrimary,
   inputStyle,
-  consultarRamaJudicial,
   formatoCOP,
 } from "../App.jsx";
 
 // Portal del cliente: lo que ve el cliente final con su código de acceso.
 // Todo sale del RPC obtener_portal_cliente (security definer, sin notas
-// internas) y, para el estado judicial, de la consulta pública de la Rama.
+// internas). Lo del caso es solo lo que el abogado escribe en la línea de tiempo.
 
 const VERDE_PROFUNDO = "#0B3B33";
 const DORADO = "#C9A24B";
@@ -51,21 +50,6 @@ function numeroWhatsapp(celular) {
   return d.length === 10 ? `57${d}` : d;
 }
 
-// Etapas generales de un proceso. Se infiere en cuál va a partir de lo que
-// hay registrado (radicado, actuaciones y su texto); es orientativo.
-const ETAPAS = [
-  { titulo: "Estudio del caso", detalle: "Tu abogado revisa los hechos, las pruebas y la estrategia." },
-  { titulo: "Radicación", detalle: "La demanda o solicitud se presenta ante la autoridad." },
-  { titulo: "En trámite", detalle: "El juzgado o la entidad avanza con autos, notificaciones y audiencias." },
-  { titulo: "Decisión", detalle: "Se profiere sentencia o decisión de fondo." },
-];
-function etapaActual(cliente, ramaInfo) {
-  const textos = [...(ramaInfo?.actuaciones || []).map((a) => `${a.actuacion} ${a.anotacion || ""}`), ...(cliente.actuaciones || []).map((a) => a.nota)].join(" ").toLowerCase();
-  if (/sentencia|fallo|decisi[oó]n de fondo|archiv/.test(textos)) return 3;
-  if ((ramaInfo?.actuaciones || []).length > 1 || /audiencia|admite|admisi[oó]n|traslado|notific/.test(textos)) return 2;
-  if (cliente.radicado) return 1;
-  return 0;
-}
 
 const GLOSARIO = [
   ["Auto", "Decisión del juez para impulsar el proceso (admitir, pedir pruebas, fijar fechas). No es la sentencia."],
@@ -79,7 +63,7 @@ const GLOSARIO = [
 ];
 
 const PREGUNTAS = [
-  ["¿Cada cuánto se actualiza esta información?", "El estado en la Rama Judicial se consulta en vivo cada vez que entras. Las novedades las escribe tu abogado cuando hay avances."],
+  ["¿Cada cuánto se actualiza esta información?", "Las novedades de tu caso las escribe tu abogado cada vez que hay un avance, y las ves aquí apenas las publica."],
   ["¿Por qué el proceso tarda tanto?", "Los tiempos los marca el juzgado o la entidad, no el despacho. Es normal que pasen semanas entre una actuación y otra."],
   ["¿Mi información está segura?", "Sí. Solo se ve con tu código personal, y tus datos se tratan según la Ley 1581 de 2012 de protección de datos."],
   ["¿Qué hago si cambia mi teléfono o correo?", "Escríbele a tu abogado con el botón de WhatsApp para que actualice tus datos."],
@@ -246,10 +230,6 @@ export default function VistaPortalCliente() {
   const [contrato, setContrato] = useState(null);
   const [descargandoContrato, setDescargandoContrato] = useState(false);
 
-  const [ramaInfo, setRamaInfo] = useState(null);
-  const [consultandoRama, setConsultandoRama] = useState(false);
-  const [errorRama, setErrorRama] = useState("");
-  const [verTodasRama, setVerTodasRama] = useState(false);
   const [descargandoRecibo, setDescargandoRecibo] = useState(null);
   const [errorRecibo, setErrorRecibo] = useState("");
   const [copiado, setCopiado] = useState("");
@@ -273,7 +253,6 @@ export default function VistaPortalCliente() {
     setBuscando(true);
     setNotFound(false);
     setCliente(null);
-    setRamaInfo(null);
     setLogoUrl("");
     setContrato(null);
     const { data, error } = await supabase.rpc("obtener_portal_cliente", { p_id: code });
@@ -290,7 +269,6 @@ export default function VistaPortalCliente() {
       guardarUltimoDespacho(cambios);
       setUltimoDespacho(leerUltimoDespacho());
     }
-    if (data.radicado) consultarRama(data.radicado);
     if (data.despacho?.tieneLogo) cargarLogo(code);
     fetch(`/api/documentos/firmar?accion=contrato-portal&solo=info&codigo=${encodeURIComponent(code)}`)
       .then((r) => r.json())
@@ -320,21 +298,10 @@ export default function VistaPortalCliente() {
     }
   };
 
-  const consultarRama = async (radicado) => {
-    setConsultandoRama(true);
-    setErrorRama("");
-    try {
-      setRamaInfo(await consultarRamaJudicial(radicado));
-    } catch (e) {
-      setErrorRama("La Rama Judicial no respondió en este momento. Intenta de nuevo en un rato.");
-    }
-    setConsultandoRama(false);
-  };
 
   const salir = () => {
     setCliente(null);
     setCodigo("");
-    setRamaInfo(null);
     setLogoUrl("");
   };
 
@@ -421,9 +388,7 @@ export default function VistaPortalCliente() {
   const proximaCita = citas[0];
   const novedades = cliente?.actuaciones || [];
   const radicados = (cliente?.radicados?.length ? cliente.radicados : cliente?.radicado ? [cliente.radicado] : []).filter(Boolean);
-  const etapa = cliente ? etapaActual(cliente, ramaInfo) : 0;
   const colorArea = COLOR_AREA_PROCESO[cliente?.areaProceso] || "#34D399";
-  const ultimaRama = ramaInfo?.ultimaActuacion;
 
   // Lo que el cliente debería atender primero.
   const pendientes = [];
@@ -570,7 +535,7 @@ export default function VistaPortalCliente() {
         {/* Indicadores */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10, marginBottom: 14 }}>
           {[
-            { icono: "balanza", color: "#2F80ED", etiqueta: "Etapa", valor: ETAPAS[etapa].titulo, ir: "proceso" },
+            { icono: "chat", color: "#6366F1", etiqueta: "Última novedad", valor: novedades[0] ? haceCuanto(novedades[0].fecha).replace(/^./, (c) => c.toUpperCase()) : "Sin novedades aún", ir: "proceso" },
             { icono: "calendario", color: "#7C3AED", etiqueta: "Próxima cita", valor: proximaCita ? `${fechaCorta(proximaCita.fecha)}${proximaCita.hora ? ` · ${proximaCita.hora}` : ""}` : "Sin agendar", ir: "resumen" },
             { icono: "tarjeta", color: "#10B981", etiqueta: saldo > 0 ? "Próximo pago" : "Pagos", valor: saldo > 0 ? (proximoPago ? fechaCorta(proximoPago) : formatoCOP(saldo)) : valorTotal > 0 ? "Al día" : `${pagos.length} registrados`, ir: "pagos" },
             { icono: "clip", color: "#F59E0B", etiqueta: "Documentos", valor: documentos.length ? `${documentos.length - docsPendientes.length}/${documentos.length} firmados` : "Ninguno aún", ir: "documentos" },
@@ -631,47 +596,14 @@ export default function VistaPortalCliente() {
                 </Tarjeta>
               )}
 
-              <Tarjeta>
-                <Encabezado icono="objetivo" color="#2F80ED" titulo="¿En qué va mi caso?" subtitulo="Etapa aproximada según las actuaciones registradas" />
-                <div style={{ display: "flex", flexDirection: "column" }}>
-                  {ETAPAS.map((e, i) => {
-                    const hecho = i < etapa;
-                    const actual = i === etapa;
-                    return (
-                      <div key={e.titulo} style={{ display: "flex", gap: 12 }}>
-                        <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
-                          <div style={{ width: 26, height: 26, borderRadius: "50%", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", background: hecho ? "#10B981" : actual ? "#2F80ED" : COLORS.surfaceSoft, color: hecho || actual ? "#FFFFFF" : COLORS.muted, border: hecho || actual ? "none" : `1px solid ${COLORS.border}`, boxShadow: actual ? "0 0 0 5px rgba(47,128,237,0.15)" : "none", ...fuente, fontSize: 12, fontWeight: 800 }}>
-                            {hecho ? <Icono tipo="check" size={13} /> : i + 1}
-                          </div>
-                          {i < ETAPAS.length - 1 && <div style={{ width: 2, flex: 1, minHeight: 18, background: hecho ? "#10B981" : COLORS.border, margin: "3px 0" }} />}
-                        </div>
-                        <div style={{ paddingBottom: i < ETAPAS.length - 1 ? 14 : 0 }}>
-                          <p style={{ ...fuente, fontSize: 14, fontWeight: 800, color: actual ? "#2F80ED" : hecho ? COLORS.headingText : COLORS.muted, margin: "3px 0 0" }}>
-                            {e.titulo}
-                            {actual && <span style={{ fontSize: 11, fontWeight: 700, marginLeft: 8, color: "#2F80ED", background: "rgba(47,128,237,0.1)", padding: "2px 8px", borderRadius: 20 }}>Aquí vamos</span>}
-                          </p>
-                          <p style={{ ...fuente, fontSize: 12.5, color: COLORS.muted, margin: "3px 0 0", lineHeight: 1.45 }}>{e.detalle}</p>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </Tarjeta>
 
-              {(novedades[0] || ultimaRama) && (
+              {novedades[0] && (
                 <Tarjeta>
                   <Encabezado icono="chispa" color="#6366F1" titulo="Lo último en tu caso" />
                   {novedades[0] && (
-                    <div style={{ borderRadius: 14, padding: 14, background: "rgba(99,102,241,0.07)", borderLeft: "3px solid #6366F1", marginBottom: ultimaRama ? 10 : 0 }}>
+                    <div style={{ borderRadius: 14, padding: 14, background: "rgba(99,102,241,0.07)", borderLeft: "3px solid #6366F1", marginBottom: 0 }}>
                       <p style={{ ...fuente, fontSize: 11, fontWeight: 700, color: "#6366F1", margin: 0, textTransform: "uppercase", letterSpacing: 0.6 }}>Nota de tu abogado · {fechaLarga(novedades[0].fecha)}</p>
                       <p style={{ ...fuente, fontSize: 13.5, color: COLORS.ink, margin: "6px 0 0", lineHeight: 1.55, whiteSpace: "pre-wrap" }}>{novedades[0].nota}</p>
-                    </div>
-                  )}
-                  {ultimaRama && (
-                    <div style={{ borderRadius: 14, padding: 14, background: "rgba(47,128,237,0.07)", borderLeft: "3px solid #2F80ED" }}>
-                      <p style={{ ...fuente, fontSize: 11, fontWeight: 700, color: "#2F80ED", margin: 0, textTransform: "uppercase", letterSpacing: 0.6 }}>Rama Judicial · {fechaLarga(ultimaRama.fecha)}</p>
-                      <p style={{ ...fuente, fontSize: 13.5, fontWeight: 700, color: COLORS.ink, margin: "6px 0 0" }}>{ultimaRama.actuacion}</p>
-                      {ultimaRama.anotacion && <p style={{ ...fuente, fontSize: 12.5, color: COLORS.inkSoft, margin: "4px 0 0", lineHeight: 1.5 }}>{ultimaRama.anotacion}</p>}
                     </div>
                   )}
                   <button type="button" onClick={() => setPestana("proceso")} style={{ ...fuente, marginTop: 12, background: "none", border: "none", color: "#2F80ED", fontWeight: 700, fontSize: 13, cursor: "pointer", padding: 0 }}>
@@ -756,9 +688,7 @@ export default function VistaPortalCliente() {
                   {[
                     ["Área", cliente.areaProceso && cliente.areaProceso !== "Otro" ? cliente.areaProceso : null],
                     ["Tipo de proceso", cliente.tipoProceso && cliente.tipoProceso !== "Otro" ? cliente.tipoProceso : null],
-                    ["Juzgado o entidad", cliente.juzgadoActual || ramaInfo?.proceso?.despacho],
-                    ["Departamento", ramaInfo?.proceso?.departamento],
-                    ["Partes", ramaInfo?.proceso?.sujetosProcesales],
+                    ["Juzgado o entidad", cliente.juzgadoActual],
                     ["Estado", cliente.procesoPausado ? "En pausa" : "Activo"],
                   ]
                     .filter(([, v]) => v)
@@ -786,43 +716,6 @@ export default function VistaPortalCliente() {
                 )}
               </Tarjeta>
 
-              {cliente.radicado && (
-                <Tarjeta>
-                  <Encabezado
-                    icono="balanza"
-                    color="#2F80ED"
-                    titulo="Actuaciones en la Rama Judicial"
-                    subtitulo={ramaInfo?.consultadoEn ? `Consultado ${new Date(ramaInfo.consultadoEn).toLocaleTimeString("es-CO", { hour: "numeric", minute: "2-digit" })}` : "Consulta en vivo"}
-                    accion={
-                      <button type="button" onClick={() => consultarRama(cliente.radicado)} disabled={consultandoRama} title="Actualizar" style={{ background: COLORS.surfaceSoft, border: `1px solid ${COLORS.border}`, borderRadius: 10, width: 34, height: 34, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: COLORS.inkSoft }}>
-                        <Icono tipo="refrescar" size={15} />
-                      </button>
-                    }
-                  />
-                  {consultandoRama && <p style={{ ...fuente, fontSize: 13, color: COLORS.muted }}>Consultando la Rama Judicial…</p>}
-                  {errorRama && <p style={{ ...fuente, fontSize: 13, color: "#B42318" }}>{errorRama}</p>}
-                  {ramaInfo && !ramaInfo.encontrado && <p style={{ ...fuente, fontSize: 13, color: COLORS.muted }}>Este radicado todavía no aparece en la consulta pública de la Rama Judicial.</p>}
-                  {ramaInfo?.encontrado && (
-                    <div style={{ position: "relative", paddingLeft: 20 }}>
-                      <div style={{ position: "absolute", left: 5, top: 6, bottom: 6, width: 2, background: COLORS.border }} />
-                      {(ramaInfo.actuaciones || []).slice(0, verTodasRama ? 15 : 5).map((a, i) => (
-                        <div key={i} style={{ position: "relative", paddingBottom: 14 }}>
-                          <div style={{ position: "absolute", left: -20, top: 3, width: 12, height: 12, borderRadius: "50%", background: i === 0 ? "#2F80ED" : COLORS.panel, border: "2px solid #2F80ED" }} />
-                          <p style={{ ...fuente, fontSize: 11.5, color: COLORS.muted, margin: 0 }}>{fechaLarga(a.fecha)}</p>
-                          <p style={{ ...fuente, fontSize: 13.5, fontWeight: 700, color: COLORS.ink, margin: "2px 0 0" }}>{a.actuacion}</p>
-                          {a.anotacion && <p style={{ ...fuente, fontSize: 12.5, color: COLORS.inkSoft, margin: "3px 0 0", lineHeight: 1.5 }}>{a.anotacion}</p>}
-                        </div>
-                      ))}
-                      {(ramaInfo.actuaciones || []).length > 5 && (
-                        <button type="button" onClick={() => setVerTodasRama(!verTodasRama)} style={{ ...fuente, background: "none", border: "none", color: "#2F80ED", fontWeight: 700, fontSize: 13, cursor: "pointer", padding: 0 }}>
-                          {verTodasRama ? "Ver menos" : `Ver las ${ramaInfo.actuaciones.length} actuaciones`}
-                        </button>
-                      )}
-                    </div>
-                  )}
-                  <p style={{ ...fuente, fontSize: 11.5, color: COLORS.muted, margin: "10px 0 0", lineHeight: 1.45 }}>¿No entiendes algún término? Revisa el glosario en la pestaña Ayuda.</p>
-                </Tarjeta>
-              )}
 
               <Tarjeta>
                 <Encabezado icono="chat" color="#6366F1" titulo="Novedades de tu abogado" subtitulo="Explicadas en palabras sencillas" />
