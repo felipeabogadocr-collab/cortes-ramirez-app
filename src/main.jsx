@@ -6,6 +6,11 @@ import "./index.css";
 
 const LLAVE_RECARGA_CHUNK = "nomos-recarga-por-chunk";
 
+// Red de seguridad para el enlace corto del portal (/p/CODIGO): si por
+// alguna razón llega a la app en vez de al servidor, igual abre el portal.
+const enlaceCorto = window.location.pathname.match(/^\/p\/([^/]+)\/?$/);
+if (enlaceCorto) window.history.replaceState(null, "", `/?codigo=${enlaceCorto[1]}#portal`);
+
 // Sin esto, el "autoUpdate" del plugin PWA no hacía nada por sí solo: el
 // service worker nuevo se instalaba en segundo plano (y sí quedaba
 // "activo" para próximas pestañas), pero la pestaña YA abierta seguía

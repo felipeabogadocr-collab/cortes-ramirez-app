@@ -42,7 +42,7 @@ export default defineConfig({
         // fallado (la promesa de "funciona sin internet" ya no se cumplía
         // para ese caso puntual).
         globPatterns: ["**/*.{js,css,html,png,webp,svg,woff2}"],
-        navigateFallbackDenylist: [/^\/api\//],
+        navigateFallbackDenylist: [/^\/api\//, /^\/p\//],
       },
     }),
   ],

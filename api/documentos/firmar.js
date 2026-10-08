@@ -74,6 +74,45 @@ async function manejarContrato(req, res, admin) {
   return res.status(200).json({ url: firmada.signedUrl });
 }
 
+// Enlace para compartir el portal: /p/CODIGO (reescrito aquí en vercel.json).
+// WhatsApp y las redes leen estas etiquetas para armar la tarjeta del
+// enlace con el nombre del despacho; la persona sigue de inmediato al portal.
+const escaparHtml = (t) => String(t || "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+async function manejarTarjetaPortal(req, res, admin) {
+  const codigo = String(req.query?.codigo || "").slice(0, 80);
+  const origen = `https://${req.headers.host}`;
+  let despacho = "";
+  if (codigo) {
+    const { data: cliente } = await buscarClientePortal(admin, codigo, "despacho_id");
+    if (cliente?.despacho_id) {
+      const { data } = await admin.from("despachos").select("nombre").eq("id", cliente.despacho_id).maybeSingle();
+      despacho = data?.nombre || "";
+    }
+  }
+  const destino = `${origen}/?codigo=${encodeURIComponent(codigo)}#portal`;
+  const titulo = despacho ? `${despacho} · Portal del cliente` : "Portal del cliente · Nomos";
+  const descripcion = `Consulta tu proceso, pagos, citas y documentos${despacho ? ` con ${despacho}` : ""}. Con tecnología de Nomos.`;
+  const imagen = `${origen}/og-portal.png`;
+  res.setHeader("Content-Type", "text/html; charset=utf-8");
+  res.setHeader("Cache-Control", "public, max-age=300");
+  return res.status(200).send(`<!doctype html><html lang="es"><head><meta charset="utf-8">
+<title>${escaparHtml(titulo)}</title>
+<meta name="robots" content="noindex">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Nomos">
+<meta property="og:title" content="${escaparHtml(titulo)}">
+<meta property="og:description" content="${escaparHtml(descripcion)}">
+<meta property="og:image" content="${imagen}">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="${escaparHtml(titulo)}">
+<meta name="twitter:description" content="${escaparHtml(descripcion)}">
+<meta name="twitter:image" content="${imagen}">
+<meta http-equiv="refresh" content="0;url=${escaparHtml(destino)}">
+</head><body><a href="${escaparHtml(destino)}">Entrar a mi portal</a></body></html>`);
+}
+
 async function manejarRecibo(req, res, admin) {
   const { codigo, pagoId } = req.query || {};
   if (!codigo || !pagoId) {
@@ -144,6 +183,9 @@ export default async function handler(req, res) {
       return res.status(429).json({ error: "Demasiados intentos. Espera un momento e inténtalo de nuevo." });
     }
     return manejarRecibo(req, res, admin);
+  }
+  if (req.method === "GET" && req.query?.accion === "tarjeta-portal") {
+    return manejarTarjetaPortal(req, res, supabaseAdmin());
   }
   if (req.method === "GET" && req.query?.accion === "contrato-portal") {
     const admin = supabaseAdmin();

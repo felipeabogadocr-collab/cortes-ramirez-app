@@ -731,7 +731,9 @@ export function VentanaCompartirPortal({ clienteId, cliente, onCerrar, onActuali
   }, []);
   const codigoMostrado = codigoCorto ? formatoCodigoPortal(codigoCorto) : clienteId;
   const numero = numeroWhatsappCliente(cliente.telefono);
-  const link = `${window.location.origin}/?codigo=${encodeURIComponent(codigoCorto || clienteId)}#portal`;
+  // /p/CODIGO arma la tarjeta del enlace (nombre del despacho + Nomos) y
+  // lleva directo al portal.
+  const link = `${window.location.origin}/p/${encodeURIComponent(codigoCorto || clienteId)}`;
   // Sin emojis a propósito: los de secuencia compuesta (como 1️⃣2️⃣) no se ven
   // bien en todos los WhatsApp y salían como "�".
   const mensaje = `*${getNombreDespacho()}*\n\nHola ${cliente.nombre || ""}, te compartimos acceso a tu portal personal. Ahí puedes consultar el estado de tu proceso, tus pagos y tus documentos cuando quieras.\n\nEntra con este enlace (ya trae tu código):\n${link}\n\nSi te pide el código de acceso, es este:\n${codigoMostrado}`;

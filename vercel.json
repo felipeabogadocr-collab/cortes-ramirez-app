@@ -3,6 +3,7 @@
     { "path": "/api/cron/vigilancia-judicial", "schedule": "0 13 * * *" }
   ],
   "rewrites": [
+    { "source": "/p/:codigo", "destination": "/api/documentos/firmar?accion=tarjeta-portal&codigo=:codigo" },
     { "source": "/(.*)", "destination": "/index.html" }
   ],
   "headers": [
