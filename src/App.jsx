@@ -1355,7 +1355,7 @@ export function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-export const APP_VERSION = "1.168.0";
+export const APP_VERSION = "1.169.0";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -5145,6 +5145,20 @@ export function LineaDeTiempo({ cliente, onAgregar, onEditarFecha, onEditarNota,
       ) : (
         <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.muted, marginBottom: 10 }}>Sin actuaciones registradas todavía.</p>
       )}
+      {/* Atajos: lo que antes se cargaba como documento ahora se anota aquí y
+          el cliente lo ve en su portal (pestaña Proceso). */}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 8 }}>
+        {["Documento enviado a ", "Documento recibido de ", "Se radicó ante ", "La entidad respondió: ", "Audiencia programada para "].map((t) => (
+          <button
+            key={t}
+            type="button"
+            onClick={() => setNota((n) => (n.trim() ? `${n.trim()}\n${t}` : t))}
+            style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, fontWeight: 600, padding: "4px 10px", borderRadius: 20, border: `1px solid ${COLORS.border}`, background: COLORS.surfaceSoft, color: COLORS.inkSoft, cursor: "pointer" }}
+          >
+            + {t.replace(/[:\s]+$/, "")}
+          </button>
+        ))}
+      </div>
       <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
         <input
           type="date"

@@ -53,6 +53,18 @@ export async function subirReciboImagen(clienteId, pagoId, blob) {
   return ruta;
 }
 
+// Contrato del cliente para su portal (PDF o imagen). Va al mismo bucket
+// privado de los recibos, en la carpeta del despacho; el portal lo descarga
+// con una URL firmada que entrega el servidor.
+export async function subirContratoCliente(clienteId, archivo) {
+  if (!despachoActualId) throw new Error("Sin despacho activo");
+  const ext = (archivo.name.split(".").pop() || "pdf").toLowerCase().replace(/[^a-z0-9]/g, "") || "pdf";
+  const ruta = `${despachoActualId}/${clienteId}/contrato.${ext}`;
+  const { error } = await supabase.storage.from("recibos").upload(ruta, archivo, { contentType: archivo.type || "application/pdf", upsert: true });
+  if (error) throw error;
+  return ruta;
+}
+
 export async function obtenerUrlReciboImagen(ruta) {
   if (!ruta) return null;
   const { data, error } = await supabase.storage.from("recibos").download(ruta);

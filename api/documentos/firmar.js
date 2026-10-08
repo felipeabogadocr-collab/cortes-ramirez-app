@@ -60,6 +60,20 @@ async function manejarLogo(req, res, admin) {
   return res.status(200).json({ url: firmada.signedUrl });
 }
 
+// Contrato del cliente para descargar desde su portal. Sin pagoId:
+// ?accion=contrato-portal&codigo=...  (&solo=info solo dice si existe).
+async function manejarContrato(req, res, admin) {
+  const { codigo, solo } = req.query || {};
+  if (!codigo) return res.status(400).json({ error: "Faltan datos" });
+  const { data: cliente } = await buscarClientePortal(admin, codigo, "data");
+  const contrato = cliente?.data?.contrato;
+  if (!contrato?.ruta) return res.status(200).json({ disponible: false });
+  if (solo === "info") return res.status(200).json({ disponible: true, nombre: contrato.nombre || "Contrato", fecha: contrato.fecha || null });
+  const { data: firmada, error } = await admin.storage.from("recibos").createSignedUrl(contrato.ruta, 120, { download: contrato.nombre || true });
+  if (error || !firmada?.signedUrl) return res.status(404).json({ error: "No encontrado" });
+  return res.status(200).json({ url: firmada.signedUrl });
+}
+
 async function manejarRecibo(req, res, admin) {
   const { codigo, pagoId } = req.query || {};
   if (!codigo || !pagoId) {
@@ -130,6 +144,12 @@ export default async function handler(req, res) {
       return res.status(429).json({ error: "Demasiados intentos. Espera un momento e inténtalo de nuevo." });
     }
     return manejarRecibo(req, res, admin);
+  }
+  if (req.method === "GET" && req.query?.accion === "contrato-portal") {
+    const admin = supabaseAdmin();
+    const puedeContinuar = await dentroDelLimite(admin, req, "documentos/firmar", 20, 60);
+    if (!puedeContinuar) return res.status(429).json({ error: "Demasiados intentos." });
+    return manejarContrato(req, res, admin);
   }
   if (req.method === "GET" && req.query?.accion === "logo-portal") {
     const admin = supabaseAdmin();

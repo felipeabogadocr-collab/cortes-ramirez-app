@@ -222,6 +222,8 @@ export default function VistaPortalCliente() {
   const [notFound, setNotFound] = useState(false);
   const [pestana, setPestana] = useState("resumen");
   const [logoUrl, setLogoUrl] = useState("");
+  const [contrato, setContrato] = useState(null);
+  const [descargandoContrato, setDescargandoContrato] = useState(false);
 
   const [ramaInfo, setRamaInfo] = useState(null);
   const [consultandoRama, setConsultandoRama] = useState(false);
@@ -252,6 +254,7 @@ export default function VistaPortalCliente() {
     setCliente(null);
     setRamaInfo(null);
     setLogoUrl("");
+    setContrato(null);
     const { data, error } = await supabase.rpc("obtener_portal_cliente", { p_id: code });
     setBuscando(false);
     if (error || !data) {
@@ -262,6 +265,10 @@ export default function VistaPortalCliente() {
     setPestana("resumen");
     if (data.radicado) consultarRama(data.radicado);
     if (data.despacho?.tieneLogo) cargarLogo(code);
+    fetch(`/api/documentos/firmar?accion=contrato-portal&solo=info&codigo=${encodeURIComponent(code)}`)
+      .then((r) => r.json())
+      .then((info) => setContrato(info?.disponible ? info : null))
+      .catch(() => {});
   };
 
   // El bucket de logos es privado: el servidor da una URL firmada y aquí se
@@ -301,6 +308,18 @@ export default function VistaPortalCliente() {
       setCopiado(clave);
       setTimeout(() => setCopiado(""), 1500);
     });
+  };
+
+  const descargarContrato = async () => {
+    setDescargandoContrato(true);
+    try {
+      const r = await fetch(`/api/documentos/firmar?accion=contrato-portal&codigo=${encodeURIComponent(codigo.trim())}`);
+      const { url } = await r.json();
+      if (url) window.open(url, "_blank", "noopener");
+    } catch (e) {
+      // sin conexión: el botón queda disponible para reintentar
+    }
+    setDescargandoContrato(false);
   };
 
   const descargarRecibo = async (pago) => {
@@ -361,7 +380,7 @@ export default function VistaPortalCliente() {
   const cuotasVencidas = cuotas.filter((c) => c.vencida);
 
   const documentos = cliente?.documentos || [];
-  const tieneContrato = documentos.some((d) => /contrato/i.test(d.titulo || ""));
+  const tieneContrato = !!contrato || documentos.some((d) => /contrato/i.test(d.titulo || ""));
   const docsPendientes = documentos.filter((d) => !d.firmado);
   const citas = cliente?.citas || [];
   const proximaCita = citas[0];
@@ -879,6 +898,20 @@ export default function VistaPortalCliente() {
             <Tarjeta>
               <Encabezado icono="clip" color="#F59E0B" titulo="Mis documentos" subtitulo={documentos.length ? `${documentos.length - docsPendientes.length} de ${documentos.length} firmados` : null} />
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {contrato && (
+                  <div style={{ display: "flex", alignItems: "center", gap: 12, padding: 12, borderRadius: 14, border: `1px solid ${COLORS.border}`, flexWrap: "wrap" }}>
+                    <div style={{ width: 40, height: 48, borderRadius: 8, background: "rgba(62,124,124,0.12)", color: "#3E7C7C", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                      <Icono tipo="documento" size={18} />
+                    </div>
+                    <div style={{ flex: "1 1 160px", minWidth: 0 }}>
+                      <p style={{ ...fuente, fontSize: 13.5, fontWeight: 700, color: COLORS.ink, margin: 0 }}>Contrato de prestación de servicios</p>
+                      <p style={{ ...fuente, fontSize: 12, color: COLORS.muted, margin: "3px 0 0" }}>{contrato.fecha ? `Cargado el ${fechaLarga(contrato.fecha)}` : contrato.nombre}</p>
+                    </div>
+                    <BotonAccion onClick={descargarContrato} color="#3E7C7C" style={{ padding: "8px 14px", fontSize: 12.5 }}>
+                      {descargandoContrato ? "Abriendo…" : "Descargar ↓"}
+                    </BotonAccion>
+                  </div>
+                )}
                 {!tieneContrato && (
                   <div style={{ border: `1.5px dashed ${COLORS.border}`, borderRadius: 14, padding: 16, display: "flex", gap: 14, alignItems: "flex-start", flexWrap: "wrap" }}>
                     <div style={{ width: 44, height: 54, borderRadius: 8, border: `1.5px dashed ${COLORS.border}`, display: "flex", alignItems: "center", justifyContent: "center", color: COLORS.muted, flexShrink: 0 }}>

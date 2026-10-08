@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from "react";
-import { storageSet, getNombreDespacho, obtenerClientesPorId } from "../lib/storage";
+import { storageSet, getNombreDespacho, obtenerClientesPorId, subirContratoCliente } from "../lib/storage";
 import {
   COLORS, uid, registrarAuditoria, diasDesde, exportarCSV, useIndex, useConfirmarDialogo,
   useAvisoAntesDeSalir, useUsuariosDespacho, Field, inputStyle, CampoDinero, buttonPrimary,
@@ -666,6 +666,47 @@ export function VentanaRegistrarPago({ clienteId, cliente, usuarioActual, onRegi
 // Compartir el portal: muestra el mensaje antes de enviarlo, con WhatsApp
 // directo y botones para copiar el mensaje o solo el código. El link ya
 // lleva el código, así el cliente entra con un solo toque sin copiar nada.
+// Contrato que el cliente ve y descarga en su portal. Es el único
+// documento que se carga para el portal; lo demás (documentos enviados,
+// recibidos, radicaciones) se anota en la línea de tiempo.
+const TAMANO_MAX_CONTRATO_MB = 8;
+function BotonContrato({ id, cliente, onActualizar }) {
+  const [subiendo, setSubiendo] = useState(false);
+  const [error, setError] = useState("");
+  const subir = async (e) => {
+    const archivo = e.target.files?.[0];
+    e.target.value = "";
+    if (!archivo) return;
+    if (archivo.size > TAMANO_MAX_CONTRATO_MB * 1024 * 1024) {
+      setError(`Máximo ${TAMANO_MAX_CONTRATO_MB} MB`);
+      return;
+    }
+    setSubiendo(true);
+    setError("");
+    try {
+      const ruta = await subirContratoCliente(id, archivo);
+      const actualizado = { ...cliente, contrato: { ruta, nombre: archivo.name, fecha: new Date().toISOString() } };
+      await storageSet(`cliente:${id}`, JSON.stringify(actualizado), false);
+      onActualizar(actualizado);
+    } catch (err) {
+      setError("No se pudo subir. Intenta de nuevo.");
+    }
+    setSubiendo(false);
+  };
+  const tiene = !!cliente.contrato?.ruta;
+  return (
+    <label
+      className="drx-btn-ghost"
+      title={tiene ? `Contrato cargado: ${cliente.contrato.nombre}. Toca para reemplazarlo.` : "Subir el contrato para que el cliente lo descargue en su portal"}
+      style={{ ...buttonGhost, cursor: subiendo ? "wait" : "pointer", color: error ? "#B42318" : tiene ? "#166534" : undefined, display: "inline-flex", alignItems: "center", gap: 5 }}
+    >
+      <Icono tipo="documento" size={13} />
+      {subiendo ? "Subiendo…" : error || (tiene ? "Contrato ✓" : "Subir contrato")}
+      <input type="file" accept="application/pdf,image/*,.doc,.docx" onChange={subir} disabled={subiendo} style={{ display: "none" }} />
+    </label>
+  );
+}
+
 // Código corto del portal: 8 caracteres sin letras/números que se confunden
 // (0/O, 1/I/L), mostrado como ABCD-2345. Se crea la primera vez que se comparte.
 const ALFABETO_CODIGO = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
@@ -1697,11 +1738,12 @@ export default function ClientesTab({ usuarioActual, onIrARegistrarPago, onListo
                   >
                     Compartir portal ↗
                   </button>
+                  <BotonContrato id={id} cliente={c} onActualizar={(act) => setClientes((prev) => ({ ...prev, [id]: act }))} />
                   <button
                     className="drx-btn-ghost"
                     style={buttonGhost}
                     title="Copiar solo el código de acceso al portal"
-                    onClick={() => copiar(id, `portal-${id}`)}
+                    onClick={() => copiar(c.codigoPortal ? formatoCodigoPortal(c.codigoPortal) : id, `portal-${id}`)}
                   >
                     {copiado === `portal-${id}` ? (
                       "✓ Copiado"
