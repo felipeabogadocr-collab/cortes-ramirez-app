@@ -1354,7 +1354,7 @@ export function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-export const APP_VERSION = "1.164.0";
+export const APP_VERSION = "1.165.0";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -4895,7 +4895,20 @@ function BuscadorGlobal({ onIr }) {
 // en el texto original, solo mejorando la redacción. Responde en texto
 // plano (no JSON): es una sola nota, no hay nada que parsear ni que se
 // pueda romper por un formato inesperado.
-async function redactarActuacionConIA(textoOriginal) {
+async function redactarActuacionConIA(textoOriginal, { alReintentar } = {}) {
+  // Si Google está saturado, el servidor ya reintentó; aquí se espera un poco
+  // más y se intenta una última vez antes de mostrar el error.
+  try {
+    return await pedirRedaccionActuacion(textoOriginal);
+  } catch (e) {
+    if (!e.saturado) throw e;
+    alReintentar?.();
+    await new Promise((r) => setTimeout(r, 4000));
+    return pedirRedaccionActuacion(textoOriginal);
+  }
+}
+
+async function pedirRedaccionActuacion(textoOriginal) {
   const { data: sesionData } = await supabase.auth.getSession();
   const token = sesionData?.session?.access_token;
   const response = await fetch("/api/assistant", {
@@ -4917,8 +4930,12 @@ async function redactarActuacionConIA(textoOriginal) {
       messages: [{ role: "user", content: textoOriginal }],
     }),
   });
-  const data = await response.json();
-  if (!response.ok || data.error) throw new Error(data.error || "No se pudo contactar al asistente de IA");
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || data.error) {
+    const error = new Error(data.error || "No se pudo contactar al asistente de IA");
+    error.saturado = !!data.saturado || response.status === 503;
+    throw error;
+  }
   const texto = (data.content || []).map((b) => b.text || "").join("").trim();
   if (!texto) throw new Error("El asistente no devolvió ningún texto");
   return data.truncado ? `${texto}\n\n(Se cortó por límite de espacio — revísalo antes de guardarlo.)` : texto;
@@ -4952,10 +4969,15 @@ export function LineaDeTiempo({ cliente, onAgregar, onEditarFecha, onEditarNota,
     setRedactando(true);
     setErrorIA("");
     try {
-      const mejorado = await redactarActuacionConIA(nota.trim());
+      const mejorado = await redactarActuacionConIA(nota.trim(), { alReintentar: () => setErrorIA("La IA está ocupada, reintentando en unos segundos…") });
+      setErrorIA("");
       setNota(mejorado);
     } catch (e) {
-      setErrorIA(`No se pudo mejorar la redacción (${e?.message || "error desconocido"}). Puedes agregar la nota tal como está.`);
+      setErrorIA(
+        e?.saturado
+          ? "La IA de Google sigue saturada. Espera un minuto y vuelve a tocar «Redactar con IA», o agrega la nota tal como está."
+          : `No se pudo mejorar la redacción (${e?.message || "error desconocido"}). Puedes agregar la nota tal como está.`
+      );
     }
     setRedactando(false);
   };

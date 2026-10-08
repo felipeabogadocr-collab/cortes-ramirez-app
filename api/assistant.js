@@ -11,7 +11,24 @@
 import { supabaseAdmin } from "./_lib/supabaseAdmin.js";
 import { dentroDelLimite, dentroDelLimitePorClave } from "./_lib/rateLimit.js";
 
-const GEMINI_MODEL = "gemini-3.6-flash";
+const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-3.6-flash";
+// Modelos de respaldo (nombres separados por coma, variable de entorno
+// GEMINI_MODELOS_RESPALDO en Vercel) para cuando el principal está saturado
+// ("high demand") o sin cuota gratuita: cada modelo tiene su propia cuota,
+// así que pasar a otro suele resolverlo al instante. Vacío = sin respaldo.
+const MODELOS_RESPALDO = (process.env.GEMINI_MODELOS_RESPALDO || "")
+  .split(",")
+  .map((m) => m.trim())
+  .filter(Boolean);
+
+// Google responde 503/UNAVAILABLE ("This model is currently experiencing high
+// demand") cuando el modelo está saturado un momento — se resuelve solo en
+// segundos, así que vale la pena reintentar en vez de rendirse al primer fallo.
+const esSaturado = (r) =>
+  !r.ok &&
+  (r.status === 503 || r.status === 500 || ["UNAVAILABLE", "INTERNAL"].includes(r.data?.error?.status) || /high demand|overloaded|try again later/i.test(r.data?.error?.message || ""));
+const esSinCuota = (r) => !r.ok && (r.status === 429 || r.data?.error?.status === "RESOURCE_EXHAUSTED");
+const esperar = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const MAX_TOKENS_CAP = 2000;
 
 // La cuota gratuita de Gemini la comparten TODOS los despachos de la
@@ -189,14 +206,31 @@ export default async function handler(req, res) {
   const geminiTools = toGeminiTools(tools);
   if (geminiTools && !tieneAdjunto) body.tools = geminiTools;
 
-  const llamarGemini = async (cuerpo) => {
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`, {
+  const llamarModelo = async (cuerpo, modelo) => {
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelo}:generateContent?key=${apiKey}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(cuerpo),
     });
-    const data = await response.json();
+    const data = await response.json().catch(() => ({}));
     return { ok: response.ok, status: response.status, data };
+  };
+
+  // Si el modelo está saturado se reintenta dos veces con una pausa corta;
+  // si sigue saturado (o sin cuota), se prueba con los modelos de respaldo.
+  const llamarGemini = async (cuerpo) => {
+    let r = await llamarModelo(cuerpo, GEMINI_MODEL);
+    for (const pausa of [700, 1800]) {
+      if (!esSaturado(r)) break;
+      await esperar(pausa);
+      r = await llamarModelo(cuerpo, GEMINI_MODEL);
+    }
+    for (const modelo of MODELOS_RESPALDO) {
+      if (!esSaturado(r) && !esSinCuota(r)) break;
+      console.error(`Gemini ${GEMINI_MODEL} no disponible (${r.status}); probando ${modelo}`);
+      r = await llamarModelo(cuerpo, modelo);
+    }
+    return r;
   };
 
   try {
@@ -245,6 +279,9 @@ export default async function handler(req, res) {
       // toGeminiContents) Gemini igual se queja de eso, que el usuario vea un
       // mensaje claro en vez del texto técnico crudo con el link a la
       // documentación de Google.
+      if (esSaturado(resultado)) {
+        return res.status(503).json({ error: "La IA de Google está saturada en este momento. Intenta de nuevo en unos segundos.", saturado: true });
+      }
       if (/thought_signature/i.test(resultado.data?.error?.message || "")) {
         return res.status(502).json({ error: "El asistente tuvo un problema encadenando varias acciones seguidas. Vuelve a intentar tu solicitud." });
       }
