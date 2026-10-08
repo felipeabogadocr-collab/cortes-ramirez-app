@@ -1354,7 +1354,7 @@ export function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-export const APP_VERSION = "1.159.0";
+export const APP_VERSION = "1.160.0";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -6535,6 +6535,12 @@ function PanelMiDespacho({ usuarioActual, fotoPerfilUrl, subiendoFotoPerfil, cam
           )}
         </div>
 
+        {esAdmin && !usuarioActual.es_superadmin && (
+          <div style={{ marginBottom: 18, background: COLORS.surfaceSoft, border: `1px solid ${COLORS.border}`, borderRadius: 12, padding: 14 }}>
+            <PagarPlanWompi compacto />
+          </div>
+        )}
+
         <div style={{ marginBottom: 18 }}>
           <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, fontWeight: 700, color: COLORS.muted, textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 8 }}>
             Abogados del equipo
@@ -7272,7 +7278,175 @@ const CUENTA_PAGO_NOMOS = {
   titular: "Felipe Cortés Ramírez",
 };
 
-function PantallaPendienteActivacion({ usuarioActual, onCerrarSesion }) {
+// Pago de la suscripción a Nomos con Wompi (tarjeta, PSE, Nequi, botón
+// Bancolombia). El link se arma en el servidor (api/despachos/reportar-pago.js)
+// con la firma de integridad — aquí solo se elige el plan y se redirige. Si
+// los pagos en línea no están configurados todavía (faltan las llaves de
+// Wompi en Vercel), no se muestra nada y queda el pago manual de siempre.
+async function llamarPagosNomos(cuerpo) {
+  const { data: sesionData } = await supabase.auth.getSession();
+  const token = sesionData?.session?.access_token;
+  const resp = await fetch("/api/despachos/reportar-pago", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    body: JSON.stringify(cuerpo),
+  });
+  const datos = await resp.json().catch(() => ({}));
+  if (!resp.ok) throw new Error(datos.error || "No se pudo conectar con el servidor de pagos.");
+  return datos;
+}
+
+export function PagarPlanWompi({ compacto = false }) {
+  const [config, setConfig] = useState(null);
+  const [plan, setPlan] = useState("despacho");
+  const [abriendo, setAbriendo] = useState(false);
+  const [error, setError] = useState("");
+  useEffect(() => {
+    let cancelado = false;
+    fetch("/api/despachos/reportar-pago?wompi=config")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => !cancelado && setConfig(d))
+      .catch(() => !cancelado && setConfig(null));
+    return () => {
+      cancelado = true;
+    };
+  }, []);
+  if (!config?.habilitado) return null;
+
+  const pagar = async () => {
+    setAbriendo(true);
+    setError("");
+    try {
+      const { url } = await llamarPagosNomos({ accion: "wompi_checkout", plan });
+      window.location.href = url;
+    } catch (e) {
+      setError(e.message);
+      setAbriendo(false);
+    }
+  };
+
+  const opciones = [
+    { id: "abogado", nombre: "Abogado", detalle: "1 abogado", valor: config.planes?.abogado?.valor || 80000 },
+    { id: "despacho", nombre: "Despacho", detalle: "Usuarios ilimitados", valor: config.planes?.despacho?.valor || 120000 },
+  ];
+  return (
+    <div style={{ textAlign: "left", marginBottom: compacto ? 0 : 16 }}>
+      <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, fontWeight: 700, color: COLORS.headingText, textTransform: "uppercase", letterSpacing: 0.4, margin: "0 0 8px" }}>
+        Paga tu plan en línea {config.pruebas && <span style={{ color: "#B45309" }}>(modo prueba)</span>}
+      </p>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 10 }}>
+        {opciones.map((o) => (
+          <button
+            key={o.id}
+            type="button"
+            onClick={() => setPlan(o.id)}
+            style={{
+              textAlign: "left",
+              cursor: "pointer",
+              borderRadius: 10,
+              padding: "10px 12px",
+              border: `2px solid ${plan === o.id ? COLORS.accentBright : COLORS.border}`,
+              background: plan === o.id ? COLORS.accentSoft : COLORS.panel,
+              fontFamily: "Inter, sans-serif",
+              color: COLORS.ink,
+            }}
+          >
+            <div style={{ fontSize: 13, fontWeight: 800 }}>{o.nombre}</div>
+            <div style={{ fontSize: 15, fontWeight: 800, color: COLORS.headingText }}>{formatoCOP(o.valor)}<span style={{ fontSize: 11, fontWeight: 600, color: COLORS.muted }}>/mes</span></div>
+            <div style={{ fontSize: 11, color: COLORS.muted }}>{o.detalle}</div>
+          </button>
+        ))}
+      </div>
+      <button className="drx-btn-primary drx-cta-shine" style={{ ...buttonPrimary, width: "100%" }} onClick={pagar} disabled={abriendo}>
+        {abriendo ? "Abriendo Wompi…" : "Pagar con Wompi →"}
+      </button>
+      <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, color: COLORS.muted, margin: "6px 0 0", textAlign: "center" }}>
+        Tarjeta, PSE, Nequi o botón Bancolombia. Tu plan se activa solo apenas se aprueba el pago.
+      </p>
+      {error && <p style={{ color: "#B42318", fontSize: 12.5, margin: "8px 0 0", fontFamily: "Inter, sans-serif" }}>{error}</p>}
+    </div>
+  );
+}
+
+// Al volver de Wompi (?pago=wompi&id=<transacción>) se confirma el pago
+// contra el servidor. PSE puede quedar "PENDING" unos minutos, así que se
+// vuelve a preguntar cada 5 s durante 2 minutos antes de rendirse.
+function useConfirmacionPagoWompi(usuarioActual, onAprobado) {
+  const [aviso, setAviso] = useState(null);
+  useEffect(() => {
+    if (!usuarioActual) return;
+    const params = new URLSearchParams(window.location.search);
+    const id = params.get("id");
+    if (params.get("pago") !== "wompi" || !id) return;
+    window.history.replaceState(null, "", window.location.pathname + window.location.hash);
+    let intentos = 0;
+    let temporizador = null;
+    let cancelado = false;
+    const revisar = async () => {
+      try {
+        const { estado } = await llamarPagosNomos({ accion: "wompi_estado", id });
+        if (cancelado) return;
+        if (estado === "APPROVED") {
+          setAviso({ tipo: "ok", texto: "✓ Pago aprobado. Tu plan de Nomos quedó activo. ¡Gracias!" });
+          onAprobado?.();
+        } else if (estado === "PENDING" && intentos < 24) {
+          intentos += 1;
+          setAviso({ tipo: "pendiente", texto: "Tu pago está en proceso (PSE puede tardar unos minutos). Tu plan se activa solo apenas Wompi lo confirme." });
+          temporizador = setTimeout(revisar, 5000);
+        } else if (estado === "PENDING") {
+          setAviso({ tipo: "pendiente", texto: "Wompi todavía no confirma tu pago. Apenas lo apruebe, tu plan se activa solo; si tienes afán, escríbenos por WhatsApp." });
+        } else {
+          setAviso({ tipo: "error", texto: "El pago no fue aprobado. Puedes intentarlo de nuevo con otro medio de pago." });
+        }
+      } catch (e) {
+        if (!cancelado) setAviso({ tipo: "error", texto: e.message });
+      }
+    };
+    setAviso({ tipo: "pendiente", texto: "Confirmando tu pago con Wompi…" });
+    revisar();
+    return () => {
+      cancelado = true;
+      clearTimeout(temporizador);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [usuarioActual?.id]);
+  return [aviso, setAviso];
+}
+
+function AvisoPagoWompi({ aviso, onCerrar }) {
+  if (!aviso) return null;
+  const colores = aviso.tipo === "ok" ? ["#F0FDF4", "#BBF7D0", "#166534"] : aviso.tipo === "error" ? ["#FEF2F2", "#F3C6C0", "#B42318"] : ["#FFFBEB", "#FDE68A", "#92400E"];
+  return (
+    <div
+      role="status"
+      style={{
+        position: "fixed",
+        top: "calc(14px + var(--sat))",
+        left: "50%",
+        transform: "translateX(-50%)",
+        zIndex: 4500,
+        width: "min(520px, calc(100vw - 28px))",
+        background: colores[0],
+        border: `1px solid ${colores[1]}`,
+        color: colores[2],
+        borderRadius: 12,
+        padding: "12px 40px 12px 14px",
+        fontFamily: "Inter, sans-serif",
+        fontSize: 13.5,
+        fontWeight: 600,
+        lineHeight: 1.5,
+        boxShadow: "0 12px 30px rgba(0,0,0,0.12)",
+      }}
+    >
+      {aviso.texto}
+      <button onClick={onCerrar} aria-label="Cerrar" style={{ position: "absolute", top: 8, right: 10, background: "none", border: "none", color: colores[2], fontSize: 18, cursor: "pointer" }}>
+        ×
+      </button>
+    </div>
+  );
+}
+
+function PantallaPendienteActivacion({ usuarioActual, onCerrarSesion, avisoPago, onCerrarAvisoPago }) {
   const { oscuro, alternar } = useTema();
   const [reportando, setReportando] = useState(false);
   const [reportado, setReportado] = useState(!!usuarioActual.pagoReportadoEn);
@@ -7321,6 +7495,8 @@ function PantallaPendienteActivacion({ usuarioActual, onCerrarSesion }) {
           {pruebaVencida ? ". Para seguir usándolo, activa tu plan pagando abajo." : ". Solo falta activar tu plan para entrar."}
         </p>
 
+        <AvisoPagoWompi aviso={avisoPago} onCerrar={onCerrarAvisoPago} />
+        <PagarPlanWompi />
         {reportado ? (
           <p
             style={{
@@ -7334,7 +7510,7 @@ function PantallaPendienteActivacion({ usuarioActual, onCerrarSesion }) {
         ) : (
           <div style={{ textAlign: "left", background: COLORS.surfaceSoft, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: "14px 16px", marginBottom: 16 }}>
             <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, fontWeight: 700, color: COLORS.headingText, textTransform: "uppercase", letterSpacing: 0.4, margin: "0 0 8px" }}>
-              Cómo pagar
+              O paga por transferencia
             </p>
             <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.inkSoft, margin: "0 0 4px" }}>
               Nequi / Daviplata: <strong style={{ color: COLORS.ink }}>{CUENTA_PAGO_NOMOS.nequiDaviplata}</strong>
@@ -8925,6 +9101,7 @@ function App() {
     setCambiandoUsuario(false);
   }, []);
 
+  const [avisoPagoWompi, setAvisoPagoWompi] = useConfirmacionPagoWompi(usuarioActual, () => cargarPerfilActual(false));
   const [avisoInactividad, setAvisoInactividad] = useState(false);
   useCierreSesionPorInactividad(!!usuarioActual && !modoPublico && !modoPortal, cerrarSesion, setAvisoInactividad);
 
@@ -9039,7 +9216,7 @@ function App() {
   }
 
   if (!usuarioActual.despachoActivo && !usuarioActual.es_superadmin) {
-    return <PantallaPendienteActivacion usuarioActual={usuarioActual} onCerrarSesion={cerrarSesion} />;
+    return <PantallaPendienteActivacion usuarioActual={usuarioActual} onCerrarSesion={cerrarSesion} avisoPago={avisoPagoWompi} onCerrarAvisoPago={() => setAvisoPagoWompi(null)} />;
   }
 
   const irADocumentos = () => {
@@ -9080,6 +9257,7 @@ function App() {
       <AvisoErroresAlmacenamiento />
       <IndicadorSincronizacion />
       <AvisoPruebaGratis pruebaHasta={usuarioActual.pruebaHasta} />
+      <AvisoPagoWompi aviso={avisoPagoWompi} onCerrar={() => setAvisoPagoWompi(null)} />
       <div
         className={`drx-sidebar-overlay${sidebarMovilAbierta ? " drx-sidebar-abierta" : ""}`}
         onClick={() => setSidebarMovilAbierta(false)}

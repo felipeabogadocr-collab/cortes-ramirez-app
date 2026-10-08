@@ -108,7 +108,7 @@ export default async function handler(req, res) {
     // "pagó este mes" calculando sobre la fecha más reciente de cada uno.
     const { data: pagos } = await admin
       .from("plataforma_pagos")
-      .select("id, despacho_id, valor, fecha")
+      .select("*")
       .order("fecha", { ascending: false });
     const pagosPorDespacho = {};
     (pagos || []).forEach((p) => {

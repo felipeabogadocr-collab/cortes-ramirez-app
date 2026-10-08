@@ -669,6 +669,14 @@ create table if not exists plataforma_pagos (
 
 create index if not exists plataforma_pagos_despacho_idx on plataforma_pagos (despacho_id, fecha desc);
 
+-- Pagos en línea con Wompi (api/despachos/reportar-pago.js): cada pago
+-- aprobado se anota solo, con el id de la transacción de Wompi. La columna
+-- única evita anotarlo dos veces si Wompi avisa más de una vez (o si el
+-- aviso y la confirmación al volver del pago llegan los dos).
+alter table plataforma_pagos add column if not exists wompi_transaccion_id text;
+alter table plataforma_pagos add column if not exists metodo text;
+create unique index if not exists plataforma_pagos_wompi_idx on plataforma_pagos (wompi_transaccion_id) where wompi_transaccion_id is not null;
+
 alter table plataforma_pagos enable row level security;
 -- Sin políticas a propósito: solo el endpoint de servidor (llave
 -- service_role, ya protegido por verificarSuperadmin) lee y escribe aquí —

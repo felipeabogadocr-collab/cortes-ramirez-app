@@ -274,6 +274,7 @@ function PanelPagosDespacho({ despacho, pagos, onRegistrado, onEliminado }) {
                 <div key={p.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: COLORS.panel, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "6px 10px" }}>
                   <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.ink, margin: 0 }}>
                     {formatoCOP(p.valor)} · {new Date(`${p.fecha}T12:00:00`).toLocaleDateString("es-CO", { dateStyle: "medium" })}
+                    {p.metodo && <span style={{ color: COLORS.muted }}> · {p.metodo}</span>}
                   </p>
                   <button
                     onClick={() => eliminar(p.id)}
