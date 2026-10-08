@@ -207,6 +207,26 @@ function Desplegable({ titulo, children }) {
   );
 }
 
+// El despacho con el que el cliente entró la última vez en este celular o
+// computador: así la pantalla de ingreso (antes de escribir el código) ya
+// muestra el logo, el nombre de la firma y su WhatsApp.
+const LLAVE_ULTIMO_DESPACHO = "nomos-portal-ultimo-despacho";
+function leerUltimoDespacho() {
+  try {
+    return JSON.parse(localStorage.getItem(LLAVE_ULTIMO_DESPACHO) || "null");
+  } catch {
+    return null;
+  }
+}
+function guardarUltimoDespacho(cambios) {
+  try {
+    const actual = leerUltimoDespacho() || {};
+    localStorage.setItem(LLAVE_ULTIMO_DESPACHO, JSON.stringify({ ...actual, ...cambios }));
+  } catch {
+    // sin espacio o sin localStorage: el ingreso sale con la marca de Nomos
+  }
+}
+
 const PESTANAS = [
   { id: "resumen", titulo: "Resumen", icono: "grafico" },
   { id: "proceso", titulo: "Proceso", icono: "balanza" },
@@ -222,6 +242,7 @@ export default function VistaPortalCliente() {
   const [notFound, setNotFound] = useState(false);
   const [pestana, setPestana] = useState("resumen");
   const [logoUrl, setLogoUrl] = useState("");
+  const [ultimoDespacho, setUltimoDespacho] = useState(() => leerUltimoDespacho());
   const [contrato, setContrato] = useState(null);
   const [descargandoContrato, setDescargandoContrato] = useState(false);
 
@@ -263,6 +284,12 @@ export default function VistaPortalCliente() {
     }
     setCliente(data);
     setPestana("resumen");
+    if (data.despacho?.nombre) {
+      const cambios = { nombre: data.despacho.nombre, celular: data.despacho.celular || "" };
+      if (!data.despacho.tieneLogo) cambios.logo = null;
+      guardarUltimoDespacho(cambios);
+      setUltimoDespacho(leerUltimoDespacho());
+    }
     if (data.radicado) consultarRama(data.radicado);
     if (data.despacho?.tieneLogo) cargarLogo(code);
     fetch(`/api/documentos/firmar?accion=contrato-portal&solo=info&codigo=${encodeURIComponent(code)}`)
@@ -280,6 +307,14 @@ export default function VistaPortalCliente() {
       const { url } = await r.json();
       const blob = await (await fetch(url)).blob();
       setLogoUrl(URL.createObjectURL(blob));
+      if (blob.size < 300 * 1024) {
+        const lector = new FileReader();
+        lector.onload = () => {
+          guardarUltimoDespacho({ logo: lector.result });
+          setUltimoDespacho(leerUltimoDespacho());
+        };
+        lector.readAsDataURL(blob);
+      }
     } catch (e) {
       // Sin logo se muestra el ícono de Nomos.
     }
@@ -404,9 +439,16 @@ export default function VistaPortalCliente() {
       <div style={{ minHeight: "100vh", background: `radial-gradient(1200px 500px at 50% -10%, #145C4E 0%, ${VERDE_PROFUNDO} 45%, #06231E 100%)`, padding: "48px 20px 60px", boxSizing: "border-box" }}>
         <div style={{ maxWidth: 440, margin: "0 auto" }}>
           <div style={{ textAlign: "center", marginBottom: 28 }}>
-            <div style={{ width: 64, height: 64, borderRadius: 18, margin: "0 auto 16px", background: "rgba(255,255,255,0.08)", border: `1px solid ${DORADO}66`, display: "flex", alignItems: "center", justifyContent: "center", color: DORADO, boxShadow: `0 0 0 6px rgba(201,162,75,0.08)` }}>
-              <IconoNomos size={32} />
-            </div>
+            {ultimoDespacho?.logo ? (
+              <div style={{ width: 84, height: 84, borderRadius: 22, margin: "0 auto 14px", background: "#FFFFFF", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", boxShadow: `0 0 0 6px rgba(201,162,75,0.15)` }}>
+                <img src={ultimoDespacho.logo} alt="" style={{ width: "86%", height: "86%", objectFit: "contain" }} />
+              </div>
+            ) : (
+              <div style={{ width: 64, height: 64, borderRadius: 18, margin: "0 auto 16px", background: "rgba(255,255,255,0.08)", border: `1px solid ${DORADO}66`, display: "flex", alignItems: "center", justifyContent: "center", color: DORADO, boxShadow: `0 0 0 6px rgba(201,162,75,0.08)` }}>
+                <IconoNomos size={32} />
+              </div>
+            )}
+            {ultimoDespacho?.nombre && <p style={{ ...fuente, fontSize: 17, fontWeight: 800, color: "#FFFFFF", margin: "0 0 10px" }}>{ultimoDespacho.nombre}</p>}
             <p style={{ ...fuente, fontSize: 11, fontWeight: 700, letterSpacing: 3, color: DORADO, textTransform: "uppercase", margin: 0 }}>Portal privado</p>
             <h1 style={{ ...fuente, fontSize: 28, fontWeight: 800, color: "#FFFFFF", margin: "8px 0 8px", letterSpacing: -0.5 }}>Tu caso, siempre a la vista</h1>
             <p style={{ ...fuente, fontSize: 14, color: "rgba(255,255,255,0.7)", margin: 0, lineHeight: 1.55 }}>Consulta el avance de tu proceso, tus pagos, citas y documentos en un solo lugar.</p>
@@ -448,6 +490,23 @@ export default function VistaPortalCliente() {
           <p style={{ ...fuente, fontSize: 11.5, color: "rgba(255,255,255,0.55)", margin: "18px 0 0", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
             <Icono tipo="escudo" size={12} /> Conexión cifrada · Solo tú accedes con tu código
           </p>
+          {numeroWhatsapp(ultimoDespacho?.celular) && (
+            <a
+              href={`https://wa.me/${numeroWhatsapp(ultimoDespacho.celular)}?text=${encodeURIComponent("Hola, necesito ayuda para entrar a mi portal de cliente.")}`}
+              target="_blank"
+              rel="noreferrer"
+              style={{ ...fuente, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, margin: "18px auto 0", width: "fit-content", background: "#1DA851", color: "#FFFFFF", textDecoration: "none", borderRadius: 999, padding: "11px 18px", fontSize: 14, fontWeight: 800, boxShadow: "0 10px 24px -8px rgba(29,168,81,0.7)" }}
+            >
+              ¿No tienes tu código? Escríbenos por WhatsApp
+            </a>
+          )}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 7, marginTop: 26, color: "rgba(255,255,255,0.6)" }}>
+            <span style={{ ...fuente, fontSize: 11.5 }}>Con tecnología de</span>
+            <span style={{ color: DORADO, display: "flex" }}>
+              <IconoNomos size={16} />
+            </span>
+            <span style={{ ...fuente, fontSize: 13.5, fontWeight: 800, color: "#FFFFFF" }}>Nomos</span>
+          </div>
         </div>
       </div>
     );
