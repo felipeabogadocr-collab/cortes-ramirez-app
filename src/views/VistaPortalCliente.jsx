@@ -38,6 +38,28 @@ function EncabezadoTarjeta({ icono, color, titulo }) {
   );
 }
 
+const fuente = { fontFamily: "Inter, sans-serif" };
+const fechaLarga = (f) => {
+  if (!f) return "";
+  const d = new Date(/^\d{4}-\d{2}-\d{2}$/.test(f) ? `${f}T12:00:00` : f);
+  return isNaN(d) ? f : d.toLocaleDateString("es-CO", { dateStyle: "long" });
+};
+function numeroWhatsapp(celular) {
+  const d = String(celular || "").replace(/\D/g, "");
+  if (!d) return "";
+  return d.length === 10 ? `57${d}` : d;
+}
+const botonWhatsapp = {
+  ...buttonPrimary,
+  background: "#1DA851",
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: 6,
+  textDecoration: "none",
+  boxSizing: "border-box",
+};
+
 export default function VistaPortalCliente() {
   const [codigo, setCodigo] = useState("");
   const [cliente, setCliente] = useState(null);
@@ -122,6 +144,25 @@ export default function VistaPortalCliente() {
   const valorTotal = Number(cliente?.valorTotal) || 0;
   const saldo = valorTotal > 0 ? valorTotal - totalPagado : null;
   const porcentajePagado = valorTotal > 0 ? Math.min(100, Math.round((totalPagado / valorTotal) * 100)) : 0;
+  const despacho = cliente?.despacho || {};
+  const whatsappDespacho = numeroWhatsapp(despacho.celular);
+  const enlaceWhatsapp = (texto) => `https://wa.me/${whatsappDespacho}?text=${encodeURIComponent(texto)}`;
+  const saludo = `Hola${cliente?.abogadoAsignado ? ` ${cliente.abogadoAsignado}` : ""}, soy ${cliente?.nombre || "tu cliente"}.`;
+  const cuotas = (cliente?.cuotas || []).filter((c) => c && c.fecha);
+  // Las cuotas se dan por pagadas en orden, según lo abonado en total.
+  let restante = totalPagado;
+  const cuotasConEstado = [...cuotas]
+    .sort((a, b) => String(a.fecha).localeCompare(String(b.fecha)))
+    .map((c) => {
+      const valor = Number(c.valor) || 0;
+      const pagada = valor > 0 && restante >= valor;
+      restante = Math.max(0, restante - valor);
+      return { ...c, valor, pagada };
+    });
+  const hoy = new Date().toISOString().slice(0, 10);
+  const siguienteCuota = cuotasConEstado.find((c) => !c.pagada);
+  const proximoPago = siguienteCuota?.fecha || (saldo > 0 ? cliente?.proximoPago : null);
+  const tieneContrato = (cliente?.documentos || []).some((d) => /contrato/i.test(d.titulo || ""));
   const colorArea = COLOR_AREA_PROCESO[cliente?.areaProceso] || COLORS.accentBright;
 
   return (
@@ -265,7 +306,7 @@ export default function VistaPortalCliente() {
               <div style={{ minWidth: 0 }}>
                 <h2 style={{ fontFamily: "Inter, sans-serif", fontSize: 19, fontWeight: 800, margin: 0, color: COLORS.headingText }}>Hola, {cliente.nombre}</h2>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
-                  {cliente.areaProceso && (
+                  {cliente.areaProceso && cliente.areaProceso !== "Otro" && (
                     <span
                       style={{
                         fontFamily: "Inter, sans-serif",
@@ -281,7 +322,7 @@ export default function VistaPortalCliente() {
                       {cliente.areaProceso}
                     </span>
                   )}
-                  {cliente.tipoProceso && (
+                  {cliente.tipoProceso && cliente.tipoProceso !== "Otro" && (
                     <span
                       style={{
                         fontFamily: "Inter, sans-serif",
@@ -301,6 +342,51 @@ export default function VistaPortalCliente() {
               </div>
             </div>
           </Card>
+
+          {(cliente.abogadoAsignado || despacho.nombre || whatsappDespacho) && (
+            <Card style={{ borderRadius: 16 }}>
+              <EncabezadoTarjeta icono="persona" color="#0F766E" titulo="Tu abogado" />
+              {cliente.abogadoAsignado && <p style={{ ...fuente, fontSize: 14.5, fontWeight: 700, color: COLORS.headingText, margin: 0 }}>{cliente.abogadoAsignado}</p>}
+              {despacho.nombre && <p style={{ ...fuente, fontSize: 12.5, color: COLORS.muted, margin: "3px 0 0" }}>{despacho.nombre}</p>}
+              {cliente.juzgadoActual && (
+                <p style={{ ...fuente, fontSize: 12.5, color: COLORS.inkSoft, margin: "10px 0 0", display: "flex", alignItems: "center", gap: 6 }}>
+                  <Icono tipo="edificio" size={13} /> Tu proceso está en: {cliente.juzgadoActual}
+                </p>
+              )}
+              {whatsappDespacho && (
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 14 }}>
+                  <a className="drx-btn-primary" style={botonWhatsapp} href={enlaceWhatsapp(`${saludo} Quisiera recibir información sobre mi proceso.`)} target="_blank" rel="noreferrer">
+                    Solicitar información
+                  </a>
+                  <a className="drx-btn-primary" style={{ ...botonWhatsapp, background: COLORS.navy }} href={enlaceWhatsapp(`${saludo} Quisiera agendar una cita.`)} target="_blank" rel="noreferrer">
+                    Pedir una cita
+                  </a>
+                </div>
+              )}
+            </Card>
+          )}
+
+          {cliente.citas?.length > 0 && (
+            <Card style={{ borderRadius: 16 }}>
+              <EncabezadoTarjeta icono="calendario" color="#E11D48" titulo={cliente.citas.length > 1 ? "Próximas citas" : "Próxima cita"} />
+              {cliente.citas.map((c, i) => (
+                <div key={i} style={{ padding: "10px 0", borderTop: i ? `1px solid ${COLORS.border}` : "none", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                  <div>
+                    <p style={{ ...fuente, fontSize: 13.5, fontWeight: 700, color: COLORS.headingText, margin: 0 }}>{c.titulo || "Cita con tu abogado"}</p>
+                    <p style={{ ...fuente, fontSize: 12, color: COLORS.muted, margin: "3px 0 0" }}>
+                      {fechaLarga(c.fecha)}
+                      {c.hora ? ` · ${c.hora}` : ""}
+                    </p>
+                  </div>
+                  {c.meet && (
+                    <a className="drx-btn-primary" style={{ ...botonWhatsapp, background: "#1A73E8", padding: "8px 14px", fontSize: 12.5 }} href={c.meet} target="_blank" rel="noreferrer">
+                      Unirme por Meet
+                    </a>
+                  )}
+                </div>
+              ))}
+            </Card>
+          )}
 
           {cliente.radicado && (
             <Card style={{ borderRadius: 16 }}>
@@ -385,6 +471,22 @@ export default function VistaPortalCliente() {
             </Card>
           )}
 
+          {cliente.actuaciones?.length > 0 && (
+            <Card style={{ borderRadius: 16 }}>
+              <EncabezadoTarjeta icono="reloj" color="#6366F1" titulo="Novedades de tu caso" />
+              <div style={{ position: "relative", paddingLeft: 18 }}>
+                <div style={{ position: "absolute", left: 5, top: 6, bottom: 6, width: 2, background: COLORS.border }} />
+                {cliente.actuaciones.map((a, i) => (
+                  <div key={i} style={{ position: "relative", paddingBottom: i < cliente.actuaciones.length - 1 ? 14 : 0 }}>
+                    <div style={{ position: "absolute", left: -17, top: 4, width: 10, height: 10, borderRadius: "50%", background: i === 0 ? "#6366F1" : COLORS.surface, border: "2px solid #6366F1" }} />
+                    <p style={{ ...fuente, fontSize: 11.5, color: COLORS.muted, margin: 0 }}>{fechaLarga(a.fecha)}</p>
+                    <p style={{ ...fuente, fontSize: 13, color: COLORS.ink, margin: "2px 0 0", lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{a.nota}</p>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          )}
+
           {valorTotal > 0 && (
             <Card style={{ borderRadius: 16 }}>
               <EncabezadoTarjeta icono="tarjeta" color="#10B981" titulo="Estado de cuenta" />
@@ -431,6 +533,31 @@ export default function VistaPortalCliente() {
                   `Saldo pendiente: ${formatoCOP(saldo)}`
                 )}
               </span>
+              {proximoPago && saldo > 0 && (
+                <p style={{ ...fuente, fontSize: 12.5, color: proximoPago < hoy ? "#B42318" : COLORS.inkSoft, margin: "12px 0 0", display: "flex", alignItems: "center", gap: 6 }}>
+                  <Icono tipo="calendario" size={13} />
+                  {proximoPago < hoy ? "Pago vencido desde" : "Próximo pago:"} {fechaLarga(proximoPago)}
+                  {siguienteCuota?.valor ? ` · ${formatoCOP(siguienteCuota.valor)}` : ""}
+                </p>
+              )}
+              {cuotasConEstado.length > 0 && (
+                <div style={{ marginTop: 14, borderTop: `1px solid ${COLORS.border}`, paddingTop: 10 }}>
+                  <p style={{ ...fuente, fontSize: 12, fontWeight: 700, color: COLORS.inkSoft, margin: "0 0 6px" }}>Plan de pagos</p>
+                  {cuotasConEstado.map((c, i) => (
+                    <div key={i} style={{ ...fuente, display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 12.5, padding: "6px 0" }}>
+                      <span style={{ color: COLORS.ink }}>
+                        {c.esAnticipo ? "Anticipo" : `Cuota ${cuotasConEstado.filter((x, j) => j <= i && !x.esAnticipo).length}`} · {fechaLarga(c.fecha)}
+                      </span>
+                      <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <span style={{ fontWeight: 700, color: COLORS.ink }}>{formatoCOP(c.valor)}</span>
+                        <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 20, background: c.pagada ? "#DCFCE7" : c.fecha < hoy ? "#FEE2E2" : "#EFF6FF", color: c.pagada ? "#166534" : c.fecha < hoy ? "#B42318" : "#1D4ED8" }}>
+                          {c.pagada ? "Pagada" : c.fecha < hoy ? "Vencida" : "Pendiente"}
+                        </span>
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </Card>
           )}
 
@@ -493,45 +620,41 @@ export default function VistaPortalCliente() {
             </Card>
           )}
 
-          {cliente.documentos?.length > 0 && (
-            <Card style={{ borderRadius: 16 }}>
-              <EncabezadoTarjeta icono="clip" color="#F5A524" titulo="Documentos" />
-              <div style={{ display: "flex", flexDirection: "column" }}>
-                {cliente.documentos.map((d, i, arr) => (
-                  <div
-                    key={i}
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      fontFamily: "Inter, sans-serif",
-                      fontSize: 12.5,
-                      padding: "10px 0",
-                      borderBottom: i < arr.length - 1 ? `1px solid ${COLORS.border}` : "none",
-                    }}
-                  >
-                    <span style={{ color: COLORS.ink, fontWeight: 600 }}>{d.titulo}</span>
-                    <span
-                      style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: 5,
-                        fontWeight: 700,
-                        fontSize: 11.5,
-                        padding: "3px 10px",
-                        borderRadius: 20,
-                        background: d.firmado ? "#DCFCE7" : "#FEF3E2",
-                        color: d.firmado ? "#166534" : "#B45309",
-                      }}
-                    >
+          <Card style={{ borderRadius: 16 }}>
+            <EncabezadoTarjeta icono="clip" color="#F5A524" titulo="Documentos" />
+            <div style={{ display: "flex", flexDirection: "column" }}>
+              {!tieneContrato && (
+                <div style={{ border: `1.5px dashed ${COLORS.border}`, borderRadius: 12, padding: 14, marginBottom: cliente.documentos?.length ? 8 : 0, background: COLORS.surfaceSoft }}>
+                  <p style={{ ...fuente, fontSize: 13, fontWeight: 700, color: COLORS.ink, margin: 0 }}>Contrato de prestación de servicios</p>
+                  <p style={{ ...fuente, fontSize: 12, color: COLORS.muted, margin: "4px 0 0", lineHeight: 1.45 }}>Tu contrato todavía no está cargado aquí. Puedes pedírselo a tu abogado.</p>
+                  {whatsappDespacho && (
+                    <a className="drx-btn-primary" style={{ ...botonWhatsapp, marginTop: 10, padding: "8px 14px", fontSize: 12.5 }} href={enlaceWhatsapp(`${saludo} ¿Me pueden compartir mi contrato de prestación de servicios en el portal?`)} target="_blank" rel="noreferrer">
+                      Pedírselo a mi abogado
+                    </a>
+                  )}
+                </div>
+              )}
+              {(cliente.documentos || []).map((d, i, arr) => (
+                <div
+                  key={i}
+                  style={{ ...fuente, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap", fontSize: 12.5, padding: "10px 0", borderBottom: i < arr.length - 1 ? `1px solid ${COLORS.border}` : "none" }}
+                >
+                  <span style={{ color: COLORS.ink, fontWeight: 600 }}>{d.titulo}</span>
+                  <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontWeight: 700, fontSize: 11.5, padding: "3px 10px", borderRadius: 20, background: d.firmado ? "#DCFCE7" : "#FEF3E2", color: d.firmado ? "#166534" : "#B45309" }}>
                       <Icono tipo={d.firmado ? "check" : "reloj"} size={11} />
                       {d.firmado ? "Firmado" : "Pendiente de firma"}
                     </span>
-                  </div>
-                ))}
-              </div>
-            </Card>
-          )}
+                    {d.id && (
+                      <a href={`/?codigo=${encodeURIComponent(d.id)}#firmar`} style={{ fontWeight: 700, fontSize: 12, color: COLORS.navy }}>
+                        {d.firmado ? "Ver" : "Firmar ahora"}
+                      </a>
+                    )}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </Card>
         </div>
       )}
     </div>

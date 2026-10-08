@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { storageGet, firmarDocumentoPublico, registrarEventoDocumentoPublico } from "../lib/storage";
 import {
   COLORS,
@@ -26,6 +26,7 @@ const DIAS_VENCIMIENTO_FIRMA = 30;
 
 export default function VistaFirma() {
   const [codigo, setCodigo] = useState("");
+  const autoBuscar = useRef(false);
   const [doc, setDoc] = useState(null);
   const [buscando, setBuscando] = useState(false);
   const [notFound, setNotFound] = useState(false);
@@ -71,6 +72,25 @@ export default function VistaFirma() {
     // si falla — es informativo, no un requisito para poder seguir.
     registrarEventoDocumentoPublico(code, "documento_visualizado");
   };
+
+  // Desde el portal del cliente se llega con ?codigo=...#firmar: abre el
+  // documento directo, sin tener que escribir el código.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const desdeLink = (params.get("codigo") || "").trim();
+    if (!desdeLink) return;
+    window.history.replaceState(null, "", window.location.pathname + window.location.hash);
+    autoBuscar.current = true;
+    setCodigo(desdeLink.toUpperCase());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  useEffect(() => {
+    if (autoBuscar.current && codigo) {
+      autoBuscar.current = false;
+      buscar();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [codigo]);
 
   const empezarColocacion = () => {
     if (!nombre.trim() || !numeroId.trim()) {

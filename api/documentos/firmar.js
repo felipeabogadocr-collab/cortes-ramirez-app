@@ -40,12 +40,22 @@ async function manejarRecibo(req, res, admin) {
     return res.status(400).json({ error: "Faltan datos" });
   }
 
-  const { data: cliente, error: errorCliente } = await admin
+  // Código corto del portal (8 caracteres) o el id completo de enlaces viejos.
+  const corto = String(codigo).trim().replace(/-/g, "").toUpperCase();
+  let { data: cliente, error: errorCliente } = await admin
     .from("clientes")
     .select("data")
     .eq("id", codigo)
     .is("eliminado_en", null)
     .maybeSingle();
+  if (!cliente && !errorCliente && /^[A-Z0-9]{8}$/.test(corto)) {
+    ({ data: cliente, error: errorCliente } = await admin
+      .from("clientes")
+      .select("data")
+      .eq("data->>codigoPortal", corto)
+      .is("eliminado_en", null)
+      .maybeSingle());
+  }
   if (errorCliente || !cliente) {
     return res.status(404).json({ error: "No encontrado" });
   }

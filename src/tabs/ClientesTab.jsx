@@ -666,13 +666,34 @@ export function VentanaRegistrarPago({ clienteId, cliente, usuarioActual, onRegi
 // Compartir el portal: muestra el mensaje antes de enviarlo, con WhatsApp
 // directo y botones para copiar el mensaje o solo el código. El link ya
 // lleva el código, así el cliente entra con un solo toque sin copiar nada.
-export function VentanaCompartirPortal({ clienteId, cliente, onCerrar }) {
+// Código corto del portal: 8 caracteres sin letras/números que se confunden
+// (0/O, 1/I/L), mostrado como ABCD-2345. Se crea la primera vez que se comparte.
+const ALFABETO_CODIGO = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+function generarCodigoPortal() {
+  const bytes = crypto.getRandomValues(new Uint8Array(8));
+  return Array.from(bytes, (b) => ALFABETO_CODIGO[b % ALFABETO_CODIGO.length]).join("");
+}
+export const formatoCodigoPortal = (c) => (c && c.length === 8 ? `${c.slice(0, 4)}-${c.slice(4)}` : c);
+
+export function VentanaCompartirPortal({ clienteId, cliente, onCerrar, onActualizar }) {
   const [copiado, setCopiado] = useState("");
+  const [codigoCorto, setCodigoCorto] = useState(cliente.codigoPortal || "");
+  useEffect(() => {
+    if (cliente.codigoPortal) return;
+    const nuevo = generarCodigoPortal();
+    const actualizado = { ...cliente, codigoPortal: nuevo };
+    storageSet(`cliente:${clienteId}`, JSON.stringify(actualizado), false).then(() => {
+      setCodigoCorto(nuevo);
+      onActualizar?.(actualizado);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const codigoMostrado = codigoCorto ? formatoCodigoPortal(codigoCorto) : clienteId;
   const numero = numeroWhatsappCliente(cliente.telefono);
-  const link = `${window.location.origin}/?codigo=${encodeURIComponent(clienteId)}#portal`;
+  const link = `${window.location.origin}/?codigo=${encodeURIComponent(codigoCorto || clienteId)}#portal`;
   // Sin emojis a propósito: los de secuencia compuesta (como 1️⃣2️⃣) no se ven
   // bien en todos los WhatsApp y salían como "�".
-  const mensaje = `*${getNombreDespacho()}*\n\nHola ${cliente.nombre || ""}, te compartimos acceso a tu portal personal. Ahí puedes consultar el estado de tu proceso, tus pagos y tus documentos cuando quieras.\n\nEntra con este enlace (ya trae tu código):\n${link}\n\nSi te pide el código de acceso, es este:\n${clienteId}`;
+  const mensaje = `*${getNombreDespacho()}*\n\nHola ${cliente.nombre || ""}, te compartimos acceso a tu portal personal. Ahí puedes consultar el estado de tu proceso, tus pagos y tus documentos cuando quieras.\n\nEntra con este enlace (ya trae tu código):\n${link}\n\nSi te pide el código de acceso, es este:\n${codigoMostrado}`;
   const copiar = (texto, clave) => {
     const marcar = () => {
       setCopiado(clave);
@@ -689,9 +710,9 @@ export function VentanaCompartirPortal({ clienteId, cliente, onCerrar }) {
       <div style={{ background: COLORS.surfaceSoft, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: "10px 12px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, marginBottom: 14 }}>
         <div style={{ minWidth: 0 }}>
           <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11, color: COLORS.muted, margin: 0 }}>Código de acceso</p>
-          <p style={{ fontFamily: "monospace", fontSize: 15, fontWeight: 700, color: COLORS.ink, margin: 0, wordBreak: "break-all" }}>{clienteId}</p>
+          <p style={{ fontFamily: "monospace", fontSize: 15, fontWeight: 700, color: COLORS.ink, margin: 0, wordBreak: "break-all" }}>{codigoMostrado}</p>
         </div>
-        <button className="drx-btn-ghost" style={{ ...buttonGhost, flexShrink: 0 }} onClick={() => copiar(clienteId, "codigo")}>
+        <button className="drx-btn-ghost" style={{ ...buttonGhost, flexShrink: 0 }} onClick={() => copiar(codigoMostrado, "codigo")}>
           {copiado === "codigo" ? "✓ Copiado" : "Copiar código"}
         </button>
       </div>
@@ -1768,7 +1789,7 @@ export default function ClientesTab({ usuarioActual, onIrARegistrarPago, onListo
         />
       )}
       {compartirPortalId && clientes[compartirPortalId] && (
-        <VentanaCompartirPortal clienteId={compartirPortalId} cliente={clientes[compartirPortalId]} onCerrar={() => setCompartirPortalId(null)} />
+        <VentanaCompartirPortal clienteId={compartirPortalId} cliente={clientes[compartirPortalId]} onCerrar={() => setCompartirPortalId(null)} onActualizar={(c) => setClientes((prev) => ({ ...prev, [compartirPortalId]: c }))} />
       )}
       {toastGuardado && (
         <div
