@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabaseClient";
 import {
   COLORS,
@@ -50,8 +50,21 @@ export default function VistaPortalCliente() {
   const [descargandoRecibo, setDescargandoRecibo] = useState(null);
   const [errorRecibo, setErrorRecibo] = useState("");
 
-  const buscar = async () => {
-    const code = codigo.trim();
+  // El link que el despacho comparte por WhatsApp ya trae el código
+  // (?codigo=...#portal): el cliente entra directo, sin tener que copiarlo
+  // ni escribirlo. Se borra de la barra de direcciones apenas se lee.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const desdeLink = (params.get("codigo") || "").trim();
+    if (!desdeLink) return;
+    window.history.replaceState(null, "", window.location.pathname + window.location.hash);
+    setCodigo(desdeLink);
+    buscar(desdeLink);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const buscar = async (codigoDirecto) => {
+    const code = (typeof codigoDirecto === "string" ? codigoDirecto : codigo).trim();
     if (!code) return;
     setBuscando(true);
     setNotFound(false);

@@ -1263,7 +1263,7 @@ function AcuerdoPagoForm({ cliente, clienteId, saldo, datosResponsable, usuarioA
   );
 }
 
-function FormularioPago({ cliente, onRegistrar, mediosPago = MEDIOS_PAGO_DEFECTO }) {
+export function FormularioPago({ cliente, onRegistrar, mediosPago = MEDIOS_PAGO_DEFECTO }) {
   const hoyStr = new Date().toISOString().slice(0, 10);
   const [medioPago, setMedioPago] = useState(mediosPago[0]);
   const [valor, setValor] = useState("");
@@ -2258,6 +2258,61 @@ function OtroIngresoCard({ ingreso, onEditar, onEliminar, mediosPago = MEDIOS_PA
   );
 }
 
+// Registra un pago de un cliente: arma el recibo, calcula el próximo pago
+// (según el calendario de cuotas o la frecuencia del plan), lo guarda y deja
+// la auditoría. Exportado para que Clientes pueda registrar el pago ahí
+// mismo, con la misma lógica, sin mandar a Contabilidad.
+export async function registrarPagoDeCliente(id, cliente, datosPago, usuarioActual) {
+  const pago = {
+    id: uid(),
+    fecha: new Date(`${datosPago.fechaPago}T12:00:00`).toISOString(),
+    medioPago: datosPago.medioPago,
+    valor: datosPago.valor,
+    concepto: datosPago.concepto,
+    retencionPorcentaje: datosPago.retencionPorcentaje || 0,
+  };
+  const reciboImagen = await generarReciboImagen(id, cliente, pago);
+  pago.reciboImagen = reciboImagen;
+
+  const pagosAntesDeEste = cliente.pagos || [];
+  let proximoPago = cliente.proximoPago || null;
+  if (datosPago.fechaProximoPago) {
+    // El abogado indicó manualmente la próxima fecha, tiene prioridad.
+    proximoPago = { fecha: datosPago.fechaProximoPago, valorEsperado: datosPago.valorProximoPago };
+  } else if (cliente.planPago && cliente.planPago.frecuencia !== "Pago único" && cliente.planPago.frecuencia !== "Otro") {
+    // No se indicó manualmente: si el plan tiene un calendario de cuotas
+    // con fechas ya armado (lo normal, desde que se creó el cliente o
+    // desde un acuerdo de pago), el próximo pago de verdad es la
+    // siguiente cuota de esa lista — no una cuenta genérica de "un mes
+    // después de hoy", que podía quedar desfasada del calendario real.
+    const cuotas = cliente.planPago.cuotas;
+    const siguienteCuota = Array.isArray(cuotas) ? cuotas[pagosAntesDeEste.length + 1] : null;
+    if (siguienteCuota) {
+      proximoPago = { fecha: siguienteCuota.fecha, valorEsperado: siguienteCuota.valor };
+    } else {
+      // Sin calendario de cuotas (o ya se pagaron todas las que había):
+      // se calcula por frecuencia. Si el plan tiene valor pero nunca
+      // quedó guardada su frecuencia real (un cliente creado antes de
+      // que se corrigiera ese error en el editor de plan de pago), se
+      // asume mensual — mejor eso que dejar la fecha de "próximo pago"
+      // congelada para siempre en el pasado, mostrando al cliente como
+      // atrasado aunque acabe de pagar al día.
+      const frecuencia = cliente.planPago.frecuencia || "Mensual";
+      const siguienteFecha = calcularProximaFechaPorFrecuencia(datosPago.fechaPago, frecuencia);
+      proximoPago = { fecha: siguienteFecha, valorEsperado: cliente.planPago.valor || datosPago.valor };
+    }
+  }
+
+  const actualizado = {
+    ...cliente,
+    pagos: [...(cliente.pagos || []), pago],
+    proximoPago,
+  };
+  await storageSet(`cliente:${id}`, JSON.stringify(actualizado), false);
+  registrarAuditoria(usuarioActual, "registrar_pago", "cliente", id, { nombre: cliente.nombre, valor: pago.valor, medioPago: pago.medioPago });
+  return actualizado;
+}
+
 export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onClienteInicialPagoConsumido, onListo }) {
   const { ids, cargado } = useIndex("indice-clientes", false);
   const [clientes, setClientes] = useState({});
@@ -2547,55 +2602,8 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
   }, [cargar]);
 
   const registrarPago = async (id, datosPago) => {
-    const cliente = clientes[id];
-    const pago = {
-      id: uid(),
-      fecha: new Date(`${datosPago.fechaPago}T12:00:00`).toISOString(),
-      medioPago: datosPago.medioPago,
-      valor: datosPago.valor,
-      concepto: datosPago.concepto,
-      retencionPorcentaje: datosPago.retencionPorcentaje || 0,
-    };
-    const reciboImagen = await generarReciboImagen(id, cliente, pago);
-    pago.reciboImagen = reciboImagen;
-
-    const pagosAntesDeEste = cliente.pagos || [];
-    let proximoPago = cliente.proximoPago || null;
-    if (datosPago.fechaProximoPago) {
-      // El abogado indicó manualmente la próxima fecha, tiene prioridad.
-      proximoPago = { fecha: datosPago.fechaProximoPago, valorEsperado: datosPago.valorProximoPago };
-    } else if (cliente.planPago && cliente.planPago.frecuencia !== "Pago único" && cliente.planPago.frecuencia !== "Otro") {
-      // No se indicó manualmente: si el plan tiene un calendario de cuotas
-      // con fechas ya armado (lo normal, desde que se creó el cliente o
-      // desde un acuerdo de pago), el próximo pago de verdad es la
-      // siguiente cuota de esa lista — no una cuenta genérica de "un mes
-      // después de hoy", que podía quedar desfasada del calendario real.
-      const cuotas = cliente.planPago.cuotas;
-      const siguienteCuota = Array.isArray(cuotas) ? cuotas[pagosAntesDeEste.length + 1] : null;
-      if (siguienteCuota) {
-        proximoPago = { fecha: siguienteCuota.fecha, valorEsperado: siguienteCuota.valor };
-      } else {
-        // Sin calendario de cuotas (o ya se pagaron todas las que había):
-        // se calcula por frecuencia. Si el plan tiene valor pero nunca
-        // quedó guardada su frecuencia real (un cliente creado antes de
-        // que se corrigiera ese error en el editor de plan de pago), se
-        // asume mensual — mejor eso que dejar la fecha de "próximo pago"
-        // congelada para siempre en el pasado, mostrando al cliente como
-        // atrasado aunque acabe de pagar al día.
-        const frecuencia = cliente.planPago.frecuencia || "Mensual";
-        const siguienteFecha = calcularProximaFechaPorFrecuencia(datosPago.fechaPago, frecuencia);
-        proximoPago = { fecha: siguienteFecha, valorEsperado: cliente.planPago.valor || datosPago.valor };
-      }
-    }
-
-    const actualizado = {
-      ...cliente,
-      pagos: [...(cliente.pagos || []), pago],
-      proximoPago,
-    };
-    await storageSet(`cliente:${id}`, JSON.stringify(actualizado), false);
+    const actualizado = await registrarPagoDeCliente(id, clientes[id], datosPago, usuarioActual);
     setClientes((prev) => ({ ...prev, [id]: actualizado }));
-    registrarAuditoria(usuarioActual, "registrar_pago", "cliente", id, { nombre: cliente.nombre, valor: pago.valor, medioPago: pago.medioPago });
     setFormAbiertoId(null);
   };
 

@@ -7,7 +7,7 @@ import {
   AREAS_PROCESO, COLOR_AREA_PROCESO, DIAS_ALERTA_INACTIVIDAD, numeroWhatsappCliente,
   radicadosDeCliente, tiposProcesoDeArea, useServicios, calcularProximaFechaPorFrecuencia,
   fechaHoyISO, formatoCOP, leerJSONLocal, guardarJSONLocal, useReferenciadores, useAbogadosAsociados,
-  useValorConRetraso, SelectorComision, permisosPorDefecto, enviarMensajeGrupoWhatsapp,
+  useValorConRetraso, SelectorComision, permisosPorDefecto, enviarMensajeGrupoWhatsapp, useMediosPago,
 } from "../App.jsx";
 
 // Enlace oficial de la Fiscalía para consultar el estado de una denuncia en
@@ -596,6 +596,136 @@ function PlanDePago({ planPago, onChange, valorTotal }) {
   );
 }
 
+// Ventana encima de la lista de clientes (no cambia de sección).
+function VentanaClientes({ titulo, onCerrar, children }) {
+  return (
+    <div
+      onClick={onCerrar}
+      style={{ position: "fixed", inset: 0, background: "rgba(10,18,32,0.55)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: "calc(16px + var(--sat)) calc(16px + var(--sar)) calc(16px + var(--sab)) calc(16px + var(--sal))" }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="drx-dropdown-in"
+        style={{ background: COLORS.panel, borderRadius: 16, width: "min(520px, 100%)", maxHeight: "100%", overflowY: "auto", padding: 22, boxShadow: "0 24px 60px rgba(0,0,0,0.3)" }}
+      >
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10, marginBottom: 12 }}>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 16, fontWeight: 800, color: COLORS.ink, margin: 0 }}>{titulo}</p>
+          <button onClick={onCerrar} aria-label="Cerrar" style={{ background: "none", border: "none", fontSize: 22, lineHeight: 1, cursor: "pointer", color: COLORS.muted }}>
+            ×
+          </button>
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+// Registrar un pago sin salir de Clientes: usa el mismo formulario y la
+// misma lógica de Contabilidad (recibo, próximo pago, cuotas), cargados
+// solo cuando se abre la ventana.
+export function VentanaRegistrarPago({ clienteId, cliente, usuarioActual, onRegistrado, onCerrar, onIrAContabilidad }) {
+  const [mod, setMod] = useState(null);
+  const [error, setError] = useState("");
+  const { mediosPago } = useMediosPago();
+  useEffect(() => {
+    let cancelado = false;
+    import("./ContabilidadTab.jsx")
+      .then((m) => !cancelado && setMod(m))
+      .catch(() => !cancelado && setError("No se pudo cargar el formulario de pago. Revisa tu conexión e intenta de nuevo."));
+    return () => {
+      cancelado = true;
+    };
+  }, []);
+  return (
+    <VentanaClientes titulo={`Registrar pago — ${(cliente.nombre || "").toUpperCase()}`} onCerrar={onCerrar}>
+      {error && <p style={{ color: "#B42318", fontFamily: "Inter, sans-serif", fontSize: 13 }}>{error}</p>}
+      {!mod && !error && <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted }}>Cargando…</p>}
+      {mod && (
+        <mod.FormularioPago
+          cliente={cliente}
+          mediosPago={mediosPago}
+          onRegistrar={async (datos) => {
+            try {
+              const actualizado = await mod.registrarPagoDeCliente(clienteId, cliente, datos, usuarioActual);
+              onRegistrado(actualizado);
+            } catch (e) {
+              setError(e?.message || "No se pudo registrar el pago. Intenta de nuevo.");
+            }
+          }}
+        />
+      )}
+      {onIrAContabilidad && (
+        <button type="button" onClick={onIrAContabilidad} style={{ background: "none", border: "none", color: COLORS.muted, fontFamily: "Inter, sans-serif", fontSize: 12, textDecoration: "underline", cursor: "pointer", marginTop: 10, padding: 0 }}>
+          Ver todos los pagos y recibos en Contabilidad ↗
+        </button>
+      )}
+    </VentanaClientes>
+  );
+}
+
+// Compartir el portal: muestra el mensaje antes de enviarlo, con WhatsApp
+// directo y botones para copiar el mensaje o solo el código. El link ya
+// lleva el código, así el cliente entra con un solo toque sin copiar nada.
+export function VentanaCompartirPortal({ clienteId, cliente, onCerrar }) {
+  const [copiado, setCopiado] = useState("");
+  const numero = numeroWhatsappCliente(cliente.telefono);
+  const link = `${window.location.origin}/?codigo=${encodeURIComponent(clienteId)}#portal`;
+  // Sin emojis a propósito: los de secuencia compuesta (como 1️⃣2️⃣) no se ven
+  // bien en todos los WhatsApp y salían como "�".
+  const mensaje = `*${getNombreDespacho()}*\n\nHola ${cliente.nombre || ""}, te compartimos acceso a tu portal personal. Ahí puedes consultar el estado de tu proceso, tus pagos y tus documentos cuando quieras.\n\nEntra con este enlace (ya trae tu código):\n${link}\n\nSi te pide el código de acceso, es este:\n${clienteId}`;
+  const copiar = (texto, clave) => {
+    const marcar = () => {
+      setCopiado(clave);
+      setTimeout(() => setCopiado(""), 1500);
+    };
+    if (navigator.clipboard?.writeText) navigator.clipboard.writeText(texto).then(marcar).catch(() => {});
+  };
+  const botonVerde = { ...buttonPrimary, background: "#1DA851", width: "100%", textAlign: "center", textDecoration: "none", display: "block", boxSizing: "border-box" };
+  return (
+    <VentanaClientes titulo={`Compartir portal — ${(cliente.nombre || "").toUpperCase()}`} onCerrar={onCerrar}>
+      <div style={{ background: "#ECE5DD", borderRadius: 12, padding: 12, marginBottom: 14 }}>
+        <div style={{ background: "#D9FDD3", borderRadius: 10, padding: "10px 12px", fontFamily: "Inter, sans-serif", fontSize: 13, color: "#111", whiteSpace: "pre-wrap", wordBreak: "break-word", lineHeight: 1.45 }}>{mensaje.replace(/\*/g, "")}</div>
+      </div>
+      <div style={{ background: COLORS.surfaceSoft, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: "10px 12px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, marginBottom: 14 }}>
+        <div style={{ minWidth: 0 }}>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11, color: COLORS.muted, margin: 0 }}>Código de acceso</p>
+          <p style={{ fontFamily: "monospace", fontSize: 15, fontWeight: 700, color: COLORS.ink, margin: 0, wordBreak: "break-all" }}>{clienteId}</p>
+        </div>
+        <button className="drx-btn-ghost" style={{ ...buttonGhost, flexShrink: 0 }} onClick={() => copiar(clienteId, "codigo")}>
+          {copiado === "codigo" ? "✓ Copiado" : "Copiar código"}
+        </button>
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {numero && (
+          <a href={`https://wa.me/${numero}?text=${encodeURIComponent(mensaje)}`} target="_blank" rel="noreferrer" className="drx-btn-primary" style={botonVerde} onClick={onCerrar}>
+            Enviar por WhatsApp a {cliente.telefono} ↗
+          </a>
+        )}
+        {cliente.grupoWhatsapp && (
+          <button
+            className="drx-btn-primary"
+            style={botonVerde}
+            onClick={() => {
+              enviarMensajeGrupoWhatsapp(cliente, mensaje);
+              onCerrar();
+            }}
+          >
+            Enviar al grupo de WhatsApp ↗
+          </button>
+        )}
+        {!numero && (
+          <a href={`https://wa.me/?text=${encodeURIComponent(mensaje)}`} target="_blank" rel="noreferrer" className="drx-btn-primary" style={botonVerde} onClick={onCerrar}>
+            Abrir WhatsApp y elegir el contacto ↗
+          </a>
+        )}
+        <button className="drx-btn-ghost" style={{ ...buttonGhost, width: "100%" }} onClick={() => copiar(mensaje, "mensaje")}>
+          {copiado === "mensaje" ? "✓ Mensaje copiado" : "Copiar mensaje completo"}
+        </button>
+      </div>
+    </VentanaClientes>
+  );
+}
+
 export default function ClientesTab({ usuarioActual, onIrARegistrarPago, onListo }) {
   const { ids, cargado, addId, removeId } = useIndex("indice-clientes", false);
   const { usuarios: abogadosDespacho } = useUsuariosDespacho();
@@ -627,6 +757,8 @@ export default function ClientesTab({ usuarioActual, onIrARegistrarPago, onListo
   const [soloSinRadicado, setSoloSinRadicado] = useState(false);
   const [soloInactivos, setSoloInactivos] = useState(false);
   const [toastGuardado, setToastGuardado] = useState("");
+  const [pagoClienteId, setPagoClienteId] = useState(null);
+  const [compartirPortalId, setCompartirPortalId] = useState(null);
   const { confirmar, ConfirmarDialogo } = useConfirmarDialogo();
 
   useEffect(() => {
@@ -681,7 +813,7 @@ export default function ClientesTab({ usuarioActual, onIrARegistrarPago, onListo
     setToastGuardado(
       proximoPago
         ? `"${form.nombre}" se guardó correctamente`
-        : `"${form.nombre}" se guardó correctamente. Cuando pague, ve a Contabilidad para registrar el pago.`
+        : `"${form.nombre}" se guardó correctamente. Cuando pague, toca "Registrar pago" en su tarjeta.`
     );
     setTimeout(() => setToastGuardado(""), 4200);
     guardarJSONLocal(LLAVE_BORRADOR_CLIENTE, null);
@@ -1536,42 +1668,14 @@ export default function ClientesTab({ usuarioActual, onIrARegistrarPago, onListo
                   </div>
                 </div>
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap", maxWidth: "100%" }}>
-                  {(() => {
-                    const numeroPortal = numeroWhatsappCliente(c.telefono);
-                    const puedeCompartir = !!numeroPortal || !!c.grupoWhatsapp;
-                    return (
-                      <button
-                        className="drx-btn-ghost"
-                        disabled={!puedeCompartir}
-                        title={puedeCompartir ? undefined : "Agrega un teléfono o un grupo de WhatsApp del proceso (en Editar) para poder compartir el portal"}
-                        style={{
-                          ...buttonGhost,
-                          background: puedeCompartir ? "#1DA851" : undefined,
-                          color: puedeCompartir ? "#FFFFFF" : undefined,
-                          border: puedeCompartir ? "none" : undefined,
-                          opacity: puedeCompartir ? 1 : 0.55,
-                          cursor: puedeCompartir ? "pointer" : "not-allowed",
-                        }}
-                        onClick={() => {
-                          if (!puedeCompartir) return;
-                          // Sin emojis a propósito: los de secuencia compuesta
-                          // (como los números con recuadro 1️⃣2️⃣) no se ven bien
-                          // en todos los WhatsApp/dispositivos y salían como
-                          // "�" — con texto plano se ve más serio para un
-                          // mensaje de despacho de abogados, y no depende de que
-                          // el teléfono de cada cliente tenga esas fuentes.
-                          const mensaje = `*${getNombreDespacho()}*\n\nHola ${c.nombre || ""}, te compartimos acceso a tu portal personal. Ahí puedes consultar el estado de tu proceso y tu estado de cuenta cuando quieras.\n\nIngresa aquí: ${window.location.origin}/#portal\nCódigo de acceso: *${id}*`;
-                          if (numeroPortal) {
-                            window.open(`https://wa.me/${numeroPortal}?text=${encodeURIComponent(mensaje)}`, "_blank");
-                          } else {
-                            enviarMensajeGrupoWhatsapp(c, mensaje);
-                          }
-                        }}
-                      >
-                        {numeroPortal ? "Compartir portal ↗" : puedeCompartir ? "Compartir portal al grupo ↗" : "Compartir portal ↗"}
-                      </button>
-                    );
-                  })()}
+                  <button
+                    className="drx-btn-ghost"
+                    style={{ ...buttonGhost, background: "#1DA851", color: "#FFFFFF", border: "none" }}
+                    title="Ver el mensaje y enviarlo por WhatsApp, o copiar el código"
+                    onClick={() => setCompartirPortalId(id)}
+                  >
+                    Compartir portal ↗
+                  </button>
                   <button
                     className="drx-btn-ghost"
                     style={buttonGhost}
@@ -1609,10 +1713,10 @@ export default function ClientesTab({ usuarioActual, onIrARegistrarPago, onListo
                     <button
                       className="drx-btn-ghost"
                       style={{ ...buttonGhost, color: "#F43F5E", borderColor: "#FBD5DC" }}
-                      title="Ir a Contabilidad a registrar un pago de este cliente"
-                      onClick={() => onIrARegistrarPago(id)}
+                      title="Registrar un pago de este cliente aquí mismo"
+                      onClick={() => setPagoClienteId(id)}
                     >
-                      Registrar pago ↗
+                      Registrar pago
                     </button>
                   )}
                   <button className="drx-btn-ghost" style={buttonGhost} onClick={() => empezarEdicion(id)}>
@@ -1648,6 +1752,24 @@ export default function ClientesTab({ usuarioActual, onIrARegistrarPago, onListo
           <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted, textAlign: "center" }}>Ningún cliente coincide con "{filtro}".</p>
         )}
       </div>
+      {pagoClienteId && clientes[pagoClienteId] && (
+        <VentanaRegistrarPago
+          clienteId={pagoClienteId}
+          cliente={clientes[pagoClienteId]}
+          usuarioActual={usuarioActual}
+          onCerrar={() => setPagoClienteId(null)}
+          onIrAContabilidad={onIrARegistrarPago ? () => onIrARegistrarPago(pagoClienteId) : null}
+          onRegistrado={(actualizado) => {
+            setClientes((prev) => ({ ...prev, [pagoClienteId]: actualizado }));
+            setPagoClienteId(null);
+            setToastGuardado("Pago registrado y recibo generado");
+            setTimeout(() => setToastGuardado(""), 4200);
+          }}
+        />
+      )}
+      {compartirPortalId && clientes[compartirPortalId] && (
+        <VentanaCompartirPortal clienteId={compartirPortalId} cliente={clientes[compartirPortalId]} onCerrar={() => setCompartirPortalId(null)} />
+      )}
       {toastGuardado && (
         <div
           className="drx-fade-in"
