@@ -169,7 +169,23 @@ function TarjetaHerramienta({ h }) {
 
   // Al abrir el portal, el dato principal (cédula, placa, NIT) queda copiado
   // para pegarlo de una vez.
-  const abrir = () => {
+  const abrir = (e) => {
+    // En computador, el portal del Estado se abre en una ventana al lado de
+    // Nomos (no en otra pestaña), para copiar y pegar sin perder de vista
+    // la ficha. Esos portales no se dejan mostrar dentro de Nomos (lo
+    // bloquean por seguridad), así que una ventana aparte es lo más cercano.
+    const pantalla = window.screen || {};
+    const anchoTotal = pantalla.availWidth || window.innerWidth;
+    if (anchoTotal >= 1000) {
+      const ancho = Math.round(anchoTotal * 0.55);
+      const alto = pantalla.availHeight || window.innerHeight;
+      const izquierda = (pantalla.availLeft || 0) + anchoTotal - ancho;
+      const ventana = window.open(h.url, "nomos-antecedentes", `popup=yes,width=${ancho},height=${alto},left=${izquierda},top=${pantalla.availTop || 0}`);
+      if (ventana) {
+        e.preventDefault();
+        ventana.focus();
+      }
+    }
     if (!valorPrincipal) return;
     copiarTexto(valorPrincipal).then((ok) => {
       if (!ok) return;
