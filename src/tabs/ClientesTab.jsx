@@ -426,6 +426,25 @@ function PlanDePago({ planPago, onChange, valorTotal }) {
     onChange({ ...combinado, cuotas, descripcion: resumen, resumen });
   };
 
+  // Recalcula solo las FECHAS en cadena desde la primera cuota, respetando
+  // la frecuencia configurada, sin tocar los valores que el abogado ya ajustó.
+  const recalcularSoloFechas = () => {
+    const cuotasActuales = plan.cuotas || [];
+    if (cuotasActuales.length < 2) return;
+    const frecuencia = plan.frecuencia || FRECUENCIAS_PAGO[2];
+    const nuevasCuotas = cuotasActuales.map((c, i) => {
+      if (i === 0) return c; // primera cuota: fecha intacta
+      let fecha = cuotasActuales[0].fecha;
+      for (let j = 0; j < i; j++) {
+        if (fecha && frecuencia !== "Pago único" && frecuencia !== "Otro") {
+          fecha = calcularProximaFechaPorFrecuencia(fecha, frecuencia);
+        }
+      }
+      return { ...c, fecha };
+    });
+    onChange({ ...plan, cuotas: nuevasCuotas });
+  };
+
   // Si cambian el "Valor total acordado" de arriba después de armar el
   // plan, las cuotas se recalculan solas (salvo que el valor se haya puesto
   // a mano).
@@ -557,8 +576,8 @@ function PlanDePago({ planPago, onChange, valorTotal }) {
               type="button"
               className="drx-btn-ghost"
               style={{ ...buttonGhost, padding: "4px 10px", fontSize: 11.5, flexShrink: 0 }}
-              onClick={() => actualizar({})}
-              title="Vuelve a calcular todas las fechas encadenando la frecuencia desde la primera cuota, por si alguna quedó repetida"
+              onClick={recalcularSoloFechas}
+              title="Recalcula las fechas de todas las cuotas en cadena desde la primera, sin tocar los valores"
             >
               🔁 Recalcular fechas
             </button>
