@@ -424,7 +424,7 @@ export default function VistaPortalCliente() {
                 className="drx-input"
                 style={{ ...inputStyle, fontWeight: 800, fontSize: 20, fontFamily: "monospace", textAlign: "center", letterSpacing: 4, padding: "15px 12px", textTransform: "uppercase", background: "#FFFFFF", color: "#0B0B0C" }}
                 value={codigo}
-                onChange={(e) => setCodigo(e.target.value)}
+                onChange={(e) => setCodigo(e.target.value.toUpperCase().replace(/[^A-Z0-9-]/g, ""))}
                 placeholder="ABCD-2345"
                 onKeyDown={(e) => e.key === "Enter" && buscar()}
                 autoFocus

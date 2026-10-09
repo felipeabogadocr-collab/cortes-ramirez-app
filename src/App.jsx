@@ -1355,7 +1355,7 @@ export function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-export const APP_VERSION = "1.175.0";
+export const APP_VERSION = "1.176.0";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -9943,10 +9943,6 @@ function App() {
             >
               <Icono tipo="ayuda" size={16} />
             </a>
-            <button className="drx-btn-ghost" style={buttonGhost} onClick={() => setModoPublico(true)} title="Ver vista del cliente">
-              <Icono tipo="ojo" size={13} style={{ marginRight: 4, verticalAlign: -2 }} />
-              <span className="drx-oculta-movil">Ver vista del cliente ↗</span>
-            </button>
             <BotonTema oscuro={oscuro} onClick={alternar} />
           </div>
         </div>

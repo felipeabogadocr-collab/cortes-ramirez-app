@@ -1760,6 +1760,18 @@ export default function ClientesTab({ usuarioActual, onIrARegistrarPago, onListo
                     Compartir portal ↗
                   </button>
                   <BotonContrato id={id} cliente={c} onActualizar={(act) => setClientes((prev) => ({ ...prev, [id]: act }))} />
+                  {c.codigoPortal && (
+                    <a
+                      href={`/p/${encodeURIComponent(c.codigoPortal)}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="drx-btn-ghost"
+                      style={{ ...buttonGhost, textDecoration: "none" }}
+                      title="Ver cómo ve el cliente su portal"
+                    >
+                      <Icono tipo="ojo" size={13} style={{ marginRight: 4, verticalAlign: -2 }} /> Ver portal
+                    </a>
+                  )}
                   <button
                     className="drx-btn-ghost"
                     style={buttonGhost}
