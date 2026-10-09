@@ -202,7 +202,10 @@ export default async function handler(req, res) {
     // El RPC en vivo puede ser una versión vieja que no incluye actuaciones o
     // las devuelve vacías — se leen directamente de data.timeline para
     // garantizar que el portal siempre muestre la línea de tiempo completa.
-    const timelineRaw = clienteRaw?.data?.timeline || [];
+    // El RPC en vivo puede ser versión vieja — se inyectan los campos
+    // faltantes directamente desde data del cliente (admin key).
+    const raw = clienteRaw?.data || {};
+    const timelineRaw = raw.timeline || [];
     if (timelineRaw.length > 0 && (!data.actuaciones || data.actuaciones.length === 0)) {
       data.actuaciones = timelineRaw
         .map((t) => ({ fecha: t.fecha, nota: t.nota }))
@@ -210,6 +213,22 @@ export default async function handler(req, res) {
         .sort((a, b) => (b.fecha || "").localeCompare(a.fecha || ""))
         .slice(0, 20);
     }
+    const cuotasRaw = raw.planPago?.cuotas || [];
+    if (cuotasRaw.length > 0 && (!data.cuotas || data.cuotas.length === 0)) {
+      data.cuotas = cuotasRaw;
+    }
+    const pagosRaw = raw.pagos || [];
+    if (pagosRaw.length > 0 && (!data.pagos || data.pagos.length === 0)) {
+      data.pagos = pagosRaw.map((p) => ({
+        id: p.id,
+        fecha: p.fecha,
+        valor: p.valor,
+        concepto: p.concepto,
+        tieneRecibo: !!p.reciboImagen,
+      }));
+    }
+    if (!data.valorTotal && raw.valorTotal) data.valorTotal = raw.valorTotal;
+    if (!data.proximoPago && raw.proximoPago) data.proximoPago = raw.proximoPago;
     return res.status(200).json(data);
   }
   if (req.method === "GET" && req.query?.accion === "contrato-portal") {
