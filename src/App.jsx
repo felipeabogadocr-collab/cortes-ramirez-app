@@ -1355,7 +1355,7 @@ export function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-export const APP_VERSION = "1.178.0";
+export const APP_VERSION = "1.179.0";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -10077,18 +10077,12 @@ function App() {
           </div>
         </div>
 
-        <div style={{ borderTop: `1px solid ${COLORS.border}`, background: COLORS.panel, padding: "20px 24px 16px" }}>
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
-            <InsigniaPlataforma />
-            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, fontWeight: 700, color: COLORS.headingText, margin: "0 0 6px" }}>
+        <div style={{ borderTop: `1px solid ${COLORS.border}`, background: COLORS.panel, padding: "10px 24px 12px" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, fontWeight: 600, color: COLORS.inkSoft, margin: 0 }}>
               {getNombreDespacho()}
             </p>
-            <p style={{ textAlign: "center", fontFamily: "Inter, sans-serif", fontSize: 11, color: COLORS.muted, margin: 0 }}>
-              Nomos — creado por <strong style={{ color: COLORS.headingText }}>Felipe Cortés Ramírez</strong>, abogado y CEO de Cortés Ramírez Abogados. Todos los derechos reservados.
-            </p>
-            <div style={{ display: "flex", justifyContent: "center", marginTop: 4 }}>
-              <SelloVersion oscuro={oscuro} />
-            </div>
+            <SelloVersion oscuro={oscuro} />
           </div>
         </div>
       </div>
