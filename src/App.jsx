@@ -1355,7 +1355,7 @@ export function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-export const APP_VERSION = "1.185.0";
+export const APP_VERSION = "1.186.0";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -3779,9 +3779,22 @@ function ProximoEventoResumen({ onIr }) {
   const { ids, eventos, cargado } = useEventosAgenda();
   if (!cargado) return null;
   const hoyISO = fechaHoyISO();
+  const ahora = new Date();
   const proximo = ids
     .map((id) => eventos[id])
-    .filter((e) => e?.titulo && e.fecha >= hoyISO)
+    .filter((e) => {
+      if (!e?.titulo || !e.fecha) return false;
+      if (e.fecha > hoyISO) return true;
+      if (e.fecha === hoyISO) {
+        // Si tiene hora, solo mostrar si la cita aún no pasó
+        if (!e.hora) return true;
+        const [h, m] = e.hora.split(":").map(Number);
+        const horaEvento = new Date(ahora);
+        horaEvento.setHours(h, m, 0, 0);
+        return horaEvento > ahora;
+      }
+      return false; // Fecha pasada: no mostrar
+    })
     .sort((a, b) => `${a.fecha}T${a.hora || "00:00"}`.localeCompare(`${b.fecha}T${b.hora || "00:00"}`))[0];
   if (!proximo) return null;
   const fechaTexto = new Date(`${proximo.fecha}T${proximo.hora || "00:00"}:00`).toLocaleDateString("es-CO", { weekday: "long", day: "numeric", month: "long" });
