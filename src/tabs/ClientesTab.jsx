@@ -1806,16 +1806,23 @@ export default function ClientesTab({ usuarioActual, onIrARegistrarPago, onListo
                     >
                       <Icono tipo="compartir" size={13} style={{ marginRight: 5, verticalAlign: -2 }} /> Compartir portal
                     </button>
-                    <a
-                      href={c.codigoPortal ? `/p/${encodeURIComponent(c.codigoPortal)}` : undefined}
-                      target="_blank"
-                      rel="noreferrer"
+                    <button
                       className="drx-btn-ghost"
-                      style={{ ...buttonGhost, textDecoration: "none", opacity: c.codigoPortal ? 1 : 0.45, pointerEvents: c.codigoPortal ? "auto" : "none" }}
-                      title={c.codigoPortal ? "Ver cómo ve el cliente su portal" : "Primero usa 'Compartir portal' para generar el código"}
+                      style={buttonGhost}
+                      title="Ver cómo ve el cliente su portal"
+                      onClick={async () => {
+                        let codigo = c.codigoPortal;
+                        if (!codigo) {
+                          codigo = generarCodigoPortal();
+                          const actualizado = { ...c, codigoPortal: codigo };
+                          await storageSet(`cliente:${id}`, JSON.stringify(actualizado));
+                          setClientes((prev) => ({ ...prev, [id]: actualizado }));
+                        }
+                        window.open(`/p/${encodeURIComponent(codigo)}`, "_blank", "noreferrer");
+                      }}
                     >
                       <Icono tipo="ojo" size={13} style={{ marginRight: 5, verticalAlign: -2 }} /> Ver portal
-                    </a>
+                    </button>
                     <button
                       className="drx-btn-ghost"
                       style={buttonGhost}
