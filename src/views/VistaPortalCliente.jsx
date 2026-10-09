@@ -9,6 +9,7 @@ import {
   inputStyle,
   formatoCOP,
   fechaHoyISO,
+  APP_VERSION,
 } from "../App.jsx";
 
 // Portal del cliente: lo que ve el cliente final con su código de acceso.
@@ -442,21 +443,22 @@ export default function VistaPortalCliente() {
             {notFound && (
               <p style={{ ...fuente, color: "#B42318", fontSize: 13, marginTop: 10, display: "flex", alignItems: "center", gap: 6 }}>
                 <Icono tipo="alerta" size={14} />
-                No encontramos ese código. Verifícalo con tu abogado.
+                No encontramos ese código. Verifícalo con el despacho.
               </p>
             )}
             <button className="drx-btn-primary" style={{ ...buttonPrimary, marginTop: 16, width: "100%", padding: "14px", fontSize: 15, background: `linear-gradient(135deg, #145C4E, ${VERDE_PROFUNDO})` }} onClick={buscar} disabled={buscando}>
               {buscando ? "Verificando..." : "Entrar a mi portal"}
             </button>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, marginTop: 20 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 6, marginTop: 20 }}>
               {[
-                ["balanza", "Estado judicial"],
-                ["tarjeta", "Pagos y recibos"],
+                ["chat", "Novedades"],
+                ["tarjeta", "Pagos"],
+                ["balanza", "Proceso"],
                 ["lapiz", "Firma digital"],
               ].map(([ic, t]) => (
                 <div key={t} style={{ textAlign: "center", padding: "10px 4px", borderRadius: 12, background: "#F4F7F6", color: "#2C5858" }}>
-                  <Icono tipo={ic} size={17} />
-                  <p style={{ ...fuente, fontSize: 11, fontWeight: 600, color: "#475467", margin: "5px 0 0" }}>{t}</p>
+                  <Icono tipo={ic} size={16} />
+                  <p style={{ ...fuente, fontSize: 10.5, fontWeight: 600, color: "#475467", margin: "5px 0 0", lineHeight: 1.3 }}>{t}</p>
                 </div>
               ))}
             </div>
@@ -474,12 +476,13 @@ export default function VistaPortalCliente() {
               ¿No tienes tu código? Escríbenos por WhatsApp
             </a>
           )}
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 7, marginTop: 26, color: "rgba(255,255,255,0.6)" }}>
-            <span style={{ ...fuente, fontSize: 11.5 }}>Con tecnología de</span>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 7, marginTop: 26 }}>
+            <span style={{ ...fuente, fontSize: 11, color: "rgba(255,255,255,0.5)" }}>Con tecnología de</span>
             <span style={{ color: DORADO, display: "flex" }}>
-              <IconoNomos size={16} />
+              <IconoNomos size={15} />
             </span>
-            <span style={{ ...fuente, fontSize: 13.5, fontWeight: 800, color: "#FFFFFF" }}>Nomos</span>
+            <span style={{ ...fuente, fontSize: 13, fontWeight: 800, color: "#FFFFFF" }}>Nomos</span>
+            <span style={{ ...fuente, fontSize: 10, color: "rgba(255,255,255,0.35)", fontWeight: 600 }}>v{APP_VERSION}</span>
           </div>
         </div>
       </div>
@@ -553,12 +556,13 @@ export default function VistaPortalCliente() {
               key={k.etiqueta}
               type="button"
               onClick={() => setPestana(k.ir)}
-              style={{ ...fuente, textAlign: "left", cursor: "pointer", background: COLORS.panel, border: `1px solid ${COLORS.border}`, borderRadius: 16, padding: "14px 14px", boxShadow: "0 10px 26px -14px rgba(11,59,51,0.35)", display: "flex", flexDirection: "column", gap: 8 }}
+              style={{ ...fuente, textAlign: "left", cursor: "pointer", background: COLORS.panel, border: `1px solid ${COLORS.border}`, borderRadius: 16, padding: "14px 14px", boxShadow: "0 8px 24px -12px rgba(11,59,51,0.22), 0 2px 4px rgba(0,0,0,0.04)", display: "flex", flexDirection: "column", gap: 8, position: "relative", overflow: "hidden" }}
             >
-              <span style={{ width: 28, height: 28, borderRadius: 9, background: `${k.color}1A`, color: k.color, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <span style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, background: `linear-gradient(90deg, ${k.color}, ${k.color}88)`, borderRadius: "16px 16px 0 0" }} />
+              <span style={{ width: 30, height: 30, borderRadius: 10, background: `${k.color}18`, color: k.color, display: "flex", alignItems: "center", justifyContent: "center", marginTop: 4 }}>
                 <Icono tipo={k.icono} size={15} />
               </span>
-              <span style={{ fontSize: 11, color: COLORS.muted, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.6 }}>{k.etiqueta}</span>
+              <span style={{ fontSize: 10.5, color: COLORS.muted, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.7 }}>{k.etiqueta}</span>
               <span style={{ fontSize: 14.5, fontWeight: 800, color: COLORS.headingText, lineHeight: 1.2 }}>{k.valor}</span>
             </button>
           ))}
@@ -574,7 +578,7 @@ export default function VistaPortalCliente() {
                   key={p.id}
                   type="button"
                   onClick={() => setPestana(p.id)}
-                  style={{ ...fuente, minWidth: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 4, padding: "8px 0", borderRadius: 10, border: "none", cursor: "pointer", fontSize: 10.5, fontWeight: 700, letterSpacing: -0.1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", background: activa ? `linear-gradient(135deg, #145C4E, ${VERDE_PROFUNDO})` : "transparent", color: activa ? "#FFFFFF" : COLORS.inkSoft }}
+                  style={{ ...fuente, minWidth: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 4, padding: "9px 0", borderRadius: 10, border: "none", cursor: "pointer", fontSize: 10.5, fontWeight: 700, letterSpacing: -0.1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", background: activa ? `linear-gradient(150deg, #145C4E, ${VERDE_PROFUNDO})` : "transparent", color: activa ? "#FFFFFF" : COLORS.inkSoft, boxShadow: activa ? "0 4px 12px -4px rgba(11,59,51,0.45)" : "none", transition: "all 0.15s" }}
                 >
                   <Icono tipo={p.icono} size={16} />
                   <span style={{ maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis" }}>{p.titulo}</span>
@@ -607,19 +611,27 @@ export default function VistaPortalCliente() {
 
 
               <Tarjeta>
-                <Encabezado icono="chat" color="#6366F1" titulo="Novedades de tu abogado" subtitulo="Todo lo que ha pasado en tu caso, explicado en palabras sencillas" />
+                <Encabezado icono="chat" color="#6366F1" titulo="Novedades del despacho" subtitulo="Todo lo que ha pasado en tu caso, explicado en palabras sencillas" />
                 {novedades.length === 0 ? (
-                  <p style={{ ...fuente, fontSize: 13, color: COLORS.muted, margin: 0 }}>Aún no hay novedades escritas. Cuando haya un avance, tu abogado lo contará aquí.</p>
+                  <p style={{ ...fuente, fontSize: 13, color: COLORS.muted, margin: 0 }}>Aún no hay novedades escritas. Cuando haya un avance, el despacho lo contará aquí.</p>
                 ) : (
-                  <div style={{ position: "relative", paddingLeft: 20 }}>
-                    <div style={{ position: "absolute", left: 5, top: 6, bottom: 6, width: 2, background: COLORS.border }} />
-                    {novedades.map((a, i) => (
-                      <div key={i} style={{ position: "relative", paddingBottom: i < novedades.length - 1 ? 16 : 0 }}>
-                        <div style={{ position: "absolute", left: -20, top: 3, width: 12, height: 12, borderRadius: "50%", background: i === 0 ? "#6366F1" : COLORS.panel, border: "2px solid #6366F1" }} />
-                        <p style={{ ...fuente, fontSize: 11.5, color: COLORS.muted, margin: 0 }}>{fechaLarga(a.fecha)} · {haceCuanto(a.fecha)}</p>
-                        <p style={{ ...fuente, fontSize: 13.5, color: COLORS.ink, margin: "3px 0 0", lineHeight: 1.55, whiteSpace: "pre-wrap" }}>{a.nota}</p>
-                      </div>
-                    ))}
+                  <div style={{ position: "relative", paddingLeft: 24 }}>
+                    <div style={{ position: "absolute", left: 7, top: 8, bottom: 8, width: 2, background: `linear-gradient(to bottom, #6366F1, ${COLORS.border})` }} />
+                    {novedades.map((a, i) => {
+                      const diasAtras = Math.floor((Date.now() - new Date(a.fecha).getTime()) / 86400000);
+                      const dotColor = diasAtras <= 1 ? "#10B981" : diasAtras <= 7 ? "#6366F1" : diasAtras <= 30 ? "#2F80ED" : COLORS.muted;
+                      return (
+                        <div key={i} style={{ position: "relative", paddingBottom: i < novedades.length - 1 ? 20 : 0 }}>
+                          <div style={{ position: "absolute", left: -24, top: 4, width: 14, height: 14, borderRadius: "50%", background: i === 0 ? dotColor : COLORS.panel, border: `2px solid ${dotColor}`, boxShadow: i === 0 ? `0 0 0 3px ${dotColor}22` : "none" }} />
+                          <p style={{ ...fuente, fontSize: 11, color: COLORS.muted, margin: 0, letterSpacing: 0.2 }}>
+                            {fechaLarga(a.fecha)}
+                            <span style={{ display: "inline-block", margin: "0 6px", opacity: 0.4 }}>·</span>
+                            <span style={{ color: dotColor, fontWeight: 700 }}>{haceCuanto(a.fecha)}</span>
+                          </p>
+                          <p style={{ ...fuente, fontSize: 13.5, color: COLORS.ink, margin: "4px 0 0", lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{a.nota}</p>
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </Tarjeta>
@@ -964,18 +976,18 @@ export default function VistaPortalCliente() {
           )}
         </div>
 
-        <footer style={{ margin: "32px 0 0", paddingTop: 20, borderTop: `1px solid ${COLORS.border}`, display: "flex", flexDirection: "column", alignItems: "center", gap: 10, textAlign: "center" }}>
+        <footer style={{ margin: "40px 0 0", paddingTop: 24, borderTop: `1px solid ${COLORS.border}`, display: "flex", flexDirection: "column", alignItems: "center", gap: 12, textAlign: "center" }}>
           {logoUrl && <img src={logoUrl} alt={despacho.nombre || ""} style={{ height: 44, maxWidth: 180, objectFit: "contain" }} />}
           {despacho.nombre && <p style={{ ...fuente, fontSize: 13, fontWeight: 700, color: COLORS.ink, margin: 0 }}>{despacho.nombre}</p>}
           <p style={{ ...fuente, fontSize: 11.5, color: COLORS.muted, margin: 0, display: "flex", alignItems: "center", gap: 6 }}>
             <Icono tipo="escudo" size={12} /> Información confidencial · Ley 1581 de 2012
           </p>
-          <div style={{ display: "flex", alignItems: "center", gap: 7, marginTop: 4, color: COLORS.muted }}>
-            <span style={{ ...fuente, fontSize: 11 }}>Con tecnología de</span>
+          <div style={{ display: "inline-flex", alignItems: "center", gap: 8, background: COLORS.surfaceSoft, borderRadius: 999, padding: "7px 14px", border: `1px solid ${COLORS.border}` }}>
             <span style={{ color: "#3E7C7C", display: "flex" }}>
-              <IconoNomos size={16} />
+              <IconoNomos size={14} />
             </span>
-            <span style={{ ...fuente, fontSize: 13, fontWeight: 800, color: COLORS.headingText }}>Nomos</span>
+            <span style={{ ...fuente, fontSize: 12.5, fontWeight: 800, color: COLORS.headingText }}>Nomos</span>
+            <span style={{ ...fuente, fontSize: 10.5, color: COLORS.muted, fontWeight: 600 }}>v{APP_VERSION}</span>
           </div>
         </footer>
       </div>
