@@ -782,15 +782,26 @@ export const formatoCodigoPortal = (c) => (c && c.length === 8 ? `${c.slice(0, 4
 
 export function VentanaCompartirPortal({ clienteId, cliente, onCerrar, onActualizar }) {
   const [copiado, setCopiado] = useState("");
+  const [guardando, setGuardando] = useState(false);
+  const [errorGuardar, setErrorGuardar] = useState(false);
   const [codigoCorto, setCodigoCorto] = useState(cliente.codigoPortal || "");
   useEffect(() => {
-    if (cliente.codigoPortal) return;
-    const nuevo = generarCodigoPortal();
-    const actualizado = { ...cliente, codigoPortal: nuevo };
-    storageSet(`cliente:${clienteId}`, JSON.stringify(actualizado), false).then(() => {
-      setCodigoCorto(nuevo);
-      onActualizar?.(actualizado);
-    });
+    // Siempre re-guardar en Supabase al abrir: el código puede estar en
+    // caché del browser (localStorage) pero no haber llegado a la BD,
+    // lo que hace que el cliente entre el código correcto y el portal
+    // no lo encuentre. Con esto nos aseguramos de que siempre esté en BD.
+    const codigo = cliente.codigoPortal || generarCodigoPortal();
+    const actualizado = { ...cliente, codigoPortal: codigo };
+    setGuardando(true);
+    setErrorGuardar(false);
+    storageSet(`cliente:${clienteId}`, JSON.stringify(actualizado))
+      .then((ok) => {
+        setGuardando(false);
+        if (ok === false) { setErrorGuardar(true); return; }
+        setCodigoCorto(codigo);
+        onActualizar?.(actualizado);
+      })
+      .catch(() => { setGuardando(false); setErrorGuardar(true); });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const codigoMostrado = codigoCorto ? formatoCodigoPortal(codigoCorto) : clienteId;
@@ -809,6 +820,18 @@ export function VentanaCompartirPortal({ clienteId, cliente, onCerrar, onActuali
     if (navigator.clipboard?.writeText) navigator.clipboard.writeText(texto).then(marcar).catch(() => {});
   };
   const botonVerde = { ...buttonPrimary, background: "#1DA851", width: "100%", textAlign: "center", textDecoration: "none", display: "block", boxSizing: "border-box" };
+  if (guardando) return (
+    <VentanaClientes titulo="Compartir portal" onCerrar={onCerrar}>
+      <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted, textAlign: "center", padding: "20px 0" }}>Verificando código en el servidor…</p>
+    </VentanaClientes>
+  );
+  if (errorGuardar) return (
+    <VentanaClientes titulo="Compartir portal" onCerrar={onCerrar}>
+      <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: "#B42318", textAlign: "center", padding: "20px 0" }}>
+        No se pudo confirmar el código. Verifica tu conexión y vuelve a intentarlo.
+      </p>
+    </VentanaClientes>
+  );
   return (
     <VentanaClientes titulo={`Compartir portal — ${(cliente.nombre || "").toUpperCase()}`} onCerrar={onCerrar}>
       <div style={{ background: "#ECE5DD", borderRadius: 12, padding: 12, marginBottom: 14 }}>
