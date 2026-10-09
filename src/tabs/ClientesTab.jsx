@@ -688,21 +688,66 @@ export function VentanaRegistrarPago({ clienteId, cliente, usuarioActual, onRegi
 // Contrato que el cliente ve y descarga en su portal. Es el único
 // documento que se carga para el portal; lo demás (documentos enviados,
 // recibidos, radicaciones) se anota en la línea de tiempo.
-const TAMANO_MAX_CONTRATO_MB = 8;
+const TAMANO_MAX_CONTRATO_MB = 20;
+
+// Comprime imágenes antes de subir (fotos del celular llegan a 15 MB+).
+// PDFs y docs se envían tal cual.
+async function comprimirSiEsImagen(archivo) {
+  if (!archivo.type.startsWith("image/")) return archivo;
+  return new Promise((resolve) => {
+    const url = URL.createObjectURL(archivo);
+    const img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const MAX_DIM = 1920;
+      let { width, height } = img;
+      if (width > MAX_DIM || height > MAX_DIM) {
+        const ratio = Math.min(MAX_DIM / width, MAX_DIM / height);
+        width = Math.round(width * ratio);
+        height = Math.round(height * ratio);
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      canvas.getContext("2d").drawImage(img, 0, 0, width, height);
+      const intentar = (calidad) => {
+        canvas.toBlob(
+          (blob) => {
+            if (!blob) { resolve(archivo); return; }
+            if (blob.size <= TAMANO_MAX_CONTRATO_MB * 1024 * 1024 || calidad <= 0.4) {
+              const nombre = archivo.name.replace(/\.[^.]+$/, "") + ".jpg";
+              resolve(new File([blob], nombre, { type: "image/jpeg" }));
+            } else {
+              intentar(Math.max(0.4, calidad - 0.15));
+            }
+          },
+          "image/jpeg",
+          calidad
+        );
+      };
+      intentar(0.85);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); resolve(archivo); };
+    img.src = url;
+  });
+}
+
 function BotonContrato({ id, cliente, onActualizar }) {
   const [subiendo, setSubiendo] = useState(false);
   const [error, setError] = useState("");
   const subir = async (e) => {
-    const archivo = e.target.files?.[0];
+    const archivoOriginal = e.target.files?.[0];
     e.target.value = "";
-    if (!archivo) return;
-    if (archivo.size > TAMANO_MAX_CONTRATO_MB * 1024 * 1024) {
-      setError(`Máximo ${TAMANO_MAX_CONTRATO_MB} MB`);
-      return;
-    }
+    if (!archivoOriginal) return;
     setSubiendo(true);
     setError("");
     try {
+      const archivo = await comprimirSiEsImagen(archivoOriginal);
+      if (archivo.size > TAMANO_MAX_CONTRATO_MB * 1024 * 1024) {
+        setError(`Máximo ${TAMANO_MAX_CONTRATO_MB} MB`);
+        setSubiendo(false);
+        return;
+      }
       const ruta = await subirContratoCliente(id, archivo);
       const actualizado = { ...cliente, contrato: { ruta, nombre: archivo.name, fecha: new Date().toISOString() } };
       await storageSet(`cliente:${id}`, JSON.stringify(actualizado), false);
