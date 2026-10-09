@@ -212,10 +212,9 @@ function guardarUltimoDespacho(cambios) {
 }
 
 const PESTANAS = [
-  { id: "resumen", titulo: "Resumen", icono: "grafico" },
-  { id: "proceso", titulo: "Proceso", icono: "balanza" },
+  { id: "resumen", titulo: "Novedades", icono: "chat" },
   { id: "pagos", titulo: "Pagos", icono: "tarjeta" },
-  { id: "documentos", titulo: "Documentos", icono: "clip" },
+  { id: "contrato", titulo: "Contrato", icono: "documento" },
   { id: "ayuda", titulo: "Ayuda", icono: "ayuda" },
 ];
 
@@ -401,11 +400,11 @@ export default function VistaPortalCliente() {
 
   // Lo que el cliente debería atender primero.
   const pendientes = [];
-  if (docsPendientes.length) pendientes.push({ icono: "lapiz", color: "#B45309", texto: `Tienes ${docsPendientes.length} documento${docsPendientes.length > 1 ? "s" : ""} por firmar`, ir: "documentos" });
+  if (docsPendientes.length) pendientes.push({ icono: "lapiz", color: "#B45309", texto: `Tienes ${docsPendientes.length} documento${docsPendientes.length > 1 ? "s" : ""} por firmar`, ir: "contrato" });
   if (cuotasVencidas.length) pendientes.push({ icono: "alerta", color: "#B42318", texto: `${cuotasVencidas.length} cuota${cuotasVencidas.length > 1 ? "s" : ""} vencida${cuotasVencidas.length > 1 ? "s" : ""}`, ir: "pagos" });
   else if (diasProximoPago !== null && diasProximoPago >= 0 && diasProximoPago <= 7) pendientes.push({ icono: "calendario", color: "#1D4ED8", texto: diasProximoPago === 0 ? "Tu próximo pago es hoy" : `Tu próximo pago es en ${diasProximoPago} día${diasProximoPago > 1 ? "s" : ""}`, ir: "pagos" });
   if (proximaCita && diasHasta(proximaCita.fecha) <= 3) pendientes.push({ icono: "video", color: "#7C3AED", texto: `Cita ${diasHasta(proximaCita.fecha) === 0 ? "hoy" : `el ${fechaCorta(proximaCita.fecha)}`}${proximaCita.hora ? ` a las ${proximaCita.hora}` : ""}`, ir: "resumen" });
-  if (!tieneContrato) pendientes.push({ icono: "documento", color: "#64748B", texto: "Tu contrato aún no está cargado", ir: "documentos" });
+  if (!tieneContrato) pendientes.push({ icono: "documento", color: "#64748B", texto: "Tu contrato aún no está cargado", ir: "contrato" });
 
   // ---------- Pantalla de ingreso ----------
   if (!cliente) {
@@ -544,10 +543,10 @@ export default function VistaPortalCliente() {
         {/* Indicadores */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10, marginBottom: 14 }}>
           {[
-            { icono: "chat", color: "#6366F1", etiqueta: "Última novedad", valor: novedades[0] ? haceCuanto(novedades[0].fecha).replace(/^./, (c) => c.toUpperCase()) : "Sin novedades aún", ir: "proceso" },
+            { icono: "chat", color: "#6366F1", etiqueta: "Última novedad", valor: novedades[0] ? haceCuanto(novedades[0].fecha).replace(/^./, (c) => c.toUpperCase()) : "Sin novedades aún", ir: "resumen" },
             { icono: "calendario", color: "#7C3AED", etiqueta: "Próxima cita", valor: proximaCita ? `${fechaCorta(proximaCita.fecha)}${proximaCita.hora ? ` · ${proximaCita.hora}` : ""}` : "Sin agendar", ir: "resumen" },
             { icono: "tarjeta", color: "#10B981", etiqueta: saldo > 0 ? "Próximo pago" : "Pagos", valor: saldo > 0 ? (proximoPago ? fechaCorta(proximoPago) : formatoCOP(saldo)) : valorTotal > 0 ? "Al día" : `${pagos.length} registrados`, ir: "pagos" },
-            { icono: "clip", color: "#F59E0B", etiqueta: "Documentos", valor: documentos.length ? `${documentos.length - docsPendientes.length}/${documentos.length} firmados` : "Ninguno aún", ir: "documentos" },
+            { icono: "documento", color: "#F59E0B", etiqueta: "Contrato", valor: tieneContrato ? "Disponible" : "Pendiente", ir: "contrato" },
           ].map((k) => (
             <button
               key={k.etiqueta}
@@ -606,20 +605,23 @@ export default function VistaPortalCliente() {
               )}
 
 
-              {novedades[0] && (
-                <Tarjeta>
-                  <Encabezado icono="chispa" color="#6366F1" titulo="Lo último en tu caso" />
-                  {novedades[0] && (
-                    <div style={{ borderRadius: 14, padding: 14, background: "rgba(99,102,241,0.07)", borderLeft: "3px solid #6366F1", marginBottom: 0 }}>
-                      <p style={{ ...fuente, fontSize: 11, fontWeight: 700, color: "#6366F1", margin: 0, textTransform: "uppercase", letterSpacing: 0.6 }}>Nota de tu abogado · {fechaLarga(novedades[0].fecha)}</p>
-                      <p style={{ ...fuente, fontSize: 13.5, color: COLORS.ink, margin: "6px 0 0", lineHeight: 1.55, whiteSpace: "pre-wrap" }}>{novedades[0].nota}</p>
-                    </div>
-                  )}
-                  <button type="button" onClick={() => setPestana("proceso")} style={{ ...fuente, marginTop: 12, background: "none", border: "none", color: "#2F80ED", fontWeight: 700, fontSize: 13, cursor: "pointer", padding: 0 }}>
-                    Ver todo el historial ›
-                  </button>
-                </Tarjeta>
-              )}
+              <Tarjeta>
+                <Encabezado icono="chat" color="#6366F1" titulo="Novedades de tu abogado" subtitulo="Todo lo que ha pasado en tu caso, explicado en palabras sencillas" />
+                {novedades.length === 0 ? (
+                  <p style={{ ...fuente, fontSize: 13, color: COLORS.muted, margin: 0 }}>Aún no hay novedades escritas. Cuando haya un avance, tu abogado lo contará aquí.</p>
+                ) : (
+                  <div style={{ position: "relative", paddingLeft: 20 }}>
+                    <div style={{ position: "absolute", left: 5, top: 6, bottom: 6, width: 2, background: COLORS.border }} />
+                    {novedades.map((a, i) => (
+                      <div key={i} style={{ position: "relative", paddingBottom: i < novedades.length - 1 ? 16 : 0 }}>
+                        <div style={{ position: "absolute", left: -20, top: 3, width: 12, height: 12, borderRadius: "50%", background: i === 0 ? "#6366F1" : COLORS.panel, border: "2px solid #6366F1" }} />
+                        <p style={{ ...fuente, fontSize: 11.5, color: COLORS.muted, margin: 0 }}>{fechaLarga(a.fecha)} · {haceCuanto(a.fecha)}</p>
+                        <p style={{ ...fuente, fontSize: 13.5, color: COLORS.ink, margin: "3px 0 0", lineHeight: 1.55, whiteSpace: "pre-wrap" }}>{a.nota}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </Tarjeta>
 
               {citas.length > 0 && (
                 <Tarjeta>
@@ -689,65 +691,7 @@ export default function VistaPortalCliente() {
           )}
 
           {/* ===== MI PROCESO ===== */}
-          {pestana === "proceso" && (
-            <>
-              <Tarjeta>
-                <Encabezado icono="edificio" color="#0F766E" titulo="Datos del proceso" />
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 10 }}>
-                  {[
-                    ["Área", cliente.areaProceso && cliente.areaProceso !== "Otro" ? cliente.areaProceso : null],
-                    ["Tipo de proceso", cliente.tipoProceso && cliente.tipoProceso !== "Otro" ? cliente.tipoProceso : null],
-                    ["Juzgado o entidad", cliente.juzgadoActual],
-                    ["Estado", cliente.procesoPausado ? "En pausa" : "Activo"],
-                  ]
-                    .filter(([, v]) => v)
-                    .map(([k, v]) => (
-                      <div key={k} style={{ padding: "11px 13px", borderRadius: 12, background: COLORS.surfaceSoft, border: `1px solid ${COLORS.border}` }}>
-                        <p style={{ ...fuente, fontSize: 11, color: COLORS.muted, margin: 0, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5 }}>{k}</p>
-                        <p style={{ ...fuente, fontSize: 13.5, color: COLORS.ink, margin: "3px 0 0", fontWeight: 600, lineHeight: 1.4, wordBreak: "break-word" }}>{v}</p>
-                      </div>
-                    ))}
-                </div>
-                {radicados.length > 0 && (
-                  <div style={{ marginTop: 14 }}>
-                    <p style={{ ...fuente, fontSize: 11, color: COLORS.muted, margin: "0 0 6px", fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5 }}>Radicado{radicados.length > 1 ? "s" : ""}</p>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                      {radicados.map((r) => (
-                        <div key={r} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "9px 12px", borderRadius: 10, border: `1px dashed ${COLORS.border}` }}>
-                          <span style={{ fontFamily: "monospace", fontSize: 13, fontWeight: 700, color: COLORS.ink, wordBreak: "break-all" }}>{r}</span>
-                          <button type="button" onClick={() => copiar(r, r)} style={{ ...fuente, background: "none", border: "none", color: "#2F80ED", fontWeight: 700, fontSize: 12, cursor: "pointer", flexShrink: 0 }}>
-                            {copiado === r ? "✓ Copiado" : "Copiar"}
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </Tarjeta>
-
-
-              <Tarjeta>
-                <Encabezado icono="chat" color="#6366F1" titulo="Novedades de tu abogado" subtitulo="Explicadas en palabras sencillas" />
-                {novedades.length === 0 ? (
-                  <p style={{ ...fuente, fontSize: 13, color: COLORS.muted, margin: 0 }}>Aún no hay novedades escritas. Cuando haya un avance, tu abogado lo contará aquí.</p>
-                ) : (
-                  <div style={{ position: "relative", paddingLeft: 20 }}>
-                    <div style={{ position: "absolute", left: 5, top: 6, bottom: 6, width: 2, background: COLORS.border }} />
-                    {novedades.map((a, i) => (
-                      <div key={i} style={{ position: "relative", paddingBottom: i < novedades.length - 1 ? 16 : 0 }}>
-                        <div style={{ position: "absolute", left: -20, top: 3, width: 12, height: 12, borderRadius: "50%", background: i === 0 ? "#6366F1" : COLORS.panel, border: "2px solid #6366F1" }} />
-                        <p style={{ ...fuente, fontSize: 11.5, color: COLORS.muted, margin: 0 }}>
-                          {fechaLarga(a.fecha)} · {haceCuanto(a.fecha)}
-                        </p>
-                        <p style={{ ...fuente, fontSize: 13.5, color: COLORS.ink, margin: "3px 0 0", lineHeight: 1.55, whiteSpace: "pre-wrap" }}>{a.nota}</p>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </Tarjeta>
-            </>
-          )}
-
+          
           {/* ===== PAGOS ===== */}
           {pestana === "pagos" && (
             <>
@@ -805,9 +749,14 @@ export default function VistaPortalCliente() {
                           <p style={{ ...fuente, fontSize: 13.5, fontWeight: 700, color: COLORS.ink, margin: 0 }}>{c.esAnticipo ? "Anticipo" : `Cuota ${c.numero}`}</p>
                           <p style={{ ...fuente, fontSize: 12, color: COLORS.muted, margin: "2px 0 0" }}>{fechaLarga(c.fecha)}</p>
                         </div>
-                        <div style={{ textAlign: "right" }}>
+                        <div style={{ textAlign: "right", display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
                           <p style={{ ...fuente, fontSize: 13.5, fontWeight: 800, color: COLORS.ink, margin: 0 }}>{formatoCOP(c.valor)}</p>
-                          <p style={{ ...fuente, fontSize: 11, fontWeight: 700, margin: "2px 0 0", color: c.pagada ? "#10B981" : c.vencida ? "#B42318" : "#1D4ED8" }}>{c.pagada ? "Pagada" : c.vencida ? "Vencida" : c === siguienteCuota ? "Siguiente" : "Pendiente"}</p>
+                          <p style={{ ...fuente, fontSize: 11, fontWeight: 700, margin: 0, color: c.pagada ? "#10B981" : c.vencida ? "#B42318" : "#1D4ED8" }}>{c.pagada ? "Pagada" : c.vencida ? "Vencida" : c === siguienteCuota ? "Siguiente" : "Pendiente"}</p>
+                          {!c.pagada && whatsapp && (
+                            <a href={wa(`${saludo} Voy a realizar el pago de la ${c.esAnticipo ? "anticipo" : `cuota ${c.numero}`} por ${formatoCOP(c.valor)} (fecha ${fechaLarga(c.fecha)}). ¿Me confirman los datos para el pago?`)} target="_blank" rel="noreferrer" style={{ ...fuente, fontSize: 11, fontWeight: 700, color: "#1DA851", textDecoration: "none", whiteSpace: "nowrap" }}>
+                              Avisar que voy a pagar
+                            </a>
+                          )}
                         </div>
                       </div>
                     ))}
@@ -854,10 +803,10 @@ export default function VistaPortalCliente() {
             </>
           )}
 
-          {/* ===== DOCUMENTOS ===== */}
-          {pestana === "documentos" && (
+          {/* ===== CONTRATO ===== */}
+          {pestana === "contrato" && (
             <Tarjeta>
-              <Encabezado icono="clip" color="#F59E0B" titulo="Mis documentos" subtitulo={documentos.length ? `${documentos.length - docsPendientes.length} de ${documentos.length} firmados` : null} />
+              <Encabezado icono="documento" color="#F59E0B" titulo="Mis documentos" subtitulo={documentos.length ? `${documentos.length - docsPendientes.length} de ${documentos.length} firmados` : null} />
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                 {contrato && (
                   <div style={{ display: "flex", alignItems: "center", gap: 12, padding: 12, borderRadius: 14, border: `1px solid ${COLORS.border}`, flexWrap: "wrap" }}>
