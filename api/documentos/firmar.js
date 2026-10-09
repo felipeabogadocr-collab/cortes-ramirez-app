@@ -195,10 +195,21 @@ export default async function handler(req, res) {
     if (!codigo) return res.status(400).json({ error: "Falta el código" });
     // Buscar el cliente por código corto (codigoPortal) o UUID usando admin
     // para garantizar que RLS no bloquee nada.
-    const { data: clienteParcial } = await buscarClientePortal(admin, codigo, "id");
-    const idReal = clienteParcial?.id || codigo;
+    const { data: clienteRaw } = await buscarClientePortal(admin, codigo, "id, data");
+    const idReal = clienteRaw?.id || codigo;
     const { data, error } = await admin.rpc("obtener_portal_cliente", { p_id: idReal });
     if (error || !data) return res.status(404).json({ error: "No encontramos ese código" });
+    // El RPC en vivo puede ser una versión vieja que no incluye actuaciones o
+    // las devuelve vacías — se leen directamente de data.timeline para
+    // garantizar que el portal siempre muestre la línea de tiempo completa.
+    const timelineRaw = clienteRaw?.data?.timeline || [];
+    if (timelineRaw.length > 0 && (!data.actuaciones || data.actuaciones.length === 0)) {
+      data.actuaciones = timelineRaw
+        .map((t) => ({ fecha: t.fecha, nota: t.nota }))
+        .filter((t) => t.nota)
+        .sort((a, b) => (b.fecha || "").localeCompare(a.fecha || ""))
+        .slice(0, 20);
+    }
     return res.status(200).json(data);
   }
   if (req.method === "GET" && req.query?.accion === "contrato-portal") {
