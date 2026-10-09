@@ -933,8 +933,7 @@ export default function ClientesTab({ usuarioActual, onIrARegistrarPago, onListo
     const radicados = (form.radicados || []).map((r) => r.trim()).filter(Boolean);
     await storageSet(
       `cliente:${id}`,
-      JSON.stringify({ ...form, radicados, radicado: radicados[0] || "", timeline: [], ultimaActuacion: new Date().toISOString(), proximoPago }),
-      false
+      JSON.stringify({ ...form, radicados, radicado: radicados[0] || "", timeline: [], ultimaActuacion: new Date().toISOString(), proximoPago, codigoPortal: generarCodigoPortal() })
     );
     await addId(id);
     registrarAuditoria(usuarioActual, "crear_cliente", "cliente", id, { nombre: form.nombre });
