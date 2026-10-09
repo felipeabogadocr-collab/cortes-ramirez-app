@@ -195,7 +195,7 @@ export default async function handler(req, res) {
     if (!codigo) return res.status(400).json({ error: "Falta el código" });
     // Buscar el cliente por código corto (codigoPortal) o UUID usando admin
     // para garantizar que RLS no bloquee nada.
-    const { data: clienteRaw } = await buscarClientePortal(admin, codigo, "id, data");
+    const { data: clienteRaw } = await buscarClientePortal(admin, codigo, "id, data, despacho_id");
     const idReal = clienteRaw?.id || codigo;
     const { data, error } = await admin.rpc("obtener_portal_cliente", { p_id: idReal });
     if (error || !data) return res.status(404).json({ error: "No encontramos ese código" });
@@ -229,6 +229,13 @@ export default async function handler(req, res) {
     }
     if (!data.valorTotal && raw.valorTotal) data.valorTotal = raw.valorTotal;
     if (!data.proximoPago && raw.proximoPago) data.proximoPago = raw.proximoPago;
+    // Si el RPC viejo no devuelve celular del despacho, se consulta directo.
+    if (clienteRaw?.despacho_id && (!data.despacho?.celular)) {
+      const { data: dep } = await admin.from("despachos").select("celular, nombre").eq("id", clienteRaw.despacho_id).maybeSingle();
+      if (dep) {
+        data.despacho = { ...(data.despacho || {}), celular: dep.celular || data.despacho?.celular || "", nombre: data.despacho?.nombre || dep.nombre || "" };
+      }
+    }
     return res.status(200).json(data);
   }
   if (req.method === "GET" && req.query?.accion === "contrato-portal") {
