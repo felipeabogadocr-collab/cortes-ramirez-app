@@ -187,6 +187,20 @@ export default async function handler(req, res) {
   if (req.method === "GET" && req.query?.accion === "tarjeta-portal") {
     return manejarTarjetaPortal(req, res, supabaseAdmin());
   }
+  if (req.method === "GET" && req.query?.accion === "datos-portal") {
+    const admin = supabaseAdmin();
+    const puedeContinuar = await dentroDelLimite(admin, req, "documentos/firmar", 30, 60);
+    if (!puedeContinuar) return res.status(429).json({ error: "Demasiados intentos. Espera un momento." });
+    const { codigo } = req.query || {};
+    if (!codigo) return res.status(400).json({ error: "Falta el código" });
+    // Buscar el cliente por código corto (codigoPortal) o UUID usando admin
+    // para garantizar que RLS no bloquee nada.
+    const { data: clienteParcial } = await buscarClientePortal(admin, codigo, "id");
+    const idReal = clienteParcial?.id || codigo;
+    const { data, error } = await admin.rpc("obtener_portal_cliente", { p_id: idReal });
+    if (error || !data) return res.status(404).json({ error: "No encontramos ese código" });
+    return res.status(200).json(data);
+  }
   if (req.method === "GET" && req.query?.accion === "contrato-portal") {
     const admin = supabaseAdmin();
     const puedeContinuar = await dentroDelLimite(admin, req, "documentos/firmar", 20, 60);

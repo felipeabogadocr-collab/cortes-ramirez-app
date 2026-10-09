@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { supabase } from "../lib/supabaseClient";
 import {
   COLORS,
   Field,
@@ -255,9 +254,18 @@ export default function VistaPortalCliente() {
     setCliente(null);
     setLogoUrl("");
     setContrato(null);
-    const { data, error } = await supabase.rpc("obtener_portal_cliente", { p_id: code });
+    // Usar el endpoint del servidor para buscar por codigoPortal o UUID,
+    // con admin key, para que RLS y el RPC de Supabase no bloqueen nada.
+    let data = null;
+    try {
+      const resp = await fetch(`/api/documentos/firmar?accion=datos-portal&codigo=${encodeURIComponent(code)}`);
+      if (!resp.ok) { setBuscando(false); setNotFound(true); return; }
+      data = await resp.json();
+    } catch {
+      setBuscando(false); setNotFound(true); return;
+    }
     setBuscando(false);
-    if (error || !data) {
+    if (!data) {
       setNotFound(true);
       return;
     }
