@@ -232,6 +232,7 @@ export default function VistaPortalCliente() {
   const [descargandoRecibo, setDescargandoRecibo] = useState(null);
   const [errorRecibo, setErrorRecibo] = useState("");
   const [copiado, setCopiado] = useState("");
+  const [cuotasSeleccionadas, setCuotasSeleccionadas] = useState(new Set());
 
   // El link que el despacho comparte por WhatsApp ya trae el código
   // (?codigo=...#portal): el cliente entra directo. Se borra de la barra
@@ -729,40 +730,98 @@ export default function VistaPortalCliente() {
                   {whatsapp && saldo > 0 && (
                     <div style={{ marginTop: 12 }}>
                       <BotonAccion href={wa(`${saludo} Acabo de hacer un pago y te envío el comprobante.`)} icono="chat" variante="borde">
-                        Reportar un pago a mi abogado
+                        Reportar un pago al despacho
                       </BotonAccion>
                     </div>
                   )}
                 </Tarjeta>
               )}
 
-              {cuotas.length > 0 && (
-                <Tarjeta>
-                  <Encabezado icono="calendario" color="#2F80ED" titulo="Plan de pagos" subtitulo={`${cuotas.filter((c) => c.pagada).length} de ${cuotas.length} cuotas pagadas`} />
-                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                    {cuotas.map((c, i) => (
-                      <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, padding: "11px 12px", borderRadius: 12, border: `1px solid ${c === siguienteCuota ? "#2F80ED" : COLORS.border}`, background: c === siguienteCuota ? "rgba(47,128,237,0.05)" : "transparent" }}>
-                        <div style={{ width: 30, height: 30, borderRadius: "50%", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", background: c.pagada ? "#10B981" : c.vencida ? "#FEE2E2" : COLORS.surfaceSoft, color: c.pagada ? "#FFFFFF" : c.vencida ? "#B42318" : COLORS.muted, ...fuente, fontSize: 12, fontWeight: 800 }}>
-                          {c.pagada ? <Icono tipo="check" size={14} /> : c.esAnticipo ? "A" : c.numero}
-                        </div>
+              {cuotas.length > 0 && (() => {
+                const cuotasPendientes = cuotas.filter((c) => !c.pagada);
+                const totalSeleccionado = [...cuotasSeleccionadas].reduce((s, i) => s + (Number(cuotas[i]?.valor) || 0), 0);
+                const mensajeAbono = () => {
+                  const items = [...cuotasSeleccionadas]
+                    .sort((a, b) => a - b)
+                    .map((i) => {
+                      const c = cuotas[i];
+                      return `  - ${c.esAnticipo ? "Anticipo" : `Cuota ${c.numero}`}: ${formatoCOP(c.valor)} (${fechaLarga(c.fecha)})`;
+                    })
+                    .join("\n");
+                  return `${saludo} Quiero realizar los siguientes pagos:\n${items}\nTotal: ${formatoCOP(totalSeleccionado)}. ¿Me confirman los datos para el pago?`;
+                };
+                const toggleCuota = (i) => {
+                  setCuotasSeleccionadas((prev) => {
+                    const next = new Set(prev);
+                    if (next.has(i)) next.delete(i); else next.add(i);
+                    return next;
+                  });
+                };
+                return (
+                  <Tarjeta>
+                    <Encabezado
+                      icono="calendario"
+                      color="#2F80ED"
+                      titulo="Plan de pagos"
+                      subtitulo={
+                        cuotasPendientes.length === 0
+                          ? "Todas las cuotas pagadas ✓"
+                          : `Faltan ${cuotasPendientes.length} de ${cuotas.length} cuota${cuotas.length !== 1 ? "s" : ""}`
+                      }
+                    />
+                    {cuotasPendientes.length > 0 && whatsapp && (
+                      <p style={{ ...fuente, fontSize: 12, color: COLORS.muted, margin: "0 0 12px", lineHeight: 1.5 }}>
+                        Selecciona las cuotas que vas a pagar y te generamos el mensaje para avisar al despacho.
+                      </p>
+                    )}
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                      {cuotas.map((c, i) => {
+                        const seleccionada = cuotasSeleccionadas.has(i);
+                        return (
+                          <div
+                            key={i}
+                            onClick={() => !c.pagada && toggleCuota(i)}
+                            style={{ display: "flex", alignItems: "center", gap: 12, padding: "11px 12px", borderRadius: 12, border: `1px solid ${seleccionada ? "#2F80ED" : c === siguienteCuota ? "#2F80ED" : COLORS.border}`, background: seleccionada ? "rgba(47,128,237,0.08)" : c === siguienteCuota ? "rgba(47,128,237,0.03)" : "transparent", cursor: c.pagada ? "default" : "pointer" }}
+                          >
+                            {!c.pagada ? (
+                              <div style={{ width: 20, height: 20, borderRadius: 6, flexShrink: 0, border: `2px solid ${seleccionada ? "#2F80ED" : COLORS.border}`, background: seleccionada ? "#2F80ED" : "transparent", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                                {seleccionada && <svg width="11" height="11" viewBox="0 0 12 12" fill="none"><polyline points="1,6 5,10 11,2" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+                              </div>
+                            ) : (
+                              <div style={{ width: 20, height: 20, flexShrink: 0 }} />
+                            )}
+                            <div style={{ width: 30, height: 30, borderRadius: "50%", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", background: c.pagada ? "#10B981" : c.vencida ? "#FEE2E2" : COLORS.surfaceSoft, color: c.pagada ? "#FFFFFF" : c.vencida ? "#B42318" : COLORS.muted, ...fuente, fontSize: 12, fontWeight: 800 }}>
+                              {c.pagada ? <Icono tipo="check" size={14} /> : c.esAnticipo ? "A" : c.numero}
+                            </div>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <p style={{ ...fuente, fontSize: 13.5, fontWeight: 700, color: COLORS.ink, margin: 0 }}>{c.esAnticipo ? "Anticipo" : `Cuota ${c.numero}`}</p>
+                              <p style={{ ...fuente, fontSize: 12, color: COLORS.muted, margin: "2px 0 0" }}>{fechaLarga(c.fecha)}</p>
+                            </div>
+                            <div style={{ textAlign: "right", display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
+                              <p style={{ ...fuente, fontSize: 13.5, fontWeight: 800, color: COLORS.ink, margin: 0 }}>{formatoCOP(c.valor)}</p>
+                              <p style={{ ...fuente, fontSize: 11, fontWeight: 700, margin: 0, color: c.pagada ? "#10B981" : c.vencida ? "#B42318" : "#1D4ED8" }}>{c.pagada ? "Pagada" : c.vencida ? "Vencida" : c === siguienteCuota ? "Siguiente" : "Pendiente"}</p>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    {cuotasSeleccionadas.size > 0 && whatsapp && (
+                      <div style={{ marginTop: 14, padding: "14px 16px", borderRadius: 14, background: "rgba(47,128,237,0.07)", border: "1.5px solid #2F80ED", display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
                         <div style={{ flex: 1, minWidth: 0 }}>
-                          <p style={{ ...fuente, fontSize: 13.5, fontWeight: 700, color: COLORS.ink, margin: 0 }}>{c.esAnticipo ? "Anticipo" : `Cuota ${c.numero}`}</p>
-                          <p style={{ ...fuente, fontSize: 12, color: COLORS.muted, margin: "2px 0 0" }}>{fechaLarga(c.fecha)}</p>
+                          <p style={{ ...fuente, fontSize: 12, fontWeight: 600, color: "#1D4ED8", margin: 0 }}>
+                            {cuotasSeleccionadas.size} cuota{cuotasSeleccionadas.size !== 1 ? "s" : ""} seleccionada{cuotasSeleccionadas.size !== 1 ? "s" : ""}
+                          </p>
+                          <p style={{ ...fuente, fontSize: 20, fontWeight: 900, color: COLORS.headingText, margin: "3px 0 0" }}>{formatoCOP(totalSeleccionado)}</p>
                         </div>
-                        <div style={{ textAlign: "right", display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
-                          <p style={{ ...fuente, fontSize: 13.5, fontWeight: 800, color: COLORS.ink, margin: 0 }}>{formatoCOP(c.valor)}</p>
-                          <p style={{ ...fuente, fontSize: 11, fontWeight: 700, margin: 0, color: c.pagada ? "#10B981" : c.vencida ? "#B42318" : "#1D4ED8" }}>{c.pagada ? "Pagada" : c.vencida ? "Vencida" : c === siguienteCuota ? "Siguiente" : "Pendiente"}</p>
-                          {!c.pagada && whatsapp && (
-                            <a href={wa(`${saludo} Voy a realizar el pago de la ${c.esAnticipo ? "anticipo" : `cuota ${c.numero}`} por ${formatoCOP(c.valor)} (fecha ${fechaLarga(c.fecha)}). ¿Me confirman los datos para el pago?`)} target="_blank" rel="noreferrer" style={{ ...fuente, fontSize: 11, fontWeight: 700, color: "#1DA851", textDecoration: "none", whiteSpace: "nowrap" }}>
-                              Avisar que voy a pagar
-                            </a>
-                          )}
-                        </div>
+                        <a href={wa(mensajeAbono())} target="_blank" rel="noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: 7, background: "#1DA851", color: "#FFF", textDecoration: "none", borderRadius: 12, padding: "11px 16px", ...fuente, fontSize: 13.5, fontWeight: 800, flexShrink: 0 }}>
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="#fff" aria-hidden="true"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm0 18.2a8.2 8.2 0 0 1-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.2-.4.2-.4.7-1.3.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3 3 3 0 0 0-.9 2.2 5.2 5.2 0 0 0 1.1 2.7 11.8 11.8 0 0 0 4.5 4c1.7.7 2.3.8 3.1.6.5-.1 1.5-.6 1.7-1.2.2-.6.2-1.1.2-1.2-.1-.1-.3-.2-.5-.3z"/></svg>
+                          Avisar al despacho
+                        </a>
                       </div>
-                    ))}
-                  </div>
-                </Tarjeta>
-              )}
+                    )}
+                  </Tarjeta>
+                );
+              })()}
 
               <Tarjeta>
                 <Encabezado icono="documento" color="#8B5CF6" titulo="Historial de pagos" subtitulo={pagos.length ? "Descarga el recibo de cada pago" : null} />
@@ -829,10 +888,10 @@ export default function VistaPortalCliente() {
                     </div>
                     <div style={{ flex: "1 1 200px" }}>
                       <p style={{ ...fuente, fontSize: 14, fontWeight: 700, color: COLORS.ink, margin: 0 }}>Contrato de prestación de servicios</p>
-                      <p style={{ ...fuente, fontSize: 12.5, color: COLORS.muted, margin: "4px 0 10px", lineHeight: 1.45 }}>Todavía no está cargado. Puedes pedírselo a tu abogado y aparecerá aquí para consultarlo o firmarlo.</p>
+                      <p style={{ ...fuente, fontSize: 12.5, color: COLORS.muted, margin: "4px 0 10px", lineHeight: 1.45 }}>Todavía no está cargado. Puedes pedírselo al despacho y aparecerá aquí para consultarlo o firmarlo.</p>
                       {whatsapp && (
                         <BotonAccion href={wa(`${saludo} ¿Me pueden cargar mi contrato de prestación de servicios en el portal?`)} icono="chat" style={{ padding: "9px 14px", fontSize: 12.5 }}>
-                          Pedírselo a mi abogado
+                          Pedírselo al despacho
                         </BotonAccion>
                       )}
                     </div>
@@ -890,7 +949,7 @@ export default function VistaPortalCliente() {
               </Tarjeta>
               {whatsapp && (
                 <Tarjeta>
-                  <Encabezado icono="chat" color="#1DA851" titulo="¿Necesitas algo más?" subtitulo="Escríbele directamente a tu abogado" />
+                  <Encabezado icono="chat" color="#1DA851" titulo="¿Necesitas algo más?" subtitulo={`Escríbele directamente al despacho${despacho.nombre ? ` ${despacho.nombre}` : ""}`} />
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 8 }}>
                     <BotonAccion href={wa(`${saludo} Quisiera recibir información sobre mi proceso.`)} icono="chat">
                       Solicitar información
@@ -923,16 +982,16 @@ export default function VistaPortalCliente() {
 
       {whatsapp && (
         <a
-          href={wa(`${saludo} Te escribo desde mi portal.`)}
+          href={wa(`${saludo} Estuve revisando mi portal y tengo una duda. ¿Puedo hablar con alguien${despacho.nombre ? ` de ${despacho.nombre}` : " del despacho"}?`)}
           target="_blank"
           rel="noreferrer"
-          aria-label={`Escribir por WhatsApp a ${despacho.nombre || "mi abogado"}`}
+          aria-label={`Escribir por WhatsApp a ${despacho.nombre || "el despacho"}`}
           style={{ position: "fixed", right: "calc(18px + var(--sar, 0px))", bottom: "calc(18px + var(--sab, 0px))", zIndex: 20, display: "flex", alignItems: "center", gap: 8, background: "#1DA851", color: "#FFFFFF", textDecoration: "none", borderRadius: 999, padding: "12px 18px 12px 14px", boxShadow: "0 12px 28px -8px rgba(29,168,81,0.7)", ...fuente, fontSize: 14, fontWeight: 800 }}
         >
           <svg width="22" height="22" viewBox="0 0 24 24" fill="#FFFFFF" aria-hidden="true">
             <path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm0 18.2a8.2 8.2 0 0 1-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.2-.4.2-.4.7-1.3.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3 3 3 0 0 0-.9 2.2 5.2 5.2 0 0 0 1.1 2.7 11.8 11.8 0 0 0 4.5 4c1.7.7 2.3.8 3.1.6.5-.1 1.5-.6 1.7-1.2.2-.6.2-1.1.2-1.2-.1-.1-.3-.2-.5-.3z" />
           </svg>
-          WhatsApp
+          Tengo una duda
         </a>
       )}
     </div>
