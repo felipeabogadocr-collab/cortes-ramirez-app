@@ -8,6 +8,7 @@ import {
   buttonPrimary,
   inputStyle,
   formatoCOP,
+  fechaHoyISO,
 } from "../App.jsx";
 
 // Portal del cliente: lo que ve el cliente final con su código de acceso.
@@ -368,7 +369,7 @@ export default function VistaPortalCliente() {
   const whatsapp = numeroWhatsapp(despacho.celular);
   const wa = (texto) => (whatsapp ? `https://wa.me/${whatsapp}?text=${encodeURIComponent(texto)}` : null);
   const saludo = `Hola${cliente?.abogadoAsignado ? ` ${cliente.abogadoAsignado}` : ""}, soy ${cliente?.nombre || "tu cliente"}.`;
-  const hoy = new Date().toISOString().slice(0, 10);
+  const hoy = fechaHoyISO();
 
   let restante = totalPagado;
   const cuotas = [...(cliente?.cuotas || [])]

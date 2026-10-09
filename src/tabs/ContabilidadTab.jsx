@@ -45,6 +45,7 @@ import {
   useAbogadosAsociados,
   useValorConRetraso,
   useMediosPago,
+  fechaHoyISO,
 } from "../App.jsx";
 
 // Lista de arranque para un despacho nuevo — cada despacho la puede editar
@@ -1264,7 +1265,7 @@ function AcuerdoPagoForm({ cliente, clienteId, saldo, datosResponsable, usuarioA
 }
 
 export function FormularioPago({ cliente, onRegistrar, mediosPago = MEDIOS_PAGO_DEFECTO }) {
-  const hoyStr = new Date().toISOString().slice(0, 10);
+  const hoyStr = fechaHoyISO();
   const [medioPago, setMedioPago] = useState(mediosPago[0]);
   const [valor, setValor] = useState("");
   const [fechaPago, setFechaPago] = useState(hoyStr);
@@ -1722,7 +1723,7 @@ const ORDEN_CONTABILIDAD = [
 ];
 
 function FormularioEgreso({ onRegistrar, mediosPago = MEDIOS_PAGO_DEFECTO }) {
-  const hoyStr = new Date().toISOString().slice(0, 10);
+  const hoyStr = fechaHoyISO();
   const [concepto, setConcepto] = useState("");
   const [categoria, setCategoria] = useState(CATEGORIAS_EGRESO[0]);
   const [valor, setValor] = useState("");
@@ -2099,7 +2100,7 @@ function IngresoUnificadoCard({ movimiento, onVerCliente }) {
 }
 
 function FormularioOtroIngreso({ onRegistrar, mediosPago = MEDIOS_PAGO_DEFECTO }) {
-  const hoyStr = new Date().toISOString().slice(0, 10);
+  const hoyStr = fechaHoyISO();
   const [concepto, setConcepto] = useState("");
   const [categoria, setCategoria] = useState(CATEGORIAS_OTRO_INGRESO[0]);
   const [valor, setValor] = useState("");
@@ -2537,7 +2538,7 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
       concepto: `${credito.concepto} (cuota ${idxCuota + 1}/${credito.cuotas.length})`,
       categoria: credito.categoria,
       valor: cuota.valor,
-      fecha: new Date().toISOString().slice(0, 10),
+      fecha: fechaHoyISO(),
       medioPago: medioPago || "",
     });
     await marcarCuotaPagada(credito.id, idxCuota, nuevoEgreso.id);

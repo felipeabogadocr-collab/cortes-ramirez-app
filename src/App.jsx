@@ -1355,7 +1355,7 @@ export function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-export const APP_VERSION = "1.183.0";
+export const APP_VERSION = "1.184.0";
 
 function SelloVersion({ oscuro }) {
   return (
@@ -2806,7 +2806,7 @@ async function ejecutarHerramienta(nombreHerramienta, input, usuarioActual) {
   if (nombreHerramienta === "listar_agenda_proxima") {
     const idsAgendaRaw = await storageGet("indice-agenda", true);
     const idsAgenda = idsAgendaRaw ? JSON.parse(idsAgendaRaw) : [];
-    const hoyISO = new Date().toISOString().slice(0, 10);
+    const hoyISO = fechaHoyISO();
     const eventos = [];
     const valoresAgenda = await obtenerValoresPorClaves(idsAgenda.map((id) => `evento:${id}`));
     for (const id of idsAgenda) {
@@ -3778,7 +3778,7 @@ function TerminosPorVencerResumen({ onIr }) {
 function ProximoEventoResumen({ onIr }) {
   const { ids, eventos, cargado } = useEventosAgenda();
   if (!cargado) return null;
-  const hoyISO = new Date().toISOString().slice(0, 10);
+  const hoyISO = fechaHoyISO();
   const proximo = ids
     .map((id) => eventos[id])
     .filter((e) => e?.titulo && e.fecha >= hoyISO)
@@ -6006,7 +6006,11 @@ export function useMediosPago() {
 }
 
 export function fechaHoyISO() {
-  return new Date().toISOString().slice(0, 10);
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const dia = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${dia}`;
 }
 
 function useNotificacionesPanel(prefs) {
