@@ -1795,85 +1795,85 @@ export default function ClientesTab({ usuarioActual, onIrARegistrarPago, onListo
                   {c.notas && <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.inkSoft, margin: "8px 0 0" }}>{c.notas}</p>}
                   </div>
                 </div>
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", maxWidth: "100%" }}>
-                  <button
-                    className="drx-btn-ghost"
-                    style={{ ...buttonGhost, background: "#1DA851", color: "#FFFFFF", border: "none" }}
-                    title="Ver el mensaje y enviarlo por WhatsApp, o copiar el código"
-                    onClick={() => setCompartirPortalId(id)}
-                  >
-                    Compartir portal ↗
-                  </button>
-                  <BotonContrato id={id} cliente={c} onActualizar={(act) => setClientes((prev) => ({ ...prev, [id]: act }))} />
-                  {c.codigoPortal && (
+                <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 4 }}>
+                  {/* Fila 1: acciones del portal */}
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    <button
+                      className="drx-btn-ghost"
+                      style={{ ...buttonGhost, background: "#145C4E", color: "#FFFFFF", border: "none", fontWeight: 700 }}
+                      title="Ver el mensaje y enviarlo por WhatsApp, o copiar el código"
+                      onClick={() => setCompartirPortalId(id)}
+                    >
+                      <Icono tipo="compartir" size={13} style={{ marginRight: 5, verticalAlign: -2 }} /> Compartir portal
+                    </button>
                     <a
-                      href={`/p/${encodeURIComponent(c.codigoPortal)}`}
+                      href={c.codigoPortal ? `/p/${encodeURIComponent(c.codigoPortal)}` : undefined}
                       target="_blank"
                       rel="noreferrer"
                       className="drx-btn-ghost"
-                      style={{ ...buttonGhost, textDecoration: "none" }}
-                      title="Ver cómo ve el cliente su portal"
+                      style={{ ...buttonGhost, textDecoration: "none", opacity: c.codigoPortal ? 1 : 0.45, pointerEvents: c.codigoPortal ? "auto" : "none" }}
+                      title={c.codigoPortal ? "Ver cómo ve el cliente su portal" : "Primero usa 'Compartir portal' para generar el código"}
                     >
-                      <Icono tipo="ojo" size={13} style={{ marginRight: 4, verticalAlign: -2 }} /> Ver portal
+                      <Icono tipo="ojo" size={13} style={{ marginRight: 5, verticalAlign: -2 }} /> Ver portal
                     </a>
-                  )}
-                  <button
-                    className="drx-btn-ghost"
-                    style={buttonGhost}
-                    title="Copiar solo el código de acceso al portal"
-                    onClick={() => copiar(c.codigoPortal ? formatoCodigoPortal(c.codigoPortal) : id, `portal-${id}`)}
-                  >
-                    {copiado === `portal-${id}` ? (
-                      "✓ Copiado"
-                    ) : (
-                      <>
-                        <Icono tipo="portapapeles" size={13} style={{ marginRight: 4, verticalAlign: -2 }} /> Copiar código
-                      </>
-                    )}
-                  </button>
-                  <button
-                    className="drx-btn-ghost"
-                    style={buttonGhost}
-                    title="Copiar nombre, teléfono, correo y radicado"
-                    onClick={() => {
-                      const radicados = radicadosDeCliente(c);
-                      const datos = [
-                        c.nombre,
-                        c.telefono ? `Tel: ${c.telefono}` : null,
-                        c.email ? `Correo: ${c.email}` : null,
-                        radicados.length > 0 ? `Radicado${radicados.length > 1 ? "s" : ""}: ${radicados.join(", ")}` : null,
-                      ]
-                        .filter(Boolean)
-                        .join("\n");
-                      copiar(datos, `todo-${id}`);
-                    }}
-                  >
-                    {copiado === `todo-${id}` ? "✓ Copiado" : "Copiar datos"}
-                  </button>
-                  {onIrARegistrarPago && (
                     <button
                       className="drx-btn-ghost"
-                      style={{ ...buttonGhost, color: "#F43F5E", borderColor: "#FBD5DC" }}
-                      title="Registrar un pago de este cliente aquí mismo"
-                      onClick={() => setPagoClienteId(id)}
+                      style={buttonGhost}
+                      title="Copiar solo el código de acceso al portal"
+                      onClick={() => copiar(c.codigoPortal ? formatoCodigoPortal(c.codigoPortal) : id, `portal-${id}`)}
                     >
-                      Registrar pago
+                      <Icono tipo="portapapeles" size={13} style={{ marginRight: 5, verticalAlign: -2 }} />
+                      {copiado === `portal-${id}` ? "¡Copiado!" : "Copiar código"}
                     </button>
-                  )}
-                  <button className="drx-btn-ghost" style={buttonGhost} onClick={() => empezarEdicion(id)}>
-                    Editar
-                  </button>
-                  <button
-                    className="drx-btn-ghost"
-                    style={buttonGhost}
-                    onClick={async () => {
-                      if (!(await confirmar(`¿Eliminar a ${c.nombre}? Puedes recuperarlo después desde la Papelera.`))) return;
-                      removeId(id);
-                      registrarAuditoria(usuarioActual, "eliminar_cliente", "cliente", id, { nombre: c.nombre });
-                    }}
-                  >
-                    Eliminar
-                  </button>
+                    <BotonContrato id={id} cliente={c} onActualizar={(act) => setClientes((prev) => ({ ...prev, [id]: act }))} />
+                  </div>
+                  {/* Fila 2: acciones del caso */}
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    {onIrARegistrarPago && (
+                      <button
+                        className="drx-btn-ghost"
+                        style={buttonGhost}
+                        title="Registrar un pago de este cliente aquí mismo"
+                        onClick={() => setPagoClienteId(id)}
+                      >
+                        <Icono tipo="moneda" size={13} style={{ marginRight: 5, verticalAlign: -2 }} /> Registrar pago
+                      </button>
+                    )}
+                    <button
+                      className="drx-btn-ghost"
+                      style={buttonGhost}
+                      title="Copiar nombre, teléfono, correo y radicado"
+                      onClick={() => {
+                        const radicados = radicadosDeCliente(c);
+                        const datos = [
+                          c.nombre,
+                          c.telefono ? `Tel: ${c.telefono}` : null,
+                          c.email ? `Correo: ${c.email}` : null,
+                          radicados.length > 0 ? `Radicado${radicados.length > 1 ? "s" : ""}: ${radicados.join(", ")}` : null,
+                        ]
+                          .filter(Boolean)
+                          .join("\n");
+                        copiar(datos, `todo-${id}`);
+                      }}
+                    >
+                      <Icono tipo="portapapeles" size={13} style={{ marginRight: 5, verticalAlign: -2 }} />
+                      {copiado === `todo-${id}` ? "¡Copiado!" : "Copiar datos"}
+                    </button>
+                    <button className="drx-btn-ghost" style={buttonGhost} onClick={() => empezarEdicion(id)}>
+                      <Icono tipo="lapiz" size={13} style={{ marginRight: 5, verticalAlign: -2 }} /> Editar
+                    </button>
+                    <button
+                      className="drx-btn-ghost"
+                      style={buttonGhost}
+                      onClick={async () => {
+                        if (!(await confirmar(`¿Eliminar a ${c.nombre}? Puedes recuperarlo después desde la Papelera.`))) return;
+                        removeId(id);
+                        registrarAuditoria(usuarioActual, "eliminar_cliente", "cliente", id, { nombre: c.nombre });
+                      }}
+                    >
+                      Eliminar
+                    </button>
+                  </div>
                 </div>
               </div>
               <LineaDeTiempo
