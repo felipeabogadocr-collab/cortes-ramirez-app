@@ -24,6 +24,9 @@ export default defineConfig({
           if (id.includes("node_modules")) {
             if (id.includes("@supabase")) return "vendor-supabase";
             if (id.includes("react-dom") || id.includes("/react/") || id.includes("/scheduler/")) return "vendor-react";
+            // Nombre propio para la librería de Word: así el service worker
+            // puede dejarla fuera del precache (ver globIgnores abajo).
+            if (id.includes("/docx/")) return "vendor-docx";
           }
         },
       },
@@ -42,7 +45,32 @@ export default defineConfig({
         // fallado (la promesa de "funciona sin internet" ya no se cumplía
         // para ese caso puntual).
         globPatterns: ["**/*.{js,css,html,png,webp,svg,woff2}"],
+        // Fuera del precache lo que casi nunca se usa y pesa mucho: Excel,
+        // Word, los extras de jsPDF que los recibos no usan (HTML/SVG) y las
+        // imágenes de vista previa para WhatsApp/redes. Se guardan en caché
+        // la primera vez que se usan (runtimeCaching), así que siguen
+        // funcionando sin internet después — pero ya no se bajan ~600 KB
+        // en segundo plano en la primera visita. jsPDF y el logo PNG se
+        // quedan: generar un recibo sin conexión debe seguir funcionando.
+        globIgnores: ["**/og-*", "**/xlsx-*.js", "**/vendor-docx-*.js", "**/html2canvas*.js", "**/purify*.js", "**/index.es-*.js"],
         navigateFallbackDenylist: [/^\/api\//, /^\/p\//],
+        runtimeCaching: [
+          {
+            urlPattern: ({ url, sameOrigin }) => sameOrigin && url.pathname.startsWith("/assets/"),
+            handler: "CacheFirst",
+            options: { cacheName: "nomos-bajo-demanda", expiration: { maxEntries: 40, maxAgeSeconds: 60 * 60 * 24 * 60 } },
+          },
+          {
+            urlPattern: ({ url }) => url.origin === "https://fonts.googleapis.com",
+            handler: "StaleWhileRevalidate",
+            options: { cacheName: "nomos-fuentes-css" },
+          },
+          {
+            urlPattern: ({ url }) => url.origin === "https://fonts.gstatic.com",
+            handler: "CacheFirst",
+            options: { cacheName: "nomos-fuentes", expiration: { maxEntries: 30, maxAgeSeconds: 60 * 60 * 24 * 365 }, cacheableResponse: { statuses: [0, 200] } },
+          },
+        ],
       },
     }),
   ],

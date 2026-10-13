@@ -22,7 +22,7 @@ import {
   PLANES_PRECIO,
   FUNCIONES_LANDING,
   SEGURIDAD_LANDING,
-} from "../App.jsx";
+} from "../ui/base.jsx";
 
 export default function LandingPage({ onRegistrar, onIniciarSesion }) {
   const { oscuro, alternar } = useTema();

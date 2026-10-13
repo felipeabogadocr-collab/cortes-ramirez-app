@@ -7,10 +7,12 @@ import {
   COLOR_AREA_PROCESO,
   buttonPrimary,
   inputStyle,
-  formatoCOP,
   fechaHoyISO,
   APP_VERSION,
-} from "../App.jsx";
+} from "../ui/base.jsx";
+import {
+  formatoCOP,
+} from "../lib/utils.js";
 
 // Portal del cliente: lo que ve el cliente final con su código de acceso.
 // Todo sale del RPC obtener_portal_cliente (security definer, sin notas

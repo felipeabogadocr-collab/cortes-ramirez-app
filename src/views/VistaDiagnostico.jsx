@@ -8,7 +8,7 @@ import {
   inputStyle,
   GlobalStyle,
   APP_VERSION,
-} from "../App.jsx";
+} from "../ui/base.jsx";
 
 export default function VistaDiagnostico() {
   const [resultados, setResultados] = useState(null);

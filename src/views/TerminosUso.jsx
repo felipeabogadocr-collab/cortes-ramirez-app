@@ -4,7 +4,7 @@ import {
   BotonTema,
   useTema,
   InsigniaPlataforma,
-} from "../App.jsx";
+} from "../ui/base.jsx";
 
 export default function TerminosUso() {
   const { oscuro, alternar } = useTema();

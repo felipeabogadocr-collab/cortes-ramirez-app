@@ -1,5 +1,5 @@
 import { useState, useEffect, useLayoutEffect } from "react";
-import { NUMERO_WHATSAPP_DESPACHO } from "../App.jsx";
+import { NUMERO_WHATSAPP_DESPACHO } from "../ui/base.jsx";
 
 // Recorrido guiado obligatorio la primera vez que entra un usuario nuevo:
 // va sección por sección, abre cada una y la señala en el menú con una

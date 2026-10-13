@@ -37,9 +37,33 @@
     <meta name="twitter:title" content="Nomos — Gestión legal para despachos de abogados" />
     <meta name="twitter:description" content="Clientes, procesos judiciales, cobros, documentos con firma electrónica y contenido para redes — con inteligencia artificial." />
     <meta name="twitter:image" content="https://cortes-ramirez-app.vercel.app/og-image.png" />
+    <!-- Pantalla de carga instantánea: se pinta con el HTML, antes de que
+         llegue el JavaScript, así nunca se ve una pantalla en blanco en un
+         celular con mala señal. React la reemplaza sola al montar la app. -->
+    <style>
+      #nomos-splash { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; background: linear-gradient(155deg, #3E7C7C 0%, #2C5858 100%); font-family: Inter, system-ui, -apple-system, "Segoe UI", sans-serif; }
+      html.nomos-portal #nomos-splash { background: radial-gradient(1200px 500px at 50% -10%, #145C4E 0%, #0B3B33 45%, #06231E 100%); }
+      #nomos-splash .marca { display: inline-flex; align-items: center; gap: 12px; }
+      #nomos-splash .logo { width: 48px; height: 48px; border-radius: 13px; background: #fff; display: flex; align-items: center; justify-content: center; color: #3E7C7C; }
+      #nomos-splash .nombre { font-size: 26px; font-weight: 800; letter-spacing: 2px; color: #fff; }
+      #nomos-splash .giro { width: 22px; height: 22px; border-radius: 50%; border: 2.5px solid rgba(255,255,255,0.25); border-top-color: #fff; animation: nomos-giro 0.7s linear infinite; }
+      @keyframes nomos-giro { to { transform: rotate(360deg); } }
+    </style>
+    <script>
+      if (location.hash === "#portal" || /^\/p\//.test(location.pathname)) document.documentElement.classList.add("nomos-portal");
+    </script>
   </head>
   <body>
-    <div id="root"></div>
+    <noscript><p style="font-family: system-ui, sans-serif; text-align: center; padding: 40px 20px">Nomos necesita JavaScript activado para funcionar. Actívalo en tu navegador y vuelve a cargar la página.</p></noscript>
+    <div id="root">
+      <div id="nomos-splash" role="status" aria-label="Cargando Nomos">
+        <div class="marca">
+          <div class="logo"><svg width="26" height="26" viewBox="0 0 24 24" aria-hidden="true"><path fill-rule="evenodd" fill="currentColor" d="M7.2,3 H13.8 L18,7.2 V17.8 A2.2,2.2 0 0 1 15.8,20 H7.2 A2.2,2.2 0 0 1 5,17.8 V5.2 A2.2,2.2 0 0 1 7.2,3 Z M8.03,15.11 L10.54,17.73 L12.14,17.63 L17.62,10.39 L15.94,9.13 L10.46,16.37 L12.06,16.27 L9.55,13.65 Z"/></svg></div>
+          <span class="nombre">Nomos</span>
+        </div>
+        <span class="giro"></span>
+      </div>
+    </div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

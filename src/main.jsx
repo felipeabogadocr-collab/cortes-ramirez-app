@@ -1,7 +1,6 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import { registerSW } from "virtual:pwa-register";
-import App from "./App.jsx";
+import { haySesionGuardada } from "./ui/base.jsx";
 import "./index.css";
 
 const LLAVE_RECARGA_CHUNK = "nomos-recarga-por-chunk";
@@ -28,17 +27,27 @@ if (enlaceCorto) window.history.replaceState(null, "", `/?codigo=${enlaceCorto[1
 //   ahí es el momento exacto de recargar, una sola vez (mismo candado de
 //   sessionStorage que usa el aviso de "vite:preloadError" más abajo, para
 //   no recargar dos veces por el mismo despliegue).
-registerSW({
-  immediate: true,
-  onRegisteredSW(swUrl, registration) {
-    if (!registration) return;
-    const revisar = () => registration.update();
-    setInterval(revisar, 60 * 60 * 1000);
-    document.addEventListener("visibilitychange", () => {
-      if (document.visibilityState === "visible") revisar();
-    });
-  },
-});
+//
+// Solo se registra para el panel del despacho: el service worker precarga
+// toda la app para que funcione sin internet, y un cliente que abre su
+// portal una vez (o un visitante de la landing) no necesita descargar eso.
+let swRegistrado = false;
+async function registrarServiceWorker() {
+  if (swRegistrado) return;
+  swRegistrado = true;
+  const { registerSW } = await import("virtual:pwa-register");
+  registerSW({
+    immediate: true,
+    onRegisteredSW(swUrl, registration) {
+      if (!registration) return;
+      const revisar = () => registration.update();
+      setInterval(revisar, 60 * 60 * 1000);
+      document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "visible") revisar();
+      });
+    },
+  });
+}
 
 // Recargar de golpe al volver a la pestaña hacía perder lo que el usuario
 // tenía a medias (un recibo cargando, un documento, un formulario). Ahora
@@ -103,8 +112,46 @@ window.addEventListener("vite:preloadError", () => {
 // candado para que un despliegue futuro también pueda recargarse solo.
 setTimeout(() => sessionStorage.removeItem(LLAVE_RECARGA_CHUNK), 10000);
 
-createRoot(document.getElementById("root")).render(
-  <StrictMode>
-    <App />
-  </StrictMode>
-);
+// Qué se abre: las páginas públicas (portal del cliente, firma, legales y la
+// landing para quien no tiene sesión) cargan un armazón liviano sin el panel;
+// todo lo demás (sesión guardada, regreso de Google/Supabase con parámetros
+// en la URL, #agenda, #diagnostico...) carga la app completa como siempre.
+function vistaPublica() {
+  const hash = window.location.hash.replace("#", "");
+  if (hash === "portal") return "portal";
+  if (hash === "firmar") return "firma";
+  if (hash === "privacidad" || hash === "terminos") return hash;
+  if (hash) return null;
+  const params = new URLSearchParams(window.location.search);
+  if (["code", "error", "error_description", "token", "type", "pago", "recorrido"].some((p) => params.has(p))) return null;
+  return haySesionGuardada() ? null : "landing";
+}
+
+const raiz = createRoot(document.getElementById("root"));
+
+async function montarPanel(inicio) {
+  const { default: App } = await import("./App.jsx");
+  raiz.render(
+    <StrictMode>
+      <App inicio={inicio} />
+    </StrictMode>
+  );
+  registrarServiceWorker();
+}
+
+const publica = vistaPublica();
+if (publica) {
+  import("./PublicApp.jsx").then(({ default: PublicApp }) => {
+    raiz.render(
+      <PublicApp
+        vista={publica}
+        onEntrarAlPanel={(inicio) => {
+          window.history.replaceState(null, "", window.location.pathname);
+          montarPanel(inicio);
+        }}
+      />
+    );
+  });
+} else {
+  montarPanel();
+}

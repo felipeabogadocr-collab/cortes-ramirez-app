@@ -92,7 +92,7 @@ async function manejarTarjetaPortal(req, res, admin) {
   const destino = `${origen}/?codigo=${encodeURIComponent(codigo)}#portal`;
   const titulo = despacho ? `${despacho} · Portal del cliente` : "Portal del cliente · Nomos";
   const descripcion = `Consulta tu proceso, pagos, citas y documentos${despacho ? ` con ${despacho}` : ""}. Con tecnología de Nomos.`;
-  const imagen = `${origen}/og-portal.png`;
+  const imagen = `${origen}/og-portal.jpg`;
   res.setHeader("Content-Type", "text/html; charset=utf-8");
   res.setHeader("Cache-Control", "public, max-age=300");
   return res.status(200).send(`<!doctype html><html lang="es"><head><meta charset="utf-8">
@@ -103,6 +103,7 @@ async function manejarTarjetaPortal(req, res, admin) {
 <meta property="og:title" content="${escaparHtml(titulo)}">
 <meta property="og:description" content="${escaparHtml(descripcion)}">
 <meta property="og:image" content="${imagen}">
+<meta property="og:image:type" content="image/jpeg">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">

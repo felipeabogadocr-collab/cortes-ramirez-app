@@ -13,9 +13,13 @@ import {
   TIPOS_ID,
   NUMERO_WHATSAPP_DESPACHO,
   sha256Hex,
+} from "../ui/base.jsx";
+import {
   DocumentoTextoConFirmas,
+} from "../ui/firma.jsx";
+import {
   calcularEstado,
-} from "../App.jsx";
+} from "../lib/utils.js";
 
 function DocumentoConFirmas({ doc, previewFirmante, onMovePreview }) {
   return <DocumentoTextoConFirmas contenido={doc.contenido} firmantes={doc.firmantes || []} previewFirmante={previewFirmante} onMovePreview={onMovePreview} />;
@@ -221,7 +225,7 @@ Certificado generado: ${new Date().toLocaleString("es-CO", { dateStyle: "full", 
 
       {!doc && (
         <Card>
-          <Field label="Código del documento (te lo compartió tu abogado)">
+          <Field label="Código del documento (te lo compartió el despacho)">
             <input
               className="drx-input"
               style={{
@@ -241,12 +245,12 @@ Certificado generado: ${new Date().toLocaleString("es-CO", { dateStyle: "full", 
           </Field>
           {notFound && (
             <p style={{ color: "#B42318", fontSize: 13, marginTop: 10, fontFamily: "Inter, sans-serif" }}>
-              No encontramos ningún documento con ese código. Verifícalo con tu abogado.
+              No encontramos ningún documento con ese código. Verifícalo con el despacho.
             </p>
           )}
           {expirado && (
             <p style={{ color: "#B42318", fontSize: 13, marginTop: 10, fontFamily: "Inter, sans-serif" }}>
-              Este enlace de firma venció (los enlaces sin firmar duran {DIAS_VENCIMIENTO_FIRMA} días por seguridad). Pídele a tu abogado que te comparta uno nuevo.
+              Este enlace de firma venció (los enlaces sin firmar duran {DIAS_VENCIMIENTO_FIRMA} días por seguridad). Pídele al despacho que te comparta uno nuevo.
             </p>
           )}
           <button className="drx-btn-primary" style={{ ...buttonPrimary, marginTop: 14 }} onClick={buscar} disabled={buscando}>

@@ -4,7 +4,7 @@ import {
   BotonTema,
   useTema,
   InsigniaPlataforma,
-} from "../App.jsx";
+} from "../ui/base.jsx";
 import { getNombreDespacho } from "../lib/storage";
 
 export default function PoliticaPrivacidad() {
@@ -42,7 +42,7 @@ export default function PoliticaPrivacidad() {
         {[
           {
             t: "1. Responsable del tratamiento",
-            c: `${getNombreDespacho()}, en su calidad de despacho de abogados, es responsable del tratamiento de los datos personales que recolecta a través de esta plataforma para la gestión de sus clientes y procesos.`,
+            c: `${getNombreDespacho().replace(/^./, (l) => l.toUpperCase())}, en su calidad de despacho de abogados, es responsable del tratamiento de los datos personales que recolecta a través de esta plataforma para la gestión de sus clientes y procesos.`,
           },
           {
             t: "2. Finalidad del tratamiento",
