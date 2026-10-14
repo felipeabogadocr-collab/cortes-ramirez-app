@@ -102,8 +102,14 @@ async function obtenerAccessTokenVigente(admin, usuarioId) {
       grant_type: "refresh_token",
     }),
   });
-  const datos = await resp.json();
-  if (!resp.ok || !datos.access_token) return null;
+  const datos = await resp.json().catch(() => ({}));
+  // Solo "invalid_grant" significa que Google revocó o venció el permiso de
+  // verdad (hay que reconectar). Cualquier otra falla (red, Google lento,
+  // 5xx) es pasajera: no se trata como desconexión ni se borra nada.
+  if (!resp.ok || !datos.access_token) {
+    if (datos.error === "invalid_grant") return null;
+    throw new Error("google_no_disponible");
+  }
 
   const nuevaExpiracion = new Date(Date.now() + (datos.expires_in || 3600) * 1000).toISOString();
   await admin
@@ -202,7 +208,14 @@ export default async function handler(req, res) {
     // valida de verdad: si ya no se puede renovar el token, se borra la
     // conexión muerta y se reporta desconectado, para que quede claro que
     // hay que volver a conectar.
-    const accessToken = await obtenerAccessTokenVigente(admin, usuario.id);
+    let accessToken;
+    try {
+      accessToken = await obtenerAccessTokenVigente(admin, usuario.id);
+    } catch {
+      // Google no respondió ahora: la conexión sigue guardada, se reporta
+      // conectada (el próximo evento lo reintentará).
+      return res.status(200).json({ conectado: true, email: conexion.email_google || null });
+    }
     if (!accessToken) {
       await admin.from("google_calendar_conexiones").delete().eq("usuario_id", usuario.id);
       return res.status(200).json({ conectado: false, email: null, reconectar: true });
@@ -229,7 +242,12 @@ export default async function handler(req, res) {
       if (!titulo || !fecha) return res.status(400).json({ error: "Falta título o fecha." });
       if (accion === "actualizar_evento" && !googleEventoId) return res.status(400).json({ error: "Falta el id del evento de Google." });
 
-      const accessToken = await obtenerAccessTokenVigente(admin, usuario.id);
+      let accessToken;
+      try {
+        accessToken = await obtenerAccessTokenVigente(admin, usuario.id);
+      } catch {
+        return res.status(503).json({ error: "Google Calendar no respondió. Intenta de nuevo en un momento." });
+      }
       if (!accessToken) return res.status(409).json({ error: "no_conectado" });
 
       const { start, end } = construirRangoFecha(fecha, hora);
@@ -302,7 +320,12 @@ export default async function handler(req, res) {
       const { googleEventoId } = req.body || {};
       if (!googleEventoId) return res.status(400).json({ error: "Falta el id del evento de Google." });
 
-      const accessToken = await obtenerAccessTokenVigente(admin, usuario.id);
+      let accessToken;
+      try {
+        accessToken = await obtenerAccessTokenVigente(admin, usuario.id);
+      } catch {
+        return res.status(503).json({ error: "Google Calendar no respondió. Intenta de nuevo en un momento." });
+      }
       if (!accessToken) return res.status(409).json({ error: "no_conectado" });
 
       try {

@@ -336,8 +336,28 @@ export default function AgendaTab({ onListo }) {
   // automático), para que las notificaciones lleguen por la vía nativa de
   // Google en vez de depender solo del permiso de notificaciones del
   // navegador (que se pierde si Nomos no está abierto).
-  const [googleConectado, setGoogleConectado] = useState(null);
-  const [googleEmail, setGoogleEmail] = useState(null);
+  // El último estado conocido se recuerda en este dispositivo para no mostrar
+  // "no conectado" mientras se confirma con el servidor (la conexión real
+  // vive en el servidor, por usuario, y sirve en todos los dispositivos).
+  const LLAVE_ESTADO_GOOGLE = "nomos-google-calendar-estado";
+  const leerEstadoGuardado = () => {
+    try {
+      return JSON.parse(localStorage.getItem(LLAVE_ESTADO_GOOGLE) || "null");
+    } catch {
+      return null;
+    }
+  };
+  const [googleConectado, setGoogleConectadoBase] = useState(() => leerEstadoGuardado()?.conectado ?? null);
+  const [googleEmail, setGoogleEmail] = useState(() => leerEstadoGuardado()?.email ?? null);
+  const setGoogleConectado = useCallback((valor, email) => {
+    setGoogleConectadoBase(valor);
+    try {
+      if (valor === false) localStorage.removeItem(LLAVE_ESTADO_GOOGLE);
+      else if (valor === true) localStorage.setItem(LLAVE_ESTADO_GOOGLE, JSON.stringify({ conectado: true, email: email ?? null }));
+    } catch {
+      // sin localStorage solo se pierde el atajo visual
+    }
+  }, []);
   const [conectandoGoogle, setConectandoGoogle] = useState(false);
   const [avisoGoogle, setAvisoGoogle] = useState("");
 
@@ -346,17 +366,37 @@ export default function AgendaTab({ onListo }) {
     return data?.session?.access_token || "";
   }, []);
 
-  const consultarEstadoGoogle = useCallback(async () => {
+  // Solo una respuesta clara del servidor cambia el estado: si la consulta
+  // falla (sin señal, sesión renovándose), se conserva el último estado
+  // conocido y se reintenta una vez, en vez de mostrar "no conectado".
+  const consultarEstadoGoogle = useCallback(async (reintento = false) => {
     try {
       const token = await tokenActual();
       const resp = await fetch("/api/agenda/google-callback?estado=1", { headers: { Authorization: `Bearer ${token}` } });
+      if (!resp.ok) throw new Error(String(resp.status));
       const datos = await resp.json();
-      setGoogleConectado(!!datos.conectado);
+      setGoogleConectado(!!datos.conectado, datos.email || null);
       setGoogleEmail(datos.email || null);
     } catch {
-      setGoogleConectado(false);
+      if (!reintento) setTimeout(() => consultarEstadoGoogle(true), 2500);
+      else setGoogleConectadoBase((actual) => (actual === null ? false : actual));
     }
-  }, [tokenActual]);
+  }, [tokenActual, setGoogleConectado]);
+
+  // En iPhone, "Conectar" desde la app instalada abre Google en Safari y la
+  // autorización termina allá: al volver a la app hay que preguntar de nuevo,
+  // si no la pantalla seguía mostrando "no conectado" aunque ya lo estuviera.
+  useEffect(() => {
+    const alVolver = () => {
+      if (document.visibilityState === "visible") consultarEstadoGoogle();
+    };
+    document.addEventListener("visibilitychange", alVolver);
+    window.addEventListener("focus", alVolver);
+    return () => {
+      document.removeEventListener("visibilitychange", alVolver);
+      window.removeEventListener("focus", alVolver);
+    };
+  }, [consultarEstadoGoogle]);
 
   useEffect(() => {
     // Al volver de autorizar en Google, esta pestaña carga con
