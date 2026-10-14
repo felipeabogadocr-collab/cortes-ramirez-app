@@ -194,49 +194,11 @@ export default async function handler(req, res) {
     if (!puedeContinuar) return res.status(429).json({ error: "Demasiados intentos. Espera un momento." });
     const { codigo } = req.query || {};
     if (!codigo) return res.status(400).json({ error: "Falta el código" });
-    // Buscar el cliente por código corto (codigoPortal) o UUID usando admin
-    // para garantizar que RLS no bloquee nada.
-    const { data: clienteRaw } = await buscarClientePortal(admin, codigo, "id, data, despacho_id");
-    const idReal = clienteRaw?.id || codigo;
-    const { data, error } = await admin.rpc("obtener_portal_cliente", { p_id: idReal });
+    // Una sola consulta: la función de la base acepta el código corto del
+    // portal (con o sin guion) o el id completo de los enlaces viejos, y ya
+    // devuelve novedades, cuotas, pagos y el celular del despacho.
+    const { data, error } = await admin.rpc("obtener_portal_cliente", { p_id: String(codigo).trim() });
     if (error || !data) return res.status(404).json({ error: "No encontramos ese código" });
-    // El RPC en vivo puede ser una versión vieja que no incluye actuaciones o
-    // las devuelve vacías — se leen directamente de data.timeline para
-    // garantizar que el portal siempre muestre la línea de tiempo completa.
-    // El RPC en vivo puede ser versión vieja — se inyectan los campos
-    // faltantes directamente desde data del cliente (admin key).
-    const raw = clienteRaw?.data || {};
-    const timelineRaw = raw.timeline || [];
-    if (timelineRaw.length > 0 && (!data.actuaciones || data.actuaciones.length === 0)) {
-      data.actuaciones = timelineRaw
-        .map((t) => ({ fecha: t.fecha, nota: t.nota }))
-        .filter((t) => t.nota)
-        .sort((a, b) => (b.fecha || "").localeCompare(a.fecha || ""))
-        .slice(0, 20);
-    }
-    const cuotasRaw = raw.planPago?.cuotas || [];
-    if (cuotasRaw.length > 0 && (!data.cuotas || data.cuotas.length === 0)) {
-      data.cuotas = cuotasRaw;
-    }
-    const pagosRaw = raw.pagos || [];
-    if (pagosRaw.length > 0 && (!data.pagos || data.pagos.length === 0)) {
-      data.pagos = pagosRaw.map((p) => ({
-        id: p.id,
-        fecha: p.fecha,
-        valor: p.valor,
-        concepto: p.concepto,
-        tieneRecibo: !!p.reciboImagen,
-      }));
-    }
-    if (!data.valorTotal && raw.valorTotal) data.valorTotal = raw.valorTotal;
-    if (!data.proximoPago && raw.proximoPago) data.proximoPago = raw.proximoPago;
-    // Si el RPC viejo no devuelve celular del despacho, se consulta directo.
-    if (clienteRaw?.despacho_id && (!data.despacho?.celular)) {
-      const { data: dep } = await admin.from("despachos").select("celular, nombre").eq("id", clienteRaw.despacho_id).maybeSingle();
-      if (dep) {
-        data.despacho = { ...(data.despacho || {}), celular: dep.celular || data.despacho?.celular || "", nombre: data.despacho?.nombre || dep.nombre || "" };
-      }
-    }
     return res.status(200).json(data);
   }
   if (req.method === "GET" && req.query?.accion === "contrato-portal") {
