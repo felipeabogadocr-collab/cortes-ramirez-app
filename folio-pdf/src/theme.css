@@ -455,7 +455,11 @@ select:focus-visible {
    una sola columna apilada en tablet/celular. */
 .sign-layout {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  /* minmax(0, 1fr) y no solo 1fr: si no, una fila de miniaturas de un PDF
+     largo (muchas páginas, sin wrap) empuja su columna a su ancho de
+     contenido completo en vez de respetar el 1fr, y se desborda toda la
+     cuadrícula. */
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 24px;
 }
 
