@@ -35,7 +35,7 @@ const TerminosUso = lazy(() => import("./views/TerminosUso.jsx"));
 const VistaDiagnostico = lazy(() => import("./views/VistaDiagnostico.jsx"));
 import { supabase } from "./lib/supabaseClient";
 import {
-  APP_VERSION, AlEntrar, BotonTema, COLORS, COLOR_AREA_PROCESO, Card, CargandoSeccion, EstadoBadge, FONT_IMPORT_ID, FUNCIONES_LANDING, Field, GlobalStyle, ICONOS_SEGURIDAD_ORDEN, ICONOS_TAB, Icono, IconoLuna, IconoNomos, IconoSeguridad, IconoSol, IconoTab, InsigniaPlataforma, Kicker, NUMERO_WHATSAPP_DESPACHO, PLANES_PRECIO, PantallaCargaInicial, SEGURIDAD_LANDING, Spinner, TIPOS_ID, TexturaGrano, VistaPreviaAnimada, buttonGhost, buttonPrimary, ensureFonts, fechaHoyISO, footerLinkStyle, inputStyle, navLinkStyle, sha256Hex, useTema,
+  APP_VERSION, AlEntrar, BotonTema, COLORS, COLOR_AREA_PROCESO, Card, CargandoSeccion, EstadoBadge, FUNCIONES_LANDING, Field, GlobalStyle, ICONOS_SEGURIDAD_ORDEN, ICONOS_TAB, Icono, IconoLuna, IconoNomos, IconoSeguridad, IconoSol, IconoTab, InsigniaPlataforma, Kicker, NUMERO_WHATSAPP_DESPACHO, PLANES_PRECIO, PantallaCargaInicial, SEGURIDAD_LANDING, Spinner, TIPOS_ID, TexturaGrano, VistaPreviaAnimada, buttonGhost, buttonPrimary, fechaHoyISO, footerLinkStyle, inputStyle, navLinkStyle, sha256Hex, useTema,
 } from "./ui/base.jsx";
 export {
   APP_VERSION, AlEntrar, BotonTema, COLORS, COLOR_AREA_PROCESO, Card, EstadoBadge, FUNCIONES_LANDING, Field, GlobalStyle, ICONOS_SEGURIDAD_ORDEN, ICONOS_TAB, Icono, IconoLuna, IconoNomos, IconoSeguridad, IconoSol, IconoTab, InsigniaPlataforma, Kicker, NUMERO_WHATSAPP_DESPACHO, PLANES_PRECIO, SEGURIDAD_LANDING, Spinner, TIPOS_ID, TexturaGrano, VistaPreviaAnimada, buttonGhost, buttonPrimary, fechaHoyISO, footerLinkStyle, inputStyle, navLinkStyle, sha256Hex, useTema,
@@ -6839,9 +6839,6 @@ function LoginGate({ onIngresar, onCancelar, pantallaInicial, errorExterno }) {
   const [challengeId2FA, setChallengeId2FA] = useState(null);
   const segundosEsperaRecuperacion = useCuentaRegresiva(proximoEnvioRecuperacion);
 
-  useEffect(() => {
-    ensureFonts();
-  }, []);
 
   // Si la carga del perfil después de un login exitoso falla (p. ej. una
   // migración de base de datos que no se corrió todavía), App.jsx lo detecta
@@ -7894,9 +7891,6 @@ export default function AppConErrorBoundary({ inicio } = {}) {
 }
 
 function App({ inicio }) {
-  useEffect(() => {
-    ensureFonts();
-  }, []);
 
   const isFirmaView = typeof window !== "undefined" && window.location.hash.replace("#", "") === "firmar";
   const isPortalView = typeof window !== "undefined" && window.location.hash.replace("#", "") === "portal";

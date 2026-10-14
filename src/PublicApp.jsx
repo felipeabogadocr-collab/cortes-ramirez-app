@@ -1,5 +1,5 @@
-import { Component, StrictMode, Suspense, lazy, useEffect } from "react";
-import { COLORS, GlobalStyle, CargandoSeccion, PantallaCargaInicial, ensureFonts, haySesionGuardada } from "./ui/base.jsx";
+import { Component, StrictMode, Suspense, lazy } from "react";
+import { COLORS, GlobalStyle, CargandoSeccion, PantallaCargaInicial, haySesionGuardada } from "./ui/base.jsx";
 
 // Páginas que abre gente SIN sesión (clientes del despacho, visitantes de la
 // landing, quien firma un documento). Se sirven desde aquí, sin App.jsx: así
@@ -65,10 +65,6 @@ function EnlacePanel({ onEntrarAlPanel }) {
 }
 
 function Contenido({ vista, onEntrarAlPanel }) {
-  useEffect(() => {
-    ensureFonts();
-  }, []);
-
   if (vista === "landing") {
     return (
       <Suspense fallback={<PantallaCargaInicial />}>

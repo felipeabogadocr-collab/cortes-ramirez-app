@@ -57,18 +57,6 @@ export async function sha256Hex(texto) {
   }
 }
 
-export const FONT_IMPORT_ID = "despacho-fonts";
-
-export function ensureFonts() {
-  if (document.getElementById(FONT_IMPORT_ID)) return;
-  const link = document.createElement("link");
-  link.id = FONT_IMPORT_ID;
-  link.rel = "stylesheet";
-  link.href =
-    "https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700;800&family=Source+Serif+4:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800;900&family=Dancing+Script:wght@600;700&display=swap";
-  document.head.appendChild(link);
-}
-
 export const GlobalStyle = () => (
   <style>{`
     /* --- Bordes seguros del celular (iPhone con isla/notch, barra de gestos,
@@ -448,7 +436,7 @@ export function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-export const APP_VERSION = "1.193.0";
+export const APP_VERSION = "1.194.0";
 
 export function EstadoBadge({ estado }) {
   const config = {
