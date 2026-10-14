@@ -688,6 +688,10 @@ import {
   obtenerClientesPorId,
   obtenerValoresPorClaves,
   obtenerDocumentosPorId,
+  claveIndiceAgenda,
+  getUsuarioAgendaId,
+  obtenerIdsAgenda,
+  setUsuarioAgenda,
 } from "./lib/storage";
 
 export function useIndex(key, shared) {
@@ -1921,8 +1925,7 @@ export function useEventosAgenda() {
   const estadoRef = useRef(estado);
 
   const cargar = useCallback(async () => {
-    const idsRaw = await storageGet("indice-agenda", true);
-    const idsActuales = idsRaw ? JSON.parse(idsRaw) : [];
+    const idsActuales = await obtenerIdsAgenda();
     const valores = await obtenerValoresPorClaves(idsActuales.map((id) => `evento:${id}`));
     const mapa = {};
     idsActuales.forEach((id) => {
@@ -1941,10 +1944,10 @@ export function useEventosAgenda() {
 
   const crear = async (datos) => {
     const id = uid();
-    const registro = { ...datos, creadoEn: new Date().toISOString() };
+    const registro = { ...datos, creadoEn: new Date().toISOString(), usuarioId: getUsuarioAgendaId() };
     const nuevosIds = [id, ...estadoRef.current.ids];
     await storageSet(`evento:${id}`, JSON.stringify(registro), true);
-    await storageSet("indice-agenda", JSON.stringify(nuevosIds), true);
+    await storageSet(claveIndiceAgenda(), JSON.stringify(nuevosIds), true);
     const nuevo = { ids: nuevosIds, eventos: { ...estadoRef.current.eventos, [id]: registro } };
     estadoRef.current = nuevo;
     setEstado(nuevo);
@@ -1953,7 +1956,7 @@ export function useEventosAgenda() {
 
   const eliminar = async (id) => {
     const nuevosIds = estadoRef.current.ids.filter((x) => x !== id);
-    await storageSet("indice-agenda", JSON.stringify(nuevosIds), true);
+    await storageSet(claveIndiceAgenda(), JSON.stringify(nuevosIds), true);
     const { [id]: _quitado, ...restoEventos } = estadoRef.current.eventos;
     const nuevo = { ids: nuevosIds, eventos: restoEventos };
     estadoRef.current = nuevo;
@@ -2008,8 +2011,7 @@ function useAgendaRecordatorios() {
     let cancelado = false;
     const revisar = async () => {
       if (cancelado) return;
-      const idsRaw = await storageGet("indice-agenda", true);
-      const ids = (idsRaw ? JSON.parse(idsRaw) : []).filter((id) => !yaNotificados.has(id));
+      const ids = (await obtenerIdsAgenda()).filter((id) => !yaNotificados.has(id));
       const ahora = Date.now();
       const valores = await obtenerValoresPorClaves(ids.map((id) => `evento:${id}`));
       for (const id of ids) {
@@ -6348,6 +6350,7 @@ function App({ inicio }) {
       return;
     }
     setDespachoActual(perfil?.despacho_id || null, perfil?.despachos?.nombre || "", perfil?.despachos?.logo_ruta || null, perfil?.despachos?.celular || "");
+    setUsuarioAgenda(user.id, perfil?.rol === "Administrador");
     if (perfil?.despacho_id) iniciarSincronizacionOffline();
     // Un despacho nace "activo" con una demo de 3 horas (prueba_hasta) — si
     // esa fecha ya pasó y nadie lo activó de verdad (lo que limpia

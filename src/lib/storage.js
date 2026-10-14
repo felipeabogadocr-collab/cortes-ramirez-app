@@ -17,11 +17,69 @@ let despachoActualNombre = "";
 let despachoActualLogoRuta = null;
 let despachoActualCelular = "";
 export function setDespachoActual(id, nombre, logoRuta, celular) {
+  if (!id) setUsuarioAgenda(null, false);
   despachoActualId = id || null;
   despachoActualNombre = nombre || "";
   despachoActualLogoRuta = logoRuta || null;
   despachoActualCelular = celular || "";
 }
+// Agenda personal --------------------------------------------------------
+// Cada usuario del despacho tiene su propia agenda: si Diego, Paola y
+// Alejandro trabajan en el mismo despacho, cada uno ve y sincroniza con su
+// Google Calendar solo sus eventos. Los eventos siguen siendo filas
+// "evento:ID" del despacho (así el portal del cliente sigue viendo sus
+// citas, sean con quien sean); lo que es de cada uno es el índice.
+let usuarioAgendaId = null;
+let usuarioAgendaEsAdmin = false;
+export function setUsuarioAgenda(id, esAdmin) {
+  usuarioAgendaId = id || null;
+  usuarioAgendaEsAdmin = !!esAdmin;
+}
+export function getUsuarioAgendaId() {
+  return usuarioAgendaId;
+}
+const INDICE_AGENDA_COMPARTIDO = "indice-agenda";
+export function claveIndiceAgenda() {
+  return usuarioAgendaId ? `${INDICE_AGENDA_COMPARTIDO}:${usuarioAgendaId}` : INDICE_AGENDA_COMPARTIDO;
+}
+
+// Antes la agenda era una sola para todo el despacho ("indice-agenda").
+// La primera vez que un administrador abre su agenda personal, esos
+// eventos pasan a él (normalmente el abogado principal, que es quien la
+// venía usando) y el índice compartido queda vacío. Se consulta directo a
+// la base — nunca con la copia offline — para no confundir "sin señal" con
+// "todavía no tiene agenda" y pisar una agenda que sí existe.
+let migracionAgendaHecha = null;
+async function migrarAgendaCompartida() {
+  const clavePropia = claveIndiceAgenda();
+  if (!usuarioAgendaId || !usuarioAgendaEsAdmin || !despachoActualId) return;
+  if (migracionAgendaHecha === clavePropia) return;
+  const { data, error } = await supabase
+    .from("app_settings")
+    .select("key, value")
+    .eq("despacho_id", despachoActualId)
+    .in("key", [clavePropia, INDICE_AGENDA_COMPARTIDO]);
+  if (error) return;
+  const filas = Object.fromEntries((data || []).map((f) => [f.key, f.value]));
+  migracionAgendaHecha = clavePropia;
+  const compartidos = filas[INDICE_AGENDA_COMPARTIDO] ? JSON.parse(filas[INDICE_AGENDA_COMPARTIDO]) : [];
+  if (compartidos.length === 0) return;
+  const propios = filas[clavePropia] ? JSON.parse(filas[clavePropia]) : [];
+  const unidos = [...propios, ...compartidos.filter((id) => !propios.includes(id))];
+  await storageSet(clavePropia, JSON.stringify(unidos));
+  await storageSet(INDICE_AGENDA_COMPARTIDO, "[]");
+}
+
+export async function obtenerIdsAgenda() {
+  try {
+    await migrarAgendaCompartida();
+  } catch (e) {
+    console.warn("No se pudo pasar la agenda compartida a la personal:", e);
+  }
+  const raw = await storageGet(claveIndiceAgenda());
+  return raw ? JSON.parse(raw) : [];
+}
+
 export function getDespachoActualId() {
   return despachoActualId;
 }

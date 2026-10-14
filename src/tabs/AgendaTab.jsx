@@ -755,7 +755,7 @@ export default function AgendaTab({ onListo }) {
         titulo="Agenda"
         color="#8B5CF6"
         icono={<Icono tipo="calendario" size={19} />}
-        subtitulo="Tus eventos y asesorías, todo en un solo lugar — sin perder ni una."
+        subtitulo="Tu agenda personal: solo tú ves tus eventos y asesorías, y se sincronizan con tu propio Google Calendar."
       />
 
       {permisoNotif !== "granted" && permisoNotif !== "unsupported" && !googleConectado && (

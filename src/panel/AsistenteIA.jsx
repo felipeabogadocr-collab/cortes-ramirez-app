@@ -4,7 +4,7 @@
 import { COLORS, Card, Icono, IconoNomos, buttonGhost, buttonPrimary, fechaHoyISO, inputStyle } from "../ui/base.jsx";
 import { Fragment, useEffect, useRef, useState } from "react";
 import { TAMANO_MAX_ARCHIVO_MB, archivoDemasiadoGrande, calcularEstado, diasDesde, diasHasta, formatoCOP, radicadosDeCliente, textoEstadoPago } from "../lib/utils.js";
-import { getNombreDespacho, obtenerClientesPorId, obtenerDocumentosPorId, obtenerValoresPorClaves, storageGet, storageSet } from "../lib/storage";
+import { claveIndiceAgenda, getNombreDespacho, obtenerClientesPorId, obtenerDocumentosPorId, obtenerIdsAgenda, obtenerValoresPorClaves, storageSet } from "../lib/storage";
 import { supabase } from "../lib/supabaseClient";
 import { AREAS_PROCESO, DIAS_ALERTA_INACTIVIDAD, DIAS_AVISO_PROXIMO_PAGO, IconoLex, NOMBRE_ASISTENTE, TIPOS_PROCESO_POR_AREA, calcularResumenOperacion, diagnosticoOperacion, ensureMammoth, ensureXLSX, generarReciboImagen, registrarAuditoria, uid, useConfirmarDialogo, ensureJsPDF } from "../App.jsx";
 
@@ -486,17 +486,15 @@ async function ejecutarHerramienta(nombreHerramienta, input, usuarioActual) {
 
   if (nombreHerramienta === "crear_evento_agenda") {
     const id = uid();
-    await storageSet(`evento:${id}`, JSON.stringify({ titulo: input.titulo, fecha: input.fecha, hora: input.hora || "", notas: input.notas || "", creadoEn: new Date().toISOString() }), true);
-    const idsAgendaRaw = await storageGet("indice-agenda", true);
-    const idsAgenda = idsAgendaRaw ? JSON.parse(idsAgendaRaw) : [];
-    await storageSet("indice-agenda", JSON.stringify([id, ...idsAgenda]), true);
+    await storageSet(`evento:${id}`, JSON.stringify({ titulo: input.titulo, fecha: input.fecha, hora: input.hora || "", notas: input.notas || "", creadoEn: new Date().toISOString(), usuarioId: usuarioActual?.id || null }), true);
+    const idsAgenda = await obtenerIdsAgenda();
+    await storageSet(claveIndiceAgenda(), JSON.stringify([id, ...idsAgenda]), true);
     registrarAuditoria(usuarioActual, "crear_evento", "evento", id, { nombre: input.titulo });
     return { mensaje: `Evento "${input.titulo}" agendado para el ${input.fecha}${input.hora ? ` a las ${input.hora}` : ""}.` };
   }
 
   if (nombreHerramienta === "listar_agenda_proxima") {
-    const idsAgendaRaw = await storageGet("indice-agenda", true);
-    const idsAgenda = idsAgendaRaw ? JSON.parse(idsAgendaRaw) : [];
+    const idsAgenda = await obtenerIdsAgenda();
     const hoyISO = fechaHoyISO();
     const eventos = [];
     const valoresAgenda = await obtenerValoresPorClaves(idsAgenda.map((id) => `evento:${id}`));
