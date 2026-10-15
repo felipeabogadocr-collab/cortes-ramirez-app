@@ -25,9 +25,11 @@ function formatFechaHora() {
   return { fecha, hora };
 }
 
-// Compone la firma (dibujada, imagen subida o texto en cursiva) junto con el
-// sello automático "Firmado por... el... a las..." en una sola imagen.
-async function composeStamp({ signatureDataUrl, nombre }) {
+// Compone la firma (dibujada, imagen subida o texto en cursiva), opcionalmente
+// junto con el sello automático "Firmado por... el... a las..." — si no se
+// incluye el sello, la gráfica de la firma se centra en todo el lienzo en vez
+// de dejar el espacio reservado para el texto.
+async function composeStamp({ signatureDataUrl, nombre, incluirSello = true }) {
   const canvas = document.createElement("canvas");
   canvas.width = STAMP_W;
   canvas.height = STAMP_H;
@@ -35,21 +37,24 @@ async function composeStamp({ signatureDataUrl, nombre }) {
 
   const img = await loadImage(signatureDataUrl);
   const maxW = STAMP_W * 0.85;
-  const maxH = STAMP_H * 0.62;
+  const maxH = incluirSello ? STAMP_H * 0.62 : STAMP_H * 0.85;
   const scale = Math.min(maxW / img.width, maxH / img.height, 1);
   const w = img.width * scale;
   const h = img.height * scale;
-  ctx.drawImage(img, (STAMP_W - w) / 2, 10 + (maxH - h) / 2, w, h);
+  const y = incluirSello ? 10 + (maxH - h) / 2 : (STAMP_H - h) / 2;
+  ctx.drawImage(img, (STAMP_W - w) / 2, y, w, h);
 
-  const textY = STAMP_H * 0.66;
-  const { fecha, hora } = formatFechaHora();
-  ctx.textAlign = "center";
-  ctx.fillStyle = "#1f2937";
-  ctx.font = "700 22px Manrope, sans-serif";
-  ctx.fillText(`Firmado por ${nombre}`, STAMP_W / 2, textY + 12);
-  ctx.fillStyle = "#4b5563";
-  ctx.font = "500 17px Manrope, sans-serif";
-  ctx.fillText(`el ${fecha} a las ${hora}`, STAMP_W / 2, textY + 36);
+  if (incluirSello) {
+    const textY = STAMP_H * 0.66;
+    const { fecha, hora } = formatFechaHora();
+    ctx.textAlign = "center";
+    ctx.fillStyle = "#1f2937";
+    ctx.font = "700 22px Manrope, sans-serif";
+    ctx.fillText(`Firmado por ${nombre}`, STAMP_W / 2, textY + 12);
+    ctx.fillStyle = "#4b5563";
+    ctx.font = "500 17px Manrope, sans-serif";
+    ctx.fillText(`el ${fecha} a las ${hora}`, STAMP_W / 2, textY + 36);
+  }
 
   return canvas.toDataURL("image/png");
 }
@@ -233,6 +238,7 @@ export default function SignTool({ chainedFile, onConsumedChain }) {
   const [metodo, setMetodo] = useState("dibujar");
   const [estiloFirmaId, setEstiloFirmaId] = useState(ESTILOS_FIRMA[0].id);
   const [negrilla, setNegrilla] = useState(false);
+  const [incluirSello, setIncluirSello] = useState(true);
   const [nombre, setNombre] = useState("");
   const [firmaDibujada, setFirmaDibujada] = useState(null);
   const [firmaImagen, setFirmaImagen] = useState(null);
@@ -268,7 +274,7 @@ export default function SignTool({ chainedFile, onConsumedChain }) {
           setStampUrl(null);
           return;
         }
-        const compuesta = await composeStamp({ signatureDataUrl: grafica, nombre: nombre.trim() });
+        const compuesta = await composeStamp({ signatureDataUrl: grafica, nombre: nombre.trim(), incluirSello });
         if (!cancelado) setStampUrl(compuesta);
       } catch {
         if (!cancelado) setStampUrl(null);
@@ -278,7 +284,7 @@ export default function SignTool({ chainedFile, onConsumedChain }) {
     return () => {
       cancelado = true;
     };
-  }, [metodo, nombre, firmaDibujada, firmaImagen, estiloFirmaId, negrilla]);
+  }, [metodo, nombre, firmaDibujada, firmaImagen, estiloFirmaId, negrilla, incluirSello]);
 
   useEffect(() => {
     if (chainedFile) {
@@ -337,7 +343,7 @@ export default function SignTool({ chainedFile, onConsumedChain }) {
         const estilo = ESTILOS_FIRMA.find((e) => e.id === estiloFirmaId);
         grafica = await renderTextoCursivo(nombre.trim(), estilo, negrilla);
       }
-      const compuesta = await composeStamp({ signatureDataUrl: grafica, nombre: nombre.trim() });
+      const compuesta = await composeStamp({ signatureDataUrl: grafica, nombre: nombre.trim(), incluirSello });
       const out = await signPdf(bytes, compuesta, pageIndex, box);
       setResultado(out);
     } catch {
@@ -497,6 +503,26 @@ export default function SignTool({ chainedFile, onConsumedChain }) {
           </span>
           Tu firma no se almacena ni se comparte: se aplica directamente en tu navegador.
         </p>
+
+        <label
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            fontSize: 13,
+            fontWeight: 600,
+            cursor: "pointer",
+            marginBottom: 14,
+          }}
+        >
+          <input
+            type="checkbox"
+            checked={incluirSello}
+            onChange={(e) => setIncluirSello(e.target.checked)}
+            style={{ width: 16, height: 16 }}
+          />
+          Incluir sello de "Firmado por... el... a las..." junto a la firma
+        </label>
 
         <div className="sign-tabs">
           <button className={`sign-tab ${metodo === "dibujar" ? "active" : ""}`} onClick={() => setMetodo("dibujar")}>
