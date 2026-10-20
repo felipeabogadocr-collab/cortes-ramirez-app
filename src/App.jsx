@@ -3603,7 +3603,7 @@ export function useDatosReportes() {
   };
 }
 
-export const CATEGORIAS_EGRESO = ["Arriendo", "Nómina", "Servicios públicos", "Insumos de oficina", "Impuestos", "Software y herramientas", "Marketing", "Pendiente por clasificar", "Otro"];
+export const CATEGORIAS_EGRESO = ["Arriendo", "Nómina", "Adelanto de nómina", "Servicios públicos", "Insumos de oficina", "Impuestos", "Software y herramientas", "Marketing", "Pendiente por clasificar", "Otro"];
 
 // Los egresos del despacho (arriendo, nómina, servicios...) no pertenecen a
 // ningún cliente puntual, así que se guardan como una sola lista bajo una
@@ -3645,6 +3645,11 @@ export function useEgresos() {
       // cambia en nada cómo cuenta este egreso en los totales normales,
       // solo lo hace aparecer en la sección "Retorno de inversión".
       esInversion: !!datos.esInversion,
+      // Solo para "Adelanto de nómina": a quién se le prestó y en cuántos
+      // pagos de nómina se le descuenta. La salida de plata cuenta como
+      // egreso el día del adelanto; los descuentos posteriores solo se
+      // anotan aquí (la nómina de ese mes ya se registra por el neto).
+      ...(datos.adelanto ? { adelanto: datos.adelanto } : {}),
     };
     const actualizados = [nuevo, ...egresos];
     await storageSet("egresos-contabilidad", JSON.stringify(actualizados), false);

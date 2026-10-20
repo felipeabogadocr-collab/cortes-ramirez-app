@@ -1796,6 +1796,206 @@ function FormularioEgreso({ onRegistrar, mediosPago = MEDIOS_PAGO_DEFECTO }) {
   );
 }
 
+// Las cinco formas de mover plata en Contabilidad, como tarjetas del mismo
+// tamaño (antes eran botones de colores distintos, uno al lado del otro y
+// partidos en dos filas). Cada una abre su formulario justo debajo; tocar
+// la misma tarjeta otra vez lo cierra.
+const ACCIONES_CONTABILIDAD = [
+  { id: "pago", titulo: "Pago de cliente", detalle: "Abono o cuota de un cliente", color: "#3E7C7C", icono: "M12 3v18M16.5 7.5c0-1.9-2-3-4.5-3s-4.5 1.2-4.5 3.2c0 4.6 9 2.4 9 7 0 2-2 3.3-4.5 3.3S7.5 16.9 7.5 15" },
+  { id: "egreso", titulo: "Egreso", detalle: "Arriendo, nómina, servicios…", color: "#E5484D", icono: "M12 4v14M6 12l6 6 6-6" },
+  { id: "ingreso", titulo: "Otro ingreso", detalle: "Plata que no es de un cliente", color: "#12A26B", icono: "M12 20V6M6 12l6-6 6 6" },
+  { id: "credito", titulo: "Crédito", detalle: "Compras o préstamos a cuotas", color: "#7C3AED", icono: "M3 7h18v10H3zM3 11h18M7 15h3" },
+  { id: "adelanto", titulo: "Adelanto de nómina", detalle: "Préstamo a un empleado", color: "#D97706", icono: "M16 8a4 4 0 1 1-8 0 4 4 0 0 1 8 0zM4 20c1.2-3.4 4.2-5 8-5M17 14v6M14 17h6" },
+];
+
+function AccionesContabilidad({ activa, onElegir, pendienteAdelantos }) {
+  return (
+    <>
+      <style>{`
+        .drx-acciones { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-bottom: 20px; }
+        .drx-accion:hover { transform: translateY(-1px); }
+        @media (max-width: 640px) {
+          .drx-acciones { grid-template-columns: 1fr 1fr; }
+          .drx-acciones > :first-child { grid-column: 1 / -1; flex-direction: row !important; align-items: center !important; }
+        }
+      `}</style>
+      <div className="drx-acciones">
+        {ACCIONES_CONTABILIDAD.map((a) => {
+          const on = activa === a.id;
+          const conPendiente = a.id === "adelanto" && pendienteAdelantos > 0 && !on;
+          const detalle = conPendiente ? `${formatoCOP(pendienteAdelantos)} por descontar` : a.detalle;
+          return (
+            <button
+              key={a.id}
+              type="button"
+              className="drx-accion"
+              onClick={() => onElegir(on ? null : a.id)}
+              aria-expanded={on}
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "flex-start",
+                gap: 10,
+                textAlign: "left",
+                padding: "14px 14px 13px",
+                borderRadius: 16,
+                cursor: "pointer",
+                fontFamily: "Inter, sans-serif",
+                background: on ? `${a.color}12` : COLORS.panel,
+                border: `1.5px solid ${on ? a.color : COLORS.border}`,
+                boxShadow: on ? `0 0 0 3px ${a.color}22` : "0 1px 2px rgba(16,24,40,0.05)",
+                transition: "border-color .15s, box-shadow .15s, background .15s, transform .15s",
+              }}
+            >
+              <span style={{ width: 36, height: 36, flexShrink: 0, borderRadius: 11, background: on ? a.color : `${a.color}18`, color: on ? "#fff" : a.color, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                {on ? (
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
+                ) : (
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round"><path d={a.icono} /></svg>
+                )}
+              </span>
+              <span style={{ minWidth: 0 }}>
+                <span style={{ display: "block", fontSize: 13.5, fontWeight: 700, color: COLORS.ink, lineHeight: 1.25 }}>{a.titulo}</span>
+                <span style={{ display: "block", fontSize: 11.5, color: conPendiente ? a.color : COLORS.muted, fontWeight: conPendiente ? 700 : 500, marginTop: 3, lineHeight: 1.3 }}>
+                  {on ? "Toca para cerrar" : detalle}
+                </span>
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </>
+  );
+}
+
+// Adelanto de nómina: el despacho le presta a un empleado parte de su
+// sueldo y se lo descuenta después en uno o varios pagos de nómina. La
+// plata sale el día del adelanto (por eso es un egreso), y aquí solo se
+// lleva la cuenta de cuánto falta por descontarle.
+function FormularioAdelantoNomina({ onRegistrar, mediosPago = MEDIOS_PAGO_DEFECTO, empleadosConocidos = [] }) {
+  const hoyStr = fechaHoyISO();
+  const [empleado, setEmpleado] = useState("");
+  const [valor, setValor] = useState("");
+  const [fecha, setFecha] = useState(hoyStr);
+  const [cuotas, setCuotas] = useState("1");
+  const [medioPago, setMedioPago] = useState("");
+  const [nota, setNota] = useState("");
+  const [guardando, setGuardando] = useState(false);
+  const n = Math.max(1, Number(cuotas) || 1);
+  const porPago = Number(valor) > 0 ? Math.ceil(Number(valor) / n) : 0;
+
+  const registrar = async () => {
+    if (!empleado.trim() || !(Number(valor) > 0)) return;
+    setGuardando(true);
+    await onRegistrar({ empleado: empleado.trim(), valor, fecha, cuotas: n, medioPago, nota: nota.trim() });
+    setEmpleado("");
+    setValor("");
+    setFecha(hoyStr);
+    setCuotas("1");
+    setMedioPago("");
+    setNota("");
+    setGuardando(false);
+  };
+
+  return (
+    <div style={{ marginTop: 12, borderTop: `1px solid ${COLORS.border}`, paddingTop: 14 }}>
+      <div className="drx-grid-form" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+        <Field label="Empleado">
+          <input className="drx-input" style={inputStyle} value={empleado} onChange={(e) => setEmpleado(e.target.value)} placeholder="Nombre de quien recibe el adelanto" list="drx-empleados-adelanto" />
+          <datalist id="drx-empleados-adelanto">
+            {empleadosConocidos.map((e) => (
+              <option key={e} value={e} />
+            ))}
+          </datalist>
+        </Field>
+        <Field label="Valor del adelanto (COP)">
+          <CampoDinero style={inputStyle} value={valor} onChange={(e) => setValor(e.target.value)} placeholder="Ej: 500.000" />
+        </Field>
+      </div>
+      <div className="drx-grid-form" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 12 }}>
+        <Field label="Fecha">
+          <input type="date" className="drx-input" style={inputStyle} value={fecha} onChange={(e) => setFecha(e.target.value)} />
+        </Field>
+        <Field label="Se descuenta en">
+          <select className="drx-input" style={inputStyle} value={cuotas} onChange={(e) => setCuotas(e.target.value)}>
+            {[1, 2, 3, 4, 5, 6].map((k) => (
+              <option key={k} value={k}>
+                {k === 1 ? "1 pago de nómina" : `${k} pagos de nómina`}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field label="¿De qué cuenta salió?">
+          <select className="drx-input" style={inputStyle} value={medioPago} onChange={(e) => setMedioPago(e.target.value)}>
+            <option value="">Sin especificar</option>
+            {mediosPago.map((m) => (
+              <option key={m} value={m}>
+                {m}
+              </option>
+            ))}
+          </select>
+        </Field>
+      </div>
+      <Field label="Nota (opcional)">
+        <input className="drx-input" style={inputStyle} value={nota} onChange={(e) => setNota(e.target.value)} placeholder="Ej: calamidad doméstica, autorizado por la gerencia" />
+      </Field>
+      {porPago > 0 && (
+        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.inkSoft, marginTop: 12, background: "#FEF3C7", borderRadius: 10, padding: "9px 12px" }}>
+          Se le descontarán <b>{formatoCOP(porPago)}</b> {n === 1 ? "en el próximo pago de nómina" : `en cada uno de los próximos ${n} pagos de nómina`}.
+        </p>
+      )}
+      <button className="drx-btn-primary" style={{ ...buttonPrimary, marginTop: 14, background: "#D97706" }} onClick={registrar} disabled={guardando || !empleado.trim() || !(Number(valor) > 0)}>
+        {guardando ? "Guardando..." : "Registrar adelanto"}
+      </button>
+    </div>
+  );
+}
+
+function AdelantosNomina({ adelantos, onDescontar }) {
+  const pendientes = adelantos.filter((e) => (Number(e.valor) || 0) - (Number(e.adelanto?.descontado) || 0) > 0);
+  if (pendientes.length === 0) return null;
+  const total = pendientes.reduce((s, e) => s + (Number(e.valor) || 0) - (Number(e.adelanto?.descontado) || 0), 0);
+  return (
+    <Card style={{ marginBottom: 20, borderLeft: "4px solid #D97706" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
+        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, fontWeight: 700, color: COLORS.ink }}>Adelantos de nómina por descontar</p>
+        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, fontWeight: 800, color: "#B45309" }}>{formatoCOP(total)}</p>
+      </div>
+      <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, margin: "4px 0 6px" }}>
+        Cuando pagues la nómina, registra el descuento aquí y anota la nómina por el valor neto que pagaste.
+      </p>
+      {pendientes.map((e) => {
+        const a = e.adelanto || {};
+        const valor = Number(e.valor) || 0;
+        const descontado = Number(a.descontado) || 0;
+        const falta = valor - descontado;
+        const porPago = Math.min(falta, Math.ceil(valor / Math.max(1, Number(a.cuotas) || 1)));
+        const hechos = (a.descuentos || []).length;
+        return (
+          <div key={e.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 0", borderTop: `1px solid ${COLORS.border}`, flexWrap: "wrap" }}>
+            <div style={{ flex: 1, minWidth: 180 }}>
+              <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13.5, fontWeight: 700, color: COLORS.ink }}>{a.empleado || e.concepto}</p>
+              <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, marginTop: 2 }}>
+                {formatoCOP(valor)} el {new Date(e.fecha).toLocaleDateString("es-CO", { day: "numeric", month: "short" })} · descuento {Math.min(hechos + 1, Number(a.cuotas) || 1)} de {Number(a.cuotas) || 1}
+              </p>
+              <div style={{ height: 6, borderRadius: 6, background: "#FDE7C2", marginTop: 7, overflow: "hidden", maxWidth: 260 }}>
+                <div style={{ height: "100%", width: `${Math.round((descontado / valor) * 100)}%`, background: "#D97706" }} />
+              </div>
+            </div>
+            <div style={{ textAlign: "right" }}>
+              <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted }}>Falta</p>
+              <p style={{ fontFamily: "Inter, sans-serif", fontSize: 14, fontWeight: 800, color: COLORS.ink }}>{formatoCOP(falta)}</p>
+            </div>
+            <button className="drx-btn-ghost" style={{ ...buttonGhost, whiteSpace: "nowrap" }} onClick={() => onDescontar(e, porPago)}>
+              Descontar {formatoCOP(porPago)}
+            </button>
+          </div>
+        );
+      })}
+    </Card>
+  );
+}
+
 function EgresoCard({ egreso, onEditar, onEliminar, clientesDisponibles, mediosPago = MEDIOS_PAGO_DEFECTO }) {
   const [editando, setEditando] = useState(false);
   const [concepto, setConcepto] = useState(egreso.concepto);
@@ -2522,6 +2722,34 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
     registrarAuditoria(usuarioActual, "eliminar_egreso", "egreso", egreso.id, { concepto: egreso.concepto, valor: egreso.valor });
   };
 
+  const adelantosNomina = egresos.filter((e) => e.categoria === "Adelanto de nómina" && e.adelanto);
+  const pendienteAdelantos = adelantosNomina.reduce((s, e) => s + Math.max(0, (Number(e.valor) || 0) - (Number(e.adelanto?.descontado) || 0)), 0);
+  const empleadosConocidos = [...new Set(adelantosNomina.map((e) => e.adelanto.empleado).filter(Boolean))];
+
+  const registrarAdelanto = async (datos) => {
+    const nuevo = await crearEgreso({
+      concepto: `Adelanto de nómina — ${datos.empleado}${datos.nota ? ` (${datos.nota})` : ""}`,
+      categoria: "Adelanto de nómina",
+      valor: datos.valor,
+      fecha: datos.fecha,
+      medioPago: datos.medioPago,
+      adelanto: { empleado: datos.empleado, cuotas: datos.cuotas, descontado: 0, descuentos: [] },
+    });
+    registrarAuditoria(usuarioActual, "registrar_adelanto_nomina", "egreso", nuevo.id, { empleado: datos.empleado, valor: nuevo.valor });
+    setModoRegistro(null);
+  };
+
+  const descontarAdelanto = async (egreso, valorSugerido) => {
+    const a = egreso.adelanto || {};
+    const falta = (Number(egreso.valor) || 0) - (Number(a.descontado) || 0);
+    const ok = await confirmar(`¿Registrar que a ${a.empleado} se le descontaron ${formatoCOP(valorSugerido)} de la nómina? Le quedarían ${formatoCOP(Math.max(0, falta - valorSugerido))} por descontar.`);
+    if (!ok) return;
+    await editarEgreso(egreso.id, {
+      adelanto: { ...a, descontado: (Number(a.descontado) || 0) + valorSugerido, descuentos: [...(a.descuentos || []), { fecha: new Date().toISOString(), valor: valorSugerido }] },
+    });
+    registrarAuditoria(usuarioActual, "descontar_adelanto_nomina", "egreso", egreso.id, { empleado: a.empleado, valor: valorSugerido });
+  };
+
   const registrarCredito = async (datos) => {
     const nuevo = await crearCreditoBase(datos);
     registrarAuditoria(usuarioActual, "registrar_credito", "credito", nuevo.id, { concepto: nuevo.concepto, valorTotal: nuevo.valorTotal });
@@ -3070,36 +3298,7 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
         guardarCuentasSaldo={guardarCuentasSaldo}
       />
 
-      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 20 }}>
-        <button
-          className="drx-btn-primary"
-          style={{ ...buttonPrimary, background: modoRegistro === "pago" ? COLORS.navyDeep : COLORS.navy }}
-          onClick={() => setModoRegistro(modoRegistro === "pago" ? null : "pago")}
-        >
-          {modoRegistro === "pago" ? "Cancelar" : "+ Registrar pago de cliente"}
-        </button>
-        <button
-          className="drx-btn-primary"
-          style={{ ...buttonPrimary, background: "#F43F5E" }}
-          onClick={() => setModoRegistro(modoRegistro === "egreso" ? null : "egreso")}
-        >
-          {modoRegistro === "egreso" ? "Cancelar" : "+ Registrar egreso"}
-        </button>
-        <button
-          className="drx-btn-primary"
-          style={{ ...buttonPrimary, background: "#10B981" }}
-          onClick={() => setModoRegistro(modoRegistro === "ingreso" ? null : "ingreso")}
-        >
-          {modoRegistro === "ingreso" ? "Cancelar" : "+ Registrar otro ingreso"}
-        </button>
-        <button
-          className="drx-btn-primary"
-          style={{ ...buttonPrimary, background: "#7C3AED" }}
-          onClick={() => setModoRegistro(modoRegistro === "credito" ? null : "credito")}
-        >
-          {modoRegistro === "credito" ? "Cancelar" : "+ Registrar crédito"}
-        </button>
-      </div>
+      <AccionesContabilidad activa={modoRegistro} onElegir={setModoRegistro} pendienteAdelantos={pendienteAdelantos} />
 
       {modoRegistro === "pago" && (
         <Card style={{ marginBottom: 20, borderLeft: `4px solid ${COLORS.navy}` }}>
@@ -3155,12 +3354,24 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
           <FormularioCredito onRegistrar={registrarCredito} />
         </Card>
       )}
+      {modoRegistro === "adelanto" && (
+        <Card style={{ marginBottom: 20, borderLeft: "4px solid #D97706" }}>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, fontWeight: 700, color: COLORS.ink, marginBottom: 4 }}>Registrar adelanto de nómina</p>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, marginBottom: 14 }}>
+            Plata que le prestas a un empleado sobre su sueldo. Sale hoy como egreso y Nomos te lleva la cuenta de cuánto falta por descontarle.
+          </p>
+          <FormularioAdelantoNomina onRegistrar={registrarAdelanto} mediosPago={mediosPago} empleadosConocidos={empleadosConocidos} />
+        </Card>
+      )}
+      {modoRegistro === "adelanto" && <AdelantosNomina adelantos={adelantosNomina} onDescontar={descontarAdelanto} />}
 
       <div
         style={{
           display: "inline-flex",
           gap: 4,
-          flexWrap: "wrap",
+          flexWrap: "nowrap",
+          maxWidth: "100%",
+          overflowX: "auto",
           marginBottom: 20,
           padding: 5,
           background: COLORS.surfaceSoft,
@@ -3186,7 +3397,9 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
                 fontSize: 12.5,
                 fontWeight: 700,
                 letterSpacing: "0.02em",
-                padding: "9px 20px",
+                padding: "9px 18px",
+                whiteSpace: "nowrap",
+                flexShrink: 0,
                 borderRadius: 12,
                 border: "none",
                 background: activa ? `linear-gradient(135deg, ${COLORS.navy}, ${COLORS.navyDeep})` : "transparent",
@@ -3616,6 +3829,7 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
 
       {vistaContabilidad === "egresos" && (
         <>
+      {modoRegistro !== "adelanto" && <AdelantosNomina adelantos={adelantosNomina} onDescontar={descontarAdelanto} />}
       {creditos.length > 0 && (
         <Card style={{ marginBottom: 20 }}>
           <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, fontWeight: 700, color: COLORS.ink, marginBottom: 4 }}>Créditos y compras a cuotas</p>
