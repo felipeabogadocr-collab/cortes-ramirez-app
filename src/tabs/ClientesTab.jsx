@@ -1,12 +1,13 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { storageSet, getNombreDespacho, obtenerClientesPorId, subirContratoCliente } from "../lib/storage";
+import { TareasCliente } from "../panel/Tareas.jsx";
 import {
   COLORS, uid, registrarAuditoria, diasDesde, exportarCSV, useIndex, useConfirmarDialogo,
   useAvisoAntesDeSalir, useUsuariosDespacho, Field, inputStyle, CampoDinero, buttonPrimary,
   buttonGhost, Card, EncabezadoSeccion, Icono, AvatarIniciales, EstadoVacio, LineaDeTiempo,
   AREAS_PROCESO, COLOR_AREA_PROCESO, DIAS_ALERTA_INACTIVIDAD, numeroWhatsappCliente,
   radicadosDeCliente, tiposProcesoDeArea, useServicios, calcularProximaFechaPorFrecuencia,
-  fechaHoyISO, formatoCOP, leerJSONLocal, guardarJSONLocal, useReferenciadores, useAbogadosAsociados,
+  fechaHoyISO, formatoCOP, useTareas, leerJSONLocal, guardarJSONLocal, useReferenciadores, useAbogadosAsociados,
   useValorConRetraso, SelectorComision, permisosPorDefecto, enviarMensajeGrupoWhatsapp, useMediosPago,
 } from "../App.jsx";
 
@@ -880,6 +881,7 @@ export function VentanaCompartirPortal({ clienteId, cliente, onCerrar, onActuali
 export default function ClientesTab({ usuarioActual, onIrARegistrarPago, onListo }) {
   const { ids, cargado, addId, removeId } = useIndex("indice-clientes", false);
   const { usuarios: abogadosDespacho } = useUsuariosDespacho();
+  const tareasApi = useTareas();
   const [clientes, setClientes] = useState({});
   const [form, setForm] = useState(FORM_CLIENTE_INICIAL);
   const [showForm, setShowForm] = useState(false);
@@ -1905,6 +1907,7 @@ export default function ClientesTab({ usuarioActual, onIrARegistrarPago, onListo
                   </div>
                 </div>
               </div>
+              <TareasCliente clienteId={id} cliente={c} usuarioActual={usuarioActual} tareasApi={tareasApi} usuarios={abogadosDespacho} confirmar={confirmar} />
               <LineaDeTiempo
                 cliente={c}
                 onAgregar={(nota, fecha) => agregarActuacion(id, nota, fecha)}

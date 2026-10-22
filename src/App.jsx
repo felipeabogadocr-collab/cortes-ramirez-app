@@ -36,6 +36,7 @@ const VistaDiagnostico = lazy(() => import("./views/VistaDiagnostico.jsx"));
 // El asistente, "Mi despacho" y las notificaciones se descargan la primera vez
 // que se abren, no en cada ingreso al panel.
 const AsistenteIALazy = lazy(() => import("./panel/AsistenteIA.jsx"));
+const PanelTareasLazy = lazy(() => import("./panel/Tareas.jsx"));
 const PanelMiDespachoLazy = lazy(() => import("./panel/PanelMiDespacho.jsx"));
 const ModalNotificacionesLazy = lazy(() => import("./panel/ModalNotificaciones.jsx"));
 function AsistenteIA(props) {
@@ -1974,6 +1975,103 @@ export function useEventosAgenda() {
   return { ids: estado.ids, eventos: estado.eventos, cargado, crear, eliminar, actualizar, reload: cargar };
 }
 
+// Tareas internas del despacho: quien lleva el caso le asigna algo puntual
+// a un colega ("proyectar la contestación", "llamar al cliente"), el colega
+// la ve en su Resumen y en la campanita, y la marca como hecha cuando
+// termina — así el que la asignó sabe quién tiene qué y si ya se resolvió,
+// sin un Excel aparte. Cada colega decide cuándo agendarla en su propia
+// agenda. Se guarda una fila por tarea ("tarea:ID") más un índice del
+// despacho: marcar una tarea solo reescribe su propia fila, nunca la lista
+// entera, así dos personas trabajando a la vez no se pisan.
+export function useTareas() {
+  const [estado, setEstado] = useState({ ids: [], tareas: {} });
+  const [cargado, setCargado] = useState(false);
+  const estadoRef = useRef(estado);
+  const fijar = (nuevo) => {
+    estadoRef.current = nuevo;
+    setEstado(nuevo);
+  };
+
+  const cargar = useCallback(async () => {
+    const raw = await storageGet("indice-tareas");
+    const ids = raw ? JSON.parse(raw) : [];
+    const valores = await obtenerValoresPorClaves(ids.map((id) => `tarea:${id}`));
+    const tareas = {};
+    ids.forEach((id) => {
+      const v = valores[`tarea:${id}`];
+      if (v) tareas[id] = JSON.parse(v);
+    });
+    fijar({ ids: ids.filter((id) => tareas[id]), tareas });
+    setCargado(true);
+  }, []);
+
+  // Se vuelve a leer al regresar a la app y cada 2 minutos: así una tarea
+  // que te acaban de asignar aparece sin tener que recargar la página.
+  useEffect(() => {
+    cargar();
+    const alVolver = () => {
+      if (document.visibilityState === "visible") cargar();
+    };
+    document.addEventListener("visibilitychange", alVolver);
+    const intervalo = setInterval(cargar, 120000);
+    return () => {
+      document.removeEventListener("visibilitychange", alVolver);
+      clearInterval(intervalo);
+    };
+  }, [cargar]);
+
+  const crear = async (datos) => {
+    const id = uid();
+    const tarea = {
+      id,
+      titulo: datos.titulo.trim(),
+      detalle: (datos.detalle || "").trim(),
+      clienteId: datos.clienteId || null,
+      clienteNombre: datos.clienteNombre || "",
+      asignadoA: datos.asignadoA,
+      asignadoNombre: datos.asignadoNombre || "",
+      creadoPor: datos.creadoPor,
+      creadoPorNombre: datos.creadoPorNombre || "",
+      fechaLimite: datos.fechaLimite || "",
+      estado: "pendiente",
+      creadoEn: new Date().toISOString(),
+      // Quien se asigna algo a sí mismo ya lo vio; a un colega le aparece
+      // como nueva en la campanita hasta que la abra.
+      vistaPorAsignado: datos.asignadoA === datos.creadoPor,
+    };
+    await storageSet(`tarea:${id}`, JSON.stringify(tarea));
+    // Se relee el índice justo antes de escribirlo para no borrar una
+    // tarea que otro colega haya creado mientras tanto.
+    const raw = await storageGet("indice-tareas");
+    const idsServidor = raw ? JSON.parse(raw) : [];
+    await storageSet("indice-tareas", JSON.stringify([id, ...idsServidor.filter((x) => x !== id)]));
+    const actual = estadoRef.current;
+    fijar({ ids: [id, ...actual.ids.filter((x) => x !== id)], tareas: { ...actual.tareas, [id]: tarea } });
+    return tarea;
+  };
+
+  const actualizar = async (id, cambios) => {
+    const actual = estadoRef.current;
+    if (!actual.tareas[id]) return;
+    const tarea = { ...actual.tareas[id], ...cambios };
+    await storageSet(`tarea:${id}`, JSON.stringify(tarea));
+    fijar({ ...estadoRef.current, tareas: { ...estadoRef.current.tareas, [id]: tarea } });
+    window.dispatchEvent(new Event("nomos:tareas-cambiaron"));
+  };
+
+  const eliminar = async (id) => {
+    const raw = await storageGet("indice-tareas");
+    const idsServidor = raw ? JSON.parse(raw) : [];
+    await storageSet("indice-tareas", JSON.stringify(idsServidor.filter((x) => x !== id)));
+    const actual = estadoRef.current;
+    const { [id]: _quitada, ...resto } = actual.tareas;
+    fijar({ ids: actual.ids.filter((x) => x !== id), tareas: resto });
+  };
+
+  const lista = estado.ids.map((id) => estado.tareas[id]).filter(Boolean);
+  return { tareas: lista, cargado, crear, actualizar, eliminar, recargar: cargar };
+}
+
 // Revisa cada 30s si algún evento de la agenda ya se cumplió y todavía no se
 // avisó — cuando pasa, suena una vez y muestra una notificación del sistema
 // (si el navegador tiene permiso). Se guarda qué ids ya sonaron en
@@ -2495,6 +2593,12 @@ function ResumenTab({ nombre, usuarioId, usuarioActual, onIr, onListo, puedeVer 
           </Card>
         );
       })()}
+
+      {usuarioActual?.id && (
+        <Suspense fallback={null}>
+          <PanelTareasLazy usuarioActual={usuarioActual} />
+        </Suspense>
+      )}
 
       {tareasPendientes > 0 && (
         <div className="drx-fade-in" style={{ marginBottom: 20 }}>
@@ -3986,6 +4090,7 @@ function useNotificacionesPanel(prefs) {
   const [novedadesJudiciales, setNovedadesJudiciales] = useState([]);
   const [clientesSinRadicado, setClientesSinRadicado] = useState([]);
   const [clientesSinPago, setClientesSinPago] = useState([]);
+  const [tareasAviso, setTareasAviso] = useState({ nuevas: [], resueltas: [], vencidas: [] });
   const notifPrefs = prefs || notificacionesPorDefecto();
 
   const cargar = useCallback(async () => {
@@ -4079,7 +4184,71 @@ function useNotificacionesPanel(prefs) {
     }
     setContenidoPendiente(pendientesHoy);
     setContenidoVencido(vencidos);
+    await cargarTareasAviso();
   }, []);
+
+  // Tareas: lo que te asignaron y aún no abres, lo tuyo vencido, y lo que
+  // asignaste y un colega ya resolvió. Se revisa también al volver a la app
+  // y cada 2 minutos, para que una tarea nueva avise sin recargar.
+  const cargarTareasAviso = useCallback(async () => {
+    const yo = getUsuarioAgendaId();
+    if (!yo) return;
+    const raw = await storageGet("indice-tareas", false);
+    const ids = raw ? JSON.parse(raw) : [];
+    const valores = await obtenerValoresPorClaves(ids.map((id) => `tarea:${id}`));
+    const hoy = fechaHoyISO();
+    const nuevas = [];
+    const resueltas = [];
+    const vencidas = [];
+    for (const id of ids) {
+      const v = valores[`tarea:${id}`];
+      if (!v) continue;
+      const t = JSON.parse(v);
+      if (t.asignadoA === yo && t.estado !== "hecha") {
+        if (!t.vistaPorAsignado) nuevas.push(t);
+        else if (t.fechaLimite && t.fechaLimite < hoy) vencidas.push(t);
+      }
+      if (t.creadoPor === yo && t.estado === "hecha" && !t.cierreVisto) resueltas.push(t);
+    }
+    setTareasAviso({ nuevas, resueltas, vencidas });
+    // Aviso del sistema (si el navegador lo permite) una sola vez por tarea.
+    try {
+      const avisadas = new Set(JSON.parse(localStorage.getItem("tareas-avisadas") || "[]"));
+      const porAvisar = [...nuevas, ...resueltas].filter((t) => !avisadas.has(`${t.id}:${t.estado}`));
+      if (porAvisar.length && typeof Notification !== "undefined" && Notification.permission === "granted") {
+        porAvisar.slice(0, 3).forEach((t) =>
+          new Notification(t.estado === "hecha" ? `${(t.completadoPorNombre || "Un colega").split(" ")[0]} resolvió una tarea` : `Nueva tarea de ${(t.creadoPorNombre || "un colega").split(" ")[0]}`, {
+            body: `${t.titulo}${t.clienteNombre ? ` · ${t.clienteNombre}` : ""}`,
+            icon: "/icon-192.png",
+          })
+        );
+      }
+      porAvisar.forEach((t) => avisadas.add(`${t.id}:${t.estado}`));
+      localStorage.setItem("tareas-avisadas", JSON.stringify([...avisadas].slice(-300)));
+    } catch (e) {
+      /* sin permiso o sin almacenamiento local: el aviso de la campanita basta */
+    }
+  }, []);
+
+  // La primera carga puede correr antes de que se sepa quién inició
+  // sesión; apenas llega el perfil (y con él sus preferencias) se revisa.
+  useEffect(() => {
+    if (prefs) cargarTareasAviso();
+  }, [prefs, cargarTareasAviso]);
+
+  useEffect(() => {
+    const alVolver = () => {
+      if (document.visibilityState === "visible") cargarTareasAviso();
+    };
+    document.addEventListener("visibilitychange", alVolver);
+    window.addEventListener("nomos:tareas-cambiaron", cargarTareasAviso);
+    const intervalo = setInterval(cargarTareasAviso, 120000);
+    return () => {
+      document.removeEventListener("visibilitychange", alVolver);
+      window.removeEventListener("nomos:tareas-cambiaron", cargarTareasAviso);
+      clearInterval(intervalo);
+    };
+  }, [cargarTareasAviso]);
 
   useEffect(() => {
     cargar();
@@ -4091,6 +4260,7 @@ function useNotificacionesPanel(prefs) {
   };
 
   const count =
+    (notifPrefs.tareas !== false ? tareasAviso.nuevas.length + tareasAviso.resueltas.length + tareasAviso.vencidas.length : 0) +
     (notifPrefs.firmas !== false ? firmasNuevas.length : 0) +
     (notifPrefs.clientes !== false ? clientesInactivos.length : 0) +
     (notifPrefs.pagos !== false ? pagosPendientes.length : 0) +
@@ -4109,6 +4279,7 @@ function useNotificacionesPanel(prefs) {
     novedadesJudiciales: notifPrefs.vigilancia !== false ? novedadesJudiciales : [],
     clientesSinRadicado: notifPrefs.radicados !== false ? clientesSinRadicado : [],
     clientesSinPago: notifPrefs.sin_pago_configurado !== false ? clientesSinPago : [],
+    tareasAviso: notifPrefs.tareas !== false ? tareasAviso : { nuevas: [], resueltas: [], vencidas: [] },
     marcarFirmasVistas,
     reload: cargar,
   };
@@ -6256,6 +6427,7 @@ function App({ inicio }) {
     novedadesJudiciales,
     clientesSinRadicado,
     clientesSinPago,
+    tareasAviso,
     marcarFirmasVistas,
   } = useNotificacionesPanel(usuarioActual?.notificaciones);
 
@@ -6602,6 +6774,10 @@ function App({ inicio }) {
     return <PantallaPendienteActivacion usuarioActual={usuarioActual} onCerrarSesion={cerrarSesion} avisoPago={avisoPagoWompi} onCerrarAvisoPago={() => setAvisoPagoWompi(null)} />;
   }
 
+  const irATareas = () => {
+    setTab("resumen");
+    setMostrarNotificaciones(false);
+  };
   const irADocumentos = () => {
     setTab("documentos");
     setMostrarNotificaciones(false);
@@ -6891,6 +7067,8 @@ function App({ inicio }) {
                 novedadesJudiciales={novedadesJudiciales}
                 clientesSinRadicado={clientesSinRadicado}
                 clientesSinPago={clientesSinPago}
+                tareasAviso={tareasAviso}
+                onIrATareas={irATareas}
                 onCerrar={() => setMostrarNotificaciones(false)}
                 onMarcarVistas={marcarFirmasVistas}
                 onIrADocumentos={irADocumentos}

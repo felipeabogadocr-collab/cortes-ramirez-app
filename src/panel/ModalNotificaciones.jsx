@@ -15,6 +15,8 @@ export default function ModalNotificaciones({
   novedadesJudiciales,
   clientesSinRadicado,
   clientesSinPago,
+  tareasAviso = { nuevas: [], resueltas: [], vencidas: [] },
+  onIrATareas,
   onCerrar,
   onMarcarVistas,
   onIrADocumentos,
@@ -80,6 +82,42 @@ export default function ModalNotificaciones({
         </div>
 
         <div style={{ padding: "16px 20px" }}>
+          {tareasAviso.nuevas.length + tareasAviso.resueltas.length + tareasAviso.vencidas.length > 0 && (
+            <>
+              <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, fontWeight: 700, color: "#B45309", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 10 }}>
+                <Icono tipo="portapapeles" size={14} style={{ marginRight: 4, verticalAlign: -2 }} /> Tareas
+              </p>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 18 }}>
+                {tareasAviso.nuevas.map((t) => (
+                  <div key={`n${t.id}`} style={{ background: "#FEF3C7", borderRadius: 8, padding: "10px 12px" }}>
+                    <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, fontWeight: 600, color: "#92400E", margin: 0 }}>Nueva: {t.titulo}</p>
+                    <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11, color: "#B45309", margin: "2px 0 0" }}>
+                      Te la asignó {(t.creadoPorNombre || "un colega").split(" ")[0]}
+                      {t.clienteNombre ? ` · ${t.clienteNombre}` : ""}
+                      {t.fechaLimite ? ` · para el ${new Date(`${t.fechaLimite}T12:00:00`).toLocaleDateString("es-CO", { day: "numeric", month: "short" })}` : ""}
+                    </p>
+                  </div>
+                ))}
+                {tareasAviso.vencidas.map((t) => (
+                  <div key={`v${t.id}`} style={{ background: "#FEF2F2", borderRadius: 8, padding: "10px 12px" }}>
+                    <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, fontWeight: 600, color: "#B42318", margin: 0 }}>Vencida: {t.titulo}</p>
+                    <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11, color: "#B42318", margin: "2px 0 0" }}>{t.clienteNombre || "Sin cliente"}</p>
+                  </div>
+                ))}
+                {tareasAviso.resueltas.map((t) => (
+                  <div key={`r${t.id}`} style={{ background: "#DCFCE7", borderRadius: 8, padding: "10px 12px" }}>
+                    <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, fontWeight: 600, color: "#166534", margin: 0 }}>
+                      {(t.completadoPorNombre || "Un colega").split(" ")[0]} resolvió: {t.titulo}
+                    </p>
+                    {t.clienteNombre && <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11, color: "#166534", margin: "2px 0 0" }}>{t.clienteNombre}</p>}
+                  </div>
+                ))}
+                <button className="drx-btn-ghost" style={{ ...buttonGhost, fontSize: 12, padding: "6px 12px", alignSelf: "flex-start" }} onClick={onIrATareas}>
+                  Ver tareas
+                </button>
+              </div>
+            </>
+          )}
           <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, fontWeight: 700, color: COLORS.headingText, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 10 }}>
             <Icono tipo="lapiz" size={14} style={{ marginRight: 4, verticalAlign: -2 }} /> Firmas nuevas
           </p>

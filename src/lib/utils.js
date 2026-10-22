@@ -92,6 +92,7 @@ export function permisosPorDefecto(rol) {
 }
 
 export const NOTIF_CATEGORIAS = [
+  { id: "tareas", nombre: "Tareas asignadas y resueltas" },
   { id: "firmas", nombre: "Firmas nuevas" },
   { id: "clientes", nombre: "Clientes sin actividad" },
   { id: "pagos", nombre: "Pagos pendientes" },
