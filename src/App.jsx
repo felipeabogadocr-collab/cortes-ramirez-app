@@ -2033,6 +2033,9 @@ export function useTareas() {
       creadoPor: datos.creadoPor,
       creadoPorNombre: datos.creadoPorNombre || "",
       fechaLimite: datos.fechaLimite || "",
+      // Hora opcional: sin hora es "todo el día". Sin fecha = no es urgente.
+      hora: datos.fechaLimite ? datos.hora || "" : "",
+      sinFecha: !datos.fechaLimite,
       estado: "pendiente",
       creadoEn: new Date().toISOString(),
       // Quien se asigna algo a sí mismo ya lo vio; a un colega le aparece
@@ -4490,7 +4493,7 @@ export function useUsuariosDespacho() {
   // usar la llave service_role de Supabase para dar de alta la cuenta real en
   // Supabase Auth (con la contraseña bien hasheada por Supabase, nunca por
   // nosotros ni guardada en texto plano).
-  const crear = async ({ nombre, email, contrasena, rol }) => {
+  const crear = async ({ nombre, email, contrasena, rol, correoGoogle }) => {
     const { data: sesionData } = await supabase.auth.getSession();
     const token = sesionData?.session?.access_token;
     const response = await fetch("/api/usuarios/crear", {
@@ -4499,7 +4502,7 @@ export function useUsuariosDespacho() {
         "Content-Type": "application/json",
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
-      body: JSON.stringify({ nombre, email, contrasena, rol }),
+      body: JSON.stringify({ nombre, email, contrasena, rol, correoGoogle }),
     });
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || "No se pudo crear el usuario");
@@ -4510,6 +4513,7 @@ export function useUsuariosDespacho() {
   const actualizar = async (id, cambios) => {
     const { error } = await supabase.from("perfiles").update(cambios).eq("id", id);
     if (!error) setUsuarios((prev) => prev.map((u) => (u.id === id ? { ...u, ...cambios } : u)));
+    return { error };
   };
 
   // Revocar el acceso de alguien que ya no debería tenerlo (dejó el

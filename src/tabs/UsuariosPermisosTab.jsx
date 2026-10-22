@@ -463,7 +463,18 @@ export default function UsuariosPermisosTab({ usuarioActual, onDespachoRenombrad
   const [nombre, setNombre] = useState("");
   const [email, setEmail] = useState("");
   const [contrasena, setContrasena] = useState("");
+  const [correoGoogle, setCorreoGoogle] = useState("");
   const [rol, setRol] = useState("Asistente");
+  const [editandoGmailId, setEditandoGmailId] = useState(null);
+  const [gmailEdit, setGmailEdit] = useState("");
+  const [errorGmail, setErrorGmail] = useState("");
+  const esCorreo = (c) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test((c || "").trim());
+  const guardarGmail = async (u) => {
+    if (!esCorreo(gmailEdit)) return;
+    const { error: e } = await actualizar(u.id, { correo_google: gmailEdit.trim().toLowerCase() });
+    if (!e) return setEditandoGmailId(null);
+    setErrorGmail(/correo_google|estado de conexi/.test(e.message || "") ? "Falta actualizar la base de datos: corre el SQL de supabase/migraciones/2026-10-22-tareas-google.sql en Supabase." : e.message || "No se pudo guardar el Gmail.");
+  };
   const [error, setError] = useState("");
   const [creando, setCreando] = useState(false);
   const [eliminandoId, setEliminandoId] = useState(null);
@@ -516,15 +527,16 @@ export default function UsuariosPermisosTab({ usuarioActual, onDespachoRenombrad
   };
 
   const crear = async () => {
-    if (!nombre.trim() || !email.trim() || !contrasena.trim()) return;
+    if (!nombre.trim() || !email.trim() || !contrasena.trim() || !esCorreo(correoGoogle)) return;
     setCreando(true);
     setError("");
     try {
-      const nuevoUsuario = await crearUsuario({ nombre: nombre.trim(), email: email.trim(), contrasena, rol });
+      const nuevoUsuario = await crearUsuario({ nombre: nombre.trim(), email: email.trim(), contrasena, rol, correoGoogle: correoGoogle.trim() });
       registrarAuditoria(usuarioActual, "crear_usuario", "usuario", nuevoUsuario?.id, { nombre: nombre.trim(), rol });
       setNombre("");
       setEmail("");
       setContrasena("");
+      setCorreoGoogle("");
       setRol("Asistente");
       setMostrarForm(false);
     } catch (e) {
@@ -749,7 +761,21 @@ export default function UsuariosPermisosTab({ usuarioActual, onDespachoRenombrad
               <input className="drx-input" style={inputStyle} value={nombre} onChange={(e) => setNombre(e.target.value)} />
             </Field>
             <Field label="Correo">
-              <input type="email" className="drx-input" style={inputStyle} value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Ej: novia@correo.com" />
+              <input
+                type="email"
+                className="drx-input"
+                style={inputStyle}
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                onBlur={() => {
+                  if (!correoGoogle && /@(gmail|googlemail)\.com$/i.test(email.trim())) setCorreoGoogle(email.trim().toLowerCase());
+                }}
+                placeholder="Con este correo entra a Nomos"
+              />
+            </Field>
+            <Field label="Gmail (obligatorio)">
+              <input type="email" className="drx-input" style={inputStyle} value={correoGoogle} onChange={(e) => setCorreoGoogle(e.target.value)} placeholder="Ej: nombre@gmail.com" />
+              <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11, color: COLORS.muted, margin: "4px 0 0" }}>A este Gmail le llegan a su Google Calendar las tareas que le asignen. Puede ser el mismo correo de arriba.</p>
             </Field>
             <Field label="Contraseña">
               <input type="password" className="drx-input" style={inputStyle} value={contrasena} onChange={(e) => setContrasena(e.target.value)} />
@@ -771,7 +797,7 @@ export default function UsuariosPermisosTab({ usuarioActual, onDespachoRenombrad
             className="drx-btn-primary"
             style={{ ...buttonPrimary, marginTop: 12 }}
             onClick={crear}
-            disabled={creando || !nombre.trim() || !email.trim() || !contrasena.trim()}
+            disabled={creando || !nombre.trim() || !email.trim() || !contrasena.trim() || !esCorreo(correoGoogle)}
           >
             {creando ? "Creando…" : "Crear usuario"}
           </button>
@@ -806,6 +832,34 @@ export default function UsuariosPermisosTab({ usuarioActual, onDespachoRenombrad
                     </span>
                   </p>
                   <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, margin: "2px 0 0" }}>{u.email}</p>
+                  {editandoGmailId === u.id ? (
+                    <div style={{ display: "flex", gap: 6, marginTop: 6, flexWrap: "wrap" }}>
+                      <input type="email" className="drx-input" style={{ ...inputStyle, maxWidth: 240, padding: "6px 10px", fontSize: 13 }} value={gmailEdit} onChange={(e) => setGmailEdit(e.target.value)} placeholder="nombre@gmail.com" autoFocus />
+                      <button className="drx-btn-primary" style={{ ...buttonPrimary, padding: "6px 12px", fontSize: 12 }} onClick={() => guardarGmail(u)} disabled={!esCorreo(gmailEdit)}>
+                        Guardar
+                      </button>
+                      <button className="drx-btn-ghost" style={{ ...buttonGhost, padding: "6px 10px", fontSize: 12 }} onClick={() => setEditandoGmailId(null)}>
+                        Cancelar
+                      </button>
+                      {errorGmail && <p style={{ width: "100%", color: "#B42318", fontSize: 12, margin: 0, fontFamily: "Inter, sans-serif" }}>{errorGmail}</p>}
+                    </div>
+                  ) : (
+                    <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, margin: "3px 0 0", color: u.correo_google ? COLORS.inkSoft : "#B45309", fontWeight: u.correo_google ? 500 : 700 }}>
+                      {u.correo_google ? `Gmail: ${u.correo_google}` : "Falta el Gmail: sus tareas no llegarán a su Google Calendar"}
+                      {(usuarioActual.rol === "Administrador" || u.id === usuarioActualId) && (
+                        <button
+                          onClick={() => {
+                            setEditandoGmailId(u.id);
+                            setErrorGmail("");
+                            setGmailEdit(u.correo_google || (/@(gmail|googlemail)\.com$/i.test(u.email || "") ? u.email : ""));
+                          }}
+                          style={{ marginLeft: 8, background: "none", border: "none", cursor: "pointer", color: COLORS.accentBright, fontSize: 12, textDecoration: "underline", padding: 0, fontFamily: "Inter, sans-serif" }}
+                        >
+                          {u.correo_google ? "Cambiar" : "Agregar Gmail"}
+                        </button>
+                      )}
+                    </p>
+                  )}
                   <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11, color: COLORS.muted, margin: "2px 0 0" }}>
                     <UltimaSesionUsuario usuarioId={u.id} />
                   </p>

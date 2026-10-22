@@ -12,7 +12,7 @@ export function permisosPorDefecto(rol) {
 }
 
 export function notificacionesPorDefecto() {
-  return { firmas: true, clientes: true, pagos: true, contenido: true };
+  return { tareas: true, firmas: true, clientes: true, pagos: true, contenido: true };
 }
 
 // Validación básica de formato (no exhaustiva a propósito): rechaza basura

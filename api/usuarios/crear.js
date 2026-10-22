@@ -18,12 +18,18 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: "Método no permitido" });
   }
 
-  const { nombre, email, contrasena, rol } = req.body || {};
+  const { nombre, email, contrasena, rol, correoGoogle } = req.body || {};
   if (!nombre?.trim() || !email?.trim() || !contrasena?.trim()) {
     return res.status(400).json({ error: "Faltan nombre, correo o contraseña" });
   }
   if (!esEmailValido(email)) {
     return res.status(400).json({ error: "El correo no tiene un formato válido" });
+  }
+  // El correo de Google (Gmail o Google Workspace) es a donde llegan las
+  // tareas que le asignen como evento de Google Calendar. Es obligatorio al
+  // crear el usuario; puede ser el mismo correo con el que entra a Nomos.
+  if (!correoGoogle?.trim() || !esEmailValido(correoGoogle)) {
+    return res.status(400).json({ error: "Falta el correo de Gmail del usuario (o no tiene un formato válido)" });
   }
   const errorContrasena = validarContrasena(contrasena);
   if (errorContrasena) {
@@ -59,19 +65,24 @@ export default async function handler(req, res) {
     });
     if (createError) throw createError;
 
-    const { data: perfil, error: perfilError } = await admin
-      .from("perfiles")
-      .insert({
-        id: nuevoUsuario.user.id,
-        nombre: nombre.trim(),
-        email: email.trim(),
-        rol: rolFinal,
-        despacho_id: perfilLlamador.despacho_id,
-        permisos: permisosPorDefecto(rolFinal),
-        notificaciones: notificacionesPorDefecto(),
-      })
-      .select()
-      .single();
+    const filaPerfil = {
+      id: nuevoUsuario.user.id,
+      nombre: nombre.trim(),
+      email: email.trim(),
+      correo_google: correoGoogle.trim().toLowerCase(),
+      rol: rolFinal,
+      despacho_id: perfilLlamador.despacho_id,
+      permisos: permisosPorDefecto(rolFinal),
+      notificaciones: notificacionesPorDefecto(),
+    };
+    let { data: perfil, error: perfilError } = await admin.from("perfiles").insert(filaPerfil).select().single();
+    // Si la base todavía no tiene la columna correo_google (falta correr
+    // supabase/migraciones/2026-10-22-tareas-google.sql), el usuario se crea
+    // igual sin ella, en vez de dejar una cuenta de Auth huérfana.
+    if (perfilError && /correo_google/.test(perfilError.message || "")) {
+      const { correo_google: _sinColumna, ...sinCorreo } = filaPerfil;
+      ({ data: perfil, error: perfilError } = await admin.from("perfiles").insert(sinCorreo).select().single());
+    }
     if (perfilError) throw perfilError;
 
     return res.status(200).json(perfil);

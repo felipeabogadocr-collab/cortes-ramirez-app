@@ -640,6 +640,7 @@ create policy "mismo despacho inserta eventos de documento" on documento_eventos
 -- mientras la pestaña del navegador sigue visible.
 alter table perfiles add column if not exists ultima_actividad_en timestamptz;
 alter table perfiles add column if not exists pestana_actual text;
+alter table perfiles add column if not exists correo_google text; -- Gmail para invitaciones de tareas (ver migraciones/2026-10-22-tareas-google.sql)
 
 -- La política de update existente ("administradores actualizan perfiles del
 -- mismo despacho") NO alcanza para esto: un Abogado/Asistente normal no
@@ -663,9 +664,10 @@ set search_path = public
 as $$
 begin
   if not soy_administrador() then
-    if (to_jsonb(new) - 'ultima_actividad_en' - 'pestana_actual')
+    -- correo_google también: cada quien puede poner su propio Gmail.
+    if (to_jsonb(new) - 'ultima_actividad_en' - 'pestana_actual' - 'correo_google')
        is distinct from
-       (to_jsonb(old) - 'ultima_actividad_en' - 'pestana_actual')
+       (to_jsonb(old) - 'ultima_actividad_en' - 'pestana_actual' - 'correo_google')
     then
       raise exception 'Solo puedes actualizar tu estado de conexión.';
     end if;

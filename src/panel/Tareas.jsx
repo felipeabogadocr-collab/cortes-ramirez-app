@@ -3,19 +3,48 @@
 // asignó pueda ver quién tiene qué y si ya está resuelta.
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { supabase } from "../lib/supabaseClient";
 import { COLORS, Field, inputStyle, buttonPrimary, buttonGhost, Card } from "../ui/base.jsx";
 import { AvatarIniciales, fechaHoyISO, registrarAuditoria, useTareas, useUsuariosDespacho, useClientesLigero, useConfirmarDialogo } from "../App.jsx";
 
 const AMBAR = "#D97706";
 
-function etiquetaLimite(fecha) {
+// Cada tarea con fecha se vuelve un evento de Google Calendar (ver
+// "evento_tarea" en api/agenda/google-callback.js): en el calendario del
+// colega si conectó su Google, o como invitación a su Gmail desde el
+// calendario de quien la asignó. Si ninguno conectó Google, la tarea
+// sigue funcionando igual dentro de Nomos.
+async function llamarGoogleTarea(cuerpo) {
+  try {
+    const { data } = await supabase.auth.getSession();
+    const token = data?.session?.access_token;
+    if (!token) return null;
+    const r = await fetch("/api/agenda/google-callback", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify(cuerpo),
+    });
+    return r.ok ? await r.json() : null;
+  } catch {
+    return null;
+  }
+}
+
+function horaLegible(hora) {
+  if (!hora) return "";
+  const [h, m] = hora.split(":").map(Number);
+  return `${((h + 11) % 12) + 1}:${String(m).padStart(2, "0")} ${h < 12 ? "a. m." : "p. m."}`;
+}
+
+function etiquetaLimite(fecha, hora) {
   if (!fecha) return null;
+  const conHora = hora ? ` · ${horaLegible(hora)}` : "";
   const hoy = fechaHoyISO();
   const d = Math.round((new Date(`${fecha}T12:00:00`) - new Date(`${hoy}T12:00:00`)) / 86400000);
   if (d < 0) return { texto: `Venció hace ${-d} día${d === -1 ? "" : "s"}`, color: "#B42318", fondo: "#FEF2F2" };
-  if (d === 0) return { texto: "Vence hoy", color: "#B42318", fondo: "#FEF2F2" };
-  if (d === 1) return { texto: "Vence mañana", color: "#B45309", fondo: "#FEF3E2" };
-  return { texto: `Vence ${new Date(`${fecha}T12:00:00`).toLocaleDateString("es-CO", { day: "numeric", month: "short" })}`, color: COLORS.inkSoft, fondo: COLORS.surfaceSoft };
+  if (d === 0) return { texto: `Vence hoy${conHora}`, color: "#B42318", fondo: "#FEF2F2" };
+  if (d === 1) return { texto: `Vence mañana${conHora}`, color: "#B45309", fondo: "#FEF3E2" };
+  return { texto: `Vence ${new Date(`${fecha}T12:00:00`).toLocaleDateString("es-CO", { day: "numeric", month: "short" })}${conHora}`, color: COLORS.inkSoft, fondo: COLORS.surfaceSoft };
 }
 
 function Chip({ texto, color, fondo }) {
@@ -26,7 +55,7 @@ function FilaTarea({ tarea, yoId, esAdmin, nueva, mostrarCliente, onAlternar, on
   const hecha = tarea.estado === "hecha";
   const puedeMarcar = esAdmin || yoId === tarea.asignadoA || yoId === tarea.creadoPor;
   const puedeEliminar = esAdmin || yoId === tarea.creadoPor;
-  const limite = !hecha ? etiquetaLimite(tarea.fechaLimite) : null;
+  const limite = !hecha ? etiquetaLimite(tarea.fechaLimite, tarea.hora) : null;
   const paraMi = tarea.asignadoA === yoId;
   return (
     <div style={{ display: "flex", gap: 12, alignItems: "flex-start", padding: "12px 0", borderTop: `1px solid ${COLORS.border}` }}>
@@ -80,6 +109,19 @@ function FilaTarea({ tarea, yoId, esAdmin, nueva, mostrarCliente, onAlternar, on
             <Chip texto="Pendiente" color="#B45309" fondo="#FEF3C7" />
           )}
           {limite && <Chip {...limite} />}
+          {!hecha && !tarea.fechaLimite && <Chip texto="Sin fecha · no urgente" color={COLORS.muted} fondo={COLORS.surfaceSoft} />}
+          {tarea.googleEventoId && (
+            <a
+              href={tarea.googleHtmlLink || "https://calendar.google.com/"}
+              target="_blank"
+              rel="noopener noreferrer"
+              title={tarea.duenoEvento === "creador" ? "Le llegó como invitación a su Gmail" : "Está en su Google Calendar"}
+              style={{ display: "inline-flex", alignItems: "center", gap: 4, fontFamily: "Inter, sans-serif", fontSize: 11, fontWeight: 700, color: "#1A73E8", background: "#E8F0FE", borderRadius: 999, padding: "3px 9px", textDecoration: "none", whiteSpace: "nowrap" }}
+            >
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M3 10h18M8 3v4M16 3v4" /></svg>
+              Google Calendar
+            </a>
+          )}
           {tarea.creadoPor !== tarea.asignadoA && tarea.creadoPor !== yoId && (
             <span style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, color: COLORS.muted }}>
               · la asignó {(tarea.creadoPorNombre || "").split(" ")[0]}
@@ -99,11 +141,14 @@ function FilaTarea({ tarea, yoId, esAdmin, nueva, mostrarCliente, onAlternar, on
 function FormularioTarea({ usuarios, yo, clientes, clienteFijo, onCrear, onCancelar }) {
   const [titulo, setTitulo] = useState("");
   const [asignadoA, setAsignadoA] = useState("");
+  const [conFecha, setConFecha] = useState(true);
   const [fechaLimite, setFechaLimite] = useState("");
+  const [hora, setHora] = useState("");
   const [detalle, setDetalle] = useState("");
   const [clienteId, setClienteId] = useState(clienteFijo?.id || "");
   const [guardando, setGuardando] = useState(false);
-  const valido = titulo.trim() && asignadoA;
+  const valido = titulo.trim() && asignadoA && (!conFecha || fechaLimite);
+  const elegido = usuarios.find((x) => x.id === asignadoA);
 
   const guardar = async () => {
     if (!valido) return;
@@ -112,7 +157,8 @@ function FormularioTarea({ usuarios, yo, clientes, clienteFijo, onCrear, onCance
     await onCrear({
       titulo,
       detalle,
-      fechaLimite,
+      fechaLimite: conFecha ? fechaLimite : "",
+      hora: conFecha ? hora : "",
       asignadoA,
       asignadoNombre: u?.nombre || "",
       clienteId: clienteFijo?.id || clienteId || null,
@@ -151,18 +197,50 @@ function FormularioTarea({ usuarios, yo, clientes, clienteFijo, onCrear, onCance
             </select>
           </Field>
         )}
-        <Field label="Fecha límite (opcional)">
-          <input type="date" className="drx-input" style={inputStyle} value={fechaLimite} onChange={(e) => setFechaLimite(e.target.value)} />
-        </Field>
+      </div>
+      <div style={{ marginTop: 10 }}>
+        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.inkSoft, margin: "0 0 6px" }}>¿Para cuándo?</p>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4, padding: 4, background: COLORS.surface, border: `1px solid ${COLORS.border}`, borderRadius: 12, maxWidth: 420 }}>
+          {[
+            { v: true, t: "Con fecha y hora" },
+            { v: false, t: "Sin fecha · no urgente" },
+          ].map((o) => (
+            <button
+              key={String(o.v)}
+              type="button"
+              onClick={() => setConFecha(o.v)}
+              style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, fontWeight: 700, padding: "8px 8px", borderRadius: 9, border: "none", cursor: "pointer", whiteSpace: "nowrap", background: conFecha === o.v ? AMBAR : "transparent", color: conFecha === o.v ? "#fff" : COLORS.inkSoft }}
+            >
+              {o.t}
+            </button>
+          ))}
+        </div>
+        {conFecha && (
+          <div className="drx-grid-form" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 10 }}>
+            <Field label="Fecha">
+              <input type="date" className="drx-input" style={inputStyle} value={fechaLimite} min={fechaHoyISO()} onChange={(e) => setFechaLimite(e.target.value)} />
+            </Field>
+            <Field label="Hora (opcional)">
+              <input type="time" className="drx-input" style={inputStyle} value={hora} onChange={(e) => setHora(e.target.value)} />
+            </Field>
+          </div>
+        )}
       </div>
       <div style={{ marginTop: 10 }}>
         <Field label="Detalle (opcional)">
           <textarea className="drx-input" style={{ ...inputStyle, minHeight: 60, resize: "vertical" }} value={detalle} onChange={(e) => setDetalle(e.target.value)} placeholder="Instrucciones, documentos de soporte, a quién llamar…" />
         </Field>
       </div>
-      <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, margin: "10px 0 0" }}>
-        Le llega a la campanita y a su Resumen. Cada quien decide cuándo agendarla en su propia agenda.
+      <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, margin: "10px 0 0", lineHeight: 1.45 }}>
+        {conFecha
+          ? `Le llega a la campanita y queda en su Google Calendar${hora ? " con aviso 30 minutos antes" : " como evento de todo el día"}.`
+          : "Le llega a la campanita y a su Resumen, sin fecha. No se agenda en Google Calendar."}
       </p>
+      {conFecha && elegido && !elegido.correo_google && elegido.id !== yo.id && (
+        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: "#B45309", fontWeight: 600, margin: "6px 0 0" }}>
+          {elegido.nombre.split(" ")[0]} no tiene Gmail registrado: agrégalo en Usuarios y permisos para que la tarea le llegue a su Google Calendar.
+        </p>
+      )}
       <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
         <button className="drx-btn-primary" style={{ ...buttonPrimary, background: AMBAR }} onClick={guardar} disabled={!valido || guardando}>
           {guardando ? "Asignando…" : "Asignar tarea"}
@@ -176,9 +254,13 @@ function FormularioTarea({ usuarios, yo, clientes, clienteFijo, onCrear, onCance
 }
 
 function useAccionesTarea(api, usuarioActual, confirmar) {
+  const sincronizar = (t, extra) =>
+    t.googleEventoId &&
+    llamarGoogleTarea({ asignadoA: t.asignadoA, creadoPor: t.creadoPor, titulo: t.titulo, clienteNombre: t.clienteNombre, googleEventoId: t.googleEventoId, duenoEvento: t.duenoEvento, ...extra });
   const alternar = async (t) => {
     if (t.estado === "hecha") {
       await api.actualizar(t.id, { estado: "pendiente", completadoEn: null, completadoPor: null, completadoPorNombre: "", cierreVisto: false });
+      sincronizar(t, { accion: "evento_tarea", hecha: false });
       return;
     }
     await api.actualizar(t.id, {
@@ -189,17 +271,23 @@ function useAccionesTarea(api, usuarioActual, confirmar) {
       // Si la resolvió quien la asignó, no hay a quién avisarle.
       cierreVisto: usuarioActual.id === t.creadoPor,
     });
+    sincronizar(t, { accion: "evento_tarea", hecha: true });
     registrarAuditoria(usuarioActual, "resolver_tarea", "tarea", t.id, { nombre: t.titulo });
   };
   const eliminar = async (t) => {
     const ok = confirmar ? await confirmar(`¿Eliminar la tarea "${t.titulo}"?`) : window.confirm(`¿Eliminar la tarea "${t.titulo}"?`);
     if (!ok) return;
     await api.eliminar(t.id);
+    sincronizar(t, { accion: "borrar_evento_tarea" });
     registrarAuditoria(usuarioActual, "eliminar_tarea", "tarea", t.id, { nombre: t.titulo });
   };
   const crear = async (datos) => {
     const t = await api.crear({ ...datos, creadoPor: usuarioActual.id, creadoPorNombre: usuarioActual.nombre || "" });
     registrarAuditoria(usuarioActual, "asignar_tarea", "tarea", t.id, { nombre: t.titulo, asignadoA: t.asignadoNombre });
+    if (t.fechaLimite) {
+      const g = await llamarGoogleTarea({ accion: "evento_tarea", asignadoA: t.asignadoA, titulo: t.titulo, detalle: t.detalle, fecha: t.fechaLimite, hora: t.hora, clienteNombre: t.clienteNombre });
+      if (g?.googleEventoId) await api.actualizar(t.id, { googleEventoId: g.googleEventoId, googleHtmlLink: g.googleHtmlLink || "", duenoEvento: g.duenoEvento });
+    }
     return t;
   };
   return { alternar, eliminar, crear };
@@ -300,7 +388,7 @@ export default function PanelTareas({ usuarioActual }) {
     ...(esAdmin ? [{ id: "equipo", etiqueta: "Todo el equipo", lista: grupos.equipo }] : []),
   ];
   const actual = VISTAS.find((v) => v.id === vista) || VISTAS[0];
-  const pend = actual.lista.filter((t) => t.estado !== "hecha").sort((a, b) => (a.fechaLimite || "9999").localeCompare(b.fechaLimite || "9999"));
+  const pend = actual.lista.filter((t) => t.estado !== "hecha").sort((a, b) => `${a.fechaLimite || "9999"}${a.hora || "99"}`.localeCompare(`${b.fechaLimite || "9999"}${b.hora || "99"}`));
   const hechas = actual.lista.filter((t) => t.estado === "hecha").sort((a, b) => (b.completadoEn || "").localeCompare(a.completadoEn || ""));
   const vencidas = pend.filter((t) => t.fechaLimite && t.fechaLimite < fechaHoyISO()).length;
 

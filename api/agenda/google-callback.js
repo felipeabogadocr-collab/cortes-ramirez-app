@@ -310,6 +310,107 @@ export default async function handler(req, res) {
       }
     }
 
+    // Tareas del equipo: el evento va al Google Calendar de quien recibe la
+    // tarea. Si esa persona conectó su Google en Nomos, se crea directo en su
+    // calendario; si no, se crea en el de quien la asigna con el Gmail del
+    // colega como invitado (Google le manda la invitación por correo y le
+    // aparece en su calendario). Las tareas "sin fecha" no crean evento.
+    if (accion === "evento_tarea" || accion === "borrar_evento_tarea") {
+      const { asignadoA, creadoPor, titulo, detalle, fecha, hora, clienteNombre, googleEventoId, duenoEvento, hecha } = req.body || {};
+      if (!asignadoA) return res.status(400).json({ error: "Falta a quién se asignó la tarea." });
+      const [{ data: yo }, { data: asignado }] = await Promise.all([
+        admin.from("perfiles").select("*").eq("id", usuario.id).maybeSingle(),
+        admin.from("perfiles").select("*").eq("id", String(asignadoA)).maybeSingle(),
+      ]);
+      if (!yo || !asignado || yo.despacho_id !== asignado.despacho_id) return res.status(403).json({ error: "Ese usuario no es de tu despacho." });
+
+      const tokenDe = async (id) => {
+        try {
+          return await obtenerAccessTokenVigente(admin, id);
+        } catch {
+          return null;
+        }
+      };
+      const urlEventos = "https://www.googleapis.com/calendar/v3/calendars/primary/events";
+
+      // Cambios sobre un evento que ya existe: se usa la cuenta dueña de él
+      // (quien la marca como resuelta puede ser el colega, no quien la creó).
+      if (googleEventoId) {
+        let duenoId = asignado.id;
+        if (duenoEvento === "creador") {
+          if (!creadoPor) return res.status(400).json({ error: "Falta quién creó la tarea." });
+          const { data: creador } = await admin.from("perfiles").select("id, despacho_id").eq("id", String(creadoPor)).maybeSingle();
+          if (!creador || creador.despacho_id !== yo.despacho_id) return res.status(403).json({ error: "Ese usuario no es de tu despacho." });
+          duenoId = creador.id;
+        }
+        const token = await tokenDe(duenoId);
+        if (!token) return res.status(200).json({ sincronizado: false, motivo: "no_conectado" });
+        const sendUpdates = duenoEvento === "creador" ? "all" : "none";
+        try {
+          // Solo se tocan eventos que Nomos creó para una tarea — no
+          // cualquier evento del calendario de un colega.
+          const previo = await fetch(`${urlEventos}/${encodeURIComponent(googleEventoId)}`, { headers: { Authorization: `Bearer ${token}` } });
+          if (previo.status === 404 || previo.status === 410) return res.status(200).json({ sincronizado: true });
+          const evPrevio = await previo.json().catch(() => ({}));
+          if (!previo.ok || !/^(✓ )?Tarea: /.test(evPrevio.summary || "")) return res.status(200).json({ sincronizado: false, motivo: "no_es_tarea" });
+          if (accion === "borrar_evento_tarea") {
+            const r = await fetch(`${urlEventos}/${encodeURIComponent(googleEventoId)}?sendUpdates=${sendUpdates}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+            return res.status(200).json({ sincronizado: r.ok || r.status === 404 || r.status === 410 });
+          }
+          const r = await fetch(`${urlEventos}/${encodeURIComponent(googleEventoId)}?sendUpdates=${sendUpdates}`, {
+            method: "PATCH",
+            headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+            body: JSON.stringify({ summary: `${hecha ? "✓ " : ""}Tarea: ${titulo}${clienteNombre ? ` · ${clienteNombre}` : ""}` }),
+          });
+          return res.status(200).json({ sincronizado: r.ok });
+        } catch (e) {
+          console.error("Error actualizando evento de tarea:", e);
+          return res.status(200).json({ sincronizado: false, motivo: "error_google" });
+        }
+      }
+
+      if (accion === "borrar_evento_tarea") return res.status(200).json({ sincronizado: true });
+      if (!titulo) return res.status(400).json({ error: "Falta el título de la tarea." });
+      if (!fecha) return res.status(200).json({ sincronizado: false, motivo: "sin_fecha" });
+
+      const { start, end } = construirRangoFecha(fecha, hora);
+      const cuerpo = {
+        summary: `Tarea: ${titulo}${clienteNombre ? ` · ${clienteNombre}` : ""}`,
+        description: `${detalle ? `${detalle}\n\n` : ""}Asignada por ${yo.nombre || "el despacho"} desde Nomos. Márcala como resuelta en Nomos cuando la termines.`,
+        start,
+        end,
+        ...(hora ? { reminders: { useDefault: false, overrides: [{ method: "popup", minutes: 30 }] } } : {}),
+      };
+
+      const crearEn = async (token, conInvitado) => {
+        const correo = (asignado.correo_google || asignado.email || "").trim();
+        const body = conInvitado && correo ? { ...cuerpo, attendees: [{ email: correo }] } : cuerpo;
+        const r = await fetch(`${urlEventos}?sendUpdates=${conInvitado ? "all" : "none"}`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        const datos = await r.json().catch(() => ({}));
+        if (!r.ok) {
+          console.error("Error creando evento de tarea:", datos);
+          return null;
+        }
+        return datos;
+      };
+
+      const tokenAsignado = await tokenDe(asignado.id);
+      if (tokenAsignado) {
+        const ev = await crearEn(tokenAsignado, false);
+        if (ev) return res.status(200).json({ sincronizado: true, googleEventoId: ev.id, googleHtmlLink: ev.htmlLink || null, duenoEvento: "asignado", via: "calendario_propio" });
+      }
+      const tokenYo = asignado.id === usuario.id ? null : await tokenDe(usuario.id);
+      if (tokenYo && (asignado.correo_google || asignado.email)) {
+        const ev = await crearEn(tokenYo, true);
+        if (ev) return res.status(200).json({ sincronizado: true, googleEventoId: ev.id, googleHtmlLink: ev.htmlLink || null, duenoEvento: "creador", via: "invitacion" });
+      }
+      return res.status(200).json({ sincronizado: false, motivo: "nadie_conectado" });
+    }
+
     if (accion === "consultar_evento") {
       // Para "traer" a Nomos un cambio que se hizo directo en Google
       // Calendar (moverlo de hora, cambiar el título, borrarlo) — se
