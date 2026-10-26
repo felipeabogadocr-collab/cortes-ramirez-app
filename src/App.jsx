@@ -1262,13 +1262,13 @@ export async function calcularResumenOperacion() {
     // Un proceso en pausa (el cliente decidió detenerlo, está a la espera de
     // algo externo, etc.) tampoco debería sumar como descuidado ni generar
     // avisos de pago — el abogado lo pausó a propósito.
-    if (dias !== null && dias >= DIAS_ALERTA_INACTIVIDAD && c.estadoVigilancia !== "Finalizado" && !c.procesoPausado) clientesInactivos++;
+    if (dias !== null && dias >= DIAS_ALERTA_INACTIVIDAD && c.estadoVigilancia !== "Finalizado" && !c.procesoPausado && !c.inactivo) clientesInactivos++;
     else clientesActivos++;
     // Una bolsa administrativa (ej. "Pagos pendientes por clasificar") no
     // es un cliente real esperando que le cobren — no debería generar
     // alertas de pago próximo/atrasado, igual que ya no cuenta en la
     // concentración de cartera ni en el ranking de clientes.
-    if (c.proximoPago?.fecha && !c.procesoPausado && !c.esClienteAdministrativo) {
+    if (c.proximoPago?.fecha && !c.procesoPausado && !c.inactivo && !c.esClienteAdministrativo) {
       const diasPago = diasHasta(c.proximoPago.fecha);
       if (diasPago !== null && diasPago <= DIAS_AVISO_PROXIMO_PAGO) pagosPendientes++;
       if (diasPago !== null && diasPago < 0) pagosAtrasados++;
@@ -2825,7 +2825,55 @@ function SidebarButton({ active, onClick, onMouseEnter, children, color, icono, 
   );
 }
 
-function BuscadorGlobal({ onIr }) {
+// Búsqueda de la barra de arriba. Antes dependía solo de una consulta
+// exacta al servidor sobre el nombre (con tildes y todo) y, al elegir un
+// resultado, solo cambiaba de pestaña sin abrir al cliente. Ahora busca
+// sobre la lista de clientes del despacho (sin importar tildes ni
+// mayúsculas, y también por teléfono, correo, radicado o quien paga), y
+// al elegir uno lo deja abierto en Clientes.
+const quitarTildes = (t) => (t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+let cacheClientesBusqueda = { t: 0, porId: null };
+async function clientesParaBuscar() {
+  if (cacheClientesBusqueda.porId && Date.now() - cacheClientesBusqueda.t < 30000) return cacheClientesBusqueda.porId;
+  const raw = await storageGet("indice-clientes");
+  const ids = raw ? JSON.parse(raw) : [];
+  const porId = ids.length ? await obtenerClientesPorId(ids) : {};
+  cacheClientesBusqueda = { t: Date.now(), porId };
+  return porId;
+}
+async function buscarEnTodo(texto) {
+  const q = quitarTildes(texto.trim());
+  const digitos = texto.replace(/\D/g, "");
+  const [porId, remotos] = await Promise.all([clientesParaBuscar().catch(() => ({})), buscarGlobal(texto).catch(() => [])]);
+  const clientes = [];
+  for (const [id, c] of Object.entries(porId)) {
+    if (!c) continue;
+    const nombre = quitarTildes(c.nombre);
+    let puntaje = 0;
+    let detalle = "";
+    if (nombre.startsWith(q) || nombre.split(/\s+/).some((p) => p.startsWith(q))) puntaje = 3;
+    else if (nombre.includes(q)) puntaje = 2;
+    else {
+      const radicado = radicadosDeCliente(c).find((r) => (digitos.length >= 4 && r.replace(/\D/g, "").includes(digitos)) || quitarTildes(r).includes(q));
+      const otra = [c.pagador?.nombre, ...(c.otrasPersonas || []).map((o) => o?.nombre)].find((n) => n && quitarTildes(n).includes(q));
+      if (radicado) detalle = `Radicado ${radicado}`;
+      else if (digitos.length >= 4 && (c.telefono || "").replace(/\D/g, "").includes(digitos)) detalle = `Tel. ${c.telefono}`;
+      else if (quitarTildes(c.email).includes(q)) detalle = c.email;
+      else if (otra) detalle = `Relacionado: ${otra}`;
+      if (detalle) puntaje = 1;
+    }
+    if (puntaje) clientes.push({ tipo: "cliente", id, titulo: c.nombre || "(sin nombre)", detalle, inactivo: !!c.inactivo, puntaje });
+  }
+  clientes.sort((a, b) => b.puntaje - a.puntaje || (a.inactivo ? 1 : 0) - (b.inactivo ? 1 : 0) || a.titulo.localeCompare(b.titulo));
+  // Si la lista local no trajo nada (p. ej. sin señal), se usa lo que haya
+  // encontrado el servidor.
+  const idsLocales = new Set(clientes.map((c) => c.id));
+  const extra = remotos.filter((r) => r.tipo === "cliente" && !idsLocales.has(r.id));
+  const documentos = remotos.filter((r) => r.tipo === "documento");
+  return [...clientes.slice(0, 8), ...extra, ...documentos];
+}
+
+export function BuscadorGlobal({ onIr }) {
   const [q, setQ] = useState("");
   const [resultados, setResultados] = useState([]);
   const [abierto, setAbierto] = useState(false);
@@ -2841,7 +2889,7 @@ function BuscadorGlobal({ onIr }) {
     }
     setBuscando(true);
     const timer = setTimeout(async () => {
-      const encontrados = await buscarGlobal(texto);
+      const encontrados = await buscarEnTodo(texto);
       setResultados(encontrados);
       setIndiceActivo(-1);
       setBuscando(false);
@@ -2861,8 +2909,9 @@ function BuscadorGlobal({ onIr }) {
     return () => window.removeEventListener("keydown", alPresionarTecla);
   }, []);
 
-  const ir = (tabDestino) => {
-    onIr(tabDestino);
+  const ir = (r) => {
+    onIr(r.tipo === "cliente" ? "clientes" : "documentos", r.tipo === "cliente" ? { clienteId: r.id } : {});
+    inputRef.current?.blur();
     setAbierto(false);
     setQ("");
     setResultados([]);
@@ -2874,7 +2923,7 @@ function BuscadorGlobal({ onIr }) {
         ref={inputRef}
         className="drx-input"
         style={{ ...inputStyle, width: "100%", minWidth: 0, boxSizing: "border-box" }}
-        placeholder="Buscar cliente o documento..."
+        placeholder="Buscar cliente, radicado o documento..."
         data-tour="buscar"
         title="Buscar cliente o documento (Ctrl+K)"
         value={q}
@@ -2892,10 +2941,9 @@ function BuscadorGlobal({ onIr }) {
           } else if (e.key === "ArrowUp") {
             e.preventDefault();
             setIndiceActivo((i) => (i <= 0 ? resultados.length - 1 : i - 1));
-          } else if (e.key === "Enter" && indiceActivo >= 0) {
+          } else if (e.key === "Enter") {
             e.preventDefault();
-            const r = resultados[indiceActivo];
-            ir(r.tipo === "cliente" ? "clientes" : "documentos");
+            ir(resultados[indiceActivo >= 0 ? indiceActivo : 0]);
           } else if (e.key === "Escape") {
             setAbierto(false);
           }
@@ -2928,7 +2976,10 @@ function BuscadorGlobal({ onIr }) {
           {resultados.map((r, i) => (
             <button
               key={`${r.tipo}-${r.id}`}
-              onMouseDown={() => ir(r.tipo === "cliente" ? "clientes" : "documentos")}
+              onMouseDown={(e) => {
+                e.preventDefault();
+                ir(r);
+              }}
               onMouseEnter={() => setIndiceActivo(i)}
               style={{
                 display: "block",
@@ -2944,7 +2995,10 @@ function BuscadorGlobal({ onIr }) {
               }}
             >
               <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: COLORS.ink }}>{r.titulo}</p>
-              <p style={{ margin: "2px 0 0", fontSize: 11, color: COLORS.muted }}>{r.tipo === "cliente" ? "Cliente" : "Documento"}</p>
+              <p style={{ margin: "2px 0 0", fontSize: 11, color: COLORS.muted }}>
+                {r.tipo === "cliente" ? (r.inactivo ? "Cliente inactivo" : "Cliente") : "Documento"}
+                {r.detalle ? ` · ${r.detalle}` : ""}
+              </p>
             </button>
           ))}
         </div>
@@ -3515,7 +3569,7 @@ export function useDatosReportes() {
   // que no debería sumar aquí (sí suma en carteraPendienteTotal, que es el
   // total sin cobrar todavía, atrasado o no).
   const carteraAtrasadaTotal = listaClientes.reduce((sum, c) => {
-    if (c.procesoPausado || !c.proximoPago?.fecha || c.esClienteAdministrativo) return sum;
+    if (c.procesoPausado || c.inactivo || !c.proximoPago?.fecha || c.esClienteAdministrativo) return sum;
     const totalPagado = (c.pagos || []).reduce((s, p) => s + (Number(p.valor) || 0), 0);
     const valorTotal = Number(c.valorTotal) || 0;
     const saldo = valorTotal > 0 ? valorTotal - totalPagado : 0;
@@ -3601,7 +3655,7 @@ export function useDatosReportes() {
   const inicioProximoMes = new Date(hoyProyeccion.getFullYear(), hoyProyeccion.getMonth() + 1, 1);
   const finProximoMes = new Date(hoyProyeccion.getFullYear(), hoyProyeccion.getMonth() + 2, 1);
   const proyeccionProximoMes = listaClientes.reduce((sum, c) => {
-    if (c.procesoPausado || !c.proximoPago?.fecha || !c.proximoPago?.valorEsperado) return sum;
+    if (c.procesoPausado || c.inactivo || !c.proximoPago?.fecha || !c.proximoPago?.valorEsperado) return sum;
     const fecha = new Date(c.proximoPago.fecha);
     return fecha >= inicioProximoMes && fecha < finProximoMes ? sum + (Number(c.proximoPago.valorEsperado) || 0) : sum;
   }, 0);
@@ -3631,7 +3685,7 @@ export function useDatosReportes() {
   // nadie les puso fecha — quedan invisibles en "Flujo de caja proyectado"
   // dando una falsa sensación de que ya no falta nada por cobrar.
   const clientesSinProximoPago = listaClientesReales.filter((c) => {
-    if (c.procesoPausado) return false;
+    if (c.procesoPausado || c.inactivo) return false;
     const totalPagado = (c.pagos || []).reduce((s, p) => s + (Number(p.valor) || 0), 0);
     const saldo = (Number(c.valorTotal) || 0) - totalPagado;
     return saldo > 0 && !c.proximoPago?.fecha;
@@ -4149,10 +4203,10 @@ function useNotificacionesPanel(prefs) {
       const c = clientesNotif[id];
       if (!c) continue;
       const dias = diasDesde(c.ultimaActuacion);
-      if (dias !== null && dias >= DIAS_ALERTA_INACTIVIDAD && !c.procesoPausado) {
+      if (dias !== null && dias >= DIAS_ALERTA_INACTIVIDAD && !c.procesoPausado && !c.inactivo) {
         inactivos.push({ nombre: c.nombre, dias });
       }
-      if (c.proximoPago?.fecha && !c.procesoPausado && !c.esClienteAdministrativo) {
+      if (c.proximoPago?.fecha && !c.procesoPausado && !c.inactivo && !c.esClienteAdministrativo) {
         const diasPago = diasHasta(c.proximoPago.fecha);
         if (diasPago !== null && diasPago <= DIAS_AVISO_PROXIMO_PAGO) {
           pendientesPago.push({ cliente: c, dias: diasPago });
@@ -4164,7 +4218,7 @@ function useNotificacionesPanel(prefs) {
       if (!c.radicado?.trim()) {
         sinRadicado.push({ nombre: c.nombre });
       }
-      if (!c.planPago?.valor && !c.proximoPago?.fecha && !c.procesoPausado) {
+      if (!c.planPago?.valor && !c.proximoPago?.fecha && !c.procesoPausado && !c.inactivo) {
         sinPago.push({ id, nombre: c.nombre });
       }
     }
@@ -6350,6 +6404,8 @@ function App({ inicio }) {
   // entre un render y otro, lo que tumba toda la app justo al terminar de
   // cargar el perfil tras el login.
   const [clienteParaPago, setClienteParaPago] = useState(null);
+  const [clienteParaVerPagos, setClienteParaVerPagos] = useState(null);
+  const [clienteParaAbrir, setClienteParaAbrir] = useState(null);
   useAgendaRecordatorios();
 
   // La ruta del archivo se guarda en perfiles.foto_url; el bucket es
@@ -6806,6 +6862,12 @@ function App({ inicio }) {
     setClienteParaPago(clienteId);
     setTab("contabilidad");
   };
+  // "Ver planes y pagos" desde la tarjeta de un cliente: abre Contabilidad
+  // ya parado en la ficha de ese cliente, sin tener que buscarlo otra vez.
+  const irAPlanesYPagos = (clienteId) => {
+    setClienteParaVerPagos(clienteId);
+    setTab("contabilidad");
+  };
 
   const puedeVer = (seccionId) => {
     if (usuarioActual.rol === "Administrador") return true;
@@ -7018,7 +7080,13 @@ function App({ inicio }) {
               <line x1="3" y1="18" x2="21" y2="18" />
             </svg>
           </button>
-          <BuscadorGlobal onIr={setTab} />
+          <BuscadorGlobal
+            onIr={(destino, extra) => {
+              if (extra?.clienteId) setClienteParaAbrir(extra.clienteId);
+              setTab(destino);
+              setMostrarNotificaciones(false);
+            }}
+          />
           <div className="drx-topbar-acciones" style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
             <div style={{ position: "relative" }}>
             <button
@@ -7162,7 +7230,14 @@ function App({ inicio }) {
               {tab === "clientes" && puedeVer("clientes") && (
                 <TabErrorBoundary nombre="clientes">
                   <Suspense fallback={<CargandoSeccion />}>
-                    <ClientesTab usuarioActual={usuarioActual} onIrARegistrarPago={irARegistrarPago} onListo={marcarDatosListos} />
+                    <ClientesTab
+                      usuarioActual={usuarioActual}
+                      onIrARegistrarPago={irARegistrarPago}
+                      onIrAPlanesYPagos={puedeVer("contabilidad") ? irAPlanesYPagos : null}
+                      clienteInicial={clienteParaAbrir}
+                      onClienteInicialConsumido={() => setClienteParaAbrir(null)}
+                      onListo={marcarDatosListos}
+                    />
                   </Suspense>
                 </TabErrorBoundary>
               )}
@@ -7183,7 +7258,14 @@ function App({ inicio }) {
               {tab === "contabilidad" && puedeVer("contabilidad") && (
                 <TabErrorBoundary nombre="contabilidad">
                   <Suspense fallback={<CargandoSeccion />}>
-                    <ContabilidadTab usuarioActual={usuarioActual} clienteInicialPago={clienteParaPago} onClienteInicialPagoConsumido={() => setClienteParaPago(null)} onListo={marcarDatosListos} />
+                    <ContabilidadTab
+                      usuarioActual={usuarioActual}
+                      clienteInicialPago={clienteParaPago}
+                      onClienteInicialPagoConsumido={() => setClienteParaPago(null)}
+                      clienteInicialVer={clienteParaVerPagos}
+                      onClienteInicialVerConsumido={() => setClienteParaVerPagos(null)}
+                      onListo={marcarDatosListos}
+                    />
                   </Suspense>
                 </TabErrorBoundary>
               )}

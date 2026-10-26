@@ -115,6 +115,9 @@ export default async function handler(req, res) {
     let c = fila.data || {};
     const radicados = radicadosDeCliente(c);
     if (radicados.length === 0) continue;
+    // Cliente marcado inactivo (proceso terminado): se conserva todo, pero
+    // ya no se consulta en la Rama Judicial ni genera avisos.
+    if (c.inactivo) continue;
     revisados++;
 
     for (const radicado of radicados) {

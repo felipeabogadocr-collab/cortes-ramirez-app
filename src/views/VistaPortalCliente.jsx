@@ -528,9 +528,9 @@ export default function VistaPortalCliente() {
                     {cliente.tipoProceso}
                   </Chip>
                 )}
-                <Chip color={cliente.procesoPausado ? "#FDE68A" : "#A7F3D0"} fondo="rgba(255,255,255,0.08)" borde="rgba(255,255,255,0.18)">
-                  <span style={{ width: 7, height: 7, borderRadius: "50%", background: cliente.procesoPausado ? "#FBBF24" : "#34D399" }} />
-                  {cliente.procesoPausado ? "En pausa" : "Caso activo"}
+                <Chip color={cliente.inactivo ? "#E5E7EB" : cliente.procesoPausado ? "#FDE68A" : "#A7F3D0"} fondo="rgba(255,255,255,0.08)" borde="rgba(255,255,255,0.18)">
+                  <span style={{ width: 7, height: 7, borderRadius: "50%", background: cliente.inactivo ? "#9CA3AF" : cliente.procesoPausado ? "#FBBF24" : "#34D399" }} />
+                  {cliente.inactivo ? "Caso finalizado" : cliente.procesoPausado ? "En pausa" : "Caso activo"}
                 </Chip>
               </div>
               {cliente.clienteDesde && <p style={{ ...fuente, fontSize: 12, color: "rgba(255,255,255,0.55)", margin: "12px 0 0" }}>Cliente desde {mesAnio(cliente.clienteDesde)} · Actualizado {haceCuanto(cliente.actualizadoEn)}</p>}

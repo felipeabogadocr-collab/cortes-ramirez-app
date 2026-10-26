@@ -2514,7 +2514,7 @@ export async function registrarPagoDeCliente(id, cliente, datosPago, usuarioActu
   return actualizado;
 }
 
-export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onClienteInicialPagoConsumido, onListo }) {
+export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onClienteInicialPagoConsumido, clienteInicialVer, onClienteInicialVerConsumido, onListo }) {
   const { ids, cargado } = useIndex("indice-clientes", false);
   const [clientes, setClientes] = useState({});
   // Lista simple {id, nombre} para el selector "cliente asociado" de un
@@ -2545,6 +2545,9 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
   const [soloPendientes, setSoloPendientes] = useState(false);
   const [orden, setOrden] = useState("nombre");
   const [expandidos, setExpandidos] = useState({});
+  // "Ver planes y pagos" desde Clientes: se muestra solo la ficha de ese
+  // cliente (con todos sus pagos desplegados) hasta que pidan ver todos.
+  const [soloClienteId, setSoloClienteId] = useState(null);
   // Antes solo había una forma de registrar plata: entrando al cliente
   // puntual y buscando su botón de "+ Registrar pago". Esta barra de arriba
   // deja registrar cualquiera de los 3 movimientos (pago de cliente, egreso,
@@ -2561,6 +2564,16 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
       onClienteInicialPagoConsumido?.();
     }
   }, [clienteInicialPago, clientes, onClienteInicialPagoConsumido]);
+  useEffect(() => {
+    if (!clienteInicialVer || !clientes[clienteInicialVer]) return;
+    setVistaContabilidad("clientes");
+    setFiltro("");
+    setSoloPendientes(false);
+    setSoloClienteId(clienteInicialVer);
+    setExpandidos((prev) => ({ ...prev, [clienteInicialVer]: true }));
+    onClienteInicialVerConsumido?.();
+    setTimeout(() => document.getElementById("seccion-clientes")?.scrollIntoView({ behavior: "smooth", block: "start" }), 80);
+  }, [clienteInicialVer, clientes, onClienteInicialVerConsumido]);
   const [filtroEgreso, setFiltroEgreso] = useState("");
   const [categoriaFiltroEgreso, setCategoriaFiltroEgreso] = useState("Todas");
   const [cuentaFiltroEgreso, setCuentaFiltroEgreso] = useState("Todas");
@@ -2868,7 +2881,7 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
 
   const proximosPagos = ids
     .map((id) => ({ id, c: clientes[id] }))
-    .filter(({ c }) => c?.proximoPago?.fecha && !c.procesoPausado && !c.esClienteAdministrativo)
+    .filter(({ c }) => c?.proximoPago?.fecha && !c.procesoPausado && !c.inactivo && !c.esClienteAdministrativo)
     .map(({ id, c }) => ({ id, c, dias: diasHasta(c.proximoPago.fecha) }))
     .filter(({ dias }) => dias !== null && dias <= DIAS_AVISO_PROXIMO_PAGO)
     .sort((a, b) => a.dias - b.dias);
@@ -3031,7 +3044,7 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
   });
   ids.forEach((id) => {
     const c = clientes[id];
-    if (!c || c.procesoPausado || !c.proximoPago?.fecha || !c.proximoPago?.valorEsperado) return;
+    if (!c || c.procesoPausado || c.inactivo || !c.proximoPago?.fecha || !c.proximoPago?.valorEsperado) return;
     const fecha = new Date(c.proximoPago.fecha);
     if (fecha < hoyInicioDia) return; // ya vencido: no es proyección futura, es cartera atrasada
     const clave = `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, "0")}`;
@@ -3261,6 +3274,7 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
   const filtroConRetraso = useValorConRetraso(filtro);
   const idsFiltrados = useMemo(() => {
     const textoFiltro = filtroConRetraso.trim().toLowerCase();
+    if (soloClienteId && clientes[soloClienteId]) return [soloClienteId];
     let resultado = textoFiltro ? ids.filter((id) => clientes[id]?.nombre?.toLowerCase().includes(textoFiltro)) : ids;
     if (soloPendientes) resultado = resultado.filter((id) => !clientes[id]?.esClienteAdministrativo && (saldoDe(clientes[id]) || 0) > 0);
     return [...resultado].sort((a, b) => {
@@ -3275,7 +3289,7 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
       }
       return (clientes[a]?.nombre || "").localeCompare(clientes[b]?.nombre || "");
     });
-  }, [ids, clientes, filtroConRetraso, soloPendientes, orden]);
+  }, [ids, clientes, filtroConRetraso, soloPendientes, orden, soloClienteId]);
 
   return (
     <div>
@@ -4199,7 +4213,10 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
           style={{ ...inputStyle, maxWidth: 320, flex: 1, minWidth: 220 }}
           placeholder="Filtrar por nombre de cliente..."
           value={filtro}
-          onChange={(e) => setFiltro(e.target.value)}
+          onChange={(e) => {
+            setFiltro(e.target.value);
+            setSoloClienteId(null);
+          }}
         />
         <label style={{ display: "flex", alignItems: "center", gap: 6, fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.inkSoft, cursor: "pointer" }}>
           <input type="checkbox" checked={soloPendientes} onChange={(e) => setSoloPendientes(e.target.checked)} />
@@ -4213,10 +4230,23 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
           ))}
         </select>
       </div>
+      {soloClienteId && clientes[soloClienteId] && (
+        <div
+          className="drx-fade-in"
+          style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap", background: "#FFF1F3", border: "1px solid #FBD5DC", borderRadius: 10, padding: "10px 14px", marginBottom: 12 }}
+        >
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.ink, margin: 0 }}>
+            Viendo planes y pagos de <strong>{clientes[soloClienteId].nombre}</strong>
+          </p>
+          <button className="drx-btn-ghost" style={{ ...buttonGhost, padding: "6px 12px", fontSize: 12.5 }} onClick={() => setSoloClienteId(null)}>
+            Ver todos los clientes
+          </button>
+        </div>
+      )}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
         <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted, margin: 0 }}>
           {idsFiltrados.length} cliente{idsFiltrados.length !== 1 ? "s" : ""}
-          {filtro.trim() ? ` de ${ids.length}` : " registrado" + (ids.length !== 1 ? "s" : "")}
+          {filtro.trim() || soloClienteId ? ` de ${ids.length}` : " registrado" + (idsFiltrados.length !== 1 ? "s" : "")}
         </p>
         <button
           className="drx-btn-ghost"
@@ -4269,7 +4299,12 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
                 <div style={{ display: "flex", gap: 12 }}>
                   <AvatarIniciales nombre={c.nombre} />
                   <div>
-                  <p style={{ fontFamily: "Inter, sans-serif", fontSize: 17, fontWeight: 700, margin: 0, color: COLORS.ink }}>{c.nombre}</p>
+                  <p style={{ fontFamily: "Inter, sans-serif", fontSize: 17, fontWeight: 700, margin: 0, color: COLORS.ink }}>
+                    {c.nombre}
+                    {c.inactivo && (
+                      <span style={{ marginLeft: 8, verticalAlign: 2, fontSize: 11, fontWeight: 700, padding: "2px 9px", borderRadius: 20, background: "#E5E7EB", color: "#374151" }}>Inactivo</span>
+                    )}
+                  </p>
                   <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.muted, margin: "4px 0 0" }}>
                     {pagos.length} pago{pagos.length !== 1 ? "s" : ""} registrado{pagos.length !== 1 ? "s" : ""} · Total: {formatoCOP(totalPagado)}
                     {ultimoPago && ` · Último pago: ${new Date(ultimoPago.fecha).toLocaleDateString("es-CO", { dateStyle: "medium" })}`}

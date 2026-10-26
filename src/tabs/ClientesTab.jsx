@@ -878,7 +878,7 @@ export function VentanaCompartirPortal({ clienteId, cliente, onCerrar, onActuali
   );
 }
 
-export default function ClientesTab({ usuarioActual, onIrARegistrarPago, onListo }) {
+export default function ClientesTab({ usuarioActual, onIrARegistrarPago, onIrAPlanesYPagos, clienteInicial, onClienteInicialConsumido, onListo }) {
   const { ids, cargado, addId, removeId } = useIndex("indice-clientes", false);
   const { usuarios: abogadosDespacho } = useUsuariosDespacho();
   const tareasApi = useTareas();
@@ -908,7 +908,15 @@ export default function ClientesTab({ usuarioActual, onIrARegistrarPago, onListo
     if (showForm && form.nombre.trim()) guardarJSONLocal(LLAVE_BORRADOR_CLIENTE, form);
   }, [form, showForm]);
   const [soloSinRadicado, setSoloSinRadicado] = useState(false);
-  const [soloInactivos, setSoloInactivos] = useState(false);
+  // "Sin movimiento" = sin actuaciones hace rato (antes se llamaba "Solo
+  // inactivos", que ahora es otra cosa: el cliente marcado como inactivo).
+  const [soloSinMovimiento, setSoloSinMovimiento] = useState(false);
+  // Un cliente inactivo (ya pagó todo y el proceso terminó) no se borra:
+  // queda guardado con su historial y recibos, pero sale de la lista normal.
+  const [verInactivos, setVerInactivos] = useState(false);
+  // Al llegar desde el buscador de arriba (o desde otra pestaña) se muestra
+  // solo ese cliente, aunque esté inactivo, hasta que pidan ver todos.
+  const [soloClienteId, setSoloClienteId] = useState(null);
   const [toastGuardado, setToastGuardado] = useState("");
   const [pagoClienteId, setPagoClienteId] = useState(null);
   const [compartirPortalId, setCompartirPortalId] = useState(null);
@@ -925,6 +933,39 @@ export default function ClientesTab({ usuarioActual, onIrARegistrarPago, onListo
       if (cargado) onListo?.();
     })();
   }, [ids, cargado]);
+
+  useEffect(() => {
+    if (!clienteInicial) return;
+    if (clientes[clienteInicial]) {
+      setSoloClienteId(clienteInicial);
+      setFiltro("");
+      onClienteInicialConsumido?.();
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } else if (cargado && Object.keys(clientes).length > 0 && !ids.includes(clienteInicial)) {
+      onClienteInicialConsumido?.();
+    }
+  }, [clienteInicial, clientes, cargado, ids, onClienteInicialConsumido]);
+
+  const cambiarEstadoCliente = async (id, inactivar) => {
+    const c = clientes[id];
+    if (!c) return;
+    if (
+      inactivar &&
+      !(await confirmar(
+        `¿Marcar a ${c.nombre} como inactivo? No se borra nada: su historial, pagos y recibos quedan guardados por si los necesitas (un derecho de petición, una tutela…). Solo sale de la lista de clientes y deja de generar avisos. Lo puedes reactivar cuando quieras.`
+      ))
+    )
+      return;
+    const ahora = new Date().toISOString();
+    const actualizado = inactivar
+      ? { ...c, inactivo: true, inactivoDesde: ahora, inactivoPor: usuarioActual.nombre || "" }
+      : { ...c, inactivo: false, inactivoDesde: null, inactivoPor: null, reactivadoEn: ahora };
+    await storageSet(`cliente:${id}`, JSON.stringify(actualizado), false);
+    setClientes((prev) => ({ ...prev, [id]: actualizado }));
+    registrarAuditoria(usuarioActual, inactivar ? "inactivar_cliente" : "reactivar_cliente", "cliente", id, { nombre: c.nombre });
+    setToastGuardado(inactivar ? `${c.nombre} quedó inactivo` : `${c.nombre} está activo de nuevo`);
+    setTimeout(() => setToastGuardado(""), 3500);
+  };
 
   const copiar = (texto, etiqueta) => {
     navigator.clipboard?.writeText(texto);
@@ -1088,6 +1129,7 @@ export default function ClientesTab({ usuarioActual, onIrARegistrarPago, onListo
       return fb.localeCompare(fa);
     });
 
+    if (soloClienteId && clientes[soloClienteId]) return [soloClienteId];
     const textoFiltro = filtroConRetraso.trim().toLowerCase();
     let resultado = textoFiltro
       ? idsOrdenados.filter((id) => {
@@ -1100,15 +1142,17 @@ export default function ClientesTab({ usuarioActual, onIrARegistrarPago, onListo
           );
         })
       : idsOrdenados;
+    resultado = resultado.filter((id) => !!clientes[id]?.inactivo === verInactivos);
     if (soloSinRadicado) resultado = resultado.filter((id) => radicadosDeCliente(clientes[id]).length === 0);
-    if (soloInactivos) {
+    if (soloSinMovimiento) {
       resultado = resultado.filter((id) => {
         const dias = diasDesde(clientes[id]?.ultimaActuacion);
         return dias !== null && dias >= DIAS_ALERTA_INACTIVIDAD && !clientes[id]?.procesoPausado;
       });
     }
     return resultado;
-  }, [ids, clientes, orden, filtroConRetraso, soloSinRadicado, soloInactivos]);
+  }, [ids, clientes, orden, filtroConRetraso, soloSinRadicado, soloSinMovimiento, verInactivos, soloClienteId]);
+  const totalInactivos = useMemo(() => ids.filter((id) => clientes[id]?.inactivo).length, [ids, clientes]);
 
   return (
     <div>
@@ -1141,8 +1185,37 @@ export default function ClientesTab({ usuarioActual, onIrARegistrarPago, onListo
           style={{ ...inputStyle, maxWidth: 320, flex: 1, minWidth: 220 }}
           placeholder="Filtrar por nombre, radicado o teléfono..."
           value={filtro}
-          onChange={(e) => setFiltro(e.target.value)}
+          onChange={(e) => {
+            setFiltro(e.target.value);
+            setSoloClienteId(null);
+          }}
         />
+        <div style={{ display: "flex", border: `1px solid ${COLORS.border}`, borderRadius: 8, overflow: "hidden" }}>
+          {[
+            { v: false, t: `Activos (${ids.length - totalInactivos})` },
+            { v: true, t: `Inactivos (${totalInactivos})` },
+          ].map((o) => (
+            <button
+              key={String(o.v)}
+              onClick={() => {
+                setVerInactivos(o.v);
+                setSoloClienteId(null);
+              }}
+              style={{
+                border: "none",
+                padding: "8px 14px",
+                fontFamily: "Inter, sans-serif",
+                fontSize: 12,
+                fontWeight: 700,
+                cursor: "pointer",
+                background: verInactivos === o.v ? (o.v ? "#E5E7EB" : COLORS.accentSoft) : COLORS.panel,
+                color: verInactivos === o.v ? COLORS.navy : COLORS.muted,
+              }}
+            >
+              {o.t}
+            </button>
+          ))}
+        </div>
         <div style={{ display: "flex", border: `1px solid ${COLORS.border}`, borderRadius: 8, overflow: "hidden" }}>
           <button
             onClick={() => setOrden("recientes")}
@@ -1195,13 +1268,32 @@ export default function ClientesTab({ usuarioActual, onIrARegistrarPago, onListo
           Solo sin radicado
         </label>
         <label style={{ display: "flex", alignItems: "center", gap: 6, fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.inkSoft, cursor: "pointer" }}>
-          <input type="checkbox" checked={soloInactivos} onChange={(e) => setSoloInactivos(e.target.checked)} />
-          Solo inactivos
+          <input type="checkbox" checked={soloSinMovimiento} onChange={(e) => setSoloSinMovimiento(e.target.checked)} />
+          Sin movimiento reciente
         </label>
       </div>
+      {soloClienteId && clientes[soloClienteId] && (
+        <div
+          className="drx-fade-in"
+          style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap", background: COLORS.accentSoft, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: "10px 14px", marginBottom: 12 }}
+        >
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.ink, margin: 0 }}>
+            Mostrando a <strong>{clientes[soloClienteId].nombre}</strong>
+            {clientes[soloClienteId].inactivo ? " (cliente inactivo)" : ""}
+          </p>
+          <button className="drx-btn-ghost" style={{ ...buttonGhost, padding: "6px 12px", fontSize: 12.5 }} onClick={() => setSoloClienteId(null)}>
+            Ver todos los clientes
+          </button>
+        </div>
+      )}
+      {verInactivos && !soloClienteId && (
+        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.inkSoft, background: "#F3F4F6", border: "1px solid #E5E7EB", borderRadius: 10, padding: "10px 14px", margin: "0 0 12px" }}>
+          Clientes que ya terminaron. Su historial, pagos y recibos siguen guardados; no generan avisos ni se consultan en la Rama Judicial.
+        </p>
+      )}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
         <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted, margin: 0 }}>
-          {idsFiltrados.length} cliente{idsFiltrados.length !== 1 ? "s" : ""}
+          {idsFiltrados.length} cliente{idsFiltrados.length !== 1 ? "s" : ""}{verInactivos && !soloClienteId ? ` inactivo${idsFiltrados.length !== 1 ? "s" : ""}` : ""}
           {filtro.trim()
             ? ` de ${ids.length}`
             : orden === "az"
@@ -1601,7 +1693,7 @@ export default function ClientesTab({ usuarioActual, onIrARegistrarPago, onListo
           const inactivo = dias !== null && dias >= DIAS_ALERTA_INACTIVIDAD && !c.procesoPausado;
 
           return (
-            <Card key={id} style={{ borderLeft: `4px solid ${COLOR_AREA_PROCESO[c.areaProceso] || "#14B8A6"}` }}>
+            <Card key={id} style={{ borderLeft: `4px solid ${c.inactivo ? "#9CA3AF" : COLOR_AREA_PROCESO[c.areaProceso] || "#14B8A6"}`, ...(c.inactivo ? { background: "#FAFAF9" } : {}) }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 12 }}>
                 <div style={{ flex: 1, minWidth: 260, display: "flex", gap: 12 }}>
                   <AvatarIniciales nombre={c.nombre} />
@@ -1778,6 +1870,23 @@ export default function ClientesTab({ usuarioActual, onIrARegistrarPago, onListo
                     >
                       {dias === null ? "Sin actuaciones" : dias === 0 ? "Actuación hoy" : `Hace ${dias} día${dias !== 1 ? "s" : ""}`}
                     </span>
+                    {c.inactivo && (
+                      <span
+                        title={c.inactivoPor ? `Lo marcó ${c.inactivoPor}` : undefined}
+                        style={{
+                          fontFamily: "Inter, sans-serif",
+                          fontSize: 11,
+                          fontWeight: 700,
+                          padding: "3px 9px",
+                          borderRadius: 20,
+                          background: "#E5E7EB",
+                          color: "#374151",
+                          border: "1px solid #D1D5DB",
+                        }}
+                      >
+                        Inactivo{c.inactivoDesde ? ` desde ${new Date(c.inactivoDesde).toLocaleDateString("es-CO", { day: "numeric", month: "short", year: "numeric" })}` : ""}
+                      </span>
+                    )}
                     {c.procesoPausado && (
                       <span
                         style={{
@@ -1870,6 +1979,16 @@ export default function ClientesTab({ usuarioActual, onIrARegistrarPago, onListo
                         <Icono tipo="moneda" size={13} style={{ marginRight: 5, verticalAlign: -2 }} /> Registrar pago
                       </button>
                     )}
+                    {onIrAPlanesYPagos && puedeVerDinero && (
+                      <button
+                        className="drx-btn-ghost"
+                        style={{ ...buttonGhost, color: "#E11D48", borderColor: "#FBD5DC" }}
+                        title="Abrir este cliente en Contabilidad: su plan, saldo y todos sus pagos y recibos"
+                        onClick={() => onIrAPlanesYPagos(id)}
+                      >
+                        <Icono tipo="moneda" size={13} style={{ marginRight: 5, verticalAlign: -2 }} /> Ver planes y pagos
+                      </button>
+                    )}
                     <button
                       className="drx-btn-ghost"
                       style={buttonGhost}
@@ -1893,6 +2012,25 @@ export default function ClientesTab({ usuarioActual, onIrARegistrarPago, onListo
                     <button className="drx-btn-ghost" style={buttonGhost} onClick={() => empezarEdicion(id)}>
                       <Icono tipo="lapiz" size={13} style={{ marginRight: 5, verticalAlign: -2 }} /> Editar
                     </button>
+                    {c.inactivo ? (
+                      <button
+                        className="drx-btn-ghost"
+                        style={{ ...buttonGhost, color: "#166534", borderColor: "#BBF7D0" }}
+                        title="Volver a mostrarlo en la lista de clientes activos"
+                        onClick={() => cambiarEstadoCliente(id, false)}
+                      >
+                        Reactivar cliente
+                      </button>
+                    ) : (
+                      <button
+                        className="drx-btn-ghost"
+                        style={buttonGhost}
+                        title="El proceso terminó: lo saca de la lista sin borrar su historial, pagos ni recibos"
+                        onClick={() => cambiarEstadoCliente(id, true)}
+                      >
+                        Marcar inactivo
+                      </button>
+                    )}
                     <button
                       className="drx-btn-ghost"
                       style={buttonGhost}
@@ -1922,7 +2060,9 @@ export default function ClientesTab({ usuarioActual, onIrARegistrarPago, onListo
         })}
         {cargado && ids.length === 0 && !showForm && <EstadoVacio icono={<Icono tipo="persona" size={26} />} texto="Aún no has registrado clientes." />}
         {ids.length > 0 && idsFiltrados.length === 0 && (
-          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted, textAlign: "center" }}>Ningún cliente coincide con "{filtro}".</p>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted, textAlign: "center" }}>
+            {filtro.trim() ? `Ningún cliente ${verInactivos ? "inactivo " : ""}coincide con "${filtro}".` : verInactivos ? "No hay clientes inactivos." : "No hay clientes con estos filtros."}
+          </p>
         )}
       </div>
       {pagoClienteId && clientes[pagoClienteId] && (
