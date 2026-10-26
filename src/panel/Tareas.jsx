@@ -4,7 +4,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
-import { COLORS, Field, inputStyle, buttonPrimary, buttonGhost, Card } from "../ui/base.jsx";
+import { COLORS, Field, inputStyle, buttonPrimary, buttonGhost, Card, BuscadorCliente } from "../ui/base.jsx";
 import { AvatarIniciales, fechaHoyISO, registrarAuditoria, useTareas, useUsuariosDespacho, useClientesLigero, useConfirmarDialogo } from "../App.jsx";
 
 const AMBAR = "#D97706";
@@ -185,16 +185,7 @@ function FormularioTarea({ usuarios, yo, clientes, clienteFijo, onCrear, onCance
         </Field>
         {!clienteFijo && (
           <Field label="Cliente (opcional)">
-            <select className="drx-input" style={inputStyle} value={clienteId} onChange={(e) => setClienteId(e.target.value)}>
-              <option value="">Sin cliente</option>
-              {Object.entries(clientes || {})
-                .sort((a, b) => (a[1].nombre || "").localeCompare(b[1].nombre || ""))
-                .map(([id, c]) => (
-                  <option key={id} value={id}>
-                    {c.nombre}
-                  </option>
-                ))}
-            </select>
+            <BuscadorCliente opciones={Object.entries(clientes || {}).map(([id, c]) => ({ id, ...c }))} value={clienteId} onChange={setClienteId} textoNinguno="Sin cliente" />
           </Field>
         )}
       </div>

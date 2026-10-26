@@ -5,6 +5,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { storageGet, storageSet, obtenerUrlReciboImagen, getNombreDespacho, obtenerClientesPorId } from "../lib/storage";
 import { numeroEnLetras } from "../lib/numeroEnLetras.js";
+import { BuscadorCliente } from "../ui/base.jsx";
 import { valorRetenido, valorNetoPago, montoAhorro, generarCuotasAcuerdoPago } from "../lib/contabilidadCalculos.js";
 import {
   COLORS,
@@ -2043,14 +2044,7 @@ function EgresoCard({ egreso, onEditar, onEliminar, clientesDisponibles, mediosP
         {clientesDisponibles && (
           <div style={{ marginBottom: 12 }}>
             <Field label="Cliente asociado (opcional) — se ve también en su tarjeta">
-              <select className="drx-input" style={inputStyle} value={clienteId} onChange={(e) => setClienteId(e.target.value)}>
-                <option value="">Ninguno</option>
-                {clientesDisponibles.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.nombre}
-                  </option>
-                ))}
-              </select>
+              <BuscadorCliente opciones={clientesDisponibles} value={clienteId} onChange={setClienteId} />
             </Field>
           </div>
         )}
@@ -2521,7 +2515,7 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
   // egreso — se arma una sola vez por cambio de datos en vez de recorrer
   // ids/clientes en cada EgresoCard.
   const clientesParaSelector = useMemo(
-    () => [...ids].map((id) => ({ id, nombre: clientes[id]?.nombre })).filter((c) => c.nombre).sort((a, b) => a.nombre.localeCompare(b.nombre)),
+    () => [...ids].map((id) => ({ id, nombre: clientes[id]?.nombre, inactivo: !!clientes[id]?.inactivo })).filter((c) => c.nombre).sort((a, b) => a.nombre.localeCompare(b.nombre)),
     [ids, clientes]
   );
   const [formAbiertoId, setFormAbiertoId] = useState(null);
@@ -3319,16 +3313,13 @@ export default function ContabilidadTab({ usuarioActual, clienteInicialPago, onC
           <p style={{ fontFamily: "Inter, sans-serif", fontSize: 15, fontWeight: 700, color: COLORS.ink, marginBottom: 4 }}>Registrar pago de un cliente</p>
           <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: COLORS.muted, marginBottom: 14 }}>Elige el cliente sin tener que buscarlo abajo en la lista.</p>
           <Field label="Cliente">
-            <select className="drx-input" style={inputStyle} value={pagoRapidoClienteId} onChange={(e) => setPagoRapidoClienteId(e.target.value)}>
-              <option value="">Selecciona un cliente...</option>
-              {[...ids]
-                .sort((a, b) => (clientes[a]?.nombre || "").localeCompare(clientes[b]?.nombre || ""))
-                .map((id) => (
-                  <option key={id} value={id}>
-                    {clientes[id]?.nombre || "(sin nombre)"}
-                  </option>
-                ))}
-            </select>
+            <BuscadorCliente
+              opciones={ids.filter((id) => clientes[id]).map((id) => ({ id, nombre: clientes[id].nombre || "(sin nombre)", inactivo: !!clientes[id].inactivo }))}
+              value={pagoRapidoClienteId}
+              onChange={setPagoRapidoClienteId}
+              textoNinguno={null}
+              autoFocus={!pagoRapidoClienteId}
+            />
           </Field>
           {pagoRapidoClienteId && clientes[pagoRapidoClienteId] && (
             <FormularioPago

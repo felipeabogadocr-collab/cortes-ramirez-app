@@ -4016,11 +4016,14 @@ export function useClientesLigero() {
   const [cargado, setCargado] = useState(false);
   useEffect(() => {
     if (!idsCargado) return;
-    obtenerValoresPorClaves(ids.map((id) => `cliente:${id}`)).then((valores) => {
+    // Los clientes viven en su propia tabla ("clientes"), no en
+    // app_settings — antes se buscaban ahí y la lista llegaba vacía (solo
+    // "Ninguno" en la Agenda y en Tareas).
+    obtenerClientesPorId(ids).then((porId) => {
       const ligero = {};
       ids.forEach((id) => {
-        const raw = valores[`cliente:${id}`];
-        if (raw) ligero[id] = { nombre: JSON.parse(raw).nombre };
+        const c = porId[id];
+        if (c) ligero[id] = { nombre: c.nombre, inactivo: !!c.inactivo };
       });
       setClientes(ligero);
       setCargado(true);

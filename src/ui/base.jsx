@@ -332,6 +332,141 @@ export const inputStyle = {
   outline: "none",
 };
 
+// Elegir un cliente escribiendo en vez de bajar por un desplegable larguísimo:
+// filtra sin importar tildes ni mayúsculas (por cualquier parte del nombre),
+// se maneja con flechas + Enter, y los inactivos salen al final marcados.
+// "opciones" es [{ id, nombre, inactivo? }].
+const sinTildes = (t) => (t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+export function BuscadorCliente({ opciones, value, onChange, placeholder = "Buscar cliente por nombre…", textoNinguno = "Ninguno", cargando = false, autoFocus = false }) {
+  const [q, setQ] = useState("");
+  const [abierto, setAbierto] = useState(false);
+  const [activo, setActivo] = useState(0);
+  const inputRef = useRef(null);
+  const elegido = value ? opciones.find((o) => o.id === value) : null;
+  const lista = (() => {
+    const t = sinTildes(q.trim());
+    const base = [...opciones].sort((a, b) => (a.inactivo ? 1 : 0) - (b.inactivo ? 1 : 0) || (a.nombre || "").localeCompare(b.nombre || ""));
+    if (!t) return base.slice(0, 8);
+    const palabras = t.split(/\s+/);
+    return base
+      .map((o) => {
+        const n = sinTildes(o.nombre);
+        if (!palabras.every((p) => n.includes(p))) return null;
+        return { o, rango: n.startsWith(t) ? 0 : n.split(/\s+/).some((w) => w.startsWith(palabras[0])) ? 1 : 2 };
+      })
+      .filter(Boolean)
+      .sort((a, b) => a.rango - b.rango)
+      .map((x) => x.o)
+      .slice(0, 8);
+  })();
+  const elegir = (o) => {
+    onChange(o ? o.id : "");
+    setQ("");
+    setAbierto(false);
+  };
+
+  if (elegido) {
+    return (
+      <div style={{ ...inputStyle, display: "flex", alignItems: "center", gap: 8, padding: "7px 8px 7px 12px" }}>
+        <span style={{ flex: 1, minWidth: 0, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {elegido.nombre}
+          {elegido.inactivo && <span style={{ marginLeft: 6, fontSize: 11, fontWeight: 700, color: COLORS.muted }}>(inactivo)</span>}
+        </span>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            elegir(null);
+            setTimeout(() => inputRef.current?.focus(), 0);
+          }}
+          style={{ border: `1px solid ${COLORS.border}`, background: COLORS.surfaceSoft, borderRadius: 7, padding: "4px 10px", fontSize: 12, fontWeight: 600, cursor: "pointer", color: COLORS.inkSoft, fontFamily: "Inter, sans-serif", flexShrink: 0 }}
+        >
+          Cambiar
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ position: "relative" }}>
+      <span style={{ position: "absolute", left: 11, top: "50%", transform: "translateY(-50%)", color: COLORS.muted, display: "flex", pointerEvents: "none" }}>
+        <Icono tipo="lupa" size={16} />
+      </span>
+      <input
+        ref={inputRef}
+        className="drx-input"
+        style={{ ...inputStyle, width: "100%", boxSizing: "border-box", paddingLeft: 36 }}
+        placeholder={cargando ? "Cargando clientes…" : placeholder}
+        value={q}
+        autoFocus={autoFocus}
+        onChange={(e) => {
+          setQ(e.target.value);
+          setActivo(0);
+          setAbierto(true);
+        }}
+        onFocus={() => setAbierto(true)}
+        onClick={() => setAbierto(true)}
+        onBlur={() => setTimeout(() => setAbierto(false), 150)}
+        onKeyDown={(e) => {
+          if (e.key === "ArrowDown") {
+            e.preventDefault();
+            setAbierto(true);
+            setActivo((i) => Math.min(i + 1, lista.length - 1));
+          } else if (e.key === "ArrowUp") {
+            e.preventDefault();
+            setActivo((i) => Math.max(i - 1, 0));
+          } else if (e.key === "Enter" && abierto && lista[activo]) {
+            e.preventDefault();
+            elegir(lista[activo]);
+          } else if (e.key === "Escape") {
+            setAbierto(false);
+          }
+        }}
+      />
+      {abierto && (
+        <div
+          className="drx-dropdown-in"
+          style={{ position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0, zIndex: 60, background: COLORS.panel, border: `1px solid ${COLORS.border}`, borderRadius: 10, boxShadow: "0 12px 28px rgba(0,0,0,0.16)", maxHeight: 300, overflowY: "auto" }}
+        >
+          {!q.trim() && (
+            <p style={{ margin: 0, padding: "8px 12px", fontSize: 11.5, color: COLORS.muted, borderBottom: `1px solid ${COLORS.border}` }}>
+              {cargando ? "Cargando clientes…" : `Escribe para buscar entre ${opciones.length} cliente${opciones.length === 1 ? "" : "s"}`}
+            </p>
+          )}
+          {lista.map((o, i) => (
+            <button
+              type="button"
+              key={o.id}
+              onMouseDown={(e) => {
+                e.preventDefault();
+                elegir(o);
+              }}
+              onMouseEnter={() => setActivo(i)}
+              style={{ display: "block", width: "100%", textAlign: "left", border: "none", borderBottom: `1px solid ${COLORS.border}`, padding: "10px 12px", cursor: "pointer", fontFamily: "Inter, sans-serif", fontSize: 13.5, fontWeight: 600, color: COLORS.ink, background: i === activo ? COLORS.accentSoft : "transparent" }}
+            >
+              {o.nombre}
+              {o.inactivo && <span style={{ marginLeft: 6, fontSize: 11, fontWeight: 700, color: COLORS.muted }}>inactivo</span>}
+            </button>
+          ))}
+          {q.trim() && lista.length === 0 && <p style={{ margin: 0, padding: 12, fontSize: 12.5, color: COLORS.muted }}>Ningún cliente con "{q.trim()}".</p>}
+          {textoNinguno && (
+            <button
+              type="button"
+              onMouseDown={(e) => {
+                e.preventDefault();
+                elegir(null);
+              }}
+              style={{ display: "block", width: "100%", textAlign: "left", border: "none", padding: "9px 12px", cursor: "pointer", fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.muted, background: "transparent" }}
+            >
+              {textoNinguno}
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export const buttonPrimary = {
   background: `linear-gradient(135deg, #0F5540, ${COLORS.navy} 55%, ${COLORS.navyDeep})`,
   color: "#FFFFFF",
@@ -436,7 +571,7 @@ export function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-export const APP_VERSION = "1.201.0";
+export const APP_VERSION = "1.202.0";
 
 export function EstadoBadge({ estado }) {
   const config = {

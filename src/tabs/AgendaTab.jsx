@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "../lib/supabaseClient";
+import { BuscadorCliente } from "../ui/base.jsx";
 import {
   COLORS, EncabezadoSeccion, Card, buttonPrimary, buttonGhost, Field, inputStyle,
   Icono, IconoCampana, EstadoVacio, useConfirmarDialogo, useEventosAgenda, diasHasta, urgenciaTermino,
@@ -1037,17 +1038,12 @@ export default function AgendaTab({ onListo }) {
               </div>
               <div style={{ flex: 1 }}>
                 <Field label="Cliente relacionado (opcional)">
-                  <select
-                    className="drx-input"
-                    style={inputStyle}
+                  <BuscadorCliente
+                    opciones={Object.entries(clientesLigero).map(([id, c]) => ({ id, ...c }))}
                     value={form.clienteId}
-                    onChange={(e) => setForm({ ...form, clienteId: e.target.value })}
-                  >
-                    <option value="">{clientesCargados ? "Ninguno" : "Cargando..."}</option>
-                    {Object.entries(clientesLigero).map(([id, c]) => (
-                      <option key={id} value={id}>{c.nombre}</option>
-                    ))}
-                  </select>
+                    onChange={(id) => setForm({ ...form, clienteId: id })}
+                    cargando={!clientesCargados}
+                  />
                 </Field>
               </div>
             </div>
