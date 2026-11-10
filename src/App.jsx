@@ -993,41 +993,60 @@ function SelloVersion({ oscuro }) {
 // exactamente igual que antes; se agregaron para que Agenda (y cualquier
 // otro que lo pida después) pueda tener un encabezado más vestido, sin
 // tocar el de las demás pestañas.
+// Cada sección abre con el mismo encabezado: su ícono en una ficha del
+// color de la sección (suave, no un bloque sólido) y el título en serif,
+// que es lo que le da el aire de "firma de abogados" a toda la app.
+const ICONO_POR_SECCION = {
+  Agenda: "agenda",
+  Clientes: "clientes",
+  "Vigilancia judicial": "vigilancia",
+  Antecedentes: "antecedentes",
+  Contabilidad: "contabilidad",
+  "Calculadora de precios": "calculadora",
+  "Calendario de contenido": "contenido",
+  "Firmar documentos": "documentos",
+  Reportes: "reportes",
+  "Usuarios y permisos": "usuarios",
+  Plataforma: "usuarios",
+};
+
 export function EncabezadoSeccion({ titulo, color, icono, subtitulo }) {
+  const tipoIcono = ICONO_POR_SECCION[titulo];
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: subtitulo ? 22 : 26 }}>
+    <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: subtitulo ? 22 : 26 }}>
       <div
         style={{
-          width: 38,
-          height: 38,
-          borderRadius: 11,
+          width: 46,
+          height: 46,
+          borderRadius: 14,
           flexShrink: 0,
-          background: `linear-gradient(135deg, ${color}, ${color}CC)`,
-          boxShadow: `0 6px 16px ${color}40`,
-          display: icono ? "flex" : undefined,
-          alignItems: icono ? "center" : undefined,
-          justifyContent: icono ? "center" : undefined,
-          color: icono ? "#FFFFFF" : undefined,
+          background: `linear-gradient(145deg, ${color}26, ${color}0F)`,
+          border: `1px solid ${color}38`,
+          boxShadow: `0 8px 18px -10px ${color}80, inset 0 1px 0 rgba(255,255,255,0.5)`,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          color,
         }}
       >
-        {icono}
+        {icono || (tipoIcono ? <IconoTab tipo={tipoIcono} size={22} /> : null)}
       </div>
-      <div>
-        <div style={{ width: 30, height: 3, borderRadius: 2, background: `linear-gradient(90deg, ${color}, transparent)`, marginBottom: 6 }} />
+      <div style={{ minWidth: 0 }}>
         <h2
           style={{
-            fontFamily: "Inter, sans-serif",
-            fontSize: 20,
-            fontWeight: 800,
-            letterSpacing: -0.3,
-            color: COLORS.headingText,
+            fontFamily: COLORS.serif,
+            fontSize: 27,
+            fontWeight: 600,
+            letterSpacing: -0.5,
+            lineHeight: 1.1,
+            color: COLORS.ink,
             margin: 0,
           }}
         >
           {titulo}
         </h2>
         {subtitulo && (
-          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: COLORS.muted, margin: "4px 0 0" }}>{subtitulo}</p>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted, margin: "5px 0 0", lineHeight: 1.4 }}>{subtitulo}</p>
         )}
       </div>
     </div>
@@ -2268,14 +2287,16 @@ function ResumenTab({ nombre, usuarioId, usuarioActual, onIr, onListo, puedeVer 
           <Pill><Icono tipo="balanza" size={13} style={{ marginRight: 2, verticalAlign: -2 }} /> {getNombreDespacho()} — Panel de gestión</Pill>
         </div>
         <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: COLORS.muted, marginBottom: 10 }}>Hola, {nombre}</p>
-        <h1 style={{ fontFamily: "Inter, sans-serif", fontSize: 34, fontWeight: 800, letterSpacing: 0.5, textTransform: "uppercase", margin: 0, lineHeight: 1.2 }}>
-          <span style={{ color: COLORS.headingText }}>Jefe, </span>
+        <h1 style={{ fontFamily: COLORS.serif, fontSize: "clamp(31px, 8.4vw, 44px)", fontWeight: 600, letterSpacing: -1.1, margin: 0, lineHeight: 1.1 }}>
+          <span style={{ color: COLORS.ink }}>Jefe, </span>
           <span
             style={{
-              background: `linear-gradient(100deg, ${COLORS.navy}, ${COLORS.accentBright} 55%, #14B8A6)`,
+              fontStyle: "italic",
+              background: `linear-gradient(100deg, ${COLORS.navyDeep}, ${COLORS.navy} 45%, ${COLORS.gold})`,
               WebkitBackgroundClip: "text",
               backgroundClip: "text",
               color: "transparent",
+              paddingRight: 6,
             }}
           >
             ¿qué hacemos hoy?
@@ -2788,6 +2809,9 @@ export function AvatarIniciales({ nombre, size = 34, fotoUrl }) {
   );
 }
 
+// Fila del menú lateral: sin cajas ni bordes — solo el ícono en su ficha y
+// el nombre. La sección activa se marca con una barrita dorada a la
+// izquierda y un fondo de cristal muy suave.
 function SidebarButton({ active, onClick, onMouseEnter, children, color, icono, tour }) {
   const c = color || "#2F80ED";
   return (
@@ -2796,31 +2820,47 @@ function SidebarButton({ active, onClick, onMouseEnter, children, color, icono, 
       data-tour={tour}
       onClick={onClick}
       onMouseEnter={onMouseEnter}
+      aria-current={active ? "page" : undefined}
       style={{
+        position: "relative",
         display: "flex",
         alignItems: "center",
-        gap: 10,
+        gap: 11,
         width: "100%",
         textAlign: "left",
-        border: `1px solid ${active ? c : "rgba(255,255,255,0.08)"}`,
-        background: active ? `${c}26` : "rgba(255,255,255,0.03)",
-        color: active ? "#FFFFFF" : "#B9CBE5",
+        border: "none",
+        background: active ? "linear-gradient(90deg, rgba(255,255,255,0.14), rgba(255,255,255,0.05))" : "transparent",
+        color: active ? "#FFFFFF" : "rgba(226,238,235,0.72)",
         fontFamily: "Inter, sans-serif",
-        fontWeight: 700,
-        fontSize: 11.5,
-        letterSpacing: 0.6,
-        textTransform: "uppercase",
-        padding: "12px 14px",
-        borderRadius: 10,
+        fontWeight: active ? 650 : 550,
+        fontSize: 13.5,
+        letterSpacing: 0.05,
+        lineHeight: 1.2,
+        padding: "8px 10px",
+        borderRadius: 11,
         cursor: "pointer",
-        boxShadow: active ? `0 0 0 1px ${c}40, 0 4px 14px ${c}26` : "none",
+        boxShadow: active ? "inset 0 1px 0 rgba(255,255,255,0.10), 0 6px 16px -10px rgba(0,0,0,0.6)" : "none",
       }}
     >
-      <span style={{ display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, opacity: active ? 1 : 0.85 }}>
+      {active && <span aria-hidden="true" style={{ position: "absolute", left: -16, top: 9, bottom: 9, width: 3, borderRadius: "0 3px 3px 0", background: `linear-gradient(180deg, ${COLORS.goldBright}, ${COLORS.gold})`, boxShadow: `0 0 10px ${COLORS.gold}99` }} />}
+      <span
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          flexShrink: 0,
+          width: 30,
+          height: 30,
+          borderRadius: 9,
+          background: active ? c : "rgba(255,255,255,0.07)",
+          color: active ? "#FFFFFF" : "rgba(226,238,235,0.85)",
+          boxShadow: active ? `0 6px 14px -6px ${c}` : "none",
+          transition: "background .16s ease, box-shadow .16s ease",
+        }}
+      >
         <IconoTab tipo={icono} />
       </span>
-      <span style={{ flex: 1 }}>{children}</span>
-      {active && <span style={{ width: 6, height: 6, borderRadius: "50%", background: c, flexShrink: 0, boxShadow: `0 0 6px ${c}` }} />}
+      <span style={{ flex: 1, minWidth: 0 }}>{children}</span>
     </button>
   );
 }
@@ -2918,11 +2958,20 @@ export function BuscadorGlobal({ onIr }) {
   };
 
   return (
-    <div style={{ position: "relative", flex: 1, minWidth: 0, maxWidth: 320 }}>
+    <div style={{ position: "relative", flex: 1, minWidth: 0, maxWidth: 420 }}>
+      <span aria-hidden="true" style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: COLORS.muted, display: "flex", pointerEvents: "none" }}>
+        <Icono tipo="lupa" size={16} />
+      </span>
+      {!q && (
+        <span className="drx-oculta-movil" aria-hidden="true" style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", display: "flex", gap: 3, pointerEvents: "none" }}>
+          <span className="drx-kbd">Ctrl</span>
+          <span className="drx-kbd">K</span>
+        </span>
+      )}
       <input
         ref={inputRef}
         className="drx-input"
-        style={{ ...inputStyle, width: "100%", minWidth: 0, boxSizing: "border-box" }}
+        style={{ ...inputStyle, width: "100%", minWidth: 0, boxSizing: "border-box", paddingLeft: 40, borderRadius: 12, background: COLORS.surfaceSoft }}
         placeholder="Buscar cliente, radicado o documento..."
         data-tour="buscar"
         title="Buscar cliente o documento (Ctrl+K)"
@@ -2959,8 +3008,8 @@ export function BuscadorGlobal({ onIr }) {
             right: 0,
             background: COLORS.panel,
             border: `1px solid ${COLORS.border}`,
-            borderRadius: 8,
-            boxShadow: "0 8px 20px rgba(0,0,0,0.15)",
+            borderRadius: 14,
+            boxShadow: "var(--drx-sombra-flotante)",
             zIndex: 30,
             maxHeight: 320,
             overflowY: "auto",
@@ -6909,7 +6958,7 @@ function App({ inicio }) {
           width: 460,
           height: 460,
           borderRadius: "50%",
-          background: `radial-gradient(circle, rgba(22,163,74,${oscuro ? 0.28 : 0.16}) 0%, rgba(22,163,74,0) 70%)`,
+          background: `radial-gradient(circle, rgba(62,124,124,${oscuro ? 0.26 : 0.13}) 0%, rgba(62,124,124,0) 70%)`,
           animation: "drx-mesh 14s ease-in-out infinite",
           pointerEvents: "none",
           zIndex: 0,
@@ -6925,7 +6974,7 @@ function App({ inicio }) {
           width: 320,
           height: 320,
           borderRadius: "50%",
-          background: `radial-gradient(circle, rgba(20,184,166,${oscuro ? 0.24 : 0.14}) 0%, rgba(20,184,166,0) 70%)`,
+          background: `radial-gradient(circle, rgba(184,146,63,${oscuro ? 0.14 : 0.09}) 0%, rgba(184,146,63,0) 70%)`,
           animation: "drx-mesh 18s ease-in-out infinite reverse",
           pointerEvents: "none",
           zIndex: 0,
@@ -6938,11 +6987,12 @@ function App({ inicio }) {
         style={{
           width: 250,
           flexShrink: 0,
-          background: `linear-gradient(180deg, ${COLORS.navy} 0%, #052a20 100%)`,
-          borderRight: `3px solid ${COLORS.accentBright}`,
+          background: "radial-gradient(420px 260px at 0% 0%, rgba(120,200,190,0.20), transparent 70%), linear-gradient(180deg, #2B6765 0%, #174341 38%, #0B2927 100%)",
+          borderRight: "1px solid rgba(255,255,255,0.06)",
+          boxShadow: "inset -1px 0 0 rgba(0,0,0,0.25), 8px 0 30px -18px rgba(12,25,23,0.5)",
           display: "flex",
           flexDirection: "column",
-          padding: "24px 16px",
+          padding: "22px 16px 18px",
           position: "sticky",
           top: 0,
           height: "calc(100vh - var(--sat) - var(--sab))",
@@ -6950,19 +7000,34 @@ function App({ inicio }) {
           zIndex: 1,
         }}
       >
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "4px 6px 20px", marginBottom: 20, borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
-          <div style={{ display: "inline-flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
-            <div style={{ width: 40, height: 40, borderRadius: 11, background: "#FFFFFF", display: "flex", alignItems: "center", justifyContent: "center", color: COLORS.navy, flexShrink: 0 }}>
-              <IconoNomos size={22} />
-            </div>
-            <span style={{ fontFamily: "Inter, sans-serif", fontSize: 20, fontWeight: 800, letterSpacing: 1.5, color: "#FFFFFF", lineHeight: 1 }}>Nomos</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "2px 4px 18px", marginBottom: 14, borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
+          <div
+            style={{
+              width: 42,
+              height: 42,
+              borderRadius: 13,
+              background: `linear-gradient(145deg, ${COLORS.goldBright}, ${COLORS.gold})`,
+              boxShadow: "inset 0 1px 0 rgba(255,255,255,0.45), 0 10px 22px -10px rgba(0,0,0,0.7)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              color: "#0B2927",
+              flexShrink: 0,
+            }}
+          >
+            <IconoNomos size={23} />
           </div>
-          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, fontWeight: 600, color: "#D7E2F1", margin: 0, lineHeight: 1.15, textAlign: "center" }}>
-            {getNombreDespacho()}
-          </p>
+          <div style={{ minWidth: 0 }}>
+            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 19, fontWeight: 800, letterSpacing: -0.3, color: "#FFFFFF", lineHeight: 1, margin: 0 }}>Nomos</p>
+            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, fontWeight: 500, color: "rgba(226,238,235,0.66)", margin: "5px 0 0", lineHeight: 1.2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={getNombreDespacho()}>
+              {getNombreDespacho()}
+            </p>
+          </div>
         </div>
 
-        <div style={{ display: "flex", flexDirection: "column", gap: 8, flex: 1 }}>
+        <p style={{ fontFamily: "Inter, sans-serif", fontSize: 10.5, fontWeight: 700, letterSpacing: 1.4, textTransform: "uppercase", color: "rgba(226,238,235,0.38)", margin: "0 0 8px 10px" }}>Tu despacho</p>
+        {/* Tocar cualquier sección cierra el cajón en celular, también la que ya está abierta. */}
+        <div onClick={() => setSidebarMovilAbierta(false)} style={{ display: "flex", flexDirection: "column", gap: 3, flex: 1 }}>
           {puedeVer("resumen") && (
             <SidebarButton tour="resumen" active={tab === "resumen"} onClick={() => setTab("resumen")} color="#2F80ED" icono="resumen">
               Resumen
@@ -6995,38 +7060,38 @@ function App({ inicio }) {
           )}
         </div>
 
-        <div style={{ borderTop: "1px solid #3A5A82", paddingTop: 14, marginTop: 14 }}>
+        <div style={{ marginTop: 14 }}>
           <button
+            className="drx-tab"
             onClick={() => setMostrarMiDespacho(true)}
             title="Ver mi perfil"
             style={{
-              background: "none", border: "none", padding: 0, cursor: "pointer", textAlign: "left",
+              background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.08)", padding: "10px 11px", borderRadius: 13, cursor: "pointer", textAlign: "left",
               display: "flex", alignItems: "center", gap: 10, marginBottom: 10, width: "100%",
             }}
           >
             <AvatarIniciales nombre={usuarioActual.nombre} fotoUrl={fotoPerfilUrl} />
             <div>
-              <p style={{ fontFamily: "Inter, sans-serif", fontSize: 10.5, fontWeight: 700, color: "#9FB6D6", textTransform: "uppercase", letterSpacing: 0.4, margin: 0 }}>Mi perfil</p>
-              <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12.5, color: "#FFFFFF", fontWeight: 700, margin: "1px 0 0" }}>{usuarioActual.nombre}</p>
-              <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11, color: "#9FB6D6", margin: 0 }}>{usuarioActual.rol}</p>
+              <p style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: "#FFFFFF", fontWeight: 650, margin: 0, lineHeight: 1.2 }}>{usuarioActual.nombre}</p>
+              <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, color: "rgba(226,238,235,0.6)", margin: "2px 0 0" }}>{usuarioActual.rol} · Mi perfil</p>
             </div>
           </button>
-          <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+          <div style={{ display: "flex", gap: 14, flexWrap: "wrap", padding: "0 4px" }}>
             <button
               onClick={() => setCambiandoUsuario(true)}
-              style={{ background: "none", border: "none", color: "#9FB6D6", fontSize: 11.5, cursor: "pointer", fontFamily: "Inter, sans-serif", textDecoration: "underline" }}
+              className="drx-enlace-lateral" style={{ background: "none", border: "none", padding: 0, color: "rgba(226,238,235,0.55)", fontSize: 11.5, fontWeight: 500, cursor: "pointer", fontFamily: "Inter, sans-serif" }}
             >
               Cambiar de usuario
             </button>
             <button
               onClick={() => setMostrarSeguridad2FA(true)}
-              style={{ background: "none", border: "none", color: "#9FB6D6", fontSize: 11.5, cursor: "pointer", fontFamily: "Inter, sans-serif", textDecoration: "underline" }}
+              className="drx-enlace-lateral" style={{ background: "none", border: "none", padding: 0, color: "rgba(226,238,235,0.55)", fontSize: 11.5, fontWeight: 500, cursor: "pointer", fontFamily: "Inter, sans-serif" }}
             >
               Seguridad
             </button>
             <button
               onClick={cerrarSesion}
-              style={{ background: "none", border: "none", color: "#9FB6D6", fontSize: 11.5, cursor: "pointer", fontFamily: "Inter, sans-serif", textDecoration: "underline" }}
+              className="drx-enlace-lateral" style={{ background: "none", border: "none", padding: 0, color: "rgba(226,238,235,0.55)", fontSize: 11.5, fontWeight: 500, cursor: "pointer", fontFamily: "Inter, sans-serif" }}
             >
               Cerrar sesión
             </button>
@@ -7054,8 +7119,8 @@ function App({ inicio }) {
           style={{
             background: COLORS.panel,
             borderBottom: `1px solid ${COLORS.border}`,
-            boxShadow: "0 2px 10px rgba(11,61,46,0.04)",
-            padding: "16px 28px",
+            boxShadow: "0 8px 24px -20px rgba(12,25,23,0.35)",
+            padding: "13px 28px",
             display: "flex",
             justifyContent: "space-between",
             alignItems: "center",
@@ -7069,7 +7134,7 @@ function App({ inicio }) {
             key={tab}
             className="drx-barra-progreso"
             aria-hidden="true"
-            style={{ position: "absolute", bottom: -1, left: 0, height: 2, background: COLORS.accentBright }}
+            style={{ position: "absolute", bottom: -1, left: 0, height: 2, background: `linear-gradient(90deg, ${COLORS.navy}, ${COLORS.goldBright})` }}
           />
           <button
             className="drx-btn-hamburguesa"
@@ -7099,11 +7164,12 @@ function App({ inicio }) {
               title="Notificaciones"
               style={{
                 position: "relative",
-                background: "transparent",
+                background: COLORS.panel,
                 border: `1px solid ${COLORS.border}`,
-                borderRadius: 8,
-                width: 38,
-                height: 38,
+                borderRadius: 11,
+                boxShadow: "0 1px 2px rgba(12,25,23,0.05)",
+                width: 40,
+                height: 40,
                 cursor: "pointer",
                 display: "flex",
                 alignItems: "center",
@@ -7167,8 +7233,8 @@ function App({ inicio }) {
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                width: 38,
-                height: 38,
+                width: 40,
+                height: 40,
                 padding: 0,
               }}
             >
@@ -7182,7 +7248,7 @@ function App({ inicio }) {
           {ultimaSesionAnterior && (
             <div
               style={{
-                maxWidth: 760,
+                maxWidth: 900,
                 margin: "0 auto 16px",
                 background: COLORS.accentSoft,
                 border: "1px solid #C7D6EA",
@@ -7208,7 +7274,7 @@ function App({ inicio }) {
               </button>
             </div>
           )}
-          <div key={tab} className="drx-tab-transition" style={{ maxWidth: 760, margin: "0 auto" }}>
+          <div key={tab} className="drx-tab-transition" style={{ maxWidth: 900, margin: "0 auto" }}>
             {cambiandoTab && <CargandoSeccion />}
             {/* El contenido se monta siempre (para que arranque a pedir sus
                 datos y pueda avisar "onListo" cuanto antes) — mientras

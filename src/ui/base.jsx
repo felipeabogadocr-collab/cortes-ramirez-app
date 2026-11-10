@@ -23,6 +23,12 @@ export const COLORS = {
   accentBright: "#16A34A",
   accentSoft: "#E3F5EA",
   black: "#0B0B0C",
+  // Dorado de la marca (el mismo de las piezas de mercadeo): se usa en
+  // dosis chicas — el indicador de la sección activa, el isotipo — para
+  // dar el acabado "premium" sin recargar la interfaz.
+  gold: "#B8923F",
+  goldBright: "#D9B866",
+  serif: '"Source Serif 4", Georgia, "Times New Roman", serif',
 };
 
 export const TIPOS_ID = ["Cédula de ciudadanía", "Cédula de extranjería", "Pasaporte", "Tarjeta de identidad", "NIT"];
@@ -73,7 +79,7 @@ export const GlobalStyle = () => (
       --sal: env(safe-area-inset-left, 0px);
       --sar: env(safe-area-inset-right, 0px);
     }
-    html { background: #F4F6F9; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+    html { background: #F4F6F5; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
     /* El body se corre hacia adentro el alto de cada borde. Las barras
        "sticky" (encabezados) usan top: 0: el navegador ya las pega debajo de
        este relleno, porque el body es el que hace scroll. Las "fixed" van
@@ -98,44 +104,68 @@ export const GlobalStyle = () => (
     @media (max-width: 860px) {
       input:not([type="checkbox"]):not([type="radio"]), select, textarea { font-size: 16px !important; }
     }
+    /* Paleta "premium": neutros con un punto de verde (en vez de grises
+       azulados), tinta casi negra para el texto y sombras en capas muy
+       suaves. Todo sale de estas variables, así que cada sección la hereda. */
     :root, .drx-tema-claro {
-      --drx-bg: #F4F6F9;
+      --drx-bg: #F4F6F5;
       --drx-panel: #FFFFFF;
-      --drx-ink: #0B1220;
-      --drx-ink-soft: #3B4657;
-      --drx-muted: #6B7480;
-      --drx-border: #DFE3EA;
-      --drx-heading: #3E7C7C;
-      --drx-surface-soft: #FAFAF8;
+      --drx-ink: #0C1917;
+      --drx-ink-soft: #36433F;
+      --drx-muted: #6A7774;
+      --drx-border: #E1E6E3;
+      --drx-heading: #1F5451;
+      --drx-surface-soft: #F7F9F7;
+      --drx-glass: rgba(255,255,255,0.78);
+      --drx-sombra-tarjeta: 0 1px 2px rgba(12,25,23,0.04), 0 10px 28px -16px rgba(12,25,23,0.16);
+      --drx-sombra-tarjeta-hover: 0 1px 2px rgba(12,25,23,0.05), 0 18px 40px -18px rgba(12,25,23,0.24);
+      --drx-sombra-flotante: 0 24px 60px -20px rgba(12,25,23,0.35), 0 2px 6px rgba(12,25,23,0.06);
     }
     .drx-tema-oscuro {
-      --drx-bg: #10151D;
-      --drx-panel: #1A212C;
-      --drx-ink: #EDEFF3;
-      --drx-ink-soft: #C7CDD6;
-      --drx-muted: #8B95A3;
-      --drx-border: #2B3542;
-      --drx-heading: #7FCBA4;
-      --drx-surface-soft: #232C39;
+      --drx-bg: #0B1211;
+      --drx-panel: #131C1B;
+      --drx-ink: #ECF1EF;
+      --drx-ink-soft: #C3CDCA;
+      --drx-muted: #8A9794;
+      --drx-border: #25312F;
+      --drx-heading: #8ED4C0;
+      --drx-surface-soft: #1A2524;
+      --drx-glass: rgba(15,22,21,0.78);
+      --drx-sombra-tarjeta: 0 1px 2px rgba(0,0,0,0.35), 0 12px 30px -18px rgba(0,0,0,0.7);
+      --drx-sombra-tarjeta-hover: 0 1px 2px rgba(0,0,0,0.4), 0 20px 44px -18px rgba(0,0,0,0.8);
+      --drx-sombra-flotante: 0 24px 60px -18px rgba(0,0,0,0.8), 0 2px 6px rgba(0,0,0,0.4);
     }
+    body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; text-rendering: optimizeLegibility; font-variant-numeric: tabular-nums; }
+    h1, h2, h3 { letter-spacing: -0.015em; }
     .drx-tema-claro, .drx-tema-oscuro { transition: background-color .2s ease, color .2s ease, border-color .2s ease; }
     .drx-btn-primary { transition: transform .15s ease, filter .15s ease, box-shadow .15s ease; }
-    .drx-btn-primary:hover { filter: brightness(1.15); transform: translateY(-1px); }
+    .drx-btn-primary:hover { filter: brightness(1.08) saturate(1.05); transform: translateY(-1px); }
     .drx-btn-primary:active { transform: scale(0.97) translateY(0); filter: brightness(0.95); }
     .drx-btn-ghost { transition: background .15s ease, border-color .15s ease, transform .15s ease, box-shadow .15s ease; }
-    .drx-btn-ghost:hover { transform: translateY(-1px); box-shadow: 0 4px 10px rgba(16,24,40,0.08); }
+    .drx-btn-ghost:hover { transform: translateY(-1px); box-shadow: 0 6px 14px -6px rgba(12,25,23,0.18); }
     .drx-btn-ghost:active { transform: scale(0.97); box-shadow: none; }
-    .drx-tema-claro .drx-btn-ghost:hover { background: #EEF2F7; border-color: #B9C2CF; }
-    .drx-tema-oscuro .drx-btn-ghost:hover { background: #232C39; border-color: #3A4657; }
-    .drx-card { transition: box-shadow .18s ease, border-color .18s ease, transform .18s ease; box-shadow: 0 1px 2px rgba(16,24,40,0.04), 0 1px 3px rgba(16,24,40,0.05); }
-    .drx-tema-oscuro .drx-card { box-shadow: 0 1px 3px rgba(0,0,0,0.3); }
-    .drx-tema-claro .drx-card:hover { box-shadow: 0 10px 26px rgba(11,61,46,0.1); border-color: #C7D6EA; }
-    .drx-tema-oscuro .drx-card:hover { box-shadow: 0 10px 30px rgba(0,0,0,0.5); border-color: #3A4A63; }
-    .drx-tab { transition: background .15s ease, color .15s ease, filter .15s ease, transform .15s ease; }
-    .drx-tab:hover { filter: brightness(1.45); transform: translateX(2px); }
-    .drx-tab:active { transform: translateX(2px) scale(0.98); }
-    .drx-input { transition: border-color .15s ease, box-shadow .15s ease; }
-    .drx-input:focus { border-color: ${COLORS.accentBright} !important; box-shadow: 0 0 0 3px ${COLORS.accentSoft}; }
+    .drx-tema-claro .drx-btn-ghost:hover { background: #F3F6F4; border-color: #C5CFCB; }
+    .drx-tema-oscuro .drx-btn-ghost:hover { background: #1A2524; border-color: #3A4A47; }
+    /* Tarjetas: borde fino + sombra en capas. Al pasar el mouse solo se
+       profundiza la sombra (ya no "saltan"), que se siente más sereno. */
+    .drx-card { transition: box-shadow .22s ease, border-color .22s ease; box-shadow: var(--drx-sombra-tarjeta); }
+    .drx-tema-claro .drx-card:hover { box-shadow: var(--drx-sombra-tarjeta-hover); border-color: #D2DAD6; }
+    .drx-tema-oscuro .drx-card:hover { box-shadow: var(--drx-sombra-tarjeta-hover); border-color: #34433F; }
+    .drx-tab { transition: background .16s ease, color .16s ease; }
+    .drx-tab:hover { background: rgba(255,255,255,0.07) !important; color: #FFFFFF !important; }
+    .drx-tab:active { transform: scale(0.985); }
+    .drx-input { transition: border-color .15s ease, box-shadow .15s ease, background .15s ease; }
+    .drx-input:hover { border-color: #C5CFCB; }
+    .drx-tema-oscuro .drx-input:hover { border-color: #3A4A47; }
+    .drx-input:focus { border-color: ${COLORS.navy} !important; box-shadow: 0 0 0 4px rgba(62,124,124,0.16); }
+    .drx-input::placeholder { color: var(--drx-muted); opacity: 0.75; }
+    select.drx-input { cursor: pointer; }
+    /* Barra superior tipo cristal: deja ver un poco lo que pasa por debajo. */
+    .drx-topbar { background: var(--drx-glass) !important; -webkit-backdrop-filter: saturate(160%) blur(14px); backdrop-filter: saturate(160%) blur(14px); }
+    .drx-serif { font-family: ${COLORS.serif}; }
+    .drx-enlace-lateral { transition: color .15s ease; }
+    .drx-enlace-lateral:hover { color: #FFFFFF !important; text-decoration: underline; }
+    .drx-kbd { font-family: Inter, sans-serif; font-size: 10.5px; font-weight: 700; color: var(--drx-muted); border: 1px solid var(--drx-border); border-bottom-width: 2px; border-radius: 6px; padding: 1px 6px; background: var(--drx-panel); }
     .drx-fila-funcion p:first-child { transition: color .2s ease; }
     .drx-fila-funcion:hover p:first-child { color: ${COLORS.accentBright} !important; }
     .drx-chip-vigilancia { transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease; }
@@ -164,7 +194,7 @@ export const GlobalStyle = () => (
     .drx-tema-oscuro input[type="date"]::-webkit-calendar-picker-indicator {
       filter: invert(70%) sepia(60%) saturate(400%) hue-rotate(70deg) brightness(1.1);
     }
-    .drx-btn-primary:hover { box-shadow: 0 6px 20px rgba(22,163,74,0.35); }
+    .drx-btn-primary:hover { box-shadow: 0 1px 0 rgba(255,255,255,0.16) inset, 0 10px 24px -8px rgba(40,87,85,0.6); }
     .drx-glow { position: relative; }
     .drx-glow > * { position: relative; z-index: 1; }
     .drx-tema-oscuro .drx-glow::before {
@@ -192,7 +222,6 @@ export const GlobalStyle = () => (
     @keyframes drx-campana { 0%, 100% { transform: rotate(0deg); } 20% { transform: rotate(-14deg); } 40% { transform: rotate(11deg); } 60% { transform: rotate(-7deg); } 80% { transform: rotate(4deg); } }
     .drx-campana-sonando svg { animation: drx-campana 0.6s ease-in-out; transform-origin: top center; }
     @keyframes drx-spin { to { transform: rotate(360deg); } }
-    .drx-card:hover { transform: translateY(-2px); }
     @keyframes drx-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
     @keyframes drx-mesh { 0%, 100% { transform: translate(0, 0) scale(1); } 50% { transform: translate(3%, -4%) scale(1.08); } }
     .drx-cta-shine { position: relative; overflow: hidden; }
@@ -233,8 +262,8 @@ export const GlobalStyle = () => (
     .drx-boton-tema { transition: background .15s ease, border-color .15s ease, transform .15s ease; }
     .drx-boton-tema:hover { transform: rotate(-12deg); }
     .drx-boton-tema:active { transform: scale(0.9); }
-    .drx-tema-claro .drx-boton-tema:hover { background: #EEF2F7; border-color: #B9C2CF; }
-    .drx-tema-oscuro .drx-boton-tema:hover { background: #232C39; border-color: #3A4657; }
+    .drx-tema-claro .drx-boton-tema:hover { background: #F3F6F4; border-color: #C5CFCB; }
+    .drx-tema-oscuro .drx-boton-tema:hover { background: #1A2524; border-color: #3A4A47; }
     @keyframes drx-icono-tema-in { from { opacity: 0; transform: rotate(-90deg) scale(0.5); } to { opacity: 1; transform: rotate(0) scale(1); } }
     .drx-boton-tema-icono { display: flex; animation: drx-icono-tema-in 0.35s cubic-bezier(0.16, 1, 0.3, 1); }
     /* Quien activó "reducir movimiento" en su celular o computador (por
@@ -302,7 +331,8 @@ export const GlobalStyle = () => (
         color: var(--drx-heading);
       }
       .drx-topbar { padding: 10px 12px !important; flex-wrap: wrap; row-gap: 8px !important; }
-      .drx-topbar > div:not(.drx-topbar-acciones) { order: 3; flex-basis: 100%; max-width: 100% !important; }
+      .drx-topbar > div:not(.drx-topbar-acciones):not(.drx-barra-progreso) { order: 3; flex: 1 1 100% !important; max-width: 100% !important; }
+      .drx-topbar-acciones { margin-left: auto; }
       .drx-topbar-acciones { gap: 6px !important; }
       .drx-oculta-movil { display: none !important; }
       .drx-content-area { padding: 14px 14px 28px !important; }
@@ -323,8 +353,8 @@ export function Field({ label, children }) {
 
 export const inputStyle = {
   border: `1px solid ${COLORS.border}`,
-  borderRadius: 8,
-  padding: "10px 12px",
+  borderRadius: 10,
+  padding: "11px 13px",
   fontSize: 14,
   fontFamily: "Inter, sans-serif",
   color: COLORS.ink,
@@ -468,16 +498,16 @@ export function BuscadorCliente({ opciones, value, onChange, placeholder = "Busc
 }
 
 export const buttonPrimary = {
-  background: `linear-gradient(135deg, #0F5540, ${COLORS.navy} 55%, ${COLORS.navyDeep})`,
+  background: "linear-gradient(180deg, #357673 0%, #275654 100%)",
   color: "#FFFFFF",
   border: "none",
-  borderRadius: 10,
+  borderRadius: 11,
   padding: "11px 20px",
   fontSize: 14,
-  fontWeight: 600,
+  fontWeight: 650,
   cursor: "pointer",
   fontFamily: "Inter, sans-serif",
-  boxShadow: "0 2px 8px rgba(11,61,46,0.22), inset 0 1px 0 rgba(255,255,255,0.08)",
+  boxShadow: "inset 0 1px 0 rgba(255,255,255,0.16), 0 1px 2px rgba(12,25,23,0.22), 0 8px 18px -10px rgba(40,87,85,0.6)",
   letterSpacing: 0.1,
 };
 
@@ -485,12 +515,13 @@ export const buttonGhost = {
   background: COLORS.panel,
   color: COLORS.ink,
   border: `1px solid ${COLORS.border}`,
-  borderRadius: 10,
+  borderRadius: 11,
   padding: "10px 18px",
   fontSize: 14,
-  fontWeight: 500,
+  fontWeight: 550,
   cursor: "pointer",
   fontFamily: "Inter, sans-serif",
+  boxShadow: "0 1px 2px rgba(12,25,23,0.05)",
 };
 
 export const navLinkStyle = {
@@ -515,8 +546,8 @@ export function Card({ children, style, ...resto }) {
       style={{
         background: COLORS.panel,
         border: `1px solid ${COLORS.border}`,
-        borderRadius: 14,
-        padding: 20,
+        borderRadius: 16,
+        padding: 22,
         ...style,
       }}
       {...resto}
@@ -525,6 +556,18 @@ export function Card({ children, style, ...resto }) {
     </div>
   );
 }
+
+// Tarjeta de indicador (cifra grande): fondo del panel, una línea fina del
+// color del indicador arriba y un velo muy suave de ese color. Antes cada
+// una tenía un fondo pastel distinto; así se leen como una sola familia.
+export function estiloIndicador(color) {
+  return {
+    background: `linear-gradient(${color}, ${color}) top / 100% 3px no-repeat, linear-gradient(180deg, ${color}14, ${color}00 64px), ${COLORS.panel}`,
+    padding: "20px 20px 18px",
+  };
+}
+export const etiquetaIndicador = { fontFamily: "Inter, sans-serif", fontSize: 11, fontWeight: 700, color: COLORS.muted, textTransform: "uppercase", letterSpacing: 0.9, margin: 0 };
+export const cifraIndicador = { fontFamily: "Inter, sans-serif", fontSize: 25, fontWeight: 750, letterSpacing: -0.7, color: COLORS.ink, margin: "6px 0 0", lineHeight: 1.15 };
 
 export function Spinner({ texto = "Cargando…" }) {
   return (
@@ -571,7 +614,7 @@ export function TexturaGrano() {
 // Número de versión que se sube a mano cada vez que se publica un cambio
 // importante — junto con la fecha del build, deja ver de un vistazo si el
 // navegador ya tiene la versión más nueva.
-export const APP_VERSION = "1.202.0";
+export const APP_VERSION = "1.203.0";
 
 export function EstadoBadge({ estado }) {
   const config = {
@@ -798,9 +841,9 @@ export function BotonTema({ oscuro, onClick }) {
       style={{
         background: "transparent",
         border: `1px solid ${COLORS.border}`,
-        borderRadius: 8,
-        width: 38,
-        height: 38,
+        borderRadius: 11,
+        width: 40,
+        height: 40,
         cursor: "pointer",
         display: "flex",
         alignItems: "center",
@@ -830,11 +873,11 @@ export const ICONOS_TAB = {
   antecedentes: "M3 5.5h14v9H3v-9Zm4 2.3a1.6 1.6 0 1 0 0 3.2 1.6 1.6 0 0 0 0-3.2ZM4.7 13.8c.3-1.5 1.3-2.3 2.3-2.3s2 .8 2.3 2.3M11.5 8.3h4M11.5 10.7h4M11.5 13.1h2.3",
 };
 
-export function IconoTab({ tipo }) {
+export function IconoTab({ tipo, size = 16 }) {
   const d = ICONOS_TAB[tipo];
   if (!d) return null;
   return (
-    <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <svg width={size} height={size} viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
       <path d={d} />
     </svg>
   );

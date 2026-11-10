@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { getNombreDespacho } from "../lib/storage";
+import { estiloIndicador, etiquetaIndicador, cifraIndicador } from "../ui/base.jsx";
 import {
   COLORS, formatoCOP, exportarCSV, buttonGhost, Card, EncabezadoSeccion, Icono, EstadoVacio,
   Spinner, GraficaBarras, GraficaBarrasAgrupadas, COLOR_AREA_PROCESO, COLOR_ESTADO_VIGILANCIA,
@@ -239,45 +240,45 @@ export default function ReportesTab({ onListo }) {
         </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, marginBottom: 20 }}>
-        <Card>
-          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, fontWeight: 700, color: COLORS.muted, textTransform: "uppercase", letterSpacing: 0.5, margin: 0 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 14, marginBottom: 22 }}>
+        <Card style={estiloIndicador("#14B8A6")}>
+          <p style={etiquetaIndicador}>
             Clientes activos
           </p>
-          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 24, fontWeight: 800, color: COLORS.ink, margin: "4px 0 0" }}>{listaClientes.length}</p>
+          <p style={cifraIndicador}>{listaClientes.length}</p>
         </Card>
-        <Card>
-          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, fontWeight: 700, color: COLORS.muted, textTransform: "uppercase", letterSpacing: 0.5, margin: 0 }}>
+        <Card style={estiloIndicador("#10B981")}>
+          <p style={etiquetaIndicador}>
             Ingreso este mes
           </p>
-          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 24, fontWeight: 800, color: "#166534", margin: "4px 0 0" }}>{formatoCOP(ingresoMesActual)}</p>
+          <p style={cifraIndicador}>{formatoCOP(ingresoMesActual)}</p>
           {cambioMensual !== null && (
             <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, fontWeight: 600, color: cambioMensual >= 0 ? "#166534" : "#B42318", margin: "3px 0 0" }}>
               {cambioMensual >= 0 ? "▲" : "▼"} {Math.abs(cambioMensual)}% vs. mes anterior
             </p>
           )}
         </Card>
-        <Card>
-          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, fontWeight: 700, color: COLORS.muted, textTransform: "uppercase", letterSpacing: 0.5, margin: 0 }}>
+        <Card style={estiloIndicador("#F43F5E")}>
+          <p style={etiquetaIndicador}>
             Egresos este mes
           </p>
-          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 24, fontWeight: 800, color: egresoMesActual > 0 ? "#B42318" : COLORS.ink, margin: "4px 0 0" }}>
+          <p style={{ ...cifraIndicador, color: egresoMesActual > 0 ? "#B42318" : COLORS.ink }}>
             {formatoCOP(egresoMesActual)}
           </p>
         </Card>
-        <Card>
-          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, fontWeight: 700, color: COLORS.muted, textTransform: "uppercase", letterSpacing: 0.5, margin: 0 }}>
+        <Card style={estiloIndicador("#3E7C7C")}>
+          <p style={etiquetaIndicador}>
             Neto este mes
           </p>
-          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 24, fontWeight: 800, color: netoMesActual >= 0 ? "#166534" : "#B42318", margin: "4px 0 0" }}>
+          <p style={{ ...cifraIndicador, color: netoMesActual >= 0 ? COLORS.ink : "#B42318" }}>
             {formatoCOP(netoMesActual)}
           </p>
         </Card>
-        <Card>
-          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 11.5, fontWeight: 700, color: COLORS.muted, textTransform: "uppercase", letterSpacing: 0.5, margin: 0 }}>
+        <Card style={estiloIndicador("#F5A524")}>
+          <p style={etiquetaIndicador}>
             Cartera pendiente
           </p>
-          <p style={{ fontFamily: "Inter, sans-serif", fontSize: 24, fontWeight: 800, color: carteraPendienteTotal > 0 ? "#B42318" : COLORS.ink, margin: "4px 0 0" }}>
+          <p style={{ ...cifraIndicador, color: carteraPendienteTotal > 0 ? "#B42318" : COLORS.ink }}>
             {formatoCOP(carteraPendienteTotal)}
           </p>
         </Card>
