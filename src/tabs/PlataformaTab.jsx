@@ -198,7 +198,13 @@ function PanelPagosDespacho({ despacho, pagos, onRegistrado, onEliminado }) {
       setValor("");
       setFecha(fechaHoyISO());
     } catch (e) {
-      setError(e.message);
+      // El mensaje crudo de la base ("Could not find the table ... in the
+      // schema cache") no le dice nada a quien lo lee: se traduce a qué hacer.
+      setError(
+        /plataforma_pagos|schema cache/i.test(e.message || "")
+          ? "Falta crear la tabla de pagos en la base de datos. En Supabase → SQL Editor, corre el archivo supabase/migraciones/2026-11-12-pagos-plataforma.sql y vuelve a intentar."
+          : e.message
+      );
     }
     setGuardando(false);
   };
